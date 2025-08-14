@@ -1,0 +1,23 @@
+name: Template Setup
+on:
+  push:
+    branches: [ main ]
+    
+jobs:
+  setup:
+    # Only run if this is NOT the template repo
+    if: github.run_number == 1 && github.repository != 'ethosengine/che-starter'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Replace template variables
+        run: |
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+          sed -i "s|{{GITHUB_REPO_URL}}|$REPO_URL|g" README.md
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git commit -m "Initialize from template" || exit 0
+          git push

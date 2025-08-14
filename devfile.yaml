@@ -1,0 +1,39 @@
+schemaVersion: 2.2.0
+metadata:
+  name: udi-plus-workspace
+  displayName: Che Image and Workspace Development
+  description: >-
+    Universal Developer Image provides various programming languages tools and
+    runtimes for instant coding, plus ai utilities
+  icon: >-
+    https://raw.githubusercontent.com/devfile/devfile-web/main/apps/landing-page/public/pwa-192x192.png
+  tags:
+    - Java
+    - Maven
+    - Scala
+    - PHP
+    - .NET
+    - Node.js
+    - Go
+    - Python
+    - Pip
+    - ubi9
+    - Claude
+  projectType: universal
+  language: Polyglot
+  version: 1.0.0
+  projects:
+  - name: che-devworkspaces
+    git:
+      remotes:
+        origin: https://github.com/ethosengine/che-devworkspaces.git
+components:
+  - name: tools
+    container:
+      image:  harbor.ethosengine.com/devspaces/udi-plus:ubi9-plus-latest
+      memoryLimit: 4G
+      memoryRequest: 1G
+      mountSources: true
+      env:
+        - name: CLAUDE_CONFIG_DIR
+          value: /tmp/claude-config
