@@ -30,10 +30,19 @@ metadata:
 components:
   - name: tools
     container:
-      image:  harbor.ethosengine.com/devspaces/udi-plus:ubi9-plus-latest
+      image:  harbor.ethosengine.com/devspaces/udi-plus-angular:ubi9-plus-angular-latest
       memoryLimit: 4G
       memoryRequest: 1G
       mountSources: true
       env:
         - name: CLAUDE_CONFIG_DIR
           value: /tmp/claude-config
+        - name: NPM_CONFIG_CACHE
+          value: /tmp/npm-cache
+        - name: NPM_CONFIG_PREFIX
+          value: /tmp/npm-global
+      endpoints:
+        - name: angular-dev
+          targetPort: 4200
+          exposure: public
+          protocol: http
