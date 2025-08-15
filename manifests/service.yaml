@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: elohim-site-service
+  namespace: ethosengine
+spec:
+  selector:
+    app: elohim-site
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP
