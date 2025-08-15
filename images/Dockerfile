@@ -21,7 +21,7 @@ RUN npm run build
 FROM nginx:alpine
 
 # Copy built application from builder stage
-COPY --from=builder /app/dist/elohim-app /usr/share/nginx/html
+COPY --from=builder /app/dist/elohim-app/browser /usr/share/nginx/html
 
 # Copy nginx configuration (optional - using default nginx config)
 # COPY nginx.conf /etc/nginx/nginx.conf
