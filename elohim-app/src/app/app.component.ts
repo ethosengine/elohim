@@ -29,6 +29,8 @@ export class AppComponent implements OnInit, OnDestroy {
   title = 'elohim-app';
   private scrollListener?: () => void;
   private intersectionObserver?: IntersectionObserver;
+  private rafId?: number;
+  private isScrolling = false;
 
   constructor(private el: ElementRef, private renderer: Renderer2) {}
 
@@ -46,28 +48,48 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.intersectionObserver) {
       this.intersectionObserver.disconnect();
     }
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+    }
   }
 
   private setupParallaxScrolling() {
     this.scrollListener = () => {
-      const scrolled = window.pageYOffset;
-      const parallaxLayers = this.el.nativeElement.querySelectorAll('.parallax-layer');
-      
-      parallaxLayers.forEach((layer: HTMLElement) => {
-        const speed = parseFloat(layer.dataset['speed'] || '0.5');
-        const yPos = -(scrolled * speed);
-        this.renderer.setStyle(layer, 'transform', `translateY(${yPos}px)`);
-      });
-
-      // Move orbs based on scroll
-      const orbs = this.el.nativeElement.querySelectorAll('.orb');
-      orbs.forEach((orb: HTMLElement, index: number) => {
-        const speed = 0.1 * (index + 1);
-        this.renderer.setStyle(orb, 'transform', `translateY(${scrolled * speed}px)`);
-      });
+      if (!this.isScrolling) {
+        this.isScrolling = true;
+        this.rafId = requestAnimationFrame(() => {
+          this.updateParallaxElements();
+          this.isScrolling = false;
+        });
+      }
     };
 
-    window.addEventListener('scroll', this.scrollListener);
+    window.addEventListener('scroll', this.scrollListener, { passive: true });
+  }
+
+  private updateParallaxElements() {
+    const scrolled = window.pageYOffset;
+    
+    // Update CSS custom property for parallax background
+    this.renderer.setStyle(
+      this.el.nativeElement.querySelector('.parallax-bg'), 
+      '--scroll-y', 
+      `${scrolled}px`
+    );
+    
+    const parallaxLayers = this.el.nativeElement.querySelectorAll('.parallax-layer');
+    parallaxLayers.forEach((layer: HTMLElement) => {
+      const speed = parseFloat(layer.dataset['speed'] || '0.5');
+      const yPos = -(scrolled * speed);
+      this.renderer.setStyle(layer, 'transform', `translate3d(0, ${yPos}px, 0)`);
+    });
+
+    // Move orbs based on scroll
+    const orbs = this.el.nativeElement.querySelectorAll('.orb');
+    orbs.forEach((orb: HTMLElement, index: number) => {
+      const speed = 0.1 * (index + 1);
+      this.renderer.setStyle(orb, 'transform', `translate3d(0, ${scrolled * speed}px, 0)`);
+    });
   }
 
   private setupIntersectionObserver() {
@@ -81,14 +103,12 @@ export class AppComponent implements OnInit, OnDestroy {
         if (entry.isIntersecting) {
           this.renderer.addClass(entry.target, 'visible');
           
-          // Stagger card animations
+          // Add visible class to all cards in card grid (CSS handles staggering)
           const cardGrid = entry.target.querySelector('.card-grid');
           if (cardGrid) {
             const cards = cardGrid.querySelectorAll('.card');
-            cards.forEach((card: Element, index: number) => {
-              setTimeout(() => {
-                this.renderer.addClass(card, 'visible');
-              }, index * 100);
+            cards.forEach((card: Element) => {
+              this.renderer.addClass(card, 'visible');
             });
           }
         }
