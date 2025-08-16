@@ -6,19 +6,20 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+ serviceAccount: jenkins-deployer
  nodeSelector:
     node-type: edge
  containers:
- - name: node
-   image: zenika/alpine-chrome:with-node
+ - name: builder
+   image: harbor.ethosengine.com/ethosengine/ci-builder:latest
    command:
    - cat
    tty: true
- - name: docker
-   image: docker:dind
-   command:
-   - cat
-   tty: true
+   resources:
+     requests:
+       ephemeral-storage: "1Gi"
+     limits:
+       ephemeral-storage: "2Gi"
    volumeMounts:
    - name: docker-sock
      mountPath: /var/run/docker.sock
@@ -34,9 +35,12 @@ spec:
 
         stage('Checkout') {
             steps {
-                container('node'){
+                container('builder'){
                     script {
-                        checkout scm      
+                        //scm checkout
+                        checkout([$class: 'GitSCM', 
+                                 branches: [[name: '*/main']], 
+                                 userRemoteConfigs: [[url: 'https://github.com/ethosengine/elohim.git']]])
                     }
                 }
             }
@@ -44,7 +48,7 @@ spec:
         
         stage('Install Dependencies') {
             steps {
-                container('node'){
+                container('builder'){
                     dir('elohim-app') {
                         script {
                             echo 'Installing npm dependencies'
@@ -57,7 +61,7 @@ spec:
         
         stage('Build') {
             steps {
-                container('node'){
+                container('builder'){
                     dir('elohim-app') {
                         script {
                             echo 'Building Angular application'
@@ -72,11 +76,33 @@ spec:
 
         stage('Test') {
             steps {
-                container('node'){
+                container('builder'){
                     dir('elohim-app') {
                         script {
-                            echo 'Running Angular tests'
-                            sh 'npm run test -- --watch=false --browsers=ChromeHeadless'
+                            echo 'Running Angular tests with coverage'
+                            sh 'npm run test -- --watch=false --browsers=ChromeHeadless --code-coverage'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                container('builder'){
+                    dir('elohim-app') {
+                        script {
+                            withSonarQubeEnv('ee-sonarqube') {
+                                sh '''
+                                sonar-scanner \
+                                    -Dsonar.projectKey=elohim-app \
+                                    -Dsonar.sources=src \
+                                    -Dsonar.tests=src \
+                                    -Dsonar.test.inclusions=**/*.spec.ts \
+                                    -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                                '''
+                            }
                         }
                     }
                 }
@@ -85,12 +111,171 @@ spec:
 
         stage('Build Docker Image') {
             steps {
-                container('docker'){
+                container('builder'){
                     script {
-                        echo 'Building Docker image'
+                        echo 'Starting Docker daemon and building image'
+                        sh 'dockerd &'
+                        sh 'sleep 10'  // Wait for Docker daemon to start
                         sh 'docker build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
                         sh 'docker tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
                         echo 'Docker image built successfully'
+                    }
+                }
+            }
+        }
+
+        stage('Push to Harbor Registry') {
+            steps {
+                container('builder'){
+                    script {
+                        withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                            echo 'Logging into Harbor registry'
+                            sh 'echo $HARBOR_PASSWORD | docker login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
+                            
+                            echo 'Tagging image for Harbor registry'
+                            sh 'docker tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
+                            sh 'docker tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            
+                            echo 'Pushing images to Harbor registry'
+                            sh 'docker push harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
+                            sh 'docker push harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            
+                            echo 'Successfully pushed to Harbor registry'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Harbor Security Scan') {
+            steps {
+                container('builder'){
+                    script {
+                        withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                            echo 'Triggering Harbor vulnerability scan'
+                            
+                            // Trigger scan via Harbor API using wget with basic auth
+                            sh '''
+                                AUTH_HEADER="Authorization: Basic $(echo -n "$HARBOR_USERNAME:$HARBOR_PASSWORD" | base64)"
+                                echo "Triggering scan for artifact: ${BUILD_NUMBER}"
+                                wget --post-data="" \
+                                  --header="accept: application/json" \
+                                  --header="Content-Type: application/json" \
+                                  --header="$AUTH_HEADER" \
+                                  -S \
+                                  -O- \
+                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${BUILD_NUMBER}/scan" || \
+                                echo "Scan request failed - check error response above"
+                            '''
+                            
+                            echo 'Vulnerability scan initiated. Polling for completion...'
+                            
+                            // Poll for scan completion with smart retry logic
+                            sh '''
+                                AUTH_HEADER="Authorization: Basic $(echo -n "$HARBOR_USERNAME:$HARBOR_PASSWORD" | base64)"
+                                
+                                # Polling configuration
+                                MAX_ATTEMPTS=24  # 24 attempts = 4 minutes max
+                                ATTEMPT=1
+                                POLL_INTERVAL=10  # 10 seconds between polls
+                                
+                                echo "Polling for scan completion (max ${MAX_ATTEMPTS} attempts, ${POLL_INTERVAL}s intervals)..."
+                                
+                                while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                                    echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking scan status..."
+                                    
+                                    VULN_DATA=$(wget -q -O- \
+                                      --header="accept: application/json" \
+                                      --header="$AUTH_HEADER" \
+                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${BUILD_NUMBER}/additions/vulnerabilities" 2>/dev/null || echo "")
+                                    
+                                    # Check if we got valid scan data (not empty and contains scanner info)
+                                    if [ ! -z "$VULN_DATA" ] && echo "$VULN_DATA" | grep -q '"scanner"'; then
+                                        echo "✅ Scan completed after $ATTEMPT attempts!"
+                                        break
+                                    fi
+                                    
+                                    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+                                        echo "❌ Scan did not complete within timeout period"
+                                        echo "Last response: $VULN_DATA"
+                                        VULN_DATA=""  # Clear data to trigger fallback message
+                                        break
+                                    fi
+                                    
+                                    echo "Scan not ready yet, waiting ${POLL_INTERVAL}s..."
+                                    sleep $POLL_INTERVAL
+                                    ATTEMPT=$((ATTEMPT + 1))
+                                done
+                                
+                                if [ ! -z "$VULN_DATA" ]; then
+                                    echo "Vulnerability scan completed successfully!"
+                                    
+                                    # Extract scanner info
+                                    SCANNER=$(echo "$VULN_DATA" | grep -o '"scanner":{"name":"[^"]*","vendor":"[^"]*","version":"[^"]*"}' || echo "Scanner info not found")
+                                    echo "Scanner: $SCANNER"
+                                    
+                                    # Extract generated timestamp
+                                    GENERATED=$(echo "$VULN_DATA" | grep -o '"generated_at":"[^"]*"' || echo "Timestamp not found")
+                                    echo "Generated: $GENERATED"
+                                    
+                                    # Count vulnerabilities
+                                    VULN_COUNT=$(echo "$VULN_DATA" | grep -o '"vulnerabilities":\\[.*\\]' | grep -o '\\[.*\\]' | tr ',' '\\n' | wc -l)
+                                    if echo "$VULN_DATA" | grep -q '"vulnerabilities":\\[\\]'; then
+                                        echo "✅ Security Status: CLEAN - No vulnerabilities found!"
+                                    else
+                                        echo "⚠️  Security Status: $VULN_COUNT vulnerabilities detected"
+                                        echo "Raw vulnerability data:"
+                                        echo "$VULN_DATA" | head -c 1000
+                                    fi
+                                else
+                                    echo "No vulnerability data available yet. Scan may still be running."
+                                    echo "Check Harbor UI for scan progress: https://harbor.ethosengine.com"
+                                fi
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('builder'){
+                    script {
+                        echo 'Deploying to Kubernetes cluster'
+                        
+                        // Update image tag in deployment manifest
+                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUMBER}/g' manifests/deployment.yaml > manifests/deployment-${BUILD_NUMBER}.yaml"
+                        
+                        // Apply the manifests
+                        sh 'kubectl apply -f manifests/deployment-${BUILD_NUMBER}.yaml'
+                        sh 'kubectl apply -f manifests/service.yaml'
+                        
+                        // Wait for deployment to be ready
+                        sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
+                        
+                        // Show deployment status
+                        sh 'kubectl get deployments,services,pods -l app=elohim-site -n ethosengine'
+                        
+                        echo 'Deployment completed successfully!'
+                    }
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                container('builder'){
+                    script {
+                        echo 'Cleaning up to save space'
+                        dir('elohim-app') {
+                            sh 'rm -rf node_modules || true'
+                        }
+                        sh 'docker rmi elohim-app:${BUILD_NUMBER} || true'
+                        sh 'docker rmi elohim-app:latest || true'
+                        sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER} || true'
+                        sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
+                        sh 'docker system prune -f || true'
                     }
                 }
             }
@@ -106,23 +291,7 @@ spec:
             echo 'Pipeline failed. Check the logs for details.'
         }
         always {
-            container('node'){
-                dir('elohim-app') {
-                    script {
-                        // Clean up node_modules to save space
-                        sh 'rm -rf node_modules || true'
-                    }
-                }
-            }
-            container('docker'){
-                script {
-                    // Clean up local Docker images to save space
-                    echo 'Cleaning up Docker images'
-                    sh 'docker rmi elohim-app:${BUILD_NUMBER} || true'
-                    sh 'docker rmi elohim-app:latest || true'
-                    sh 'docker system prune -f || true'
-                }
-            }
+            echo 'Pipeline cleanup was handled in the Cleanup stage.'
         }
     }
 }
