@@ -36,6 +36,19 @@ ng build
 
 This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
 
+## Configuration
+
+The application uses runtime configuration loaded from `/assets/config.json`. Available configurations:
+
+- `logLevel`: `'debug' | 'info' | 'error'` - Controls application logging level
+- `environment`: `'development' | 'staging' | 'production'` - Deployment environment identifier
+
+In Kubernetes deployments, configuration is provided via ConfigMaps:
+- `elohim-config-staging` - Staging environment config
+- `elohim-config-prod` - Production environment config
+
+Local development uses the config file at `public/config.json`.
+
 ## Running unit tests
 
 To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:

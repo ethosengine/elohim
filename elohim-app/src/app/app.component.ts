@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
+import { HttpClientModule } from '@angular/common/http';
 import { HeroComponent } from './components/hero/hero.component';
 import { CrisisComponent } from './components/crisis/crisis.component';
 import { VisionComponent } from './components/vision/vision.component';
@@ -8,10 +9,14 @@ import { LearningSuccessComponent } from './components/learning-success/learning
 import { PathForwardComponent } from './components/path-forward/path-forward.component';
 import { CallToActionComponent } from './components/call-to-action/call-to-action.component';
 import { FooterComponent } from './components/footer/footer.component';
+import { DebugBarComponent } from './components/debug-bar/debug-bar.component';
+import { ConfigService } from './services/config.service';
 
 @Component({
   selector: 'app-root',
   imports: [
+    HttpClientModule,
+    DebugBarComponent,
     HeroComponent,
     CrisisComponent,
     VisionComponent,
@@ -32,13 +37,15 @@ export class AppComponent implements OnInit, OnDestroy {
   private rafId?: number;
   private isScrolling = false;
 
-  constructor(private el: ElementRef, private renderer: Renderer2) {}
+  constructor(private el: ElementRef, private renderer: Renderer2, private configService: ConfigService) {}
 
   ngOnInit() {
-    this.setupParallaxScrolling();
-    this.setupIntersectionObserver();
-    this.setupScrollIndicator();
-    this.setupHeroTitleInteraction();
+    this.configService.loadConfig().then(() => {
+      this.setupParallaxScrolling();
+      this.setupIntersectionObserver();
+      this.setupScrollIndicator();
+      this.setupHeroTitleInteraction();
+    });
   }
 
   ngOnDestroy() {
