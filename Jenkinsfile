@@ -238,26 +238,70 @@ spec:
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Stage Deploy') {
             steps {
                 container('builder'){
                     script {
-                        echo 'Deploying to Kubernetes cluster'
+                        echo 'Deploying to Staging Environment'
+                        
+                        // Validate staging dependencies exist
+                        sh '''
+                            echo "Validating staging ConfigMap exists..."
+                            kubectl get configmap elohim-config-staging -n ethosengine || {
+                                echo "❌ ERROR: elohim-config-staging ConfigMap missing"
+                                echo "Run: kubectl apply -f manifests/configmap-staging.yaml"
+                                exit 1
+                            }
+                            echo "✅ Staging ConfigMap validated"
+                        '''
                         
                         // Update image tag in deployment manifest
                         sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUMBER}/g' manifests/deployment.yaml > manifests/deployment-${BUILD_NUMBER}.yaml"
                         
-                        // Apply the manifests
+                        // Deploy staging only
                         sh 'kubectl apply -f manifests/deployment-${BUILD_NUMBER}.yaml'
-                        sh 'kubectl apply -f manifests/service.yaml'
                         
-                        // Wait for deployment to be ready
+                        // Wait for staging deployment to be ready
+                        sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
+                        
+                        // Show staging deployment status
+                        sh 'kubectl get deployments,services,pods -l app=elohim-site-staging -n ethosengine'
+                        
+                        echo 'Staging deployment completed successfully!'
+                        echo 'Staging URL: https://staging.elohim.host'
+                    }
+                }
+            }
+        }
+
+        stage('Prod Deploy') {
+            steps {
+                container('builder'){
+                    script {
+                        echo 'Deploying to Production Environment'
+                        
+                        // Validate production dependencies exist
+                        sh '''
+                            echo "Validating production ConfigMap exists..."
+                            kubectl get configmap elohim-config-prod -n ethosengine || {
+                                echo "❌ ERROR: elohim-config-prod ConfigMap missing"
+                                echo "Run: kubectl apply -f manifests/configmap-prod.yaml"
+                                exit 1
+                            }
+                            echo "✅ Production ConfigMap validated"
+                        '''
+                        
+                        // Deploy production (using same deployment file)
+                        sh 'kubectl apply -f manifests/deployment-${BUILD_NUMBER}.yaml'
+                        
+                        // Wait for production deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
                         
-                        // Show deployment status
+                        // Show production deployment status
                         sh 'kubectl get deployments,services,pods -l app=elohim-site -n ethosengine'
                         
-                        echo 'Deployment completed successfully!'
+                        echo 'Production deployment completed successfully!'
+                        echo 'Production URL: https://elohim.host'
                     }
                 }
             }

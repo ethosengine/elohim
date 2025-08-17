@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elohim-config-staging
+  namespace: default
+data:
+  config.json: |
+    {
+      "logLevel": "info",
+      "environment": "staging"
+    }

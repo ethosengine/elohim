@@ -1,0 +1,27 @@
+.debug-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #ff6b35;
+  color: white;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.debug-label {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-right: 12px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.debug-info {
+  font-size: 13px;
+}
