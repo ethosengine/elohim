@@ -113,9 +113,7 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        echo 'Starting Docker daemon and building image'
-                        sh 'dockerd &'
-                        sh 'sleep 20'  // Wait for Docker daemon to start
+                        echo 'Building Docker image using host daemon'
                         sh 'docker build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
                         sh 'docker tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
                         echo 'Docker image built successfully'
