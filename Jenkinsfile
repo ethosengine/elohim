@@ -114,6 +114,17 @@ spec:
                 container('builder'){
                     script {
                         echo 'Building Docker image using host daemon'
+                        
+                        // Debug Docker socket and permissions
+                        sh '''
+                            echo "Checking Docker socket..."
+                            ls -la /var/run/docker.sock || echo "Socket not found"
+                            ls -la /var/run/ | grep docker || echo "No docker files in /var/run"
+                            whoami
+                            groups
+                        '''
+                        
+                        sh 'docker version || echo "Docker command failed"'
                         sh 'docker build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
                         sh 'docker tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
                         echo 'Docker image built successfully'
