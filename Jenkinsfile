@@ -115,7 +115,7 @@ spec:
                     script {
                         echo 'Starting Docker daemon and building image'
                         sh 'dockerd &'
-                        sh 'sleep 10'  // Wait for Docker daemon to start
+                        sh 'sleep 20'  // Wait for Docker daemon to start
                         sh 'docker build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
                         sh 'docker tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
                         echo 'Docker image built successfully'
