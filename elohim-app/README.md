@@ -7,7 +7,13 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 To start a local development server, run:
 
 ```bash
-ng serve
+npm start
+```
+
+To start with staging configuration (enables debug-bar and other staging features):
+
+```bash
+npm run start:staging
 ```
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
@@ -43,11 +49,22 @@ The application uses runtime configuration loaded from `/assets/config.json`. Av
 - `logLevel`: `'debug' | 'info' | 'error'` - Controls application logging level
 - `environment`: `'development' | 'staging' | 'production'` - Deployment environment identifier
 
+### Local Development Configuration
+
+Local development uses Angular environment files in `src/environments/`:
+- `environment.ts` - Default development configuration
+- `environment.staging.ts` - Staging configuration (enables debug-bar)
+- `environment.prod.ts` - Production configuration
+
+Use `npm run start:staging` to run locally with staging features enabled.
+
+### Deployment Configuration
+
 In Kubernetes deployments, configuration is provided via ConfigMaps:
 - `elohim-config-staging` - Staging environment config
 - `elohim-config-prod` - Production environment config
 
-Local development uses the config file at `public/config.json`.
+Production builds load configuration from `/assets/config.json` which is mounted from ConfigMaps.
 
 ## Running unit tests
 

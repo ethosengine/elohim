@@ -97,6 +97,9 @@
             },
             "development": {
               "buildTarget": "elohim-app:build:development"
+            },
+            "staging": {
+              "buildTarget": "elohim-app:build:staging"
             }
           },
           "defaultConfiguration": "development"
