@@ -21,12 +21,12 @@ spec:
      limits:
        ephemeral-storage: "2Gi"
    volumeMounts:
-   - name: docker-sock
-     mountPath: /var/run/docker.sock
+   - name: containerd-sock
+     mountPath: /run/containerd/containerd.sock
  volumes:
-  - name: docker-sock
+  - name: containerd-sock
     hostPath:
-     path: /var/run/docker.sock
+     path: /run/containerd/containerd.sock
      type: Socket
 '''
         }
@@ -114,22 +114,21 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        echo 'Building Docker image using host daemon'
+                        echo 'Building container image using containerd'
                         
-                        // Debug Docker socket and permissions
+                        // Debug containerd socket and permissions
                         sh '''
-                            echo "Checking Docker socket..."
-                            ls -la /var/run/docker.sock || echo "Socket not found"
-                            ls -la /var/run/ | grep docker || echo "No docker files in /var/run"
+                            echo "Checking containerd socket..."
+                            ls -la /run/containerd/containerd.sock || echo "Socket not found"
                             whoami
                             groups
                         '''
                         
-                        sh 'docker version || echo "Docker command failed"'
-                        sh 'docker build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
-                        sh 'docker tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
+                        sh 'nerdctl version || echo "nerdctl command failed"'
+                        sh 'nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
+                        sh 'nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
                         env.DOCKER_BUILD_COMPLETED = 'true'
-                        echo 'Docker image built successfully'
+                        echo 'Container image built successfully'
                     }
                 }
             }
@@ -141,15 +140,15 @@ spec:
                     script {
                         withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                             echo 'Logging into Harbor registry'
-                            sh 'echo $HARBOR_PASSWORD | docker login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
+                            sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
                             
                             echo 'Tagging image for Harbor registry'
-                            sh 'docker tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
-                            sh 'docker tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            sh 'nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
+                            sh 'nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:latest'
                             
                             echo 'Pushing images to Harbor registry'
-                            sh 'docker push harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
-                            sh 'docker push harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
+                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest'
                             
                             echo 'Successfully pushed to Harbor registry'
                         }
@@ -345,19 +344,19 @@ spec:
                 if (env.DOCKER_BUILD_COMPLETED == 'true') {
                     try {
                         container('builder') {
-                            echo 'Cleaning up Docker images...'
-                            sh 'docker rmi elohim-app:${BUILD_NUMBER} || true'
-                            sh 'docker rmi elohim-app:latest || true'
-                            sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER} || true'
-                            sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
-                            sh 'docker system prune -af --volumes || true'
-                            echo 'Docker cleanup completed.'
+                            echo 'Cleaning up nerdctl images...'
+                            sh 'nerdctl -n k8s.io rmi elohim-app:${BUILD_NUMBER} || true'
+                            sh 'nerdctl -n k8s.io rmi elohim-app:latest || true'
+                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER} || true'
+                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
+                            sh 'nerdctl -n k8s.io system prune -af --volumes || true'
+                            echo 'nerdctl cleanup completed.'
                         }
                     } catch (Exception e) {
-                        echo "Docker cleanup failed: ${e.message}"
+                        echo "nerdctl cleanup failed: ${e.message}"
                     }
                 } else {
-                    echo 'Docker build was not completed, skipping Docker cleanup.'
+                    echo 'Build was not completed, skipping image cleanup.'
                 }
             }
         }
