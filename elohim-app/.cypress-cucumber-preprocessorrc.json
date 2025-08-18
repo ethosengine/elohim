@@ -1,12 +1,14 @@
 {
   "json": {
-    "enabled": false
+    "enabled": true,
+    "output": "cypress/reports/cucumber-report.json"
   },
   "messages": {
     "enabled": false
   },
   "html": {
-    "enabled": false
+    "enabled": true,
+    "output": "cypress/reports/cucumber-report.html"
   },
   "stepDefinitions": [
     "cypress/e2e/step_definitions/**/*.js"
