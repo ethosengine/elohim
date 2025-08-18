@@ -309,6 +309,75 @@ spec:
             }
         }
 
+        stage('E2E Testing - Staging Validation') {
+            steps {
+                container('builder'){
+                    dir('elohim-app') {
+                        script {
+                            echo 'Running E2E tests to validate staging deployment'
+                            
+                            // Install E2E test dependencies if not already cached
+                            sh '''
+                                if [ ! -d "node_modules/cypress" ]; then
+                                    echo "Installing Cypress and dependencies..."
+                                    npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+                                else
+                                    echo "Cypress dependencies already installed"
+                                fi
+                            '''
+                            
+                            // Verify staging endpoint is responding
+                            sh '''
+                                echo "Verifying staging endpoint is accessible..."
+                                timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do 
+                                    echo "Waiting for staging site to respond..."
+                                    sleep 5
+                                done'
+                                echo "✅ Staging site is responding"
+                            '''
+                            
+                            // Run Cypress E2E tests against staging with explicit environment targeting
+                            sh '''
+                                export CYPRESS_baseUrl=https://staging.elohim.host
+                                export CYPRESS_ENV=staging
+                                echo "Running E2E tests against: $CYPRESS_baseUrl"
+                                
+                                npx cypress run \
+                                    --headless \
+                                    --browser chrome \
+                                    --spec "cypress/e2e/staging-validation.feature" \
+                                    --reporter spec \
+                                    --reporter-options "verbose=true"
+                            '''
+                            
+                            echo '✅ Staging validation tests passed successfully!'
+                            echo 'Staging site is ready for production deployment'
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    dir('elohim-app') {
+                        // Archive test artifacts if they exist
+                        script {
+                            sh 'ls -la cypress/ || true'
+                            if (fileExists('cypress/screenshots')) {
+                                archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
+                            }
+                            if (fileExists('cypress/videos')) {
+                                archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+                            }
+                        }
+                    }
+                }
+                failure {
+                    echo '❌ E2E tests failed - staging deployment validation unsuccessful'
+                    echo 'Check test artifacts and logs for details'
+                }
+            }
+        }
+
         stage('Prod Deploy') {
             steps {
                 container('builder'){

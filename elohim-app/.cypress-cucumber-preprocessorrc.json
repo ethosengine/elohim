@@ -1,0 +1,14 @@
+{
+  "json": {
+    "enabled": false
+  },
+  "messages": {
+    "enabled": false
+  },
+  "html": {
+    "enabled": false
+  },
+  "stepDefinitions": [
+    "cypress/e2e/step_definitions/**/*.js"
+  ]
+}
