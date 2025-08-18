@@ -8,7 +8,7 @@ kind: Pod
 spec:
  serviceAccount: jenkins-deployer
  nodeSelector:
-    node-type: edge
+    node-type: operations
  containers:
  - name: builder
    image: harbor.ethosengine.com/ethosengine/ci-builder:latest
