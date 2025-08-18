@@ -26,7 +26,7 @@ spec:
      requests:
        ephemeral-storage: "1Gi"
      limits:
-       ephemeral-storage: "2Gi"
+       ephemeral-storage: "2.5Gi"
    volumeMounts:
    - name: containerd-sock
      mountPath: /run/containerd/containerd.sock
