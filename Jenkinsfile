@@ -39,9 +39,8 @@ spec:
    args:
    - --addr
    - unix:///run/buildkit/buildkitd.sock
-   - --oci-worker=false
-   - --containerd-worker=true
-   - --containerd-worker-namespace=k8s.io
+   - --oci-worker=true
+   - --containerd-worker=false
    volumeMounts:
    - name: containerd-sock
      mountPath: /run/containerd/containerd.sock
