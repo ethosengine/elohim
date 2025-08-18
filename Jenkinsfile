@@ -138,6 +138,14 @@ spec:
                         sh '''
                             set -euxo pipefail
 
+                            echo "Build context debug:"
+                            pwd
+                            ls -la
+                            echo "Checking elohim-app directory:"
+                            ls -la elohim-app/ || echo "elohim-app directory not found"
+                            echo "Checking images directory:"
+                            ls -la images/ || echo "images directory not found"
+
                             echo "Sockets available:"
                             ls -l /run/containerd/containerd.sock
                             ls -l /run/buildkit/buildkitd.sock
