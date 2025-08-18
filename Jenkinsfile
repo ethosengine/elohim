@@ -26,7 +26,7 @@ spec:
  volumes:
   - name: containerd-sock
     hostPath:
-     path: /run/containerd/containerd.sock
+     path: /var/snap/microk8s/common/run/containerd.sock
      type: Socket
 '''
         }
@@ -120,6 +120,8 @@ spec:
                         sh '''
                             echo "Checking containerd socket..."
                             ls -la /run/containerd/containerd.sock || echo "Socket not found"
+                            echo "Checking MicroK8s socket on host..."
+                            ls -la /var/snap/microk8s/common/run/containerd.sock || echo "Host socket not found"
                             whoami
                             groups
                         '''
