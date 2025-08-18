@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: elohim-config-staging
-  namespace: default
+  namespace: ethosengine
 data:
   config.json: |
     {
