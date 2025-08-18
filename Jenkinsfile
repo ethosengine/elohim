@@ -351,7 +351,7 @@ spec:
                                 echo "Running E2E tests..."
                                 npx cypress run \
                                     --headless \
-                                    --browser chrome \
+                                    --browser chromium \
                                     --spec "cypress/e2e/staging-validation.feature"
                                 
                                 echo "DEBUG: Checking for reports after test execution..."
