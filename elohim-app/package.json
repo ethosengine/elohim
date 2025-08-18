@@ -43,5 +43,18 @@
     "cypress": "^13.15.2",
     "@badeball/cypress-cucumber-preprocessor": "^22.1.0",
     "@cypress/browserify-preprocessor": "^3.0.2"
+  },
+  "cypress-cucumber-preprocessor": {
+    "json": {
+      "enabled": true,
+      "output": "cypress/reports/cucumber-report.json"
+    },
+    "html": {
+      "enabled": true,
+      "output": "cypress/reports/cucumber-report.html"
+    },
+    "stepDefinitions": [
+      "cypress/e2e/step_definitions/**/*.js"
+    ]
   }
 }
