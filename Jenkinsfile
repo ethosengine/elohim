@@ -134,7 +134,7 @@ spec:
                     script {
                         echo 'Building container image using containerd'
                         
-                        sh '''
+                        sh '''#!/bin/bash
                             set -euxo pipefail
 
                             echo "Verifying BuildKit is ready..."
@@ -206,7 +206,7 @@ spec:
                             echo 'Vulnerability scan initiated. Polling for completion...'
                             
                             // Poll for scan completion with smart retry logic
-                            sh '''
+                            sh '''#!/bin/bash
                                 AUTH_HEADER="Authorization: Basic $(echo -n "$HARBOR_USERNAME:$HARBOR_PASSWORD" | base64)"
                                 
                                 # Polling configuration
@@ -327,7 +327,7 @@ spec:
                             '''
                             
                             // Verify staging endpoint is responding
-                            sh '''
+                            sh '''#!/bin/bash
                                 echo "Verifying staging endpoint is accessible..."
                                 timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do 
                                     echo "Waiting for staging site to respond..."
@@ -337,7 +337,7 @@ spec:
                             '''
                             
                             // Run Cypress E2E tests against staging with explicit environment targeting
-                            sh '''
+                            sh '''#!/bin/bash
                                 export CYPRESS_baseUrl=https://staging.elohim.host
                                 export CYPRESS_ENV=staging
                                 export NO_COLOR=1
