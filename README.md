@@ -1,5 +1,7 @@
 # Elohim Protocol
 
+[![Contribute](https://www.eclipse.org/che/contribute.svg)](https://code.ethosengine.com/#https://github.com/ethosengine/elohim) [![Build Status](https://jenkins.ethosengine.com/buildStatus/icon?job=elohim.host)](https://jenkins.ethosengine.com/job/elohim.host/) [![Quality Gate Status](https://sonarqube.ethosengine.com/api/project_badges/measure?project=elohim-app&metric=alert_status&token=sqb_3f2231b51de20f12dbf9974b5d17c7ceafeca988)](https://sonarqube.ethosengine.com/dashboard?id=elohim-app)
+
 A manifesto for digital infrastructure organized around love - demonstrating how technology can serve human flourishing through distributed architecture and autonomous AI guardians.
 
 ## About
