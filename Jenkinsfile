@@ -340,14 +340,59 @@ spec:
                             sh '''
                                 export CYPRESS_baseUrl=https://staging.elohim.host
                                 export CYPRESS_ENV=staging
+                                export DEBUG=cypress:*
+                                export NO_COLOR=1
+                                export DISPLAY=:99
                                 echo "Running E2E tests against: $CYPRESS_baseUrl"
                                 
+                                # Start Xvfb manually
+                                echo "Starting Xvfb display server..."
+                                Xvfb :99 -screen 0 1024x768x24 -ac &
+                                XVFB_PID=$!
+                                sleep 2
+                                
+                                # Check system requirements and Cypress installation
+                                echo "=== SYSTEM DIAGNOSTICS ==="
+                                uname -a
+                                whoami
+                                pwd
+                                ls -la
+                                
+                                echo "=== CYPRESS DIAGNOSTICS ==="
+                                npx cypress cache path || echo "Cache path failed"
+                                npx cypress cache list || echo "Cache list failed" 
+                                npx cypress info || echo "Cypress info failed"
+                                npx cypress verify || echo "Cypress verify failed"
+                                
+                                echo "=== DISPLAY AND X11 DIAGNOSTICS ==="
+                                echo "DISPLAY=$DISPLAY"
+                                ps aux | grep -i xvfb || echo "No Xvfb processes found"
+                                xdpyinfo -display :99 || echo "xdpyinfo failed"
+                                
+                                echo "=== CHROME DIAGNOSTICS ==="
+                                which chromium-browser || echo "chromium-browser not found"
+                                which chromium-browser-wrapper || echo "chromium-browser-wrapper not found"
+                                chromium-browser-wrapper --version || echo "Chrome version check failed"
+                                
+                                echo "=== ATTEMPTING CYPRESS INSTALL ==="
+                                npx cypress install || echo "Manual install failed"
+                                
+                                echo "=== RUNNING CYPRESS ==="
                                 npx cypress run \
                                     --headless \
                                     --browser chrome \
                                     --spec "cypress/e2e/staging-validation.feature" \
                                     --reporter spec \
-                                    --reporter-options "verbose=true"
+                                    --reporter-options "verbose=true" || {
+                                    echo "=== CYPRESS FAILED - ADDITIONAL DEBUG ==="
+                                    ls -la /root/.cache/Cypress/ || echo "No Cypress cache found"
+                                    find /root -name "Cypress" -type d 2>/dev/null || echo "No Cypress directories found"
+                                    echo "=== END DEBUG ==="
+                                    exit 1
+                                }
+                                
+                                # Kill Xvfb
+                                kill $XVFB_PID || echo "Failed to kill Xvfb"
                             '''
                             
                             echo '✅ Staging validation tests passed successfully!'
