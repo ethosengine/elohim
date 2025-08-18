@@ -349,10 +349,16 @@ spec:
                                 npm list | grep cucumber || echo "No cucumber packages found"
                                 
                                 echo "Running E2E tests..."
-                                npx cypress run \
+                                if npx cypress run \
                                     --headless \
                                     --browser chromium \
-                                    --spec "cypress/e2e/staging-validation.feature"
+                                    --spec "cypress/e2e/staging-validation.feature"; then
+                                    echo "✅ E2E tests passed successfully!"
+                                    TEST_RESULT="passed"
+                                else
+                                    echo "❌ E2E tests failed!"
+                                    TEST_RESULT="failed"
+                                fi
                                 
                                 echo "DEBUG: Checking for reports after test execution..."
                                 ls -la cypress/reports/ 2>/dev/null || echo "No reports directory found after test"
@@ -360,6 +366,11 @@ spec:
                                 
                                 # Cleanup
                                 kill $XVFB_PID 2>/dev/null || true
+                                
+                                # Exit with appropriate code
+                                if [ "$TEST_RESULT" = "failed" ]; then
+                                    exit 1
+                                fi
                             '''
                             
                             echo '✅ Staging validation tests passed successfully!'
@@ -386,19 +397,22 @@ spec:
                             sh 'echo "DEBUG: Searching for cucumber files:"'
                             sh 'find . -name "*cucumber*" -type f 2>/dev/null || echo "No cucumber files found"'
                             
-                            // Publish cucumber reports if they exist
+                            // Publish cucumber reports using cucumber plugin
                             if (fileExists('cypress/reports/cucumber-report.json')) {
-                                publishHTML([
-                                    allowMissing: false,
-                                    alwaysLinkToLastBuild: true,
-                                    keepAll: true,
-                                    reportDir: 'cypress/reports',
-                                    reportFiles: 'cucumber-report.html',
-                                    reportName: 'Cucumber E2E Test Report',
-                                    reportTitles: 'E2E Test Results'
+                                cucumber([
+                                    reportTitle: 'E2E Test Results',
+                                    fileIncludePattern: 'cypress/reports/cucumber-report.json',
+                                    jsonReportDirectory: 'cypress/reports',
+                                    buildStatus: 'UNSTABLE',
+                                    failedFeaturesNumber: -1,
+                                    failedScenariosNumber: -1,
+                                    failedStepsNumber: -1,
+                                    skippedStepsNumber: -1,
+                                    pendingStepsNumber: -1,
+                                    undefinedStepsNumber: -1
                                 ])
                                 archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
-                                echo 'Cucumber reports published successfully'
+                                echo 'Cucumber reports published successfully with cucumber plugin'
                             } else {
                                 echo 'No cucumber reports found to publish'
                             }
