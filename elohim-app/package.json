@@ -7,7 +7,13 @@
     "start:staging": "ng serve --disable-host-check --configuration=staging",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "e2e:local": "cypress run --env baseUrl=http://localhost:4200",
+    "e2e:dev": "cypress open --env baseUrl=http://localhost:4200",
+    "e2e:staging": "CYPRESS_baseUrl=https://staging.elohim.host cypress run",
+    "e2e:preview": "cypress run"
   },
   "private": true,
   "dependencies": {
@@ -33,6 +39,9 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "cypress": "^13.15.2",
+    "@badeball/cypress-cucumber-preprocessor": "^21.1.4",
+    "@cypress/browserify-preprocessor": "^3.0.2"
   }
 }
