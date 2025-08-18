@@ -11,6 +11,7 @@ import { CallToActionComponent } from './components/call-to-action/call-to-actio
 import { FooterComponent } from './components/footer/footer.component';
 import { DebugBarComponent } from './components/debug-bar/debug-bar.component';
 import { ConfigService } from './services/config.service';
+import { AnalyticsService } from './services/analytics.service';
 
 @Component({
   selector: 'app-root',
@@ -37,10 +38,16 @@ export class AppComponent implements OnInit, OnDestroy {
   private rafId?: number;
   private isScrolling = false;
 
-  constructor(private el: ElementRef, private renderer: Renderer2, private configService: ConfigService) {}
+  constructor(
+    private el: ElementRef, 
+    private renderer: Renderer2, 
+    private configService: ConfigService,
+    private analyticsService: AnalyticsService
+  ) {}
 
   ngOnInit() {
     this.configService.loadConfig().then(() => {
+      this.analyticsService.initialize();
       this.setupParallaxScrolling();
       this.setupIntersectionObserver();
       this.setupScrollIndicator();
