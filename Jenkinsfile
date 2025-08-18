@@ -135,17 +135,17 @@ spec:
                         echo 'Building container image using containerd'
                         
                         sh '''#!/bin/bash
-                            set -euxo pipefail
+                            set -euo pipefail
 
-                            echo "Verifying BuildKit is ready..."
-                            buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers
+                            echo "Verifying BuildKit..."
+                            buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 
-                            # Create clean build context to avoid symlink issues
+                            # Create clean build context
                             mkdir -p /tmp/build-context
                             cp -r elohim-app /tmp/build-context/
                             cp images/Dockerfile /tmp/build-context/
                             
-                            # Build from clean context
+                            # Build container image
                             cd /tmp/build-context
                             BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
                               nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f Dockerfile .
@@ -214,57 +214,41 @@ spec:
                                 ATTEMPT=1
                                 POLL_INTERVAL=10  # 10 seconds between polls
                                 
-                                echo "Polling for scan completion (max ${MAX_ATTEMPTS} attempts, ${POLL_INTERVAL}s intervals)..."
+                                echo "Polling for scan completion..."
                                 
                                 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-                                    echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking scan status..."
-                                    
                                     VULN_DATA=$(wget -q -O- \
                                       --header="accept: application/json" \
                                       --header="$AUTH_HEADER" \
                                       "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${BUILD_NUMBER}/additions/vulnerabilities" 2>/dev/null || echo "")
                                     
-                                    # Check if we got valid scan data (not empty and contains scanner info)
+                                    # Check if we got valid scan data
                                     if [ ! -z "$VULN_DATA" ] && echo "$VULN_DATA" | grep -q '"scanner"'; then
-                                        echo "✅ Scan completed after $ATTEMPT attempts!"
+                                        echo "✅ Scan completed after $ATTEMPT attempts"
                                         break
                                     fi
                                     
                                     if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-                                        echo "❌ Scan did not complete within timeout period"
-                                        echo "Last response: $VULN_DATA"
-                                        VULN_DATA=""  # Clear data to trigger fallback message
+                                        echo "❌ Scan timeout after $MAX_ATTEMPTS attempts"
+                                        VULN_DATA=""
                                         break
                                     fi
                                     
-                                    echo "Scan not ready yet, waiting ${POLL_INTERVAL}s..."
+                                    [ $((ATTEMPT % 5)) -eq 0 ] && echo "Waiting for scan (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
                                     sleep $POLL_INTERVAL
                                     ATTEMPT=$((ATTEMPT + 1))
                                 done
                                 
                                 if [ ! -z "$VULN_DATA" ]; then
-                                    echo "Vulnerability scan completed successfully!"
-                                    
-                                    # Extract scanner info
-                                    SCANNER=$(echo "$VULN_DATA" | grep -o '"scanner":{"name":"[^"]*","vendor":"[^"]*","version":"[^"]*"}' || echo "Scanner info not found")
-                                    echo "Scanner: $SCANNER"
-                                    
-                                    # Extract generated timestamp
-                                    GENERATED=$(echo "$VULN_DATA" | grep -o '"generated_at":"[^"]*"' || echo "Timestamp not found")
-                                    echo "Generated: $GENERATED"
-                                    
-                                    # Count vulnerabilities
-                                    VULN_COUNT=$(echo "$VULN_DATA" | grep -o '"vulnerabilities":\\[.*\\]' | grep -o '\\[.*\\]' | tr ',' '\\n' | wc -l)
+                                    # Check vulnerabilities
                                     if echo "$VULN_DATA" | grep -q '"vulnerabilities":\\[\\]'; then
-                                        echo "✅ Security Status: CLEAN - No vulnerabilities found!"
+                                        echo "✅ Security Status: CLEAN - No vulnerabilities found"
                                     else
+                                        VULN_COUNT=$(echo "$VULN_DATA" | grep -o '"vulnerabilities":\\[.*\\]' | grep -o '\\[.*\\]' | tr ',' '\\n' | wc -l)
                                         echo "⚠️  Security Status: $VULN_COUNT vulnerabilities detected"
-                                        echo "Raw vulnerability data:"
-                                        echo "$VULN_DATA" | head -c 1000
                                     fi
                                 else
-                                    echo "No vulnerability data available yet. Scan may still be running."
-                                    echo "Check Harbor UI for scan progress: https://harbor.ethosengine.com"
+                                    echo "❌ Scan data unavailable. Check Harbor UI: https://harbor.ethosengine.com"
                                 fi
                             '''
                         }
@@ -328,9 +312,8 @@ spec:
                             
                             // Verify staging endpoint is responding
                             sh '''#!/bin/bash
-                                echo "Verifying staging endpoint is accessible..."
+                                echo "Verifying staging endpoint..."
                                 timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do 
-                                    echo "Waiting for staging site to respond..."
                                     sleep 5
                                 done'
                                 echo "✅ Staging site is responding"
@@ -344,31 +327,30 @@ spec:
                                 export DISPLAY=:99
                                 echo "Running E2E tests against: $CYPRESS_baseUrl"
                                 
-                                # Start Xvfb manually
-                                echo "Starting Xvfb display server..."
-                                Xvfb :99 -screen 0 1024x768x24 -ac &
+                                # Start display server
+                                Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
                                 XVFB_PID=$!
                                 sleep 2
                                 
-                                # Check if Cypress can run
-                                echo "Verifying Cypress installation..."
-                                npx cypress verify || {
+                                # Verify Cypress
+                                echo "Verifying Cypress..."
+                                npx cypress verify > /dev/null || {
                                     echo "❌ Cypress verification failed"
-                                    echo "Error details:"
-                                    npx cypress info || echo "Cypress info unavailable"
                                     exit 1
                                 }
                                 
-                                echo "Running Cypress tests..."
+                                echo "Creating reports directory..."
+                                mkdir -p cypress/reports
+                                
+                                echo "Running E2E tests..."
                                 npx cypress run \
                                     --headless \
                                     --browser chrome \
                                     --spec "cypress/e2e/staging-validation.feature" \
-                                    --reporter spec \
-                                    --reporter-options "verbose=true"
+                                    --reporter spec
                                 
-                                # Kill Xvfb
-                                kill $XVFB_PID || echo "Failed to kill Xvfb"
+                                # Cleanup
+                                kill $XVFB_PID 2>/dev/null || true
                             '''
                             
                             echo '✅ Staging validation tests passed successfully!'
@@ -378,11 +360,35 @@ spec:
                 }
             }
             post {
+                success {
+                    dir('elohim-app') {
+                        script {
+                            echo '✅ Publishing cucumber reports...'
+                            // Publish cucumber reports if they exist
+                            if (fileExists('cypress/reports/cucumber-report.json')) {
+                                publishHTML([
+                                    allowMissing: false,
+                                    alwaysLinkToLastBuild: true,
+                                    keepAll: true,
+                                    reportDir: 'cypress/reports',
+                                    reportFiles: 'cucumber-report.html',
+                                    reportName: 'Cucumber E2E Test Report',
+                                    reportTitles: 'E2E Test Results'
+                                ])
+                                archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
+                                echo 'Cucumber reports published successfully'
+                            } else {
+                                echo 'No cucumber reports found to publish'
+                            }
+                        }
+                    }
+                }
                 always {
                     dir('elohim-app') {
                         // Archive test artifacts if they exist
                         script {
-                            sh 'ls -la cypress/ || true'
+                            // Archive test artifacts
+                            sh 'echo "Archiving test artifacts..."'
                             if (fileExists('cypress/screenshots')) {
                                 archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
                             }
