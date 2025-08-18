@@ -342,11 +342,21 @@ spec:
                                 echo "Creating reports directory..."
                                 mkdir -p cypress/reports
                                 
+                                echo "DEBUG: Checking cucumber preprocessor config..."
+                                cat package.json | grep -A 10 "cypress-cucumber-preprocessor"
+                                
+                                echo "DEBUG: Listing installed cucumber packages..."
+                                npm list | grep cucumber || echo "No cucumber packages found"
+                                
                                 echo "Running E2E tests..."
                                 npx cypress run \
                                     --headless \
                                     --browser chrome \
                                     --spec "cypress/e2e/staging-validation.feature"
+                                
+                                echo "DEBUG: Checking for reports after test execution..."
+                                ls -la cypress/reports/ 2>/dev/null || echo "No reports directory found after test"
+                                find . -name "*cucumber*" -type f 2>/dev/null || echo "No cucumber files found after test"
                                 
                                 # Cleanup
                                 kill $XVFB_PID 2>/dev/null || true
@@ -363,6 +373,19 @@ spec:
                     dir('elohim-app') {
                         script {
                             echo '✅ Publishing cucumber reports...'
+                            
+                            // Debug: Show what files exist in cypress directory
+                            sh 'echo "DEBUG: Contents of cypress directory:"'
+                            sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
+                            
+                            // Debug: Show specifically what's in reports directory
+                            sh 'echo "DEBUG: Contents of cypress/reports directory:"'
+                            sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
+                            
+                            // Debug: Search for any cucumber-related files
+                            sh 'echo "DEBUG: Searching for cucumber files:"'
+                            sh 'find . -name "*cucumber*" -type f 2>/dev/null || echo "No cucumber files found"'
+                            
                             // Publish cucumber reports if they exist
                             if (fileExists('cypress/reports/cucumber-report.json')) {
                                 publishHTML([
