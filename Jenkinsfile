@@ -78,7 +78,7 @@ spec:
             }
         }
         
-        stage('Build') {
+        stage('Build App') {
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -93,7 +93,7 @@ spec:
             }
         }
 
-        stage('Test') {
+        stage('Unit Test') {
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -128,7 +128,7 @@ spec:
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Image') {
             steps {
                 container('builder'){
                     script {
@@ -257,7 +257,7 @@ spec:
             }
         }
 
-        stage('Stage Deploy') {
+        stage('Deploy to Staging') {
             steps {
                 container('builder'){
                     script {
@@ -405,7 +405,7 @@ spec:
             }
         }
 
-        stage('Prod Deploy') {
+        stage('Deploy to Prod') {
             steps {
                 container('builder'){
                     script {

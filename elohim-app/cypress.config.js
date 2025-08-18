@@ -80,6 +80,9 @@ module.exports = defineConfig({
                                    config.baseUrl.includes('.code.ethosengine.com') ? 'Eclipse Che' : 'Staging/CI'}`);
       console.log(`  Command Timeout: ${config.defaultCommandTimeout}ms`);
 
+      // Ensure cucumber reports are enabled
+      console.log('Cucumber preprocessor configuration loaded');
+
       return config;
     },
   },

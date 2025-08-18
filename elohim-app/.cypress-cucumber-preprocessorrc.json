@@ -12,5 +12,7 @@
   },
   "stepDefinitions": [
     "cypress/e2e/step_definitions/**/*.js"
-  ]
+  ],
+  "filterSpecs": true,
+  "omitFiltered": true
 }
