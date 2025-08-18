@@ -346,8 +346,7 @@ spec:
                                 npx cypress run \
                                     --headless \
                                     --browser chrome \
-                                    --spec "cypress/e2e/staging-validation.feature" \
-                                    --reporter spec
+                                    --spec "cypress/e2e/staging-validation.feature"
                                 
                                 # Cleanup
                                 kill $XVFB_PID 2>/dev/null || true
