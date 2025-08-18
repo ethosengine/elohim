@@ -33,7 +33,7 @@ spec:
    - name: buildkit-run
      mountPath: /run/buildkit
  - name: buildkitd
-   image: moby/buildkit:v0.13.1
+   image: moby/buildkit:v0.12.5
    securityContext:
      privileged: true
    args:
@@ -138,28 +138,18 @@ spec:
                         sh '''
                             set -euxo pipefail
 
-                            echo "Build context debug:"
-                            pwd
-                            ls -la
-                            echo "Checking elohim-app directory:"
-                            ls -la elohim-app/ || echo "elohim-app directory not found"
-                            echo "Checking images directory:"
-                            ls -la images/ || echo "images directory not found"
-
-                            echo "Sockets available:"
-                            ls -l /run/containerd/containerd.sock
-                            ls -l /run/buildkit/buildkitd.sock
-
-                            echo "Versions:"
-                            nerdctl version || true
-                            buildctl --addr unix:///run/buildkit/buildkitd.sock --version
-
-                            # Sanity: ensure worker is up
+                            echo "Verifying BuildKit is ready..."
                             buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers
 
-                            # Build
+                            # Create clean build context to avoid symlink issues
+                            mkdir -p /tmp/build-context
+                            cp -r elohim-app /tmp/build-context/
+                            cp images/Dockerfile /tmp/build-context/
+                            
+                            # Build from clean context
+                            cd /tmp/build-context
                             BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
-                              nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .
+                              nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f Dockerfile .
 
                             nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} elohim-app:latest
                         '''
