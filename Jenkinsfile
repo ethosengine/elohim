@@ -128,6 +128,7 @@ spec:
                         sh 'docker version || echo "Docker command failed"'
                         sh 'docker build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
                         sh 'docker tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
+                        env.DOCKER_BUILD_COMPLETED = 'true'
                         echo 'Docker image built successfully'
                     }
                 }
@@ -325,11 +326,6 @@ spec:
                         dir('elohim-app') {
                             sh 'rm -rf node_modules || true'
                         }
-                        sh 'docker rmi elohim-app:${BUILD_NUMBER} || true'
-                        sh 'docker rmi elohim-app:latest || true'
-                        sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER} || true'
-                        sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
-                        sh 'docker system prune -f || true'
                     }
                 }
             }
@@ -345,7 +341,25 @@ spec:
             echo 'Pipeline failed. Check the logs for details.'
         }
         always {
-            echo 'Pipeline cleanup was handled in the Cleanup stage.'
+            script {
+                if (env.DOCKER_BUILD_COMPLETED == 'true') {
+                    try {
+                        container('builder') {
+                            echo 'Cleaning up Docker images...'
+                            sh 'docker rmi elohim-app:${BUILD_NUMBER} || true'
+                            sh 'docker rmi elohim-app:latest || true'
+                            sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER} || true'
+                            sh 'docker rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
+                            sh 'docker system prune -af --volumes || true'
+                            echo 'Docker cleanup completed.'
+                        }
+                    } catch (Exception e) {
+                        echo "Docker cleanup failed: ${e.message}"
+                    }
+                } else {
+                    echo 'Docker build was not completed, skipping Docker cleanup.'
+                }
+            }
         }
     }
 }
