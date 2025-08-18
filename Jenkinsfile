@@ -9,6 +9,13 @@ spec:
  serviceAccount: jenkins-deployer
  nodeSelector:
     node-type: operations
+ volumes:
+  - name: containerd-sock
+    hostPath:
+     path: /var/snap/microk8s/common/run/containerd.sock
+     type: Socket
+  - name: buildkit-run
+    emptyDir: {}
  containers:
  - name: builder
    image: harbor.ethosengine.com/ethosengine/ci-builder:latest
@@ -23,11 +30,23 @@ spec:
    volumeMounts:
    - name: containerd-sock
      mountPath: /run/containerd/containerd.sock
- volumes:
-  - name: containerd-sock
-    hostPath:
-     path: /var/snap/microk8s/common/run/containerd.sock
-     type: Socket
+   - name: buildkit-run
+     mountPath: /run/buildkit
+ - name: buildkitd
+   image: moby/buildkit:v0.13.1
+   securityContext:
+     privileged: true
+   args:
+   - --addr
+   - unix:///run/buildkit/buildkitd.sock
+   - --oci-worker=false
+   - --containerd-worker=true
+   - --containerd-worker-namespace=k8s.io
+   volumeMounts:
+   - name: containerd-sock
+     mountPath: /run/containerd/containerd.sock
+   - name: buildkit-run
+     mountPath: /run/buildkit
 '''
         }
     }
@@ -116,19 +135,26 @@ spec:
                     script {
                         echo 'Building container image using containerd'
                         
-                        // Debug containerd socket and permissions
                         sh '''
-                            echo "Checking containerd socket..."
-                            ls -la /run/containerd/containerd.sock || echo "Socket not found"
-                            echo "Checking MicroK8s socket on host..."
-                            ls -la /var/snap/microk8s/common/run/containerd.sock || echo "Host socket not found"
-                            whoami
-                            groups
+                            set -euxo pipefail
+
+                            echo "Sockets available:"
+                            ls -l /run/containerd/containerd.sock
+                            ls -l /run/buildkit/buildkitd.sock
+
+                            echo "Versions:"
+                            nerdctl version || true
+                            buildctl --addr unix:///run/buildkit/buildkitd.sock --version
+
+                            # Sanity: ensure worker is up
+                            buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers
+
+                            # Build
+                            BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
+                              nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .
+
+                            nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} elohim-app:latest
                         '''
-                        
-                        sh 'nerdctl version || echo "nerdctl command failed"'
-                        sh 'nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f images/Dockerfile .'
-                        sh 'nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} elohim-app:latest'
                         env.DOCKER_BUILD_COMPLETED = 'true'
                         echo 'Container image built successfully'
                     }
