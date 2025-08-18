@@ -29,7 +29,7 @@ export class ConfigService {
     return this.http.get<AppConfig>('/assets/config.json').toPromise()
       .then(config => {
         this.config = config || { logLevel: 'error', environment: 'production' };
-        return this.config;
+        return this.config!;
       });
   }
 

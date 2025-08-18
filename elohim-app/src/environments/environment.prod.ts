@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  logLevel: 'error'
+  logLevel: 'error' as 'debug' | 'info' | 'error',
+  environment: 'production'
 };
