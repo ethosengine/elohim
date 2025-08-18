@@ -46,3 +46,14 @@ components:
           targetPort: 4200
           exposure: public
           protocol: http
+commands:
+  - id: setup-npm-env
+    exec:
+      component: tools
+      commandLine: |
+        echo 'export NPM_CONFIG_CACHE=/tmp/npm-cache' >> ~/.bashrc
+        echo 'export NPM_CONFIG_PREFIX=/tmp/npm-global' >> ~/.bashrc
+        source ~/.bashrc
+events:
+  postStart:
+    - setup-npm-env
