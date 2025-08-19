@@ -69,7 +69,8 @@ export const Environment = {
 
   // Check if we're running in CI/CD
   isCI() {
-    return process.env.CI || process.env.JENKINS_URL || process.env.GITHUB_ACTIONS;
+    // Use Cypress.env() instead of process.env for browser compatibility
+    return Cypress.env('CI') || Cypress.env('JENKINS_URL') || Cypress.env('GITHUB_ACTIONS');
   },
 
   // Generate Eclipse Che preview URL pattern
