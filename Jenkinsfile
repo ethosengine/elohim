@@ -300,6 +300,9 @@ spec:
                         script {
                             echo 'Running E2E tests to validate staging deployment'
                             
+                            // Mark that E2E tests are being attempted
+                            env.E2E_TESTS_RAN = 'true'
+                            
                             // Install E2E test dependencies if not already cached
                             sh '''
                                 if [ ! -d "node_modules/cypress" ]; then
@@ -372,9 +375,6 @@ spec:
                                     exit 1
                                 fi
                             '''
-                            
-                            // Mark that E2E tests were attempted
-                            env.E2E_TESTS_RAN = 'true'
                             
                             echo '✅ Staging validation tests passed successfully!'
                             echo 'Staging site is ready for production deployment'
