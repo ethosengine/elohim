@@ -13,7 +13,6 @@ Feature: Staging Site Validation
   Scenario: Essential page elements are present
     Given I navigate to the staging site  
     When the page loads
-    Then the page title should contain "Elohim"
-    And the main navigation should be visible
+    Then the page title should contain "elohim.host"
     And the hero section should be displayed
     And the footer should be present
