@@ -401,11 +401,16 @@ spec:
                                 sh 'echo "DEBUG: Contents of cypress/reports directory:"'
                                 sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
                                 
+                                // Debug: Show absolute paths for cucumber plugin
+                                sh 'echo "DEBUG: Current working directory: $(pwd)"'
+                                sh 'echo "DEBUG: Absolute path to cucumber report: $(pwd)/cypress/reports/cucumber-report.json"'
+                                sh 'test -f cypress/reports/cucumber-report.json && echo "DEBUG: File exists and is readable" || echo "DEBUG: File does not exist or is not readable"'
+                                
                                 // Publish cucumber reports using cucumber plugin
                                 if (fileExists('cypress/reports/cucumber-report.json')) {
                                 cucumber([
                                     reportTitle: 'E2E Test Results',
-                                    fileIncludePattern: 'cypress/reports/cucumber-report.json',
+                                    fileIncludePattern: 'cucumber-report.json',
                                     jsonReportDirectory: 'cypress/reports',
                                     buildStatus: 'UNSTABLE',
                                     failedFeaturesNumber: -1,
