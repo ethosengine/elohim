@@ -373,6 +373,9 @@ spec:
                                 fi
                             '''
                             
+                            // Mark that E2E tests were attempted
+                            env.E2E_TESTS_RAN = 'true'
+                            
                             echo '✅ Staging validation tests passed successfully!'
                             echo 'Staging site is ready for production deployment'
                         }
@@ -381,24 +384,25 @@ spec:
             }
             post {
                 success {
+                    echo '✅ E2E tests passed - staging validation successful!'
+                }
+                always {
                     dir('elohim-app') {
                         script {
-                            echo '✅ Publishing cucumber reports...'
-                            
-                            // Debug: Show what files exist in cypress directory
-                            sh 'echo "DEBUG: Contents of cypress directory:"'
-                            sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
-                            
-                            // Debug: Show specifically what's in reports directory
-                            sh 'echo "DEBUG: Contents of cypress/reports directory:"'
-                            sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
-                            
-                            // Debug: Search for any cucumber-related files
-                            sh 'echo "DEBUG: Searching for cucumber files:"'
-                            sh 'find . -name "*cucumber*" -type f 2>/dev/null || echo "No cucumber files found"'
-                            
-                            // Publish cucumber reports using cucumber plugin
-                            if (fileExists('cypress/reports/cucumber-report.json')) {
+                            // Only try to publish cucumber reports if E2E tests actually ran
+                            if (env.E2E_TESTS_RAN == 'true') {
+                                echo '📊 Publishing cucumber reports...'
+                                
+                                // Debug: Show what files exist in cypress directory
+                                sh 'echo "DEBUG: Contents of cypress directory:"'
+                                sh 'find cypress -type f -name "*" 2>/dev/null || echo "cypress directory not found"'
+                                
+                                // Debug: Show specifically what's in reports directory
+                                sh 'echo "DEBUG: Contents of cypress/reports directory:"'
+                                sh 'ls -la cypress/reports/ 2>/dev/null || echo "cypress/reports directory not found"'
+                                
+                                // Publish cucumber reports using cucumber plugin
+                                if (fileExists('cypress/reports/cucumber-report.json')) {
                                 cucumber([
                                     reportTitle: 'E2E Test Results',
                                     fileIncludePattern: 'cypress/reports/cucumber-report.json',
@@ -411,25 +415,26 @@ spec:
                                     pendingStepsNumber: -1,
                                     undefinedStepsNumber: -1
                                 ])
-                                archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
-                                echo 'Cucumber reports published successfully with cucumber plugin'
+                                    echo 'Cucumber reports published successfully with cucumber plugin'
+                                } else {
+                                    echo 'No cucumber reports found to publish'
+                                }
                             } else {
-                                echo 'No cucumber reports found to publish'
+                                echo 'E2E tests did not run - skipping cucumber report publishing'
                             }
-                        }
-                    }
-                }
-                always {
-                    dir('elohim-app') {
-                        // Archive test artifacts if they exist
-                        script {
-                            // Archive test artifacts
-                            sh 'echo "Archiving test artifacts..."'
-                            if (fileExists('cypress/screenshots')) {
-                                archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
-                            }
-                            if (fileExists('cypress/videos')) {
-                                archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+                            
+                            // Archive test artifacts if E2E tests ran
+                            if (env.E2E_TESTS_RAN == 'true') {
+                                sh 'echo "Archiving test artifacts..."'
+                                if (fileExists('cypress/screenshots')) {
+                                    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
+                                }
+                                if (fileExists('cypress/videos')) {
+                                    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+                                }
+                                if (fileExists('cypress/reports/cucumber-report.json')) {
+                                    archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
+                                }
                             }
                         }
                     }
