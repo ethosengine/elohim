@@ -128,7 +128,9 @@ spec:
                             timeout(time: 4, unit: 'MINUTES') {
                                 def qg = waitForQualityGate()
                                 if (qg.status != 'OK') {
-                                    error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                                    echo "❌ SonarQube Quality Gate FAILED with status: ${qg.status}"
+                                    echo "Quality gate conditions not met. Check SonarQube for details."
+                                    error "🚫 PIPELINE FAILED: SonarQube Quality Gate is ${qg.status} - fix code quality issues before proceeding"
                                 }
                                 echo "✅ SonarQube Quality Gate passed"
                             }
