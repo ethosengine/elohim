@@ -30,7 +30,7 @@ metadata:
 components:
   - name: tools
     container:
-      image:  harbor.ethosengine.com/devspaces/udi-plus-angular:ubi9-plus-angular-latest
+      image:  harbor.ethosengine.com/devspaces/udi-plus-angular:latest
       memoryLimit: 4G
       memoryRequest: 1G
       mountSources: true
@@ -39,8 +39,8 @@ components:
           value: /tmp/claude-config
         - name: NPM_CONFIG_CACHE
           value: /tmp/npm-cache
-        - name: NPM_CONFIG_PREFIX
-          value: /tmp/npm-global
+        - name: JENKINS_URL
+          value: "https://jenkins.ethosengine.com"
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -54,6 +54,34 @@ commands:
         echo 'export NPM_CONFIG_CACHE=/tmp/npm-cache' >> ~/.bashrc
         echo 'export NPM_CONFIG_PREFIX=/tmp/npm-global' >> ~/.bashrc
         source ~/.bashrc
+
+  - id: setup-claude-mcp
+    exec:
+      component: tools
+      workingDir: /projects/elohim
+      commandLine: |
+        export STORAGE_PATH=/tmp/sonarqube-mcp-storage
+        mkdir -p "$STORAGE_PATH"
+        claude mcp remove sonarqube 2>/dev/null || true
+        claude mcp add sonarqube \
+          --env STORAGE_PATH="$STORAGE_PATH" \
+          --env SONARQUBE_TOKEN="$SONARQUBE_TOKEN" \
+          --env SONARQUBE_URL="$SONARQUBE_URL" \
+          -- java -jar /opt/mcp/sonarqube-mcp.jar
+        
+        claude mcp remove jenkins 2>/dev/null || true
+        
+        export JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
+        
+        # Add Jenkins MCP server using HTTP transport
+        claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
+          --transport http \
+          --header "Authorization: Basic $JENKINS_AUTH" \
+          --env JENKINS_URL="$JENKINS_URL" \
+          --env JENKINS_USERNAME="$JENKINS_USERNAME" \
+          --env JENKINS_TOKEN="$JENKINS_TOKEN"      
+           
 events:
   postStart:
     - setup-npm-env
+    - setup-claude-mcp
