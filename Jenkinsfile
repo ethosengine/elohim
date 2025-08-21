@@ -122,6 +122,15 @@ spec:
                                     -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
                                 '''
                             }
+                            
+                            // Wait for quality gate result
+                            timeout(time: 5, unit: 'MINUTES') {
+                                def qg = waitForQualityGate()
+                                if (qg.status != 'OK') {
+                                    error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                                }
+                                echo "✅ SonarQube Quality Gate passed"
+                            }
                         }
                     }
                 }
