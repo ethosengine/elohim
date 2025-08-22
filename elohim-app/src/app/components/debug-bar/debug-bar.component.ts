@@ -15,11 +15,14 @@ export class DebugBarComponent implements OnInit {
   constructor(private readonly configService: ConfigService) {}
 
   ngOnInit() {
-    this.configService.loadConfig().then(config => {
-      this.config = config;
-      this.showDebugBar = this.config.environment === 'staging';
-    }).catch(error => {
-      this.showDebugBar = false;
+    this.configService.getConfig().subscribe({
+      next: (config) => {
+        this.config = config;
+        this.showDebugBar = this.config.environment === 'staging';
+      },
+      error: () => {
+        this.showDebugBar = false;
+      }
     });
   }
 }

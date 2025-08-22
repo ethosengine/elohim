@@ -1,48 +1,46 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Observable, of, shareReplay, map, catchError } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface AppConfig {
-  logLevel: 'debug' | 'info' | 'error';
-  environment: string;
+  readonly logLevel: 'debug' | 'info' | 'error';
+  readonly environment: string;
 }
+
+const DEFAULT_PROD_CONFIG: AppConfig = {
+  logLevel: 'error',
+  environment: 'production'
+} as const;
 
 @Injectable({
   providedIn: 'root'
 })
 export class ConfigService {
-  private config: AppConfig | null = null;
+  private readonly http = inject(HttpClient);
+  
+  readonly config$: Observable<AppConfig> = this.createConfigStream();
 
-  constructor(private readonly http: HttpClient) {}
-
-  loadConfig(): Promise<AppConfig> {
-    // Return cached config if already loaded
-    if (this.config) {
-      return Promise.resolve(this.config);
-    }
-
-    // For local development, use environment file configuration
+  private createConfigStream(): Observable<AppConfig> {
     if (!environment.production) {
-      this.config = {
-        logLevel: environment.logLevel,
-        environment: environment.environment
-      };
-      return Promise.resolve(this.config);
+      return of(this.getDevConfig());
     }
-    
-    // For production deployments, load from configmap-mounted config.json
-    return firstValueFrom(this.http.get<AppConfig>('/assets/config.json'))
-      .then(config => {
-        this.config = config || { logLevel: 'error', environment: 'production' };
-        return this.config;
-      });
+
+    return this.http.get<AppConfig>('/assets/config.json').pipe(
+      map(config => config || DEFAULT_PROD_CONFIG),
+      catchError(() => of(DEFAULT_PROD_CONFIG)),
+      shareReplay(1)
+    );
   }
 
-  getConfig(): AppConfig {
-    if (!this.config) {
-      throw new Error('Config not loaded. Call loadConfig() first.');
-    }
-    return this.config;
+  private getDevConfig(): AppConfig {
+    return {
+      logLevel: environment.logLevel || 'debug',
+      environment: environment.environment || 'development'
+    };
+  }
+
+  getConfig(): Observable<AppConfig> {
+    return this.config$;
   }
 }
