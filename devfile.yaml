@@ -52,7 +52,6 @@ commands:
       component: tools
       commandLine: |
         echo 'export NPM_CONFIG_CACHE=/tmp/npm-cache' >> ~/.bashrc
-        echo 'export NPM_CONFIG_PREFIX=/tmp/npm-global' >> ~/.bashrc
         source ~/.bashrc
 
   - id: setup-claude-mcp
