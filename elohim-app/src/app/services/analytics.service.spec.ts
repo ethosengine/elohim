@@ -61,6 +61,22 @@ describe('AnalyticsService', () => {
       value: 1
     };
 
+    // Set up script onload to be called immediately when src is set
+    Object.defineProperty(mockScript, 'src', {
+      set: function(value) {
+        this._src = value;
+        // Trigger onload immediately
+        setTimeout(() => {
+          if (this.onload) {
+            this.onload(new Event('load'));
+          }
+        }, 0);
+      },
+      get: function() {
+        return this._src;
+      }
+    });
+
     service.trackEvent(event).subscribe({
       next: () => {
         expect(mockDocument.createElement).toHaveBeenCalledWith('script');
@@ -76,13 +92,6 @@ describe('AnalyticsService', () => {
         fail('Should not error: ' + err);
       }
     });
-
-    // Simulate script load immediately
-    setTimeout(() => {
-      if (mockScript.onload) {
-        mockScript.onload(new Event('load'));
-      }
-    }, 10);
   });
 
   it('should track page views in production', (done) => {
@@ -92,6 +101,22 @@ describe('AnalyticsService', () => {
       path: '/home',
       title: 'Home'
     };
+
+    // Set up script onload to be called immediately when src is set
+    Object.defineProperty(mockScript, 'src', {
+      set: function(value) {
+        this._src = value;
+        // Trigger onload immediately
+        setTimeout(() => {
+          if (this.onload) {
+            this.onload(new Event('load'));
+          }
+        }, 0);
+      },
+      get: function() {
+        return this._src;
+      }
+    });
 
     service.trackPageView(pageView).subscribe({
       next: () => {
@@ -105,13 +130,6 @@ describe('AnalyticsService', () => {
         fail('Should not error: ' + err);
       }
     });
-
-    // Simulate script load immediately
-    setTimeout(() => {
-      if (mockScript.onload) {
-        mockScript.onload(new Event('load'));
-      }
-    }, 10);
   });
 
   it('should not track in development', (done) => {
@@ -145,6 +163,23 @@ describe('AnalyticsService', () => {
       category: 'button'
     };
 
+    // Set up script to trigger error when src is set
+    Object.defineProperty(mockScript, 'src', {
+      set: function(value) {
+        this._src = value;
+        // Trigger error immediately
+        setTimeout(() => {
+          if (this.onerror) {
+            this.onerror(new Event('error'));
+          }
+        }, 0);
+      },
+      get: function() {
+        return this._src;
+      }
+    });
+
+    // When there's an error, the stream returns EMPTY which completes immediately
     service.trackEvent(event).subscribe({
       next: () => {
         fail('Should not emit on script error');
@@ -153,20 +188,11 @@ describe('AnalyticsService', () => {
         fail('Error should be caught and logged');
       },
       complete: () => {
-        // Check that console.error was called after completion
-        setTimeout(() => {
-          expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
-          done();
-        }, 20);
+        // The stream completes immediately due to EMPTY, check error was logged
+        expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
+        done();
       }
     });
-
-    // Simulate script error
-    setTimeout(() => {
-      if (mockScript.onerror) {
-        mockScript.onerror(new Event('error'));
-      }
-    }, 10);
   });
 
   it('should handle config service errors', (done) => {
@@ -178,6 +204,7 @@ describe('AnalyticsService', () => {
       category: 'button'
     };
 
+    // When config service errors, the stream returns EMPTY which completes immediately
     service.trackEvent(event).subscribe({
       next: () => {
         fail('Should not emit on config error');
@@ -186,11 +213,9 @@ describe('AnalyticsService', () => {
         fail('Error should be caught and logged');
       },
       complete: () => {
-        // Check that console.error was called after completion
-        setTimeout(() => {
-          expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
-          done();
-        }, 20);
+        // The stream completes immediately due to EMPTY, check error was logged
+        expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
+        done();
       }
     });
   });
