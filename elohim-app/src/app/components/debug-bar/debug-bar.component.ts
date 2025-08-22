@@ -12,7 +12,7 @@ export class DebugBarComponent implements OnInit {
   config: AppConfig | null = null;
   showDebugBar = false;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {}
 
   ngOnInit() {
     this.configService.loadConfig().then(config => {

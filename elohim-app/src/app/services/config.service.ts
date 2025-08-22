@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface AppConfig {
@@ -13,7 +14,7 @@ export interface AppConfig {
 export class ConfigService {
   private config: AppConfig | null = null;
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   loadConfig(): Promise<AppConfig> {
     // For local development, use environment file configuration
@@ -26,10 +27,10 @@ export class ConfigService {
     }
     
     // For production deployments, load from configmap-mounted config.json
-    return this.http.get<AppConfig>('/assets/config.json').toPromise()
+    return firstValueFrom(this.http.get<AppConfig>('/assets/config.json'))
       .then(config => {
         this.config = config || { logLevel: 'error', environment: 'production' };
-        return this.config!;
+        return this.config;
       });
   }
 

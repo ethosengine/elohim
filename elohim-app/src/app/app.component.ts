@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { HeroComponent } from './components/hero/hero.component';
 import { CrisisComponent } from './components/crisis/crisis.component';
 import { VisionComponent } from './components/vision/vision.component';
@@ -16,7 +16,6 @@ import { AnalyticsService } from './services/analytics.service';
 @Component({
   selector: 'app-root',
   imports: [
-    HttpClientModule,
     DebugBarComponent,
     HeroComponent,
     CrisisComponent,
@@ -39,10 +38,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private isScrolling = false;
 
   constructor(
-    private el: ElementRef, 
-    private renderer: Renderer2, 
-    private configService: ConfigService,
-    private analyticsService: AnalyticsService
+    private readonly el: ElementRef, 
+    private readonly renderer: Renderer2, 
+    private readonly configService: ConfigService,
+    private readonly analyticsService: AnalyticsService
   ) {}
 
   ngOnInit() {
@@ -93,7 +92,7 @@ export class AppComponent implements OnInit, OnDestroy {
     
     const parallaxLayers = this.el.nativeElement.querySelectorAll('.parallax-layer');
     parallaxLayers.forEach((layer: HTMLElement) => {
-      const speed = parseFloat(layer.dataset['speed'] || '0.5');
+      const speed = parseFloat(layer.dataset['speed'] ?? '0.5');
       const yPos = -(scrolled * speed);
       this.renderer.setStyle(layer, 'transform', `translate3d(0, ${yPos}px, 0)`);
     });
