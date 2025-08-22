@@ -1,5 +1,4 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
-import { provideHttpClient } from '@angular/common/http';
 import { HeroComponent } from './components/hero/hero.component';
 import { CrisisComponent } from './components/crisis/crisis.component';
 import { VisionComponent } from './components/vision/vision.component';
