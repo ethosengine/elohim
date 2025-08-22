@@ -72,7 +72,8 @@ commands:
         
         export JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
         
-        # Add Jenkins MCP server using HTTP transport
+        # Add Jenkins MCP server using HTTP transport,
+        # connection might fail if the jenkins user (token owner) does not have an active oidc session
         claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
           --transport http \
           --header "Authorization: Basic $JENKINS_AUTH" \

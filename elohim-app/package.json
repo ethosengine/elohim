@@ -10,6 +10,7 @@
     "test": "ng test",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
+    "e2e:dev-headless": "cypress run --headed --no-exit --browser chrome --env baseUrl=http://localhost:4200",
     "e2e:local": "cypress run --env baseUrl=http://localhost:4200",
     "e2e:dev": "cypress open --env baseUrl=http://localhost:4200",
     "e2e:staging": "CYPRESS_baseUrl=https://staging.elohim.host cypress run",
