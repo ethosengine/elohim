@@ -17,6 +17,11 @@ export class ConfigService {
   constructor(private readonly http: HttpClient) {}
 
   loadConfig(): Promise<AppConfig> {
+    // Return cached config if already loaded
+    if (this.config) {
+      return Promise.resolve(this.config);
+    }
+
     // For local development, use environment file configuration
     if (!environment.production) {
       this.config = {

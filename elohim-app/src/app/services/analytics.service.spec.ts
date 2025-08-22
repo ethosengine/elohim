@@ -69,6 +69,9 @@ describe('AnalyticsService', () => {
     setTimeout(() => mockScript.onload?.({} as any), 0);
     await promise;
 
+    // Restore our spy after service initialization overwrites window.gtag
+    (window as any).gtag = gtagSpy;
+
     service.trackEvent('click', 'button', 'test', 1);
 
     expect(gtagSpy).toHaveBeenCalledWith('event', 'click', {
@@ -83,6 +86,9 @@ describe('AnalyticsService', () => {
     const promise = service.initialize();
     setTimeout(() => mockScript.onload?.({} as any), 0);
     await promise;
+
+    // Restore our spy after service initialization overwrites window.gtag
+    (window as any).gtag = gtagSpy;
 
     service.trackPageView('/home', 'Home');
 
