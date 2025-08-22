@@ -1,107 +1,172 @@
 import { TestBed } from '@angular/core/testing';
-import { AnalyticsService } from './analytics.service';
+import { DOCUMENT } from '@angular/common';
+import { of, throwError } from 'rxjs';
+import { AnalyticsService, AnalyticsEvent, PageView } from './analytics.service';
 import { ConfigService } from './config.service';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let configService: jasmine.SpyObj<ConfigService>;
-  let mockScript: HTMLScriptElement;
-  let gtagSpy: jasmine.Spy;
+  let mockDocument: jasmine.SpyObj<Document>;
+  let mockScript: jasmine.SpyObj<HTMLScriptElement>;
+  let mockWindow: any;
 
   beforeEach(() => {
     const configServiceSpy = jasmine.createSpyObj('ConfigService', ['getConfig']);
+    mockScript = jasmine.createSpyObj('HTMLScriptElement', [], {
+      async: true,
+      src: '',
+      onload: null,
+      onerror: null
+    });
+    
+    mockWindow = {
+      dataLayer: [],
+      gtag: jasmine.createSpy('gtag')
+    };
+    
+    mockDocument = jasmine.createSpyObj('Document', ['createElement'], {
+      head: jasmine.createSpyObj('HTMLHeadElement', ['appendChild']),
+      defaultView: mockWindow
+    });
+    
+    mockDocument.createElement.and.returnValue(mockScript);
     
     TestBed.configureTestingModule({
       providers: [
         AnalyticsService,
-        { provide: ConfigService, useValue: configServiceSpy }
+        { provide: ConfigService, useValue: configServiceSpy },
+        { provide: DOCUMENT, useValue: mockDocument }
       ]
     });
     
     service = TestBed.inject(AnalyticsService);
     configService = TestBed.inject(ConfigService) as jasmine.SpyObj<ConfigService>;
-    
-    gtagSpy = jasmine.createSpy('gtag');
-    (window as any).gtag = gtagSpy;
-    mockScript = document.createElement('script');
-    spyOn(document, 'createElement').and.returnValue(mockScript);
-    spyOn(document.head, 'appendChild');
-  });
-
-  afterEach(() => {
-    delete (window as any).gtag;
   });
 
   it('should be created', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should initialize in production', async () => {
-    configService.getConfig.and.returnValue({ environment: 'production', logLevel: 'info' });
+  it('should track events in production', (done) => {
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
 
-    const promise = service.initialize();
-    setTimeout(() => mockScript.onload?.({} as any), 0);
-    await promise;
+    const event: AnalyticsEvent = {
+      action: 'click',
+      category: 'button',
+      label: 'test',
+      value: 1
+    };
 
-    expect(document.createElement).toHaveBeenCalledWith('script');
-    expect(mockScript.src).toContain('G-NSL7PVP55B');
+    service.trackEvent(event).subscribe(() => {
+      expect(mockDocument.createElement).toHaveBeenCalledWith('script');
+      expect(mockScript.src).toContain('G-NSL7PVP55B');
+      expect(mockWindow.gtag).toHaveBeenCalledWith('event', 'click', {
+        event_category: 'button',
+        event_label: 'test',
+        value: 1
+      });
+      done();
+    });
+
+    // Simulate script load
+    setTimeout(() => mockScript.onload?.(new Event('load')), 0);
   });
 
-  it('should not initialize in development', async () => {
-    configService.getConfig.and.returnValue({ environment: 'development', logLevel: 'debug' });
-    await service.initialize();
+  it('should track page views in production', (done) => {
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
 
-    expect(document.createElement).not.toHaveBeenCalled();
+    const pageView: PageView = {
+      path: '/home',
+      title: 'Home'
+    };
+
+    service.trackPageView(pageView).subscribe(() => {
+      expect(mockWindow.gtag).toHaveBeenCalledWith('config', 'G-NSL7PVP55B', {
+        page_path: '/home',
+        page_title: 'Home'
+      });
+      done();
+    });
+
+    // Simulate script load
+    setTimeout(() => mockScript.onload?.(new Event('load')), 0);
   });
 
-  it('should handle initialization errors', async () => {
-    configService.getConfig.and.throwError('Config error');
+  it('should not track in development', (done) => {
+    configService.getConfig.and.returnValue(of({ environment: 'development', logLevel: 'debug' }));
+
+    const event: AnalyticsEvent = {
+      action: 'click',
+      category: 'button'
+    };
+
+    service.trackEvent(event).subscribe({
+      next: () => {
+        fail('Should not emit in development');
+      },
+      error: () => {
+        fail('Should not error in development');
+      },
+      complete: () => {
+        expect(mockDocument.createElement).not.toHaveBeenCalled();
+        done();
+      }
+    });
+
+    // Wait for observable to complete without emission
+    setTimeout(() => {
+      expect(mockDocument.createElement).not.toHaveBeenCalled();
+      done();
+    }, 100);
+  });
+
+  it('should handle script loading errors', (done) => {
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     spyOn(console, 'error');
 
-    await service.initialize();
+    const event: AnalyticsEvent = {
+      action: 'click',
+      category: 'button'
+    };
 
-    expect(console.error).toHaveBeenCalled();
-  });
-
-  it('should track events when initialized', async () => {
-    configService.getConfig.and.returnValue({ environment: 'production', logLevel: 'info' });
-    const promise = service.initialize();
-    setTimeout(() => mockScript.onload?.({} as any), 0);
-    await promise;
-
-    // Restore our spy after service initialization overwrites window.gtag
-    (window as any).gtag = gtagSpy;
-
-    service.trackEvent('click', 'button', 'test', 1);
-
-    expect(gtagSpy).toHaveBeenCalledWith('event', 'click', {
-      event_category: 'button',
-      event_label: 'test',
-      value: 1
+    service.trackEvent(event).subscribe({
+      next: () => {
+        fail('Should not emit on script error');
+      },
+      error: () => {
+        fail('Error should be caught and logged');
+      },
+      complete: () => {
+        expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
+        done();
+      }
     });
+
+    // Simulate script error
+    setTimeout(() => mockScript.onerror?.(new Event('error')), 0);
   });
 
-  it('should track page views when initialized', async () => {
-    configService.getConfig.and.returnValue({ environment: 'production', logLevel: 'info' });
-    const promise = service.initialize();
-    setTimeout(() => mockScript.onload?.({} as any), 0);
-    await promise;
+  it('should handle config service errors', (done) => {
+    configService.getConfig.and.returnValue(throwError(() => new Error('Config error')));
+    spyOn(console, 'error');
 
-    // Restore our spy after service initialization overwrites window.gtag
-    (window as any).gtag = gtagSpy;
+    const event: AnalyticsEvent = {
+      action: 'click',
+      category: 'button'
+    };
 
-    service.trackPageView('/home', 'Home');
-
-    expect(gtagSpy).toHaveBeenCalledWith('config', 'G-NSL7PVP55B', {
-      page_path: '/home',
-      page_title: 'Home'
+    service.trackEvent(event).subscribe({
+      next: () => {
+        fail('Should not emit on config error');
+      },
+      error: () => {
+        fail('Error should be caught and logged');
+      },
+      complete: () => {
+        expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
+        done();
+      }
     });
-  });
-
-  it('should not track when not initialized', () => {
-    service.trackEvent('click', 'button');
-    service.trackPageView('/home');
-
-    expect(gtagSpy).not.toHaveBeenCalled();
   });
 });

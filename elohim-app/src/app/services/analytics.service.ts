@@ -1,81 +1,101 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { Observable, filter, switchMap, EMPTY, of, tap, catchError } from 'rxjs';
 import { ConfigService } from './config.service';
 
-declare global {
-  interface Window {
-    dataLayer: any[];
-    gtag: (...args: any[]) => void;
-  }
+export interface AnalyticsEvent {
+  readonly action: string;
+  readonly category: string;
+  readonly label?: string;
+  readonly value?: number;
 }
+
+export interface PageView {
+  readonly path: string;
+  readonly title?: string;
+}
+
+interface GtagFunction {
+  (...args: any[]): void;
+}
+
+const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;
 
 @Injectable({
   providedIn: 'root'
 })
 export class AnalyticsService {
-  private readonly GA_TRACKING_ID = 'G-NSL7PVP55B';
-  private isInitialized = false;
+  private readonly configService = inject(ConfigService);
+  private readonly document = inject(DOCUMENT) as Document;
 
-  constructor(private readonly configService: ConfigService) {}
+  private readonly gtag$ = this.configService.getConfig().pipe(
+    filter(config => config.environment === 'production'),
+    switchMap(() => this.initializeGoogleAnalytics()),
+    catchError(error => {
+      console.error('Analytics initialization failed:', error);
+      return EMPTY;
+    })
+  );
 
-  async initialize(): Promise<void> {
-    try {
-      const config = this.configService.getConfig();
-      
-      // Only load Google Analytics in production environment
-      if (config.environment === 'production' && !this.isInitialized) {
-        await this.loadGoogleAnalytics();
-        this.isInitialized = true;
-      }
-    } catch (error) {
-      console.error('Failed to initialize analytics:', error);
-    }
+  trackEvent(event: AnalyticsEvent): Observable<void> {
+    return this.gtag$.pipe(
+      tap(gtag => gtag('event', event.action, {
+        event_category: event.category,
+        event_label: event.label,
+        value: event.value
+      })),
+      switchMap(() => of(void 0))
+    );
   }
 
-  private loadGoogleAnalytics(): Promise<void> {
-    return new Promise((resolve, reject) => {
+  trackPageView(pageView: PageView): Observable<void> {
+    return this.gtag$.pipe(
+      tap(gtag => gtag('config', GA_TRACKING_ID, {
+        page_path: pageView.path,
+        page_title: pageView.title
+      })),
+      switchMap(() => of(void 0))
+    );
+  }
+
+  private initializeGoogleAnalytics(): Observable<GtagFunction> {
+    return new Observable<GtagFunction>(subscriber => {
       try {
-        // Initialize dataLayer
-        window.dataLayer = window.dataLayer || [];
+        const window = this.document.defaultView;
+        if (!window) {
+          subscriber.error(new Error('Window not available'));
+          return;
+        }
+
+        // Initialize dataLayer and gtag
+        (window as any).dataLayer = (window as any).dataLayer || [];
+        const gtag: GtagFunction = (...args: any[]) => {
+          (window as any).dataLayer.push(args);
+        };
+        (window as any).gtag = gtag;
+
+        // Configure GA
+        gtag('js', new Date());
+        gtag('config', GA_TRACKING_ID);
+
+        // Load script
+        const script = this.document.createElement('script');
+        script.async = true;
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
         
-        // Define gtag function
-        window.gtag = function() {
-          window.dataLayer.push(arguments);
+        script.onload = () => {
+          subscriber.next(gtag);
+          subscriber.complete();
         };
         
-        // Set initial values
-        window.gtag('js', new Date());
-        window.gtag('config', this.GA_TRACKING_ID);
-        
-        // Create and append script tag
-        const script = document.createElement('script');
-        script.async = true;
-        script.src = `https://www.googletagmanager.com/gtag/js?id=${this.GA_TRACKING_ID}`;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Failed to load Google Analytics script'));
-        
-        document.head.appendChild(script);
+        script.onerror = () => {
+          subscriber.error(new Error('Failed to load Google Analytics'));
+        };
+
+        this.document.head.appendChild(script);
       } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+        subscriber.error(error);
       }
     });
-  }
-
-  trackEvent(action: string, category: string, label?: string, value?: number): void {
-    if (this.isInitialized && window.gtag) {
-      window.gtag('event', action, {
-        event_category: category,
-        event_label: label,
-        value: value
-      });
-    }
-  }
-
-  trackPageView(pagePath: string, pageTitle?: string): void {
-    if (this.isInitialized && window.gtag) {
-      window.gtag('config', this.GA_TRACKING_ID, {
-        page_path: pagePath,
-        page_title: pageTitle
-      });
-    }
   }
 }

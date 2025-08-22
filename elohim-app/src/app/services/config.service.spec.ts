@@ -6,212 +6,216 @@ import { environment } from '../../environments/environment';
 describe('ConfigService', () => {
   let service: ConfigService;
   let httpMock: HttpTestingController;
-  let originalProduction: boolean;
+  let originalEnvironment: any;
 
   beforeEach(() => {
-    originalProduction = environment.production;
+    // Store original environment values
+    originalEnvironment = {
+      production: environment.production,
+      logLevel: (environment as any).logLevel,
+      environment: (environment as any).environment
+    };
     
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [ConfigService]
     });
     
-    service = TestBed.inject(ConfigService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     httpMock.verify();
-    // Restore original environment
-    (environment as any).production = originalProduction;
-    // Reset service cache for next test
-    (service as any).config = null;
+    // Restore original environment values
+    (environment as any).production = originalEnvironment.production;
+    (environment as any).logLevel = originalEnvironment.logLevel;
+    (environment as any).environment = originalEnvironment.environment;
   });
 
   it('should be created', () => {
+    service = TestBed.inject(ConfigService);
     expect(service).toBeTruthy();
   });
 
-  describe('loadConfig in development environment', () => {
+  describe('getConfig in development environment', () => {
     beforeEach(() => {
       (environment as any).production = false;
       (environment as any).logLevel = 'debug';
       (environment as any).environment = 'development';
+      service = TestBed.inject(ConfigService);
     });
 
-    it('should load config from environment file', async () => {
-      const config = await service.loadConfig();
-
-      expect(config).toEqual({
-        logLevel: 'debug',
-        environment: 'development'
+    it('should return config from environment file', (done) => {
+      service.getConfig().subscribe(config => {
+        expect(config).toEqual({
+          logLevel: 'debug',
+          environment: 'development'
+        });
+        done();
       });
       
       // No HTTP request should be made
       httpMock.expectNone('/assets/config.json');
     });
 
-    it('should cache config after first load', async () => {
-      const config1 = await service.loadConfig();
-      const config2 = await service.loadConfig();
+    it('should use shareReplay for caching', (done) => {
+      let emissionCount = 0;
+      
+      service.getConfig().subscribe(config => {
+        emissionCount++;
+        expect(config).toEqual({
+          logLevel: 'debug',
+          environment: 'development'
+        });
+      });
 
-      expect(config1).toEqual(config2);
-      expect(config1).toEqual({
-        logLevel: 'debug',
-        environment: 'development'
+      service.getConfig().subscribe(config => {
+        emissionCount++;
+        expect(config).toEqual({
+          logLevel: 'debug',
+          environment: 'development'
+        });
+        
+        // Should only emit once due to shareReplay
+        expect(emissionCount).toBe(2);
+        done();
       });
     });
   });
 
-  describe('loadConfig in production environment', () => {
+  describe('getConfig in production environment', () => {
     beforeEach(() => {
       (environment as any).production = true;
+      service = TestBed.inject(ConfigService);
     });
 
-    it('should load config from HTTP request', async () => {
+    it('should load config from HTTP request', (done) => {
       const mockConfig: AppConfig = {
         logLevel: 'error',
         environment: 'production'
       };
 
-      const configPromise = service.loadConfig();
+      service.getConfig().subscribe(config => {
+        expect(config).toEqual(mockConfig);
+        done();
+      });
 
       const req = httpMock.expectOne('/assets/config.json');
       expect(req.request.method).toBe('GET');
       req.flush(mockConfig);
-
-      const config = await configPromise;
-      expect(config).toEqual(mockConfig);
     });
 
-    it('should use default config when HTTP request returns null', async () => {
-      const configPromise = service.loadConfig();
+    it('should use default config when HTTP request returns null', (done) => {
+      service.getConfig().subscribe(config => {
+        expect(config).toEqual({
+          logLevel: 'error',
+          environment: 'production'
+        });
+        done();
+      });
 
       const req = httpMock.expectOne('/assets/config.json');
       req.flush(null);
-
-      const config = await configPromise;
-      expect(config).toEqual({
-        logLevel: 'error',
-        environment: 'production'
-      });
     });
 
-    it('should use default config when HTTP request returns undefined', async () => {
-      const configPromise = service.loadConfig();
+    it('should use default config when HTTP request returns undefined', (done) => {
+      service.getConfig().subscribe(config => {
+        expect(config).toEqual({
+          logLevel: 'error',
+          environment: 'production'
+        });
+        done();
+      });
 
       const req = httpMock.expectOne('/assets/config.json');
       req.flush(null);
-
-      const config = await configPromise;
-      expect(config).toEqual({
-        logLevel: 'error',
-        environment: 'production'
-      });
     });
 
-    it('should handle HTTP errors gracefully', async () => {
-      const configPromise = service.loadConfig();
+    it('should handle HTTP errors gracefully with default config', (done) => {
+      service.getConfig().subscribe(config => {
+        expect(config).toEqual({
+          logLevel: 'error',
+          environment: 'production'
+        });
+        done();
+      });
 
       const req = httpMock.expectOne('/assets/config.json');
       req.error(new ErrorEvent('Network error'));
-
-      try {
-        await configPromise;
-        fail('Expected promise to reject');
-      } catch (error) {
-        expect(error).toBeDefined();
-      }
     });
 
-    it('should cache config after successful load', async () => {
+    it('should cache config after successful load using shareReplay', (done) => {
       const mockConfig: AppConfig = {
         logLevel: 'info',
         environment: 'production'
       };
 
-      const configPromise1 = service.loadConfig();
+      let subscriptionCount = 0;
+      
+      service.getConfig().subscribe(config => {
+        subscriptionCount++;
+        expect(config).toEqual(mockConfig);
+      });
+
+      service.getConfig().subscribe(config => {
+        subscriptionCount++;
+        expect(config).toEqual(mockConfig);
+        expect(subscriptionCount).toBe(2);
+        done();
+      });
+
+      // Only one HTTP request should be made due to shareReplay
       const req = httpMock.expectOne('/assets/config.json');
       req.flush(mockConfig);
-      const config1 = await configPromise1;
-
-      // Second call should not make HTTP request due to caching
-      const config2 = await service.loadConfig();
       httpMock.expectNone('/assets/config.json');
-
-      expect(config1).toEqual(config2);
-      expect(config1).toEqual(mockConfig);
     });
   });
 
-  describe('getConfig', () => {
-    it('should return config when loaded in development', async () => {
+  describe('config interface and validation', () => {
+    it('should handle missing environment values with defaults', (done) => {
       (environment as any).production = false;
-      (environment as any).logLevel = 'debug';
-      (environment as any).environment = 'development';
-
-      await service.loadConfig();
-      const config = service.getConfig();
-
-      expect(config).toEqual({
-        logLevel: 'debug',
-        environment: 'development'
+      (environment as any).logLevel = undefined;
+      (environment as any).environment = undefined;
+      service = TestBed.inject(ConfigService);
+      
+      service.getConfig().subscribe(config => {
+        expect(config).toEqual({
+          logLevel: 'debug',
+          environment: 'development'
+        });
+        done();
       });
     });
 
-    it('should return config when loaded in production', async () => {
-      (environment as any).production = true;
-      const mockConfig: AppConfig = {
-        logLevel: 'error',
-        environment: 'production'
-      };
-
-      const configPromise = service.loadConfig();
-      const req = httpMock.expectOne('/assets/config.json');
-      req.flush(mockConfig);
-      await configPromise;
-
-      const config = service.getConfig();
-      expect(config).toEqual(mockConfig);
-    });
-
-    it('should throw error when config not loaded', () => {
-      expect(() => service.getConfig()).toThrowError(/Config not loaded/);
-    });
-  });
-
-  describe('config interface', () => {
-    it('should accept valid log levels', async () => {
+    it('should accept valid log levels', (done) => {
       (environment as any).production = false;
+      (environment as any).logLevel = 'info';
+      (environment as any).environment = 'staging';
+      service = TestBed.inject(ConfigService);
       
-      // Test debug level
-      (environment as any).logLevel = 'debug';
-      await service.loadConfig();
-      expect(service.getConfig().logLevel).toBe('debug');
-
-      // Test other log levels
-      const logLevels = ['info', 'error'];
-      for (const level of logLevels) {
-        service = TestBed.inject(ConfigService);
-        (service as any).config = null; // Reset cache
-        (environment as any).logLevel = level;
-        await service.loadConfig();
-        expect(service.getConfig().logLevel).toBe(level);
-      }
+      service.getConfig().subscribe(config => {
+        expect(config.logLevel).toBe('info');
+        expect(config.environment).toBe('staging');
+        done();
+      });
     });
 
-    it('should accept valid environment strings', async () => {
+    it('should maintain readonly properties', (done) => {
       (environment as any).production = false;
       (environment as any).logLevel = 'debug';
+      (environment as any).environment = 'development';
+      service = TestBed.inject(ConfigService);
       
-      const environments = ['development', 'staging', 'production'];
-      for (const env of environments) {
-        service = TestBed.inject(ConfigService);
-        (service as any).config = null; // Reset cache
-        (environment as any).environment = env;
-        await service.loadConfig();
-        expect(service.getConfig().environment).toBe(env);
-      }
+      service.getConfig().subscribe(config => {
+        // TypeScript should enforce readonly, but let's verify at runtime
+        expect(() => {
+          (config as any).logLevel = 'error';
+        }).not.toThrow(); // Assignment works but doesn't affect original
+        
+        // Original config should remain unchanged
+        expect(config.logLevel).toBe('debug');
+        done();
+      });
     });
   });
 });

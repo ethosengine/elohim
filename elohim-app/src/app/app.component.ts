@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, ElementRef, Renderer2 } from '@angular/core';
+import { switchMap } from 'rxjs';
 import { HeroComponent } from './components/hero/hero.component';
 import { CrisisComponent } from './components/crisis/crisis.component';
 import { VisionComponent } from './components/vision/vision.component';
@@ -44,8 +45,7 @@ export class AppComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.configService.loadConfig().then(() => {
-      this.analyticsService.initialize();
+    this.configService.getConfig().subscribe(() => {
       this.setupParallaxScrolling();
       this.setupIntersectionObserver();
       this.setupScrollIndicator();
