@@ -99,7 +99,7 @@ describe('ConfigService', () => {
       const configPromise = service.loadConfig();
 
       const req = httpMock.expectOne('/assets/config.json');
-      req.flush(undefined);
+      req.flush(null);
 
       const config = await configPromise;
       expect(config).toEqual({
