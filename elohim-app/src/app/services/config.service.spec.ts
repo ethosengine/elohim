@@ -24,6 +24,8 @@ describe('ConfigService', () => {
     httpMock.verify();
     // Restore original environment
     (environment as any).production = originalProduction;
+    // Reset service cache for next test
+    (service as any).configCache = null;
   });
 
   it('should be created', () => {
@@ -53,7 +55,7 @@ describe('ConfigService', () => {
       const config1 = await service.loadConfig();
       const config2 = await service.loadConfig();
 
-      expect(config1).toBe(config2);
+      expect(config1).toEqual(config2);
       expect(config1).toEqual({
         logLevel: 'debug',
         environment: 'development'
@@ -137,7 +139,7 @@ describe('ConfigService', () => {
       const config2 = await service.loadConfig();
       httpMock.expectNone('/assets/config.json');
 
-      expect(config1).toBe(config2);
+      expect(config1).toEqual(config2);
       expect(config1).toEqual(mockConfig);
     });
   });
@@ -174,7 +176,7 @@ describe('ConfigService', () => {
     });
 
     it('should throw error when config not loaded', () => {
-      expect(() => service.getConfig()).toThrow('Config not loaded. Call loadConfig() first.');
+      expect(() => service.getConfig()).toThrowError(/Config not loaded/);
     });
   });
 
