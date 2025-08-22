@@ -193,6 +193,7 @@ describe('ConfigService', () => {
       const logLevels = ['info', 'error'];
       for (const level of logLevels) {
         service = TestBed.inject(ConfigService);
+        (service as any).config = null; // Reset cache
         (environment as any).logLevel = level;
         await service.loadConfig();
         expect(service.getConfig().logLevel).toBe(level);
@@ -206,6 +207,7 @@ describe('ConfigService', () => {
       const environments = ['development', 'staging', 'production'];
       for (const env of environments) {
         service = TestBed.inject(ConfigService);
+        (service as any).config = null; // Reset cache
         (environment as any).environment = env;
         await service.loadConfig();
         expect(service.getConfig().environment).toBe(env);
