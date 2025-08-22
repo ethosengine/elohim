@@ -116,6 +116,7 @@
             ],
             "tsConfig": "tsconfig.spec.json",
             "codeCoverage": true,
+            "karmaConfig": "karma.conf.js",
             "assets": [
               {
                 "glob": "**/*",
