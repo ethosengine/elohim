@@ -118,8 +118,8 @@ spec:
                                     -Dsonar.sources=src \
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
-                                    -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                                    -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info
                                 '''
                             }
                             
