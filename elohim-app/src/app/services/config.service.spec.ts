@@ -25,7 +25,7 @@ describe('ConfigService', () => {
     // Restore original environment
     (environment as any).production = originalProduction;
     // Reset service cache for next test
-    (service as any).configCache = null;
+    (service as any).config = null;
   });
 
   it('should be created', () => {
