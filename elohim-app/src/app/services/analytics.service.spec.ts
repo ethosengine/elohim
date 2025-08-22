@@ -61,19 +61,28 @@ describe('AnalyticsService', () => {
       value: 1
     };
 
-    service.trackEvent(event).subscribe(() => {
-      expect(mockDocument.createElement).toHaveBeenCalledWith('script');
-      expect(mockScript.src).toContain('G-NSL7PVP55B');
-      expect(mockWindow.gtag).toHaveBeenCalledWith('event', 'click', {
-        event_category: 'button',
-        event_label: 'test',
-        value: 1
-      });
-      done();
+    service.trackEvent(event).subscribe({
+      next: () => {
+        expect(mockDocument.createElement).toHaveBeenCalledWith('script');
+        expect(mockScript.src).toContain('G-NSL7PVP55B');
+        expect(mockWindow.gtag).toHaveBeenCalledWith('event', 'click', {
+          event_category: 'button',
+          event_label: 'test',
+          value: 1
+        });
+        done();
+      },
+      error: (err) => {
+        fail('Should not error: ' + err);
+      }
     });
 
-    // Simulate script load
-    setTimeout(() => mockScript.onload?.(new Event('load')), 0);
+    // Simulate script load immediately
+    setTimeout(() => {
+      if (mockScript.onload) {
+        mockScript.onload(new Event('load'));
+      }
+    }, 10);
   });
 
   it('should track page views in production', (done) => {
@@ -84,16 +93,25 @@ describe('AnalyticsService', () => {
       title: 'Home'
     };
 
-    service.trackPageView(pageView).subscribe(() => {
-      expect(mockWindow.gtag).toHaveBeenCalledWith('config', 'G-NSL7PVP55B', {
-        page_path: '/home',
-        page_title: 'Home'
-      });
-      done();
+    service.trackPageView(pageView).subscribe({
+      next: () => {
+        expect(mockWindow.gtag).toHaveBeenCalledWith('config', 'G-NSL7PVP55B', {
+          page_path: '/home',
+          page_title: 'Home'
+        });
+        done();
+      },
+      error: (err) => {
+        fail('Should not error: ' + err);
+      }
     });
 
-    // Simulate script load
-    setTimeout(() => mockScript.onload?.(new Event('load')), 0);
+    // Simulate script load immediately
+    setTimeout(() => {
+      if (mockScript.onload) {
+        mockScript.onload(new Event('load'));
+      }
+    }, 10);
   });
 
   it('should not track in development', (done) => {
@@ -116,12 +134,6 @@ describe('AnalyticsService', () => {
         done();
       }
     });
-
-    // Wait for observable to complete without emission
-    setTimeout(() => {
-      expect(mockDocument.createElement).not.toHaveBeenCalled();
-      done();
-    }, 100);
   });
 
   it('should handle script loading errors', (done) => {
@@ -141,13 +153,20 @@ describe('AnalyticsService', () => {
         fail('Error should be caught and logged');
       },
       complete: () => {
-        expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
-        done();
+        // Check that console.error was called after completion
+        setTimeout(() => {
+          expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
+          done();
+        }, 20);
       }
     });
 
     // Simulate script error
-    setTimeout(() => mockScript.onerror?.(new Event('error')), 0);
+    setTimeout(() => {
+      if (mockScript.onerror) {
+        mockScript.onerror(new Event('error'));
+      }
+    }, 10);
   });
 
   it('should handle config service errors', (done) => {
@@ -167,8 +186,11 @@ describe('AnalyticsService', () => {
         fail('Error should be caught and logged');
       },
       complete: () => {
-        expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
-        done();
+        // Check that console.error was called after completion
+        setTimeout(() => {
+          expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
+          done();
+        }, 20);
       }
     });
   });
