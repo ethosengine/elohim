@@ -28,17 +28,19 @@ export class AnalyticsService {
   private readonly configService = inject(ConfigService);
   private readonly document = inject(DOCUMENT) as Document;
 
-  private readonly gtag$ = this.configService.getConfig().pipe(
-    filter(config => config.environment === 'production'),
-    switchMap(() => this.initializeGoogleAnalytics()),
-    catchError(error => {
-      console.error('Analytics initialization failed:', error);
-      return EMPTY;
-    })
-  );
+  private getGtagStream(): Observable<GtagFunction> {
+    return this.configService.getConfig().pipe(
+      filter(config => config.environment === 'production'),
+      switchMap(() => this.initializeGoogleAnalytics()),
+      catchError(error => {
+        console.error('Analytics initialization failed:', error);
+        return EMPTY;
+      })
+    );
+  }
 
   trackEvent(event: AnalyticsEvent): Observable<void> {
-    return this.gtag$.pipe(
+    return this.getGtagStream().pipe(
       tap(gtag => gtag('event', event.action, {
         event_category: event.category,
         event_label: event.label,
@@ -49,7 +51,7 @@ export class AnalyticsService {
   }
 
   trackPageView(pageView: PageView): Observable<void> {
-    return this.gtag$.pipe(
+    return this.getGtagStream().pipe(
       tap(gtag => gtag('config', GA_TRACKING_ID, {
         page_path: pageView.path,
         page_title: pageView.title
