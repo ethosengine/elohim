@@ -8,7 +8,7 @@ import { Component, OnInit, ElementRef, Renderer2 } from '@angular/core';
 })
 export class HeroComponent implements OnInit {
 
-  constructor(private el: ElementRef, private renderer: Renderer2) {}
+  constructor(private readonly el: ElementRef, private readonly renderer: Renderer2) {}
 
   ngOnInit() {
     this.setupScrollIndicator();

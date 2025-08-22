@@ -15,7 +15,7 @@ export class AnalyticsService {
   private readonly GA_TRACKING_ID = 'G-NSL7PVP55B';
   private isInitialized = false;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {}
 
   async initialize(): Promise<void> {
     try {
@@ -55,7 +55,7 @@ export class AnalyticsService {
         
         document.head.appendChild(script);
       } catch (error) {
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
