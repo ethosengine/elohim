@@ -7,31 +7,32 @@ import { ConfigService } from './config.service';
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let configService: jasmine.SpyObj<ConfigService>;
-  let mockDocument: jasmine.SpyObj<Document>;
-  let mockScript: jasmine.SpyObj<HTMLScriptElement>;
+  let mockDocument: any;
+  let mockScript: any;
   let mockWindow: any;
 
   beforeEach(() => {
     const configServiceSpy = jasmine.createSpyObj('ConfigService', ['getConfig']);
     
-    mockScript = jasmine.createSpyObj('HTMLScriptElement', [], {
-      async: true,
+    mockScript = {
+      async: false,
       src: '',
       onload: null,
       onerror: null
-    });
+    };
     
     mockWindow = {
       dataLayer: [],
       gtag: jasmine.createSpy('gtag')
     };
     
-    mockDocument = jasmine.createSpyObj('Document', ['createElement'], {
-      head: jasmine.createSpyObj('HTMLHeadElement', ['appendChild']),
+    mockDocument = {
+      createElement: jasmine.createSpy('createElement').and.returnValue(mockScript),
+      head: {
+        appendChild: jasmine.createSpy('appendChild')
+      },
       defaultView: mockWindow
-    });
-    
-    mockDocument.createElement.and.returnValue(mockScript);
+    };
     
     TestBed.configureTestingModule({
       providers: [
@@ -49,7 +50,7 @@ describe('AnalyticsService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should track events in production', (done) => {
+  it('should track events in production environment', (done) => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
 
     const event: AnalyticsEvent = {
@@ -70,12 +71,10 @@ describe('AnalyticsService', () => {
         });
         done();
       },
-      error: (err) => {
-        fail('Should not error: ' + err);
-      }
+      error: (err) => fail('Should not error: ' + err)
     });
 
-    // Simulate script load
+    // Simulate successful script load
     setTimeout(() => {
       if (mockScript.onload) {
         mockScript.onload(new Event('load'));
@@ -83,7 +82,7 @@ describe('AnalyticsService', () => {
     }, 0);
   });
 
-  it('should track page views in production', (done) => {
+  it('should track page views in production environment', (done) => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
 
     const pageView: PageView = {
@@ -99,12 +98,10 @@ describe('AnalyticsService', () => {
         });
         done();
       },
-      error: (err) => {
-        fail('Should not error: ' + err);
-      }
+      error: (err) => fail('Should not error: ' + err)
     });
 
-    // Simulate script load
+    // Simulate successful script load
     setTimeout(() => {
       if (mockScript.onload) {
         mockScript.onload(new Event('load'));
@@ -112,7 +109,30 @@ describe('AnalyticsService', () => {
     }, 0);
   });
 
-  it('should not track in development', (done) => {
+  it('should NOT track in staging environment', (done) => {
+    configService.getConfig.and.returnValue(of({ environment: 'staging', logLevel: 'debug' }));
+
+    const event: AnalyticsEvent = {
+      action: 'click',
+      category: 'button'
+    };
+
+    service.trackEvent(event).subscribe({
+      next: () => {
+        fail('Should not emit in staging environment');
+      },
+      error: () => {
+        fail('Should not error in staging environment');
+      },
+      complete: () => {
+        expect(mockDocument.createElement).not.toHaveBeenCalled();
+        expect(mockWindow.gtag).not.toHaveBeenCalled();
+        done();
+      }
+    });
+  });
+
+  it('should NOT track in development environment', (done) => {
     configService.getConfig.and.returnValue(of({ environment: 'development', logLevel: 'debug' }));
 
     const event: AnalyticsEvent = {
@@ -122,19 +142,20 @@ describe('AnalyticsService', () => {
 
     service.trackEvent(event).subscribe({
       next: () => {
-        fail('Should not emit in development');
+        fail('Should not emit in development environment');
       },
       error: () => {
-        fail('Should not error in development');
+        fail('Should not error in development environment');
       },
       complete: () => {
         expect(mockDocument.createElement).not.toHaveBeenCalled();
+        expect(mockWindow.gtag).not.toHaveBeenCalled();
         done();
       }
     });
   });
 
-  it('should handle script loading errors', (done) => {
+  it('should handle script loading errors gracefully', (done) => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     spyOn(console, 'error');
 
@@ -143,7 +164,6 @@ describe('AnalyticsService', () => {
       category: 'button'
     };
 
-    // When there's an error, the stream returns EMPTY which completes immediately
     service.trackEvent(event).subscribe({
       next: () => {
         fail('Should not emit on script error');
@@ -152,7 +172,6 @@ describe('AnalyticsService', () => {
         fail('Error should be caught and logged');
       },
       complete: () => {
-        // The stream completes immediately due to EMPTY, check error was logged
         expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
         done();
       }
@@ -166,7 +185,7 @@ describe('AnalyticsService', () => {
     }, 0);
   });
 
-  it('should handle config service errors', (done) => {
+  it('should handle config service errors gracefully', (done) => {
     configService.getConfig.and.returnValue(throwError(() => new Error('Config error')));
     spyOn(console, 'error');
 
@@ -175,7 +194,6 @@ describe('AnalyticsService', () => {
       category: 'button'
     };
 
-    // When config service errors, the stream returns EMPTY which completes immediately
     service.trackEvent(event).subscribe({
       next: () => {
         fail('Should not emit on config error');
@@ -184,7 +202,6 @@ describe('AnalyticsService', () => {
         fail('Error should be caught and logged');
       },
       complete: () => {
-        // The stream completes immediately due to EMPTY, check error was logged
         expect(console.error).toHaveBeenCalledWith('Analytics initialization failed:', jasmine.any(Error));
         done();
       }
