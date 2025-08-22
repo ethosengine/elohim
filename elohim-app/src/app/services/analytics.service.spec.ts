@@ -16,12 +16,24 @@ describe('AnalyticsService', () => {
     // Set default return value to prevent undefined pipe error
     configServiceSpy.getConfig.and.returnValue(of({ environment: 'development', logLevel: 'debug' }));
     
-    mockScript = jasmine.createSpyObj('HTMLScriptElement', [], {
+    mockScript = {
       async: true,
-      src: '',
+      _src: '',
       onload: null,
-      onerror: null
-    });
+      onerror: null,
+      get src() {
+        return this._src;
+      },
+      set src(value) {
+        this._src = value;
+        // Auto-trigger load by default (can be overridden in tests)
+        setTimeout(() => {
+          if (this.onload) {
+            this.onload(new Event('load'));
+          }
+        }, 0);
+      }
+    } as any;
     
     mockWindow = {
       dataLayer: [],
@@ -61,22 +73,6 @@ describe('AnalyticsService', () => {
       value: 1
     };
 
-    // Set up script onload to be called immediately when src is set
-    Object.defineProperty(mockScript, 'src', {
-      set: function(value) {
-        this._src = value;
-        // Trigger onload immediately
-        setTimeout(() => {
-          if (this.onload) {
-            this.onload(new Event('load'));
-          }
-        }, 0);
-      },
-      get: function() {
-        return this._src;
-      }
-    });
-
     service.trackEvent(event).subscribe({
       next: () => {
         expect(mockDocument.createElement).toHaveBeenCalledWith('script');
@@ -101,22 +97,6 @@ describe('AnalyticsService', () => {
       path: '/home',
       title: 'Home'
     };
-
-    // Set up script onload to be called immediately when src is set
-    Object.defineProperty(mockScript, 'src', {
-      set: function(value) {
-        this._src = value;
-        // Trigger onload immediately
-        setTimeout(() => {
-          if (this.onload) {
-            this.onload(new Event('load'));
-          }
-        }, 0);
-      },
-      get: function() {
-        return this._src;
-      }
-    });
 
     service.trackPageView(pageView).subscribe({
       next: () => {
@@ -163,11 +143,11 @@ describe('AnalyticsService', () => {
       category: 'button'
     };
 
-    // Set up script to trigger error when src is set
+    // Override the default behavior to trigger error instead of load
     Object.defineProperty(mockScript, 'src', {
       set: function(value) {
         this._src = value;
-        // Trigger error immediately
+        // Trigger error immediately instead of load
         setTimeout(() => {
           if (this.onerror) {
             this.onerror(new Event('error'));
@@ -176,7 +156,8 @@ describe('AnalyticsService', () => {
       },
       get: function() {
         return this._src;
-      }
+      },
+      configurable: true
     });
 
     // When there's an error, the stream returns EMPTY which completes immediately
