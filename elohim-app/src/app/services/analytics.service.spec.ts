@@ -13,27 +13,13 @@ describe('AnalyticsService', () => {
 
   beforeEach(() => {
     const configServiceSpy = jasmine.createSpyObj('ConfigService', ['getConfig']);
-    // Set default return value to prevent undefined pipe error
-    configServiceSpy.getConfig.and.returnValue(of({ environment: 'development', logLevel: 'debug' }));
     
-    mockScript = {
+    mockScript = jasmine.createSpyObj('HTMLScriptElement', [], {
       async: true,
-      _src: '',
+      src: '',
       onload: null,
-      onerror: null,
-      get src() {
-        return this._src;
-      },
-      set src(value) {
-        this._src = value;
-        // Auto-trigger load by default (can be overridden in tests)
-        setTimeout(() => {
-          if (this.onload) {
-            this.onload(new Event('load'));
-          }
-        }, 0);
-      }
-    } as any;
+      onerror: null
+    });
     
     mockWindow = {
       dataLayer: [],
@@ -88,6 +74,13 @@ describe('AnalyticsService', () => {
         fail('Should not error: ' + err);
       }
     });
+
+    // Simulate script load
+    setTimeout(() => {
+      if (mockScript.onload) {
+        mockScript.onload(new Event('load'));
+      }
+    }, 0);
   });
 
   it('should track page views in production', (done) => {
@@ -110,6 +103,13 @@ describe('AnalyticsService', () => {
         fail('Should not error: ' + err);
       }
     });
+
+    // Simulate script load
+    setTimeout(() => {
+      if (mockScript.onload) {
+        mockScript.onload(new Event('load'));
+      }
+    }, 0);
   });
 
   it('should not track in development', (done) => {
@@ -143,23 +143,6 @@ describe('AnalyticsService', () => {
       category: 'button'
     };
 
-    // Override the default behavior to trigger error instead of load
-    Object.defineProperty(mockScript, 'src', {
-      set: function(value) {
-        this._src = value;
-        // Trigger error immediately instead of load
-        setTimeout(() => {
-          if (this.onerror) {
-            this.onerror(new Event('error'));
-          }
-        }, 0);
-      },
-      get: function() {
-        return this._src;
-      },
-      configurable: true
-    });
-
     // When there's an error, the stream returns EMPTY which completes immediately
     service.trackEvent(event).subscribe({
       next: () => {
@@ -174,6 +157,13 @@ describe('AnalyticsService', () => {
         done();
       }
     });
+
+    // Simulate script error
+    setTimeout(() => {
+      if (mockScript.onerror) {
+        mockScript.onerror(new Event('error'));
+      }
+    }, 0);
   });
 
   it('should handle config service errors', (done) => {
