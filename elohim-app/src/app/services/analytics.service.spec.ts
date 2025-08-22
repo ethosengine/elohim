@@ -6,6 +6,7 @@ describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let configService: jasmine.SpyObj<ConfigService>;
   let mockScript: HTMLScriptElement;
+  let gtagSpy: jasmine.Spy;
 
   beforeEach(() => {
     const configServiceSpy = jasmine.createSpyObj('ConfigService', ['getConfig']);
@@ -20,7 +21,8 @@ describe('AnalyticsService', () => {
     service = TestBed.inject(AnalyticsService);
     configService = TestBed.inject(ConfigService) as jasmine.SpyObj<ConfigService>;
     
-    (window as any).gtag = jasmine.createSpy('gtag');
+    gtagSpy = jasmine.createSpy('gtag');
+    (window as any).gtag = gtagSpy;
     mockScript = document.createElement('script');
     spyOn(document, 'createElement').and.returnValue(mockScript);
     spyOn(document.head, 'appendChild');
@@ -69,7 +71,7 @@ describe('AnalyticsService', () => {
 
     service.trackEvent('click', 'button', 'test', 1);
 
-    expect((window as any).gtag).toHaveBeenCalledWith('event', 'click', {
+    expect(gtagSpy).toHaveBeenCalledWith('event', 'click', {
       event_category: 'button',
       event_label: 'test',
       value: 1
@@ -84,7 +86,7 @@ describe('AnalyticsService', () => {
 
     service.trackPageView('/home', 'Home');
 
-    expect((window as any).gtag).toHaveBeenCalledWith('config', 'G-NSL7PVP55B', {
+    expect(gtagSpy).toHaveBeenCalledWith('config', 'G-NSL7PVP55B', {
       page_path: '/home',
       page_title: 'Home'
     });
@@ -94,6 +96,6 @@ describe('AnalyticsService', () => {
     service.trackEvent('click', 'button');
     service.trackPageView('/home');
 
-    expect((window as any).gtag).not.toHaveBeenCalled();
+    expect(gtagSpy).not.toHaveBeenCalled();
   });
 });
