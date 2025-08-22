@@ -13,6 +13,9 @@ describe('AnalyticsService', () => {
 
   beforeEach(() => {
     const configServiceSpy = jasmine.createSpyObj('ConfigService', ['getConfig']);
+    // Set default return value to prevent undefined pipe error
+    configServiceSpy.getConfig.and.returnValue(of({ environment: 'development', logLevel: 'debug' }));
+    
     mockScript = jasmine.createSpyObj('HTMLScriptElement', [], {
       async: true,
       src: '',
