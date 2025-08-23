@@ -2,18 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { ConfigService } from './config.service';
 
-export interface AnalyticsEvent {
-  readonly action: string;
-  readonly category: string;
-  readonly label?: string;
-  readonly value?: number;
-}
-
-export interface PageView {
-  readonly path: string;
-  readonly title?: string;
-}
-
 const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;
 
 @Injectable({
@@ -26,25 +14,6 @@ export class AnalyticsService {
 
   constructor() {
     this.initializeIfProduction();
-  }
-
-  trackEvent(event: AnalyticsEvent): void {
-    if (!this.isGoogleAnalyticsAvailable()) return;
-
-    (window as any).gtag('event', event.action, {
-      event_category: event.category,
-      event_label: event.label,
-      value: event.value
-    });
-  }
-
-  trackPageView(pageView: PageView): void {
-    if (!this.isGoogleAnalyticsAvailable()) return;
-
-    (window as any).gtag('config', GA_TRACKING_ID, {
-      page_path: pageView.path,
-      page_title: pageView.title
-    });
   }
 
   private initializeIfProduction(): void {
@@ -75,9 +44,5 @@ export class AnalyticsService {
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
     this.document.head.appendChild(script);
-  }
-
-  private isGoogleAnalyticsAvailable(): boolean {
-    return typeof (window as any)?.gtag === 'function';
   }
 }
