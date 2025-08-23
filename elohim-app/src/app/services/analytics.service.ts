@@ -9,7 +9,7 @@ const GA_TRACKING_ID = 'G-NSL7PVP55B' as const;
 })
 export class AnalyticsService {
   private readonly configService = inject(ConfigService);
-  private readonly document = inject(DOCUMENT) as Document;
+  private readonly document = inject(DOCUMENT);
   private initialized = false;
 
   constructor() {
@@ -30,7 +30,7 @@ export class AnalyticsService {
     if (!window) return;
 
     // Initialize dataLayer and gtag
-    (window as any).dataLayer = (window as any).dataLayer || [];
+    (window as any).dataLayer = (window as any).dataLayer ?? [];
     (window as any).gtag = (...args: any[]) => {
       (window as any).dataLayer.push(args);
     };
