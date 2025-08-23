@@ -72,4 +72,13 @@ describe('AnalyticsService', () => {
     expect(mockDocument.createElement).not.toHaveBeenCalled();
     expect(mockDocument.head.appendChild).not.toHaveBeenCalled();
   });
+
+  it('should handle missing window gracefully', () => {
+    mockDocument.defaultView = null;
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
+    service = TestBed.inject(AnalyticsService);
+
+    expect(mockDocument.createElement).not.toHaveBeenCalled();
+    expect(mockDocument.head.appendChild).not.toHaveBeenCalled();
+  });
 });
