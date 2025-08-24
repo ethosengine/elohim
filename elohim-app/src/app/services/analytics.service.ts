@@ -21,8 +21,17 @@ export class AnalyticsService {
       if (config.environment === 'production' && !this.initialized) {
         this.initializeGoogleAnalytics();
         this.initialized = true;
+      } else if (config.environment !== 'production') {
+        this.addNoIndexingMeta();
       }
     });
+  }
+
+  private addNoIndexingMeta(): void {
+    const robotsMeta = this.document.createElement('meta');
+    robotsMeta.name = 'robots';
+    robotsMeta.content = 'noindex, nofollow, noarchive, nosnippet';
+    this.document.head.appendChild(robotsMeta);
   }
 
   private initializeGoogleAnalytics(): void {
