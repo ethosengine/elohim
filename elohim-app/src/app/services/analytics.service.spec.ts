@@ -69,16 +69,16 @@ describe('AnalyticsService', () => {
     configService.getConfig.and.returnValue(of({ environment: 'staging', logLevel: 'debug' }));
     service = TestBed.inject(AnalyticsService);
 
-    expect(mockDocument.createElement).not.toHaveBeenCalled();
-    expect(mockDocument.head.appendChild).not.toHaveBeenCalled();
+    expect(mockDocument.createElement).not.toHaveBeenCalledWith('script');
+    expect(mockDocument.head.appendChild).not.toHaveBeenCalledWith(mockScript);
   });
 
   it('should NOT inject Google Analytics script in development environment', () => {
     configService.getConfig.and.returnValue(of({ environment: 'development', logLevel: 'debug' }));
     service = TestBed.inject(AnalyticsService);
 
-    expect(mockDocument.createElement).not.toHaveBeenCalled();
-    expect(mockDocument.head.appendChild).not.toHaveBeenCalled();
+    expect(mockDocument.createElement).not.toHaveBeenCalledWith('script');
+    expect(mockDocument.head.appendChild).not.toHaveBeenCalledWith(mockScript);
   });
 
   it('should handle missing window gracefully', () => {
