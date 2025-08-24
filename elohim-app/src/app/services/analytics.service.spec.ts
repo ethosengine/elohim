@@ -9,6 +9,7 @@ describe('AnalyticsService', () => {
   let configService: jasmine.SpyObj<ConfigService>;
   let mockDocument: any;
   let mockScript: any;
+  let mockMeta: any;
   let mockWindow: any;
 
   beforeEach(() => {
@@ -19,12 +20,19 @@ describe('AnalyticsService', () => {
       src: '',
     };
     
+    mockMeta = {
+      name: '',
+      content: ''
+    };
+    
     mockWindow = {
       dataLayer: []
     };
     
     mockDocument = {
-      createElement: jasmine.createSpy('createElement').and.returnValue(mockScript),
+      createElement: jasmine.createSpy('createElement').and.callFake((tagName: string) => {
+        return tagName === 'script' ? mockScript : mockMeta;
+      }),
       head: {
         appendChild: jasmine.createSpy('appendChild')
       },
@@ -80,5 +88,28 @@ describe('AnalyticsService', () => {
 
     expect(mockDocument.createElement).not.toHaveBeenCalled();
     expect(mockDocument.head.appendChild).not.toHaveBeenCalled();
+  });
+
+  it('should inject no-indexing meta in staging environment', () => {
+    configService.getConfig.and.returnValue(of({ environment: 'staging', logLevel: 'debug' }));
+    service = TestBed.inject(AnalyticsService);
+
+    expect(mockDocument.createElement).toHaveBeenCalledWith('meta');
+    expect(mockMeta.name).toBe('robots');
+    expect(mockMeta.content).toBe('noindex, nofollow, noarchive, nosnippet');
+    expect(mockDocument.head.appendChild).toHaveBeenCalledWith(mockMeta);
+  });
+
+  it('should NOT inject no-indexing meta in production environment', () => {
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
+    service = TestBed.inject(AnalyticsService);
+
+    const createElementCalls = mockDocument.createElement.calls.all();
+    const metaCall = createElementCalls.find((call: any) => call.args[0] === 'meta');
+    expect(metaCall).toBeUndefined();
+    
+    const appendChildCalls = mockDocument.head.appendChild.calls.all();
+    const metaAppendCall = appendChildCalls.find((call: any) => call.args[0] === mockMeta);
+    expect(metaAppendCall).toBeUndefined();
   });
 });
