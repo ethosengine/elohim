@@ -2,6 +2,12 @@
 
 [![Contribute](https://www.eclipse.org/che/contribute.svg)](https://code.ethosengine.com/#https://github.com/ethosengine/elohim) [![Build Status](https://jenkins.ethosengine.com/buildStatus/icon?job=elohim.host)](https://jenkins.ethosengine.com/job/elohim.host/) [![Quality Gate Status](https://sonarqube.ethosengine.com/api/project_badges/measure?project=elohim-app&metric=alert_status&token=sqb_3f2231b51de20f12dbf9974b5d17c7ceafeca988)](https://sonarqube.ethosengine.com/dashboard?id=elohim-app)
 
+## Support
+
+If the Elohim Protocol vision inspired you today, consider supporting the work by sending a coffee to the developer. A contribution creates space, energy, and time for the future exploration of what technology organized around love could look like.
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/mbd06b) [!["Buy Me A Crypto Coffee"](https://img.shields.io/badge/Buy%20me%20a-Crypto%20Coffee-blue.svg?style=for-the-badge&logo=ethereum)](https://commerce.coinbase.com/checkout/81641625-3924-4635-93e8-4d01caae73fd)
+
 A manifesto for digital infrastructure organized around love - demonstrating how technology can serve human flourishing through distributed architecture and autonomous AI guardians.
 
 ## About
@@ -95,17 +101,6 @@ We can encode exploitation, or we can encode love.
 The infrastructure we build today will shape human consciousness for generations. As AI development accelerates, the technical hurdles of building distributed, love-aligned systems are dropping rapidly. 
 
 **The time to build technology organized around love is now.**
-
-## Contributing
-
-This project represents a vision for technology organized around love. Contributions that advance this vision are welcome:
-
-1. **Enhanced storytelling** - Improving the narrative and visual design
-2. **Interactive elements** - Demonstrating protocol concepts through interaction
-3. **Technical accuracy** - Ensuring implementation details are sound
-4. **Accessibility** - Making the vision accessible to all users
-5. **Translations** - Globalizing the message
-6. **Implementation** - Building actual protocol components
 
 ## Further Reading
 

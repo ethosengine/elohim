@@ -12,6 +12,16 @@
     --dark: #0F0F23;
     --light: #F3F4F6;
     --accent: #10B981;
+    
+    /* ethosengine theme variables */
+    --forest-dark: rgb(26, 35, 31);
+    --forest-light: rgb(36, 49, 41);
+    --leaf-light: rgb(201, 212, 197);
+    --tech-glow: rgb(127, 203, 238);
+    --tech-accent: rgba(127, 203, 238, 0.15);
+    --tech-bright: rgba(127, 203, 238, 0.8);
+    --earthy-orange: rgb(217, 124, 43);
+    --earthy-orange-light: rgba(217, 124, 43, 0.8);
 }
 
 body {
@@ -364,7 +374,6 @@ html {
 footer {
     text-align: center;
     padding: 3rem;
-    opacity: 0.5;
 }
 
 /* Mobile Responsiveness */
