@@ -206,7 +206,7 @@ spec:
                     script {
                         echo 'Building container image using containerd'
                         
-                        sh '''#!/bin/bash
+                        sh """#!/bin/bash
                             set -euo pipefail
 
                             echo "Verifying BuildKit..."
@@ -219,17 +219,18 @@ spec:
                             
                             # Build container image with semantic versioning
                             cd /tmp/build-context
-                            BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
-                              nerdctl -n k8s.io build -t elohim-app:${IMAGE_TAG} -f Dockerfile .
+                            BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                              nerdctl -n k8s.io build -t elohim-app:${env.IMAGE_TAG} -f Dockerfile .
 
                             # Tag with commit hash for traceability
-                            nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:${GIT_COMMIT_HASH}
+                            nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} elohim-app:${env.GIT_COMMIT_HASH}
                             
                             # Only tag as latest for main branch
-                            if [ "${BRANCH_NAME}" = "main" ]; then
-                                nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:latest
+                            if [ "${env.BRANCH_NAME}" = "main" ]; then
+                                nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} elohim-app:latest
                             fi
-                        '''
+                        """
+                        
                         env.DOCKER_BUILD_COMPLETED = 'true'
                         echo 'Container image built successfully'
                     }
