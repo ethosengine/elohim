@@ -69,3 +69,22 @@ Then('the footer should be present', () => {
     cy.get('app-footer, footer, [role="contentinfo"]', { timeout }).should('exist');
   });
 });
+
+Then('the footer should display the expected git hash', () => {
+  cy.get('[data-cy="git-hash"]').should('be.visible')
+    .and('not.be.empty')
+    .and('not.contain', 'unknown')
+    .and('not.contain', 'local-dev');
+});
+
+Then('the git hash should match the deployed version', () => {
+  // Get the expected git hash from environment variable
+  const expectedGitHash = Cypress.env('EXPECTED_GIT_HASH');
+  
+  if (expectedGitHash) {
+    cy.get('[data-cy="git-hash"]').should('contain', expectedGitHash);
+  } else {
+    // If no expected hash provided, just verify it looks like a git hash (7-8 alphanumeric chars)
+    cy.get('[data-cy="git-hash"]').should('match', /^[a-f0-9]{7,8}$/);
+  }
+});
