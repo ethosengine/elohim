@@ -247,20 +247,20 @@ spec:
                             sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
                             
                             echo 'Tagging image for Harbor registry with semantic versioning'
-                            sh 'nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}'
-                            sh 'nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}'
+                            sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG}"
+                            sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH}"
                             
                             // Only tag and push latest for main branch
                             if (env.BRANCH_NAME == 'main') {
-                                sh 'nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                                sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest"
                             }
                             
                             echo 'Pushing images to Harbor registry'
-                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}'
-                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}'
+                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG}"
+                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH}"
                             
                             if (env.BRANCH_NAME == 'main') {
-                                sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                                sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest"
                             }
                             
                             echo 'Successfully pushed to Harbor registry'
@@ -278,24 +278,24 @@ spec:
                             echo 'Triggering Harbor vulnerability scan'
                             
                             // Trigger scan via Harbor API using wget with basic auth
-                            sh '''
-                                AUTH_HEADER="Authorization: Basic $(echo -n "$HARBOR_USERNAME:$HARBOR_PASSWORD" | base64)"
-                                echo "Triggering scan for artifact: ${IMAGE_TAG}"
-                                wget --post-data="" \
-                                  --header="accept: application/json" \
-                                  --header="Content-Type: application/json" \
-                                  --header="$AUTH_HEADER" \
-                                  -S \
-                                  -O- \
-                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/scan" || \
+                            sh """
+                                AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
+                                echo "Triggering scan for artifact: ${env.IMAGE_TAG}"
+                                wget --post-data="" \\
+                                  --header="accept: application/json" \\
+                                  --header="Content-Type: application/json" \\
+                                  --header="\$AUTH_HEADER" \\
+                                  -S \\
+                                  -O- \\
+                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${env.IMAGE_TAG}/scan" || \\
                                 echo "Scan request failed - check error response above"
-                            '''
+                            """
                             
                             echo 'Vulnerability scan initiated. Polling for completion...'
                             
                             // Poll for scan completion with smart retry logic
-                            sh '''#!/bin/bash
-                                AUTH_HEADER="Authorization: Basic $(echo -n "$HARBOR_USERNAME:$HARBOR_PASSWORD" | base64)"
+                            sh """#!/bin/bash
+                                AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
                                 
                                 # Polling configuration
                                 MAX_ATTEMPTS=24  # 24 attempts = 4 minutes max
@@ -304,41 +304,41 @@ spec:
                                 
                                 echo "Polling for scan completion..."
                                 
-                                while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-                                    VULN_DATA=$(wget -q -O- \
-                                      --header="accept: application/json" \
-                                      --header="$AUTH_HEADER" \
-                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
+                                while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+                                    VULN_DATA=\$(wget -q -O- \\
+                                      --header="accept: application/json" \\
+                                      --header="\$AUTH_HEADER" \\
+                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${env.IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
                                     
                                     # Check if we got valid scan data
-                                    if [ ! -z "$VULN_DATA" ] && echo "$VULN_DATA" | grep -q '"scanner"'; then
-                                        echo "✅ Scan completed after $ATTEMPT attempts"
+                                    if [ ! -z "\$VULN_DATA" ] && echo "\$VULN_DATA" | grep -q '"scanner"'; then
+                                        echo "✅ Scan completed after \$ATTEMPT attempts"
                                         break
                                     fi
                                     
-                                    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-                                        echo "❌ Scan timeout after $MAX_ATTEMPTS attempts"
+                                    if [ \$ATTEMPT -eq \$MAX_ATTEMPTS ]; then
+                                        echo "❌ Scan timeout after \$MAX_ATTEMPTS attempts"
                                         VULN_DATA=""
                                         break
                                     fi
                                     
-                                    [ $((ATTEMPT % 5)) -eq 0 ] && echo "Waiting for scan (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
-                                    sleep $POLL_INTERVAL
-                                    ATTEMPT=$((ATTEMPT + 1))
+                                    [ \$((ATTEMPT % 5)) -eq 0 ] && echo "Waiting for scan (attempt \$ATTEMPT/\$MAX_ATTEMPTS)..."
+                                    sleep \$POLL_INTERVAL
+                                    ATTEMPT=\$((ATTEMPT + 1))
                                 done
                                 
-                                if [ ! -z "$VULN_DATA" ]; then
+                                if [ ! -z "\$VULN_DATA" ]; then
                                     # Check vulnerabilities
-                                    if echo "$VULN_DATA" | grep -q '"vulnerabilities":\\[\\]'; then
+                                    if echo "\$VULN_DATA" | grep -q '"vulnerabilities":\\\\[\\\\]'; then
                                         echo "✅ Security Status: CLEAN - No vulnerabilities found"
                                     else
-                                        VULN_COUNT=$(echo "$VULN_DATA" | grep -o '"vulnerabilities":\\[.*\\]' | grep -o '\\[.*\\]' | tr ',' '\\n' | wc -l)
-                                        echo "⚠️  Security Status: $VULN_COUNT vulnerabilities detected"
+                                        VULN_COUNT=\$(echo "\$VULN_DATA" | grep -o '"vulnerabilities":\\\\[.*\\\\]' | grep -o '\\\\[.*\\\\]' | tr ',' '\\\\n' | wc -l)
+                                        echo "⚠️  Security Status: \$VULN_COUNT vulnerabilities detected"
                                     fi
                                 else
                                     echo "❌ Scan data unavailable. Check Harbor UI: https://harbor.ethosengine.com"
                                 fi
-                            '''
+                            """
                         }
                     }
                 }
@@ -363,10 +363,10 @@ spec:
                         '''
                         
                         // Update image tag in deployment manifest with semantic version
-                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${IMAGE_TAG}.yaml"
+                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${env.IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
                         // Deploy staging only
-                        sh 'kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml'
+                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
                         // Wait for staging deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
@@ -557,7 +557,7 @@ spec:
                         '''
                         
                         // Deploy production (using same deployment file)
-                        sh 'kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml'
+                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
                         // Wait for production deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
@@ -602,15 +602,15 @@ spec:
                     try {
                         container('builder') {
                             echo 'Cleaning up nerdctl images...'
-                            sh 'nerdctl -n k8s.io rmi elohim-app:${IMAGE_TAG} || true'
-                            sh 'nerdctl -n k8s.io rmi elohim-app:${GIT_COMMIT_HASH} || true'
-                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG} || true'
-                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH} || true'
+                            sh "nerdctl -n k8s.io rmi elohim-app:${env.IMAGE_TAG} || true"
+                            sh "nerdctl -n k8s.io rmi elohim-app:${env.GIT_COMMIT_HASH} || true"
+                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG} || true"
+                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH} || true"
                             if (env.BRANCH_NAME == 'main') {
-                                sh 'nerdctl -n k8s.io rmi elohim-app:latest || true'
-                                sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
+                                sh "nerdctl -n k8s.io rmi elohim-app:latest || true"
+                                sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true"
                             }
-                            sh 'nerdctl -n k8s.io system prune -af --volumes || true'
+                            sh "nerdctl -n k8s.io system prune -af --volumes || true"
                             echo 'nerdctl cleanup completed.'
                         }
                     } catch (Exception e) {
