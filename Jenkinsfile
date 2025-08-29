@@ -359,6 +359,13 @@ spec:
                     script {
                         echo 'Deploying to Staging Environment'
                         
+                        // Debug: Show environment variables
+                        echo "DEBUG - Deploy Staging Environment Variables:"
+                        echo "IMAGE_TAG: ${env.IMAGE_TAG}"
+                        echo "GIT_COMMIT_HASH: ${env.GIT_COMMIT_HASH}"
+                        echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+                        echo "BASE_VERSION: ${env.BASE_VERSION}"
+                        
                         // Validate staging dependencies exist
                         sh '''
                             echo "Validating staging ConfigMap exists..."
@@ -371,7 +378,12 @@ spec:
                         '''
                         
                         // Update image tag in deployment manifest with semantic version
+                        echo "DEBUG - Replacing BUILD_NUMBER_PLACEHOLDER with: ${env.IMAGE_TAG}"
                         sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${env.IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${env.IMAGE_TAG}.yaml"
+                        
+                        // Debug: Show what was generated
+                        echo "DEBUG - Generated deployment file content (image lines only):"
+                        sh "grep -n 'image:' manifests/deployment-${env.IMAGE_TAG}.yaml || echo 'No image lines found'"
                         
                         // Deploy staging only
                         sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
