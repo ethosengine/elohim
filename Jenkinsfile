@@ -126,10 +126,6 @@ spec:
                             error "VERSION file is empty"
                         }
                         
-                        // Set environment variables
-                        env.BASE_VERSION = baseVersion
-                        echo "DEBUG - Set env.BASE_VERSION to: '${env.BASE_VERSION}'"
-                        
                         // Get the git commit hash
                         def gitHash = sh(
                             script: 'git rev-parse --short HEAD',
@@ -137,8 +133,6 @@ spec:
                         ).trim()
                         
                         echo "DEBUG - Got git hash: '${gitHash}'"
-                        env.GIT_COMMIT_HASH = gitHash
-                        echo "DEBUG - Set env.GIT_COMMIT_HASH to: '${env.GIT_COMMIT_HASH}'"
                         
                         // Sync package.json version for build artifacts only (don't commit back)
                         dir('elohim-app') {
@@ -154,14 +148,17 @@ spec:
                         }
                         
                         echo "DEBUG - Calculated imageTag: '${imageTag}'"
+                        
+                        // Set environment variables using withEnv for proper persistence
+                        env.BASE_VERSION = baseVersion
+                        env.GIT_COMMIT_HASH = gitHash  
                         env.IMAGE_TAG = imageTag
-                        echo "DEBUG - Set env.IMAGE_TAG to: '${env.IMAGE_TAG}'"
                         
                         echo "DEBUG - Final Setup Version Stage Results:"
                         echo "Branch: ${env.BRANCH_NAME}"
-                        echo "Git Commit: ${env.GIT_COMMIT_HASH}"
-                        echo "Base Version: ${env.BASE_VERSION}"
-                        echo "Image Tag: ${env.IMAGE_TAG}"
+                        echo "Git Commit: ${gitHash}"
+                        echo "Base Version: ${baseVersion}"
+                        echo "Image Tag: ${imageTag}"
                         
                         // Persist build metadata to file for cross-stage reliability
                         writeFile file: 'build.env', text: """BASE_VERSION=${baseVersion}
