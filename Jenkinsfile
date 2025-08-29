@@ -92,7 +92,8 @@ spec:
                         sh 'git config --global --add safe.directory $(pwd)'
                         
                         // Read version from root VERSION file
-                        env.BASE_VERSION = readFile('VERSION').trim()
+                        def baseVersion = readFile('VERSION').trim()
+                        env.BASE_VERSION = baseVersion
                         
                         // Get the git commit hash
                         env.GIT_COMMIT_HASH = sh(
@@ -100,16 +101,19 @@ spec:
                             returnStdout: true
                         ).trim()
                         
+                        echo "DEBUG: Read base version: '${baseVersion}'"
+                        echo "DEBUG: ENV base version: '${env.BASE_VERSION}'"
+                        
                         // Sync package.json version for build artifacts only (don't commit back)
                         dir('elohim-app') {
-                            sh "npm version ${env.BASE_VERSION} --no-git-tag-version"
+                            sh "npm version '${baseVersion}' --no-git-tag-version"
                         }
                         
                         // Create comprehensive image tag
                         if (env.BRANCH_NAME == 'main') {
-                            env.IMAGE_TAG = "${env.BASE_VERSION}"
+                            env.IMAGE_TAG = "${baseVersion}"
                         } else {
-                            env.IMAGE_TAG = "${env.BASE_VERSION}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
+                            env.IMAGE_TAG = "${baseVersion}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
                         }
                         
                         echo "Branch: ${env.BRANCH_NAME}"
