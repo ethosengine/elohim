@@ -376,6 +376,9 @@ spec:
                         // Deploy staging only
                         sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
+                        // Force rollout restart to ensure new image is deployed
+                        sh 'kubectl rollout restart deployment/elohim-site-staging -n ethosengine'
+                        
                         // Wait for staging deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
                         
@@ -573,6 +576,9 @@ spec:
                         
                         // Deploy production (using same deployment file)
                         sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
+                        
+                        // Force rollout restart to ensure new image is deployed  
+                        sh 'kubectl rollout restart deployment/elohim-site -n ethosengine'
                         
                         // Wait for production deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
