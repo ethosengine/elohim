@@ -145,7 +145,14 @@ spec:
                     dir('elohim-app') {
                         script {
                             echo 'Building Angular application'
-                            sh "GIT_HASH=${env.GIT_COMMIT_HASH} npm run build"
+                            
+                            // Replace git hash placeholder in environment files
+                            sh """
+                                sed -i "s/GIT_HASH_PLACEHOLDER/${env.GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
+                                sed -i "s/GIT_HASH_PLACEHOLDER/${env.GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
+                            """
+                            
+                            sh 'npm run build'
                             echo 'Build output:'
                             sh 'ls -la dist/'
                         }
