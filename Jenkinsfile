@@ -62,6 +62,30 @@ spec:
     
     stages {
 
+        stage('Checkout') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'review-*'
+                    branch 'feat-*'
+                    changeRequest()
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        // Multibranch SCM checkout - supports filtered branches and PRs
+                        checkout scm
+                        
+                        // Validate that we're building an allowed branch
+                        echo "Building branch: ${env.BRANCH_NAME}"
+                        echo "Change request: ${env.CHANGE_ID ?: 'None'}"
+                    }
+                }
+            }
+        }
+
         stage('Setup Version') {
             steps {
                 container('builder'){
@@ -92,30 +116,6 @@ spec:
                         echo "Git Commit: ${env.GIT_COMMIT_HASH}"
                         echo "Semantic Version: ${env.SEMANTIC_VERSION}"
                         echo "Image Tag: ${env.IMAGE_TAG}"
-                    }
-                }
-            }
-        }
-
-        stage('Checkout') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'dev'
-                    branch 'review-*'
-                    branch 'feat-*'
-                    changeRequest()
-                }
-            }
-            steps {
-                container('builder'){
-                    script {
-                        // Multibranch SCM checkout - supports filtered branches and PRs
-                        checkout scm
-                        
-                        // Validate that we're building an allowed branch
-                        echo "Building branch: ${env.BRANCH_NAME}"
-                        echo "Change request: ${env.CHANGE_ID ?: 'None'}"
                     }
                 }
             }
