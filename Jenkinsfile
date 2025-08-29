@@ -52,11 +52,9 @@ spec:
     
     environment {
         // Initialize version variables
-        MAJOR_VERSION = '0'
-        MINOR_VERSION = '0'
         GIT_COMMIT_HASH = ''
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
-        SEMANTIC_VERSION = ''
+        BASE_VERSION = ''
         IMAGE_TAG = ''
     }
     
@@ -93,31 +91,30 @@ spec:
                         // Fix git safe.directory issue for Jenkins workspace
                         sh 'git config --global --add safe.directory $(pwd)'
                         
+                        // Read version from root VERSION file
+                        env.BASE_VERSION = readFile('VERSION').trim()
+                        
                         // Get the git commit hash
                         env.GIT_COMMIT_HASH = sh(
                             script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
                         
-                        // Calculate patch version based on commits since initial commit
-                        def patchVersion = sh(
-                            script: 'git rev-list --count HEAD',
-                            returnStdout: true
-                        ).trim()
-                        
-                        // Create semantic version
-                        env.SEMANTIC_VERSION = "${MAJOR_VERSION}.${MINOR_VERSION}.${patchVersion}"
+                        // Sync package.json version for build artifacts only (don't commit back)
+                        dir('elohim-app') {
+                            sh "npm version ${env.BASE_VERSION} --no-git-tag-version"
+                        }
                         
                         // Create comprehensive image tag
                         if (env.BRANCH_NAME == 'main') {
-                            env.IMAGE_TAG = "${env.SEMANTIC_VERSION}"
+                            env.IMAGE_TAG = "${env.BASE_VERSION}"
                         } else {
-                            env.IMAGE_TAG = "${env.SEMANTIC_VERSION}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
+                            env.IMAGE_TAG = "${env.BASE_VERSION}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
                         }
                         
                         echo "Branch: ${env.BRANCH_NAME}"
                         echo "Git Commit: ${env.GIT_COMMIT_HASH}"
-                        echo "Semantic Version: ${env.SEMANTIC_VERSION}"
+                        echo "Base Version: ${env.BASE_VERSION}"
                         echo "Image Tag: ${env.IMAGE_TAG}"
                     }
                 }
@@ -588,7 +585,7 @@ spec:
     post {
         success {
             echo 'Pipeline completed successfully. Docker image elohim-app:${IMAGE_TAG} (${GIT_COMMIT_HASH}) is ready.'
-            echo 'Semantic version: ${SEMANTIC_VERSION}'
+            echo 'Base version: ${BASE_VERSION}'
             echo 'Branch: ${BRANCH_NAME}'
         }
         failure {
