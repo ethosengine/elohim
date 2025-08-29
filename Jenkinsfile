@@ -419,11 +419,11 @@ spec:
                                 export NO_COLOR=1
                                 export DISPLAY=:99
                                 echo "Running E2E tests against: \$CYPRESS_baseUrl"
-                                echo "Expected git hash: \$CYPRESS_EXPECTED_GIT_HASH\""""
+                                echo "Expected git hash: \$CYPRESS_EXPECTED_GIT_HASH"
                                 
                                 # Start display server
                                 Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
-                                XVFB_PID=$!
+                                XVFB_PID=\$!
                                 sleep 2
                                 
                                 # Verify Cypress
@@ -459,13 +459,13 @@ spec:
                                 find . -name "*cucumber*" -type f 2>/dev/null || echo "No cucumber files found after test"
                                 
                                 # Cleanup
-                                kill $XVFB_PID 2>/dev/null || true
+                                kill \$XVFB_PID 2>/dev/null || true
                                 
                                 # Exit with appropriate code
-                                if [ "$TEST_RESULT" = "failed" ]; then
+                                if [ "\$TEST_RESULT" = "failed" ]; then
                                     exit 1
                                 fi
-                            '''
+                            """
                             
                             echo '✅ Staging validation tests passed successfully!'
                             echo 'Staging site is ready for production deployment'
