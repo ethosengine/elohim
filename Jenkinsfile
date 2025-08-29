@@ -1,9 +1,19 @@
 def loadBuildVars() {
-    def props = readProperties file: 'build.env'
+    def rootEnv = "${env.WORKSPACE}/build.env"
+    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+    def props = readProperties file: path
     env.BASE_VERSION    = props.BASE_VERSION
     env.GIT_COMMIT_HASH = props.GIT_COMMIT_HASH
     env.IMAGE_TAG       = props.IMAGE_TAG
     env.BRANCH_NAME     = props.BRANCH_NAME
+    echo "Loaded build vars from ${path}: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
+}
+
+def requireBuildVars() {
+    loadBuildVars()
+    if (!env.IMAGE_TAG?.trim() || !env.GIT_COMMIT_HASH?.trim() || !env.BASE_VERSION?.trim()) {
+        error "Build vars missing: IMAGE_TAG='${env.IMAGE_TAG}', GIT_COMMIT_HASH='${env.GIT_COMMIT_HASH}', BASE_VERSION='${env.BASE_VERSION}'"
+    }
 }
 
 pipeline {
@@ -154,9 +164,9 @@ spec:
                         echo "Image Tag: ${env.IMAGE_TAG}"
                         
                         // Persist build metadata to file for cross-stage reliability
-                        writeFile file: 'build.env', text: """BASE_VERSION=${env.BASE_VERSION}
-GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}
-IMAGE_TAG=${env.IMAGE_TAG}
+                        writeFile file: 'build.env', text: """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${imageTag}
 BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
 """.stripIndent()
                         
@@ -260,7 +270,7 @@ BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
             steps {
                 container('builder'){
                     script {
-                        loadBuildVars()
+                        requireBuildVars()
                         
                         echo 'Building container image using containerd'
                         
@@ -306,7 +316,7 @@ BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
             steps {
                 container('builder'){
                     script {
-                        loadBuildVars()
+                        requireBuildVars()
                         
                         withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                             echo 'Logging into Harbor registry'
@@ -417,7 +427,7 @@ BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
             steps {
                 container('builder'){
                     script {
-                        loadBuildVars()
+                        requireBuildVars()
                         
                         echo 'Deploying to Staging Environment'
                         
@@ -637,7 +647,7 @@ BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
             steps {
                 container('builder'){
                     script {
-                        loadBuildVars()
+                        requireBuildVars()
                         
                         echo 'Deploying to Production Environment'
                         
