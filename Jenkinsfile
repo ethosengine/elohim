@@ -364,10 +364,10 @@ spec:
                         '''
                         
                         // Update image tag in deployment manifest with semantic version
-                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${env.IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${env.IMAGE_TAG}.yaml"
+                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${IMAGE_TAG}.yaml"
                         
                         // Deploy staging only
-                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
+                        sh "kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml"
                         
                         // Wait for staging deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
@@ -563,7 +563,7 @@ spec:
                         '''
                         
                         // Deploy production (using same deployment file)
-                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
+                        sh "kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml"
                         
                         // Wait for production deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
