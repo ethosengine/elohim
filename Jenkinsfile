@@ -117,10 +117,13 @@ spec:
                             env.IMAGE_TAG = "${baseVersion}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
                         }
                         
+                        echo "DEBUG - Setup Version Stage Results:"
                         echo "Branch: ${env.BRANCH_NAME}"
                         echo "Git Commit: ${env.GIT_COMMIT_HASH}"
                         echo "Base Version: ${env.BASE_VERSION}"
                         echo "Image Tag: ${env.IMAGE_TAG}"
+                        echo "DEBUG - Local variables:"
+                        echo "baseVersion (local): ${baseVersion}"
                     }
                 }
             }
@@ -145,6 +148,12 @@ spec:
                     dir('elohim-app') {
                         script {
                             echo 'Building Angular application'
+                            
+                            // Debug: Check environment variables in Build App stage
+                            echo "DEBUG - Build App Stage Environment Variables:"
+                            echo "IMAGE_TAG: ${env.IMAGE_TAG}"
+                            echo "GIT_COMMIT_HASH: ${env.GIT_COMMIT_HASH}"
+                            echo "BASE_VERSION: ${env.BASE_VERSION}"
                             
                             // Replace git hash placeholder in environment files
                             sh """
@@ -213,6 +222,12 @@ spec:
                 container('builder'){
                     script {
                         echo 'Building container image using containerd'
+                        
+                        // Debug: Check environment variables in Build Image stage
+                        echo "DEBUG - Build Image Stage Environment Variables:"
+                        echo "IMAGE_TAG: ${env.IMAGE_TAG}"
+                        echo "GIT_COMMIT_HASH: ${env.GIT_COMMIT_HASH}"
+                        echo "BASE_VERSION: ${env.BASE_VERSION}"
                         
                         sh """#!/bin/bash
                             set -euo pipefail
