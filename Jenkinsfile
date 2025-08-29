@@ -50,16 +50,72 @@ spec:
         }
     }
     
+    environment {
+        // Initialize version variables
+        MAJOR_VERSION = '0'
+        MINOR_VERSION = '0'
+        GIT_COMMIT_HASH = ''
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
+        SEMANTIC_VERSION = ''
+        IMAGE_TAG = ''
+    }
+    
     stages {
 
-        stage('Checkout') {
+        stage('Setup Version') {
             steps {
                 container('builder'){
                     script {
-                        //scm checkout
-                        checkout([$class: 'GitSCM', 
-                                 branches: [[name: '*/main']], 
-                                 userRemoteConfigs: [[url: 'https://github.com/ethosengine/elohim.git']]])
+                        // Get the git commit hash
+                        env.GIT_COMMIT_HASH = sh(
+                            script: 'git rev-parse --short HEAD',
+                            returnStdout: true
+                        ).trim()
+                        
+                        // Calculate patch version based on commits since initial commit
+                        def patchVersion = sh(
+                            script: 'git rev-list --count HEAD',
+                            returnStdout: true
+                        ).trim()
+                        
+                        // Create semantic version
+                        env.SEMANTIC_VERSION = "${MAJOR_VERSION}.${MINOR_VERSION}.${patchVersion}"
+                        
+                        // Create comprehensive image tag
+                        if (env.BRANCH_NAME == 'main') {
+                            env.IMAGE_TAG = "${env.SEMANTIC_VERSION}"
+                        } else {
+                            env.IMAGE_TAG = "${env.SEMANTIC_VERSION}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
+                        }
+                        
+                        echo "Branch: ${env.BRANCH_NAME}"
+                        echo "Git Commit: ${env.GIT_COMMIT_HASH}"
+                        echo "Semantic Version: ${env.SEMANTIC_VERSION}"
+                        echo "Image Tag: ${env.IMAGE_TAG}"
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'dev'
+                    branch 'review-*'
+                    branch 'feat-*'
+                    changeRequest()
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        // Multibranch SCM checkout - supports filtered branches and PRs
+                        checkout scm
+                        
+                        // Validate that we're building an allowed branch
+                        echo "Building branch: ${env.BRANCH_NAME}"
+                        echo "Change request: ${env.CHANGE_ID ?: 'None'}"
                     }
                 }
             }
@@ -157,12 +213,18 @@ spec:
                             cp -r elohim-app /tmp/build-context/
                             cp images/Dockerfile /tmp/build-context/
                             
-                            # Build container image
+                            # Build container image with semantic versioning
                             cd /tmp/build-context
                             BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
-                              nerdctl -n k8s.io build -t elohim-app:${BUILD_NUMBER} -f Dockerfile .
+                              nerdctl -n k8s.io build -t elohim-app:${IMAGE_TAG} -f Dockerfile .
 
-                            nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} elohim-app:latest
+                            # Tag with commit hash for traceability
+                            nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:${GIT_COMMIT_HASH}
+                            
+                            # Only tag as latest for main branch
+                            if [ "${BRANCH_NAME}" = "main" ]; then
+                                nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:latest
+                            fi
                         '''
                         env.DOCKER_BUILD_COMPLETED = 'true'
                         echo 'Container image built successfully'
@@ -179,13 +241,22 @@ spec:
                             echo 'Logging into Harbor registry'
                             sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
                             
-                            echo 'Tagging image for Harbor registry'
-                            sh 'nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
-                            sh 'nerdctl -n k8s.io tag elohim-app:${BUILD_NUMBER} harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            echo 'Tagging image for Harbor registry with semantic versioning'
+                            sh 'nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}'
+                            sh 'nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}'
+                            
+                            // Only tag and push latest for main branch
+                            if (env.BRANCH_NAME == 'main') {
+                                sh 'nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            }
                             
                             echo 'Pushing images to Harbor registry'
-                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER}'
-                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}'
+                            sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}'
+                            
+                            if (env.BRANCH_NAME == 'main') {
+                                sh 'nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest'
+                            }
                             
                             echo 'Successfully pushed to Harbor registry'
                         }
@@ -204,14 +275,14 @@ spec:
                             // Trigger scan via Harbor API using wget with basic auth
                             sh '''
                                 AUTH_HEADER="Authorization: Basic $(echo -n "$HARBOR_USERNAME:$HARBOR_PASSWORD" | base64)"
-                                echo "Triggering scan for artifact: ${BUILD_NUMBER}"
+                                echo "Triggering scan for artifact: ${IMAGE_TAG}"
                                 wget --post-data="" \
                                   --header="accept: application/json" \
                                   --header="Content-Type: application/json" \
                                   --header="$AUTH_HEADER" \
                                   -S \
                                   -O- \
-                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${BUILD_NUMBER}/scan" || \
+                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/scan" || \
                                 echo "Scan request failed - check error response above"
                             '''
                             
@@ -232,7 +303,7 @@ spec:
                                     VULN_DATA=$(wget -q -O- \
                                       --header="accept: application/json" \
                                       --header="$AUTH_HEADER" \
-                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${BUILD_NUMBER}/additions/vulnerabilities" 2>/dev/null || echo "")
+                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
                                     
                                     # Check if we got valid scan data
                                     if [ ! -z "$VULN_DATA" ] && echo "$VULN_DATA" | grep -q '"scanner"'; then
@@ -286,11 +357,11 @@ spec:
                             echo "✅ Staging ConfigMap validated"
                         '''
                         
-                        // Update image tag in deployment manifest
-                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${BUILD_NUMBER}/g' manifests/deployment.yaml > manifests/deployment-${BUILD_NUMBER}.yaml"
+                        // Update image tag in deployment manifest with semantic version
+                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${IMAGE_TAG}.yaml"
                         
                         // Deploy staging only
-                        sh 'kubectl apply -f manifests/deployment-${BUILD_NUMBER}.yaml'
+                        sh 'kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml'
                         
                         // Wait for staging deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
@@ -481,7 +552,7 @@ spec:
                         '''
                         
                         // Deploy production (using same deployment file)
-                        sh 'kubectl apply -f manifests/deployment-${BUILD_NUMBER}.yaml'
+                        sh 'kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml'
                         
                         // Wait for production deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
@@ -513,7 +584,9 @@ spec:
 
     post {
         success {
-            echo 'Pipeline completed successfully. Docker image elohim-app:${BUILD_NUMBER} is ready.'
+            echo 'Pipeline completed successfully. Docker image elohim-app:${IMAGE_TAG} (${GIT_COMMIT_HASH}) is ready.'
+            echo 'Semantic version: ${SEMANTIC_VERSION}'
+            echo 'Branch: ${BRANCH_NAME}'
         }
         failure {
             echo 'Pipeline failed. Check the logs for details.'
@@ -524,10 +597,14 @@ spec:
                     try {
                         container('builder') {
                             echo 'Cleaning up nerdctl images...'
-                            sh 'nerdctl -n k8s.io rmi elohim-app:${BUILD_NUMBER} || true'
-                            sh 'nerdctl -n k8s.io rmi elohim-app:latest || true'
-                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${BUILD_NUMBER} || true'
-                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
+                            sh 'nerdctl -n k8s.io rmi elohim-app:${IMAGE_TAG} || true'
+                            sh 'nerdctl -n k8s.io rmi elohim-app:${GIT_COMMIT_HASH} || true'
+                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG} || true'
+                            sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH} || true'
+                            if (env.BRANCH_NAME == 'main') {
+                                sh 'nerdctl -n k8s.io rmi elohim-app:latest || true'
+                                sh 'nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true'
+                            }
                             sh 'nerdctl -n k8s.io system prune -af --volumes || true'
                             echo 'nerdctl cleanup completed.'
                         }
