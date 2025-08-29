@@ -1,3 +1,11 @@
+def loadBuildVars() {
+    def props = readProperties file: 'build.env'
+    env.BASE_VERSION    = props.BASE_VERSION
+    env.GIT_COMMIT_HASH = props.GIT_COMMIT_HASH
+    env.IMAGE_TAG       = props.IMAGE_TAG
+    env.BRANCH_NAME     = props.BRANCH_NAME
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -66,8 +74,8 @@ spec:
                     branch 'main'
                     branch 'staging'
                     branch 'dev'
-                    branch 'review-*'
-                    branch 'feat-*'
+                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
                     changeRequest()
                 }
             }
@@ -144,6 +152,15 @@ spec:
                         echo "Git Commit: ${env.GIT_COMMIT_HASH}"
                         echo "Base Version: ${env.BASE_VERSION}"
                         echo "Image Tag: ${env.IMAGE_TAG}"
+                        
+                        // Persist build metadata to file for cross-stage reliability
+                        writeFile file: 'build.env', text: """BASE_VERSION=${env.BASE_VERSION}
+GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}
+IMAGE_TAG=${env.IMAGE_TAG}
+BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
+""".stripIndent()
+                        
+                        echo "DEBUG - Persisted build variables to build.env"
                     }
                 }
             }
@@ -167,10 +184,12 @@ spec:
                 container('builder'){
                     dir('elohim-app') {
                         script {
+                            loadBuildVars()
+                            
                             echo 'Building Angular application'
                             
                             // Debug: Check environment variables in Build App stage
-                            echo "DEBUG - Build App Stage Environment Variables:"
+                            echo "DEBUG - Build App Stage Environment Variables (after loadBuildVars):"
                             echo "IMAGE_TAG: ${env.IMAGE_TAG}"
                             echo "GIT_COMMIT_HASH: ${env.GIT_COMMIT_HASH}"
                             echo "BASE_VERSION: ${env.BASE_VERSION}"
@@ -241,10 +260,12 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        loadBuildVars()
+                        
                         echo 'Building container image using containerd'
                         
                         // Debug: Check environment variables in Build Image stage
-                        echo "DEBUG - Build Image Stage Environment Variables:"
+                        echo "DEBUG - Build Image Stage Environment Variables (after loadBuildVars):"
                         echo "IMAGE_TAG: ${env.IMAGE_TAG}"
                         echo "GIT_COMMIT_HASH: ${env.GIT_COMMIT_HASH}"
                         echo "BASE_VERSION: ${env.BASE_VERSION}"
@@ -285,6 +306,8 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        loadBuildVars()
+                        
                         withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                             echo 'Logging into Harbor registry'
                             sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
@@ -317,6 +340,8 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        loadBuildVars()
+                        
                         withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                             echo 'Triggering Harbor vulnerability scan'
                             
@@ -392,10 +417,12 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        loadBuildVars()
+                        
                         echo 'Deploying to Staging Environment'
                         
                         // Debug: Show environment variables
-                        echo "DEBUG - Deploy Staging Environment Variables:"
+                        echo "DEBUG - Deploy Staging Environment Variables (after loadBuildVars):"
                         echo "IMAGE_TAG: ${env.IMAGE_TAG}"
                         echo "GIT_COMMIT_HASH: ${env.GIT_COMMIT_HASH}"
                         echo "BRANCH_NAME: ${env.BRANCH_NAME}"
@@ -444,6 +471,8 @@ spec:
                 container('builder'){
                     dir('elohim-app') {
                         script {
+                            loadBuildVars()
+                            
                             echo 'Running E2E tests to validate staging deployment'
                             
                             // Mark that E2E tests are being attempted
@@ -608,6 +637,8 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        loadBuildVars()
+                        
                         echo 'Deploying to Production Environment'
                         
                         // Validate production dependencies exist
@@ -657,15 +688,17 @@ spec:
 
     post {
         success {
-            echo 'Pipeline completed successfully. Docker image elohim-app:${IMAGE_TAG} (${GIT_COMMIT_HASH}) is ready.'
-            echo 'Base version: ${BASE_VERSION}'
-            echo 'Branch: ${BRANCH_NAME}'
+            echo "Pipeline completed successfully. Docker image elohim-app:${env.IMAGE_TAG} (${env.GIT_COMMIT_HASH}) is ready."
+            echo "Base version: ${env.BASE_VERSION}"
+            echo "Branch: ${env.BRANCH_NAME}"
         }
         failure {
             echo 'Pipeline failed. Check the logs for details.'
         }
         always {
             script {
+                loadBuildVars()
+                
                 if (env.DOCKER_BUILD_COMPLETED == 'true') {
                     try {
                         container('builder') {
