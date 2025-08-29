@@ -92,18 +92,35 @@ spec:
                         // Fix git safe.directory issue for Jenkins workspace
                         sh 'git config --global --add safe.directory $(pwd)'
                         
+                        echo "DEBUG - Setup Version: Starting variable setup"
+                        echo "DEBUG - Initial BRANCH_NAME: ${env.BRANCH_NAME}"
+                        
+                        // Check if VERSION file exists
+                        if (!fileExists('VERSION')) {
+                            error "VERSION file not found in workspace"
+                        }
+                        
                         // Read version from root VERSION file
                         def baseVersion = readFile('VERSION').trim()
+                        echo "DEBUG - Read baseVersion from file: '${baseVersion}'"
+                        
+                        if (!baseVersion) {
+                            error "VERSION file is empty"
+                        }
+                        
+                        // Set environment variables
                         env.BASE_VERSION = baseVersion
+                        echo "DEBUG - Set env.BASE_VERSION to: '${env.BASE_VERSION}'"
                         
                         // Get the git commit hash
-                        env.GIT_COMMIT_HASH = sh(
+                        def gitHash = sh(
                             script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
                         
-                        echo "DEBUG: Read base version: '${baseVersion}'"
-                        echo "DEBUG: ENV base version: '${env.BASE_VERSION}'"
+                        echo "DEBUG - Got git hash: '${gitHash}'"
+                        env.GIT_COMMIT_HASH = gitHash
+                        echo "DEBUG - Set env.GIT_COMMIT_HASH to: '${env.GIT_COMMIT_HASH}'"
                         
                         // Sync package.json version for build artifacts only (don't commit back)
                         dir('elohim-app') {
@@ -111,19 +128,22 @@ spec:
                         }
                         
                         // Create comprehensive image tag
+                        def imageTag
                         if (env.BRANCH_NAME == 'main') {
-                            env.IMAGE_TAG = "${baseVersion}"
+                            imageTag = "${baseVersion}"
                         } else {
-                            env.IMAGE_TAG = "${baseVersion}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
+                            imageTag = "${baseVersion}-${env.BRANCH_NAME}-${gitHash}"
                         }
                         
-                        echo "DEBUG - Setup Version Stage Results:"
+                        echo "DEBUG - Calculated imageTag: '${imageTag}'"
+                        env.IMAGE_TAG = imageTag
+                        echo "DEBUG - Set env.IMAGE_TAG to: '${env.IMAGE_TAG}'"
+                        
+                        echo "DEBUG - Final Setup Version Stage Results:"
                         echo "Branch: ${env.BRANCH_NAME}"
                         echo "Git Commit: ${env.GIT_COMMIT_HASH}"
                         echo "Base Version: ${env.BASE_VERSION}"
                         echo "Image Tag: ${env.IMAGE_TAG}"
-                        echo "DEBUG - Local variables:"
-                        echo "baseVersion (local): ${baseVersion}"
                     }
                 }
             }
