@@ -30,6 +30,7 @@
 
 /* Base footer styles */
 footer {
+  position: relative;
   margin-top: 0;
   padding: 2rem 1rem;
   background: var(--forest-light);
@@ -349,4 +350,17 @@ footer {
   .project-links a:not(.social-icon) {
     color: #93C5FD;
   }
+}
+
+/* Build Info */
+.build-info {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 1rem;
+  opacity: 0.4;
+}
+
+.git-hash {
+  font-size: 0.7rem;
+  color: var(--tech-glow);
 }

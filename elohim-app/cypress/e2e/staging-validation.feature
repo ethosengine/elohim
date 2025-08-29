@@ -16,3 +16,9 @@ Feature: Staging Site Validation
     Then the page title should contain "elohim.host"
     And the hero section should be displayed
     And the footer should be present
+
+  Scenario: Git hash validation
+    Given I navigate to the staging site
+    When the page loads
+    Then the footer should display the expected git hash
+    And the git hash should match the deployed version
