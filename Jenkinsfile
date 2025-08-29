@@ -90,6 +90,9 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        // Fix git safe.directory issue for Jenkins workspace
+                        sh 'git config --global --add safe.directory $(pwd)'
+                        
                         // Get the git commit hash
                         env.GIT_COMMIT_HASH = sh(
                             script: 'git rev-parse --short HEAD',
