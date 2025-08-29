@@ -688,20 +688,28 @@ BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
 
     post {
         success {
-            echo "Pipeline completed successfully. Docker image elohim-app:${env.IMAGE_TAG} (${env.GIT_COMMIT_HASH}) is ready."
-            echo "Base version: ${env.BASE_VERSION}"
-            echo "Branch: ${env.BRANCH_NAME}"
+            script {
+                try {
+                    container('builder') {
+                        loadBuildVars()
+                        echo "Pipeline completed successfully. Docker image elohim-app:${env.IMAGE_TAG} (${env.GIT_COMMIT_HASH}) is ready."
+                        echo "Base version: ${env.BASE_VERSION}"
+                        echo "Branch: ${env.BRANCH_NAME}"
+                    }
+                } catch (Exception e) {
+                    echo "Pipeline completed successfully (build vars unavailable in post section)"
+                }
+            }
         }
         failure {
             echo 'Pipeline failed. Check the logs for details.'
         }
         always {
             script {
-                loadBuildVars()
-                
                 if (env.DOCKER_BUILD_COMPLETED == 'true') {
                     try {
                         container('builder') {
+                            loadBuildVars()
                             echo 'Cleaning up nerdctl images...'
                             sh "nerdctl -n k8s.io rmi elohim-app:${env.IMAGE_TAG} || true"
                             sh "nerdctl -n k8s.io rmi elohim-app:${env.GIT_COMMIT_HASH} || true"
