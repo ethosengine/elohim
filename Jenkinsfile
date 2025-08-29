@@ -228,14 +228,14 @@ spec:
                             # Build container image with semantic versioning
                             cd /tmp/build-context
                             BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                              nerdctl -n k8s.io build -t elohim-app:${IMAGE_TAG} -f Dockerfile .
+                              nerdctl -n k8s.io build -t elohim-app:${env.IMAGE_TAG} -f Dockerfile .
 
                             # Tag with commit hash for traceability
-                            nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:${GIT_COMMIT_HASH}
+                            nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} elohim-app:${env.GIT_COMMIT_HASH}
                             
                             # Only tag as latest for main branch
-                            if [ "${BRANCH_NAME}" = "main" ]; then
-                                nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:latest
+                            if [ "${env.BRANCH_NAME}" = "main" ]; then
+                                nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} elohim-app:latest
                             fi
                         """
                         
@@ -255,17 +255,17 @@ spec:
                             sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
                             
                             echo 'Tagging image for Harbor registry with semantic versioning'
-                            sh "nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}"
-                            sh "nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}"
+                            sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG}"
+                            sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH}"
                             
                             // Only tag and push latest for main branch
                             if (env.BRANCH_NAME == 'main') {
-                                sh "nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest"
+                                sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest"
                             }
                             
                             echo 'Pushing images to Harbor registry'
-                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}"
-                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}"
+                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG}"
+                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH}"
                             
                             if (env.BRANCH_NAME == 'main') {
                                 sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest"
@@ -288,14 +288,14 @@ spec:
                             // Trigger scan via Harbor API using wget with basic auth
                             sh """
                                 AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
-                                echo "Triggering scan for artifact: ${IMAGE_TAG}"
+                                echo "Triggering scan for artifact: ${env.IMAGE_TAG}"
                                 wget --post-data="" \\
                                   --header="accept: application/json" \\
                                   --header="Content-Type: application/json" \\
                                   --header="\$AUTH_HEADER" \\
                                   -S \\
                                   -O- \\
-                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/scan" || \\
+                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${env.IMAGE_TAG}/scan" || \\
                                 echo "Scan request failed - check error response above"
                             """
                             
@@ -316,7 +316,7 @@ spec:
                                     VULN_DATA=\$(wget -q -O- \\
                                       --header="accept: application/json" \\
                                       --header="\$AUTH_HEADER" \\
-                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
+                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${env.IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
                                     
                                     # Check if we got valid scan data
                                     if [ ! -z "\$VULN_DATA" ] && echo "\$VULN_DATA" | grep -q '"scanner"'; then
@@ -371,10 +371,10 @@ spec:
                         '''
                         
                         // Update image tag in deployment manifest with semantic version
-                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${IMAGE_TAG}.yaml"
+                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${env.IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
                         // Deploy staging only
-                        sh "kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml"
+                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
                         // Wait for staging deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
@@ -572,7 +572,7 @@ spec:
                         '''
                         
                         // Deploy production (using same deployment file)
-                        sh "kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml"
+                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
                         
                         // Wait for production deployment to be ready
                         sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
@@ -617,10 +617,10 @@ spec:
                     try {
                         container('builder') {
                             echo 'Cleaning up nerdctl images...'
-                            sh "nerdctl -n k8s.io rmi elohim-app:${IMAGE_TAG} || true"
-                            sh "nerdctl -n k8s.io rmi elohim-app:${GIT_COMMIT_HASH} || true"
-                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG} || true"
-                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH} || true"
+                            sh "nerdctl -n k8s.io rmi elohim-app:${env.IMAGE_TAG} || true"
+                            sh "nerdctl -n k8s.io rmi elohim-app:${env.GIT_COMMIT_HASH} || true"
+                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG} || true"
+                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH} || true"
                             if (env.BRANCH_NAME == 'main') {
                                 sh "nerdctl -n k8s.io rmi elohim-app:latest || true"
                                 sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true"
