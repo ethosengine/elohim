@@ -64,6 +64,7 @@ spec:
             when {
                 anyOf {
                     branch 'main'
+                    branch 'staging'
                     branch 'dev'
                     branch 'review-*'
                     branch 'feat-*'
@@ -540,6 +541,11 @@ spec:
         }
 
         stage('Deploy to Prod') {
+            when {
+                anyOf {
+                    branch 'main'
+                }
+            }
             steps {
                 container('builder'){
                     script {
