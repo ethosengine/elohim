@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-site
+  namespace: ethosengine
+  labels:
+    app: elohim-site
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: elohim-site
+  template:
+    metadata:
+      labels:
+        app: elohim-site
+    spec:
+      containers:
+      - name: elohim-site
+        image: harbor.ethosengine.com/ethosengine/elohim-site:BUILD_NUMBER_PLACEHOLDER
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/nginx/html/assets/config.json
+          subPath: config.json
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: elohim-config-prod

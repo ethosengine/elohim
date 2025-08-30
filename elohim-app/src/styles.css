@@ -7,13 +7,19 @@
 }
 
 :root {
+    /* Space theme colors */
+    --space-black: #000000;
+    --atmosphere-dark: #0a0a0a;
+    --atmosphere-mid: #1a1a2e;
+    --atmosphere-light: #16213e;
+    --text-light: #F3F4F6;
+    
+    /* Accent colors for interactive elements */
     --primary: #6B46C1;
     --secondary: #EC4899;
-    --dark: #0F0F23;
-    --light: #F3F4F6;
     --accent: #10B981;
     
-    /* ethosengine theme variables */
+    /* Footer earthy theme colors */
     --forest-dark: rgb(26, 35, 31);
     --forest-light: rgb(36, 49, 41);
     --leaf-light: rgb(201, 212, 197);
@@ -26,11 +32,48 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: var(--dark);
-    color: var(--light);
+    background: 
+        radial-gradient(ellipse at 20% 30%, rgba(107, 70, 193, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(236, 72, 153, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.1) 0%, transparent 60%),
+        linear-gradient(135deg, var(--atmosphere-dark) 0%, var(--atmosphere-mid) 50%, var(--atmosphere-light) 100%);
+    color: var(--text-light);
     overflow-x: hidden;
     cursor: default;
 }
+
+/* Global fixed starry sky background - appears bright on black, subtle on gradient */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.9), transparent),
+        radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,1), transparent),
+        radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.7), transparent),
+        radial-gradient(2px 2px at 160px 30px, rgba(255,255,255,0.9), transparent),
+        radial-gradient(1px 1px at 200px 90px, rgba(255,255,255,0.8), transparent),
+        radial-gradient(2px 2px at 240px 50px, rgba(255,255,255,0.85), transparent),
+        radial-gradient(1px 1px at 280px 20px, rgba(255,255,255,0.9), transparent),
+        radial-gradient(1px 1px at 320px 100px, rgba(255,255,255,1), transparent),
+        radial-gradient(2px 2px at 360px 60px, rgba(255,255,255,0.75), transparent);
+    background-repeat: repeat;
+    background-size: 400px 200px;
+    animation: twinkle 8s linear infinite;
+    pointer-events: none;
+    z-index: -5;
+    mix-blend-mode: screen;
+}
+
+@keyframes twinkle {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 0.85; }
+}
+
 
 /* Smooth scrolling */
 html {
@@ -51,90 +94,16 @@ html {
     border-radius: 4px;
 }
 
-/* Hero Section */
-.hero {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-    background: radial-gradient(ellipse at center, rgba(107, 70, 193, 0.15) 0%, transparent 70%);
-}
-
-.hero::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-        radial-gradient(circle at 20% 50%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
-        radial-gradient(circle at 80% 50%, rgba(107, 70, 193, 0.3) 0%, transparent 50%),
-        radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
-    animation: pulse 8s ease-in-out infinite;
-    will-change: opacity;
-    transform: translateZ(0);
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.8; }
-    50% { opacity: 1; }
-}
-
-.hero-content {
-    z-index: 10;
-    text-align: center;
-    max-width: 900px;
-    padding: 0 2rem;
-}
-
-.hero h1 {
-    font-size: clamp(2.5rem, 8vw, 5rem);
-    font-weight: 900;
-    background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 1.5rem;
-    animation: float 6s ease-in-out infinite;
-    will-change: transform;
-    transform: translateZ(0);
-}
-
+/* Global float animation - used by hero component */
 @keyframes float {
     0%, 100% { transform: translate3d(0, 0, 0); }
     50% { transform: translate3d(0, -10px, 0); }
 }
 
-.hero p {
-    font-size: 1.5rem;
-    opacity: 0.9;
-    line-height: 1.6;
-    margin-bottom: 2rem;
-}
-
-.scroll-indicator {
-    position: absolute;
-    bottom: 3rem;
-    left: 50%;
-    transform: translateX(-50%);
-    animation: bounce 2s infinite;
-    cursor: pointer;
-    will-change: transform;
-}
-
+/* Bounce animation - used by hero component scroll indicator */
 @keyframes bounce {
     0%, 100% { transform: translate3d(-50%, 0, 0); }
     50% { transform: translate3d(-50%, 10px, 0); }
-}
-
-.scroll-indicator svg {
-    width: 30px;
-    height: 30px;
-    fill: var(--light);
-    opacity: 0.5;
 }
 
 /* Section Styles */
@@ -177,37 +146,6 @@ html {
     opacity: 0.9;
 }
 
-/* Parallax Backgrounds */
-.parallax-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    z-index: -1;
-    opacity: 0.3;
-    --scroll-y: 0;
-}
-
-.parallax-layer {
-    position: absolute;
-    width: 110%;
-    height: 110%;
-    will-change: transform;
-    transform: translateZ(0);
-}
-
-.layer-1 {
-    background: radial-gradient(circle at 30% 50%, rgba(236, 72, 153, 0.4) 0%, transparent 70%);
-}
-
-.layer-2 {
-    background: radial-gradient(circle at 70% 50%, rgba(107, 70, 193, 0.4) 0%, transparent 70%);
-}
-
-.layer-3 {
-    background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
-}
 
 /* Cards */
 .card-grid {
@@ -253,50 +191,6 @@ html {
     font-size: 1.3rem;
 }
 
-/* Glowing orbs */
-.orb {
-    position: fixed;
-    border-radius: 50%;
-    filter: blur(40px);
-    opacity: 0.5;
-    pointer-events: none;
-    z-index: -1;
-    will-change: transform;
-    transform: translateZ(0);
-}
-
-.orb-1 {
-    width: 400px;
-    height: 400px;
-    background: var(--primary);
-    top: 10%;
-    left: -10%;
-    animation: drift 20s infinite ease-in-out;
-}
-
-.orb-2 {
-    width: 300px;
-    height: 300px;
-    background: var(--secondary);
-    bottom: 10%;
-    right: -10%;
-    animation: drift 25s infinite ease-in-out reverse;
-}
-
-.orb-3 {
-    width: 350px;
-    height: 350px;
-    background: var(--accent);
-    top: 50%;
-    left: 50%;
-    animation: drift 30s infinite ease-in-out;
-}
-
-@keyframes drift {
-    0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-    33% { transform: translate3d(30px, -30px, 0) rotate(120deg); }
-    66% { transform: translate3d(-20px, 20px, 0) rotate(240deg); }
-}
 
 /* Quote */
 .quote {
