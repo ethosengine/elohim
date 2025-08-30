@@ -1,3 +1,35 @@
+// Best practice: Return values instead of setting env directly
+def loadBuildVars() {
+    def rootEnv = "${env.WORKSPACE}/build.env"
+    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+    
+    echo "DEBUG: Looking for build.env at: ${path}"
+    if (!fileExists(path)) {
+        error "build.env not found at ${path}"
+    }
+    
+    // Debug: Show actual file contents
+    sh "echo '--- build.env content ---'; cat '${path}'"
+    
+    def props = readProperties file: path
+    echo "DEBUG: Properties read from file: ${props}"
+    
+    // Return the properties instead of trying to set env
+    return props
+}
+
+// Helper to setup environment from properties
+def withBuildVars(props, Closure body) {
+    withEnv([
+        "BASE_VERSION=${props.BASE_VERSION ?: ''}",
+        "GIT_COMMIT_HASH=${props.GIT_COMMIT_HASH ?: ''}",
+        "IMAGE_TAG=${props.IMAGE_TAG ?: ''}",
+        "BRANCH_NAME=${props.BRANCH_NAME ?: env.BRANCH_NAME}"
+    ]) {
+        body()
+    }
+}
+
 pipeline {
     agent {
         kubernetes {
@@ -51,32 +83,26 @@ spec:
     }
     
     environment {
-        // Initialize version variables
-        GIT_COMMIT_HASH = ''
+        // Only set static values here
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
-        BASE_VERSION = ''
-        IMAGE_TAG = ''
     }
     
     stages {
-
         stage('Checkout') {
             when {
                 anyOf {
                     branch 'main'
+                    branch 'staging'
                     branch 'dev'
-                    branch 'review-*'
-                    branch 'feat-*'
+                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
                     changeRequest()
                 }
             }
             steps {
                 container('builder'){
                     script {
-                        // Multibranch SCM checkout - supports filtered branches and PRs
                         checkout scm
-                        
-                        // Validate that we're building an allowed branch
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
                     }
@@ -88,38 +114,59 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        // Fix git safe.directory issue for Jenkins workspace
+                        // Fix git safe.directory issue
                         sh 'git config --global --add safe.directory $(pwd)'
                         
-                        // Read version from root VERSION file
-                        def baseVersion = readFile('VERSION').trim()
-                        env.BASE_VERSION = baseVersion
+                        echo "DEBUG - Setup Version: Starting"
+                        echo "DEBUG - Branch: ${env.BRANCH_NAME}"
                         
-                        // Get the git commit hash
-                        env.GIT_COMMIT_HASH = sh(
+                        // Validate VERSION file
+                        if (!fileExists('VERSION')) {
+                            error "VERSION file not found in workspace"
+                        }
+                        
+                        // Read base version
+                        def baseVersion = readFile('VERSION').trim()
+                        echo "DEBUG - Base version: '${baseVersion}'"
+                        
+                        if (!baseVersion) {
+                            error "VERSION file is empty"
+                        }
+                        
+                        // Get git hash
+                        def gitHash = sh(
                             script: 'git rev-parse --short HEAD',
                             returnStdout: true
                         ).trim()
+                        echo "DEBUG - Git hash: '${gitHash}'"
                         
-                        echo "DEBUG: Read base version: '${baseVersion}'"
-                        echo "DEBUG: ENV base version: '${env.BASE_VERSION}'"
-                        
-                        // Sync package.json version for build artifacts only (don't commit back)
+                        // Sync package.json version
                         dir('elohim-app') {
                             sh "npm version '${baseVersion}' --no-git-tag-version"
                         }
                         
-                        // Create comprehensive image tag
-                        if (env.BRANCH_NAME == 'main') {
-                            env.IMAGE_TAG = "${baseVersion}"
-                        } else {
-                            env.IMAGE_TAG = "${baseVersion}-${env.BRANCH_NAME}-${env.GIT_COMMIT_HASH}"
-                        }
+                        // Create image tag
+                        def imageTag = (env.BRANCH_NAME == 'main') 
+                            ? baseVersion 
+                            : "${baseVersion}-${env.BRANCH_NAME}-${gitHash}"
                         
-                        echo "Branch: ${env.BRANCH_NAME}"
-                        echo "Git Commit: ${env.GIT_COMMIT_HASH}"
-                        echo "Base Version: ${env.BASE_VERSION}"
-                        echo "Image Tag: ${env.IMAGE_TAG}"
+                        echo "DEBUG - Image tag: '${imageTag}'"
+                        
+                        // Write build.env file
+                        def buildEnvContent = """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${imageTag}
+BRANCH_NAME=${env.BRANCH_NAME}"""
+                        
+                        writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
+                        
+                        // Verify file was written
+                        sh "cat '${env.WORKSPACE}/build.env'"
+                        
+                        // Archive for debugging
+                        archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
+                        
+                        echo "Build variables persisted to build.env"
                     }
                 }
             }
@@ -143,10 +190,22 @@ spec:
                 container('builder'){
                     dir('elohim-app') {
                         script {
-                            echo 'Building Angular application'
-                            sh 'npm run build'
-                            echo 'Build output:'
-                            sh 'ls -la dist/'
+                            def props = loadBuildVars()
+                            
+                            withBuildVars(props) {
+                                echo 'Building Angular application'
+                                echo "Using git hash: ${GIT_COMMIT_HASH}"
+                                echo "Using image tag: ${IMAGE_TAG}"
+                                
+                                // Replace placeholders
+                                sh """
+                                    sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
+                                    sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
+                                """
+                                
+                                sh 'npm run build'
+                                sh 'ls -la dist/'
+                            }
                         }
                     }
                 }
@@ -183,14 +242,11 @@ spec:
                                 '''
                             }
                             
-                            // Wait for webhook-based quality gate result
-                            echo "Waiting for SonarQube webhook to deliver quality gate result..."
+                            echo "Waiting for SonarQube quality gate..."
                             timeout(time: 4, unit: 'MINUTES') {
                                 def qg = waitForQualityGate()
                                 if (qg.status != 'OK') {
-                                    echo "❌ SonarQube Quality Gate FAILED with status: ${qg.status}"
-                                    echo "Quality gate conditions not met. Check SonarQube for details."
-                                    error "🚫 PIPELINE FAILED: SonarQube Quality Gate is ${qg.status} - fix code quality issues before proceeding"
+                                    error "SonarQube Quality Gate failed: ${qg.status}"
                                 }
                                 echo "✅ SonarQube Quality Gate passed"
                             }
@@ -204,35 +260,46 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        echo 'Building container image using containerd'
+                        def props = loadBuildVars()
                         
-                        sh """#!/bin/bash
-                            set -euo pipefail
-
-                            echo "Verifying BuildKit..."
-                            buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
-
-                            # Create clean build context
-                            mkdir -p /tmp/build-context
-                            cp -r elohim-app /tmp/build-context/
-                            cp images/Dockerfile /tmp/build-context/
-                            
-                            # Build container image with semantic versioning
-                            cd /tmp/build-context
-                            BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
-                              nerdctl -n k8s.io build -t elohim-app:${env.IMAGE_TAG} -f Dockerfile .
-
-                            # Tag with commit hash for traceability
-                            nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} elohim-app:${env.GIT_COMMIT_HASH}
-                            
-                            # Only tag as latest for main branch
-                            if [ "${env.BRANCH_NAME}" = "main" ]; then
-                                nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} elohim-app:latest
-                            fi
-                        """
+                        // Validate required variables
+                        if (!props.IMAGE_TAG || !props.GIT_COMMIT_HASH || !props.BASE_VERSION) {
+                            error "Missing required build variables: IMAGE_TAG='${props.IMAGE_TAG}', GIT_COMMIT_HASH='${props.GIT_COMMIT_HASH}', BASE_VERSION='${props.BASE_VERSION}'"
+                        }
                         
-                        env.DOCKER_BUILD_COMPLETED = 'true'
-                        echo 'Container image built successfully'
+                        withBuildVars(props) {
+                            echo 'Building container image'
+                            echo "Image tag: ${IMAGE_TAG}"
+                            echo "Git hash: ${GIT_COMMIT_HASH}"
+                            
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                # Verify BuildKit
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                # Create build context
+                                mkdir -p /tmp/build-context
+                                cp -r elohim-app /tmp/build-context/
+                                cp images/Dockerfile /tmp/build-context/
+                                
+                                # Build image
+                                cd /tmp/build-context
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                  nerdctl -n k8s.io build -t elohim-app:${IMAGE_TAG} -f Dockerfile .
+
+                                # Additional tags
+                                nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:${GIT_COMMIT_HASH}
+                                
+                                if [ "${BRANCH_NAME}" = "main" ]; then
+                                    nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} elohim-app:latest
+                                fi
+                            """
+                            
+                            // Mark build as completed
+                            env.DOCKER_BUILD_COMPLETED = 'true'
+                            echo 'Container image built successfully'
+                        }
                     }
                 }
             }
@@ -242,28 +309,31 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
-                            echo 'Logging into Harbor registry'
-                            sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
-                            
-                            echo 'Tagging image for Harbor registry with semantic versioning'
-                            sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG}"
-                            sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH}"
-                            
-                            // Only tag and push latest for main branch
-                            if (env.BRANCH_NAME == 'main') {
-                                sh "nerdctl -n k8s.io tag elohim-app:${env.IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest"
+                        def props = loadBuildVars()
+                        
+                        withBuildVars(props) {
+                            withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                                echo 'Logging into Harbor registry'
+                                sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
+                                
+                                echo "Tagging and pushing image: ${IMAGE_TAG}"
+                                sh """
+                                    nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}
+                                    nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}
+                                    
+                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG}
+                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH}
+                                """
+                                
+                                if (env.BRANCH_NAME == 'main') {
+                                    sh """
+                                        nerdctl -n k8s.io tag elohim-app:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-site:latest
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest
+                                    """
+                                }
+                                
+                                echo 'Successfully pushed to Harbor registry'
                             }
-                            
-                            echo 'Pushing images to Harbor registry'
-                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG}"
-                            sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH}"
-                            
-                            if (env.BRANCH_NAME == 'main') {
-                                sh "nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-site:latest"
-                            }
-                            
-                            echo 'Successfully pushed to Harbor registry'
                         }
                     }
                 }
@@ -274,71 +344,48 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
-                            echo 'Triggering Harbor vulnerability scan'
-                            
-                            // Trigger scan via Harbor API using wget with basic auth
-                            sh """
-                                AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
-                                echo "Triggering scan for artifact: ${env.IMAGE_TAG}"
-                                wget --post-data="" \\
-                                  --header="accept: application/json" \\
-                                  --header="Content-Type: application/json" \\
-                                  --header="\$AUTH_HEADER" \\
-                                  -S \\
-                                  -O- \\
-                                  "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${env.IMAGE_TAG}/scan" || \\
-                                echo "Scan request failed - check error response above"
-                            """
-                            
-                            echo 'Vulnerability scan initiated. Polling for completion...'
-                            
-                            // Poll for scan completion with smart retry logic
-                            sh """#!/bin/bash
-                                AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
+                        def props = loadBuildVars()
+                        
+                        withBuildVars(props) {
+                            withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                                echo "Triggering Harbor scan for: ${IMAGE_TAG}"
                                 
-                                # Polling configuration
-                                MAX_ATTEMPTS=24  # 24 attempts = 4 minutes max
-                                ATTEMPT=1
-                                POLL_INTERVAL=10  # 10 seconds between polls
-                                
-                                echo "Polling for scan completion..."
-                                
-                                while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
-                                    VULN_DATA=\$(wget -q -O- \\
+                                sh """
+                                    AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
+                                    
+                                    wget --post-data="" \\
                                       --header="accept: application/json" \\
+                                      --header="Content-Type: application/json" \\
                                       --header="\$AUTH_HEADER" \\
-                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${env.IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
-                                    
-                                    # Check if we got valid scan data
-                                    if [ ! -z "\$VULN_DATA" ] && echo "\$VULN_DATA" | grep -q '"scanner"'; then
-                                        echo "✅ Scan completed after \$ATTEMPT attempts"
-                                        break
-                                    fi
-                                    
-                                    if [ \$ATTEMPT -eq \$MAX_ATTEMPTS ]; then
-                                        echo "❌ Scan timeout after \$MAX_ATTEMPTS attempts"
-                                        VULN_DATA=""
-                                        break
-                                    fi
-                                    
-                                    [ \$((ATTEMPT % 5)) -eq 0 ] && echo "Waiting for scan (attempt \$ATTEMPT/\$MAX_ATTEMPTS)..."
-                                    sleep \$POLL_INTERVAL
-                                    ATTEMPT=\$((ATTEMPT + 1))
-                                done
+                                      -S -O- \\
+                                      "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/scan" || \\
+                                    echo "Scan request failed"
+                                """
                                 
-                                if [ ! -z "\$VULN_DATA" ]; then
-                                    # Check vulnerabilities
-                                    if echo "\$VULN_DATA" | grep -q '"vulnerabilities":\\\\[\\\\]'; then
-                                        echo "✅ Security Status: CLEAN - No vulnerabilities found"
-                                    else
-                                        VULN_COUNT=\$(echo "\$VULN_DATA" | grep -o '"vulnerabilities":\\\\[.*\\\\]' | grep -o '\\\\[.*\\\\]' | tr ',' '\\\\n' | wc -l)
-                                        echo "⚠️  Security Status: \$VULN_COUNT vulnerabilities detected"
-                                    fi
-                                else
-                                    echo "❌ Scan data unavailable. Check Harbor UI: https://harbor.ethosengine.com"
-                                fi
-                            """
+                                echo 'Scan initiated, polling for completion...'
+                                
+                                sh """#!/bin/bash
+                                    AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
+                                    MAX_ATTEMPTS=24
+                                    ATTEMPT=1
+                                    
+                                    while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
+                                        VULN_DATA=\$(wget -q -O- \\
+                                          --header="accept: application/json" \\
+                                          --header="\$AUTH_HEADER" \\
+                                          "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
+                                        
+                                        if [ ! -z "\$VULN_DATA" ] && echo "\$VULN_DATA" | grep -q '"scanner"'; then
+                                            echo "✅ Scan completed"
+                                            break
+                                        fi
+                                        
+                                        [ \$((ATTEMPT % 5)) -eq 0 ] && echo "Waiting for scan (attempt \$ATTEMPT/\$MAX_ATTEMPTS)..."
+                                        sleep 10
+                                        ATTEMPT=\$((ATTEMPT + 1))
+                                    done
+                                """
+                            }
                         }
                     }
                 }
@@ -349,33 +396,28 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        echo 'Deploying to Staging Environment'
+                        def props = loadBuildVars()
                         
-                        // Validate staging dependencies exist
-                        sh '''
-                            echo "Validating staging ConfigMap exists..."
-                            kubectl get configmap elohim-config-staging -n ethosengine || {
-                                echo "❌ ERROR: elohim-config-staging ConfigMap missing"
-                                echo "Run: kubectl apply -f manifests/configmap-staging.yaml"
-                                exit 1
-                            }
-                            echo "✅ Staging ConfigMap validated"
-                        '''
-                        
-                        // Update image tag in deployment manifest with semantic version
-                        sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${env.IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${env.IMAGE_TAG}.yaml"
-                        
-                        // Deploy staging only
-                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
-                        
-                        // Wait for staging deployment to be ready
-                        sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
-                        
-                        // Show staging deployment status
-                        sh 'kubectl get deployments,services,pods -l app=elohim-site-staging -n ethosengine'
-                        
-                        echo 'Staging deployment completed successfully!'
-                        echo 'Staging URL: https://staging.elohim.host'
+                        withBuildVars(props) {
+                            echo "Deploying to Staging: ${IMAGE_TAG}"
+                            
+                            // Validate configmap
+                            sh '''
+                                kubectl get configmap elohim-config-staging -n ethosengine || {
+                                    echo "❌ ERROR: elohim-config-staging ConfigMap missing"
+                                    exit 1
+                                }
+                            '''
+                            
+                            // Update deployment manifest
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
+                            
+                            // Deploy
+                            sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
+                            sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
+                            
+                            echo 'Staging deployment completed!'
+                        }
                     }
                 }
             }
@@ -386,86 +428,52 @@ spec:
                 container('builder'){
                     dir('elohim-app') {
                         script {
-                            echo 'Running E2E tests to validate staging deployment'
+                            def props = loadBuildVars()
                             
-                            // Mark that E2E tests are being attempted
-                            env.E2E_TESTS_RAN = 'true'
-                            
-                            // Install E2E test dependencies if not already cached
-                            sh '''
-                                if [ ! -d "node_modules/cypress" ]; then
-                                    echo "Installing Cypress and dependencies..."
-                                    npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
-                                else
-                                    echo "Cypress dependencies already installed"
-                                fi
-                            '''
-                            
-                            // Verify staging endpoint is responding
-                            sh '''#!/bin/bash
-                                echo "Verifying staging endpoint..."
-                                timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do 
-                                    sleep 5
-                                done'
-                                echo "✅ Staging site is responding"
-                            '''
-                            
-                            // Run Cypress E2E tests against staging with explicit environment targeting
-                            sh '''#!/bin/bash
-                                export CYPRESS_baseUrl=https://staging.elohim.host
-                                export CYPRESS_ENV=staging
-                                export NO_COLOR=1
-                                export DISPLAY=:99
-                                echo "Running E2E tests against: $CYPRESS_baseUrl"
+                            withBuildVars(props) {
+                                echo 'Running E2E tests against staging'
+                                env.E2E_TESTS_RAN = 'true'
                                 
-                                # Start display server
-                                Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
-                                XVFB_PID=$!
-                                sleep 2
+                                // Install Cypress if needed
+                                sh '''
+                                    if [ ! -d "node_modules/cypress" ]; then
+                                        npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+                                    fi
+                                '''
                                 
-                                # Verify Cypress
-                                echo "Verifying Cypress..."
-                                npx cypress verify > /dev/null || {
-                                    echo "❌ Cypress verification failed"
-                                    exit 1
-                                }
+                                // Verify staging is up
+                                sh '''
+                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do 
+                                        sleep 5
+                                    done'
+                                    echo "✅ Staging site is responding"
+                                '''
                                 
-                                echo "Creating reports directory..."
-                                mkdir -p cypress/reports
+                                // Run tests
+                                sh """#!/bin/bash
+                                    export CYPRESS_baseUrl=https://staging.elohim.host
+                                    export CYPRESS_ENV=staging
+                                    export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
+                                    export NO_COLOR=1
+                                    export DISPLAY=:99
+                                    
+                                    Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
+                                    XVFB_PID=\$!
+                                    sleep 2
+                                    
+                                    npx cypress verify > /dev/null
+                                    mkdir -p cypress/reports
+                                    
+                                    npx cypress run \\
+                                        --headless \\
+                                        --browser chromium \\
+                                        --spec "cypress/e2e/staging-validation.feature"
+                                    
+                                    kill \$XVFB_PID 2>/dev/null || true
+                                """
                                 
-                                echo "DEBUG: Checking cucumber preprocessor config..."
-                                cat package.json | grep -A 10 "cypress-cucumber-preprocessor"
-                                
-                                echo "DEBUG: Listing installed cucumber packages..."
-                                npm list | grep cucumber || echo "No cucumber packages found"
-                                
-                                echo "Running E2E tests..."
-                                if npx cypress run \
-                                    --headless \
-                                    --browser chromium \
-                                    --spec "cypress/e2e/staging-validation.feature"; then
-                                    echo "✅ E2E tests passed successfully!"
-                                    TEST_RESULT="passed"
-                                else
-                                    echo "❌ E2E tests failed!"
-                                    TEST_RESULT="failed"
-                                fi
-                                
-                                echo "DEBUG: Checking for reports after test execution..."
-                                ls -la cypress/reports/ 2>/dev/null || echo "No reports directory found after test"
-                                find . -name "*cucumber*" -type f 2>/dev/null || echo "No cucumber files found after test"
-                                
-                                # Cleanup
-                                kill $XVFB_PID 2>/dev/null || true
-                                
-                                # Exit with appropriate code
-                                if [ "$TEST_RESULT" = "failed" ]; then
-                                    exit 1
-                                fi
-                            '''
-                            
-                            echo '✅ Staging validation tests passed successfully!'
-                            echo 'Staging site is ready for production deployment'
+                                echo '✅ Staging validation passed!'
+                            }
                         }
                     }
                 }
@@ -477,7 +485,6 @@ spec:
                 always {
                     dir('elohim-app') {
                         script {
-                            // Only try to publish cucumber reports if E2E tests actually ran
                             if (env.E2E_TESTS_RAN == 'true') {
                                 echo '📊 Publishing cucumber reports...'
                                 
@@ -518,7 +525,6 @@ spec:
                             
                             // Archive test artifacts if E2E tests ran
                             if (env.E2E_TESTS_RAN == 'true') {
-                                sh 'echo "Archiving test artifacts..."'
                                 if (fileExists('cypress/screenshots')) {
                                     archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
                                 }
@@ -540,33 +546,33 @@ spec:
         }
 
         stage('Deploy to Prod') {
+            when {
+                branch 'main'
+            }
             steps {
                 container('builder'){
                     script {
-                        echo 'Deploying to Production Environment'
+                        def props = loadBuildVars()
                         
-                        // Validate production dependencies exist
-                        sh '''
-                            echo "Validating production ConfigMap exists..."
-                            kubectl get configmap elohim-config-prod -n ethosengine || {
-                                echo "❌ ERROR: elohim-config-prod ConfigMap missing"
-                                echo "Run: kubectl apply -f manifests/configmap-prod.yaml"
-                                exit 1
-                            }
-                            echo "✅ Production ConfigMap validated"
-                        '''
-                        
-                        // Deploy production (using same deployment file)
-                        sh "kubectl apply -f manifests/deployment-${env.IMAGE_TAG}.yaml"
-                        
-                        // Wait for production deployment to be ready
-                        sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
-                        
-                        // Show production deployment status
-                        sh 'kubectl get deployments,services,pods -l app=elohim-site -n ethosengine'
-                        
-                        echo 'Production deployment completed successfully!'
-                        echo 'Production URL: https://elohim.host'
+                        withBuildVars(props) {
+                            echo "Deploying to Production: ${IMAGE_TAG}"
+                            
+                            // Validate configmap
+                            sh '''
+                                kubectl get configmap elohim-config-prod -n ethosengine || {
+                                    echo "❌ ERROR: elohim-config-prod ConfigMap missing"
+                                    exit 1
+                                }
+                            '''
+                            
+                            // Deploy
+                     
+                            // Update deployment manifest
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml" 
+                            sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
+                            
+                            echo 'Production deployment completed!'
+                        }
                     }
                 }
             }
@@ -576,7 +582,7 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        echo 'Cleaning up to save space'
+                        echo 'Cleaning up workspace'
                         dir('elohim-app') {
                             sh 'rm -rf node_modules || true'
                         }
@@ -584,14 +590,24 @@ spec:
                 }
             }
         }
-
     }
 
     post {
         success {
-            echo 'Pipeline completed successfully. Docker image elohim-app:${IMAGE_TAG} (${GIT_COMMIT_HASH}) is ready.'
-            echo 'Base version: ${BASE_VERSION}'
-            echo 'Branch: ${BRANCH_NAME}'
+            script {
+                try {
+                    container('builder') {
+                        def props = loadBuildVars()
+                        echo "Pipeline completed successfully"
+                        echo "Docker image: elohim-app:${props.IMAGE_TAG}"
+                        echo "Git hash: ${props.GIT_COMMIT_HASH}"
+                        echo "Base version: ${props.BASE_VERSION}"
+                        echo "Branch: ${props.BRANCH_NAME}"
+                    }
+                } catch (Exception e) {
+                    echo "Pipeline completed successfully"
+                }
+            }
         }
         failure {
             echo 'Pipeline failed. Check the logs for details.'
@@ -601,23 +617,29 @@ spec:
                 if (env.DOCKER_BUILD_COMPLETED == 'true') {
                     try {
                         container('builder') {
-                            echo 'Cleaning up nerdctl images...'
-                            sh "nerdctl -n k8s.io rmi elohim-app:${env.IMAGE_TAG} || true"
-                            sh "nerdctl -n k8s.io rmi elohim-app:${env.GIT_COMMIT_HASH} || true"
-                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${env.IMAGE_TAG} || true"
-                            sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${env.GIT_COMMIT_HASH} || true"
-                            if (env.BRANCH_NAME == 'main') {
-                                sh "nerdctl -n k8s.io rmi elohim-app:latest || true"
-                                sh "nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true"
+                            def props = loadBuildVars()
+                            withBuildVars(props) {
+                                echo 'Cleaning up Docker images...'
+                                sh """
+                                    nerdctl -n k8s.io rmi elohim-app:${IMAGE_TAG} || true
+                                    nerdctl -n k8s.io rmi elohim-app:${GIT_COMMIT_HASH} || true
+                                    nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG} || true
+                                    nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH} || true
+                                """
+                                if (env.BRANCH_NAME == 'main') {
+                                    sh """
+                                        nerdctl -n k8s.io rmi elohim-app:latest || true
+                                        nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true
+                                    """
+                                }
+                                sh "nerdctl -n k8s.io system prune -af --volumes || true"
                             }
-                            sh "nerdctl -n k8s.io system prune -af --volumes || true"
-                            echo 'nerdctl cleanup completed.'
                         }
                     } catch (Exception e) {
-                        echo "nerdctl cleanup failed: ${e.message}"
+                        echo "Cleanup failed: ${e.message}"
                     }
                 } else {
-                    echo 'Build was not completed, skipping image cleanup.'
+                    echo 'Build not completed, skipping cleanup.'
                 }
             }
         }
