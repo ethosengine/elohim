@@ -1,19 +1,32 @@
+def persistBuildVars(Map vars) {
+    // Always write to the workspace root, in canonical .properties format
+    writeProperties file: "${env.WORKSPACE}/build.env", properties: vars
+    echo "Saved build vars to ${env.WORKSPACE}/build.env"
+}
+
 def loadBuildVars() {
-    def rootEnv = "${env.WORKSPACE}/build.env"
-    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+    def path = "${env.WORKSPACE}/build.env"
+    if (!fileExists(path)) {
+        error "build.env not found at ${path}"
+    }
     def props = readProperties file: path
-    echo "check current build vars: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
-    env.BASE_VERSION    = props.BASE_VERSION
-    env.GIT_COMMIT_HASH = props.GIT_COMMIT_HASH
-    env.IMAGE_TAG       = props.IMAGE_TAG
-    env.BRANCH_NAME     = props.BRANCH_NAME
-    echo "Loaded build vars from ${path}: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
+
+    // Populate env only with non-empty values
+    props.each { k, v ->
+        if (v != null && v.toString().trim()) {
+            env[k] = v.toString().trim()
+        }
+    }
+
+    echo "Loaded: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH_NAME=${env.BRANCH_NAME}"
 }
 
 def requireBuildVars() {
     loadBuildVars()
-    if (!env.IMAGE_TAG?.trim() || !env.GIT_COMMIT_HASH?.trim() || !env.BASE_VERSION?.trim()) {
-        error "Build vars missing: IMAGE_TAG='${env.IMAGE_TAG}', GIT_COMMIT_HASH='${env.GIT_COMMIT_HASH}', BASE_VERSION='${env.BASE_VERSION}'"
+    ['IMAGE_TAG','GIT_COMMIT_HASH','BASE_VERSION','BRANCH_NAME'].each { k ->
+        if (!env[k]?.trim()) {
+            error "Build vars missing: ${k}='${env[k]}'"
+        }
     }
 }
 
@@ -162,11 +175,15 @@ spec:
                         echo "Image Tag: ${imageTag}"
                         
                         // Persist build metadata to file for cross-stage reliability
-                        writeFile file: 'build.env', text: """BASE_VERSION=${baseVersion}
-                            GIT_COMMIT_HASH=${gitHash}
-                            IMAGE_TAG=${imageTag}
-                            BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
-                            """.stripIndent()
+                        persistBuildVars([
+                            BASE_VERSION   : baseVersion,
+                            GIT_COMMIT_HASH: gitHash,
+                            IMAGE_TAG      : imageTag,
+                            BRANCH_NAME    : (env.BRANCH_NAME ?: 'main')
+                        ])
+
+                        // Optional: keep a copy in the build for debugging
+                        archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
                         
                         echo "DEBUG - Persisted build variables to build.env"
                     }
