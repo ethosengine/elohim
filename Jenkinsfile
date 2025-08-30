@@ -4,23 +4,29 @@ def loadBuildVars() {
         error "build.env not found at ${path}"
     }
     def props = readProperties file: path
-
-    // Populate env only with non-empty values
-    props.each { k, v ->
-        if (v != null && v.toString().trim()) {
-            env[k] = v.toString().trim()
-        }
+    echo "check current build vars: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
+    
+    // Populate env only with non-empty values using explicit assignment
+    if (props.BASE_VERSION != null && props.BASE_VERSION.toString().trim()) {
+        env.BASE_VERSION = props.BASE_VERSION.toString().trim()
+    }
+    if (props.GIT_COMMIT_HASH != null && props.GIT_COMMIT_HASH.toString().trim()) {
+        env.GIT_COMMIT_HASH = props.GIT_COMMIT_HASH.toString().trim()
+    }
+    if (props.IMAGE_TAG != null && props.IMAGE_TAG.toString().trim()) {
+        env.IMAGE_TAG = props.IMAGE_TAG.toString().trim()
+    }
+    if (props.BRANCH_NAME != null && props.BRANCH_NAME.toString().trim()) {
+        env.BRANCH_NAME = props.BRANCH_NAME.toString().trim()
     }
 
-    echo "Loaded: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH_NAME=${env.BRANCH_NAME}"
+    echo "Loaded build vars from ${path}: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
 }
 
 def requireBuildVars() {
     loadBuildVars()
-    ['IMAGE_TAG','GIT_COMMIT_HASH','BASE_VERSION','BRANCH_NAME'].each { k ->
-        if (!env[k]?.trim()) {
-            error "Build vars missing: ${k}='${env[k]}'"
-        }
+    if (!env.IMAGE_TAG?.trim() || !env.GIT_COMMIT_HASH?.trim() || !env.BASE_VERSION?.trim()) {
+        error "Build vars missing: IMAGE_TAG='${env.IMAGE_TAG}', GIT_COMMIT_HASH='${env.GIT_COMMIT_HASH}', BASE_VERSION='${env.BASE_VERSION}'"
     }
 }
 
