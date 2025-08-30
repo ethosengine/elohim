@@ -15,17 +15,34 @@ def loadBuildVars() {
     echo "check current build vars: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
     
     // Populate env only with non-empty values using explicit assignment
-    if (props.BASE_VERSION != null && props.BASE_VERSION.toString().trim()) {
-        env.BASE_VERSION = props.BASE_VERSION.toString().trim()
+    echo "DEBUG: Assigning properties to env..."
+    if (props.BASE_VERSION != null) {
+        def val = props.BASE_VERSION.toString().trim()
+        echo "DEBUG: BASE_VERSION = '${val}'"
+        if (val) {
+            env.BASE_VERSION = val
+        }
     }
-    if (props.GIT_COMMIT_HASH != null && props.GIT_COMMIT_HASH.toString().trim()) {
-        env.GIT_COMMIT_HASH = props.GIT_COMMIT_HASH.toString().trim()
+    if (props.GIT_COMMIT_HASH != null) {
+        def val = props.GIT_COMMIT_HASH.toString().trim()
+        echo "DEBUG: GIT_COMMIT_HASH = '${val}'"
+        if (val) {
+            env.GIT_COMMIT_HASH = val
+        }
     }
-    if (props.IMAGE_TAG != null && props.IMAGE_TAG.toString().trim()) {
-        env.IMAGE_TAG = props.IMAGE_TAG.toString().trim()
+    if (props.IMAGE_TAG != null) {
+        def val = props.IMAGE_TAG.toString().trim()
+        echo "DEBUG: IMAGE_TAG = '${val}'"
+        if (val) {
+            env.IMAGE_TAG = val
+        }
     }
-    if (props.BRANCH_NAME != null && props.BRANCH_NAME.toString().trim()) {
-        env.BRANCH_NAME = props.BRANCH_NAME.toString().trim()
+    if (props.BRANCH_NAME != null) {
+        def val = props.BRANCH_NAME.toString().trim()
+        echo "DEBUG: BRANCH_NAME = '${val}'"
+        if (val) {
+            env.BRANCH_NAME = val
+        }
     }
 
     echo "Loaded build vars from ${path}: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
