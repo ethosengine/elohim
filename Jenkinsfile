@@ -2,6 +2,7 @@ def loadBuildVars() {
     def rootEnv = "${env.WORKSPACE}/build.env"
     def path = fileExists(rootEnv) ? rootEnv : 'build.env'
     def props = readProperties file: path
+    echo "check current build vars: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
     env.BASE_VERSION    = props.BASE_VERSION
     env.GIT_COMMIT_HASH = props.GIT_COMMIT_HASH
     env.IMAGE_TAG       = props.IMAGE_TAG
@@ -162,10 +163,10 @@ spec:
                         
                         // Persist build metadata to file for cross-stage reliability
                         writeFile file: 'build.env', text: """BASE_VERSION=${baseVersion}
-GIT_COMMIT_HASH=${gitHash}
-IMAGE_TAG=${imageTag}
-BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
-""".stripIndent()
+                            GIT_COMMIT_HASH=${gitHash}
+                            IMAGE_TAG=${imageTag}
+                            BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}
+                            """.stripIndent()
                         
                         echo "DEBUG - Persisted build variables to build.env"
                     }
