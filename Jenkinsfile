@@ -1,9 +1,3 @@
-def persistBuildVars(Map vars) {
-    // Always write to the workspace root, in canonical .properties format
-    writeProperties file: "${env.WORKSPACE}/build.env", properties: vars
-    echo "Saved build vars to ${env.WORKSPACE}/build.env"
-}
-
 def loadBuildVars() {
     def path = "${env.WORKSPACE}/build.env"
     if (!fileExists(path)) {
@@ -175,12 +169,11 @@ spec:
                         echo "Image Tag: ${imageTag}"
                         
                         // Persist build metadata to file for cross-stage reliability
-                        persistBuildVars([
-                            BASE_VERSION   : baseVersion,
-                            GIT_COMMIT_HASH: gitHash,
-                            IMAGE_TAG      : imageTag,
-                            BRANCH_NAME    : (env.BRANCH_NAME ?: 'main')
-                        ])
+                        // Write in proper .properties format (no indentation issues)
+                        writeFile file: "${env.WORKSPACE}/build.env", text: """BASE_VERSION=${baseVersion}
+GIT_COMMIT_HASH=${gitHash}
+IMAGE_TAG=${imageTag}
+BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}"""
 
                         // Optional: keep a copy in the build for debugging
                         archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
