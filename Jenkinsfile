@@ -1,9 +1,17 @@
 def loadBuildVars() {
-    def path = "${env.WORKSPACE}/build.env"
+    def rootEnv = "${env.WORKSPACE}/build.env"
+    def path = fileExists(rootEnv) ? rootEnv : 'build.env'
+    
+    echo "DEBUG: Looking for build.env at: ${path}"
     if (!fileExists(path)) {
         error "build.env not found at ${path}"
     }
+    
+    // Debug: Show actual file contents
+    sh "echo '--- build.env content ---'; cat '${path}' || true"
+    
     def props = readProperties file: path
+    echo "DEBUG: Properties read from file: ${props}"
     echo "check current build vars: IMAGE_TAG=${env.IMAGE_TAG}, GIT_COMMIT_HASH=${env.GIT_COMMIT_HASH}, BASE_VERSION=${env.BASE_VERSION}, BRANCH=${env.BRANCH_NAME}"
     
     // Populate env only with non-empty values using explicit assignment
@@ -176,11 +184,19 @@ spec:
                         
                         // Persist build metadata to file for cross-stage reliability
                         // Write in proper .properties format (no indentation issues)
-                        writeFile file: "${env.WORKSPACE}/build.env", text: """BASE_VERSION=${baseVersion}
+                        def buildEnvContent = """BASE_VERSION=${baseVersion}
 GIT_COMMIT_HASH=${gitHash}
 IMAGE_TAG=${imageTag}
 BRANCH_NAME=${env.BRANCH_NAME ?: 'main'}"""
+                        
+                        echo "DEBUG - Writing to build.env:"
+                        echo buildEnvContent
+                        
+                        writeFile file: "${env.WORKSPACE}/build.env", text: buildEnvContent
 
+                        // Debug: Verify what was actually written
+                        sh "echo '--- Verifying build.env was written ---'; cat '${env.WORKSPACE}/build.env' || true"
+                        
                         // Optional: keep a copy in the build for debugging
                         archiveArtifacts artifacts: 'build.env', allowEmptyArchive: false
                         
