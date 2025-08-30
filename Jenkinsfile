@@ -410,11 +410,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
                             
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/deployment.yaml > manifests/deployment-${IMAGE_TAG}.yaml"
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
                             
                             // Deploy
-                            sh "kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml"
-                            sh 'kubectl rollout restart deployment/elohim-site-staging -n ethosengine'
+                            sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
                             sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
                             
                             echo 'Staging deployment completed!'
@@ -567,9 +566,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             '''
                             
                             // Deploy
-                            sh "kubectl apply -f manifests/deployment-${IMAGE_TAG}.yaml"
-                            sh 'kubectl rollout restart deployment/elohim-site -n ethosengine'
-                            sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
+                     
+                            // Update deployment manifest
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml" 
+                            sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
                             
                             echo 'Production deployment completed!'
                         }
