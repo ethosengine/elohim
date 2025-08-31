@@ -40,7 +40,7 @@ kind: Pod
 spec:
  serviceAccount: jenkins-deployer
  nodeSelector:
-    node-type: operations
+    node-type: performance
  volumes:
   - name: containerd-sock
     hostPath:
