@@ -44,14 +44,20 @@ export class AnalyticsService {
       (window as any).dataLayer.push(args);
     };
 
-    // Configure GA
-    (window as any).gtag('js', new Date());
-    (window as any).gtag('config', GA_TRACKING_ID);
 
     // Load script
     const script = this.document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`;
+    
+    // Configure GA
+    script.onload = () => {
+      (window as any).gtag('js', new Date());
+      (window as any).gtag('config', GA_TRACKING_ID);
+    };
+    
     this.document.head.appendChild(script);
+
+
   }
 }
