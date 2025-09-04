@@ -39,7 +39,7 @@ export class AnalyticsService {
     if (!window) return;
 
     // Initialize dataLayer and gtag
-    (window as any).dataLayer = (window as any).dataLayer || [];
+    (window as any).dataLayer = (window as any).dataLayer ?? [];
     (window as any).gtag = function() {
       (window as any).dataLayer.push(arguments);
     };
