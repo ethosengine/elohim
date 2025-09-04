@@ -570,6 +570,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml" 
                             sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
+                            sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
                             
                             echo 'Production deployment completed!'
                         }
