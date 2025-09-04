@@ -117,11 +117,15 @@ describe('AnalyticsService', () => {
     expect(metaAppendCall).toBeUndefined();
   });
 
-  it('should execute script onload callback', () => {
+  it('should execute script onload callback and test gtag function', () => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     service = TestBed.inject(AnalyticsService);
     
+    // Execute the onload callback
     mockScript.onload();
-    expect(mockWindow.dataLayer.length).toBeGreaterThan(0);
+    
+    // Test that gtag function was created and works
+    mockWindow.gtag('test');
+    expect(mockWindow.dataLayer.length).toBeGreaterThan(2);
   });
 });
