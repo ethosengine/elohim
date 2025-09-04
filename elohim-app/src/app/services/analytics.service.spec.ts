@@ -139,4 +139,18 @@ describe('AnalyticsService', () => {
     // Verify existing dataLayer was preserved
     expect(mockWindow.dataLayer).toEqual(['existing']);
   });
+
+  it('should not reinitialize if already initialized', () => {
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
+    service = TestBed.inject(AnalyticsService);
+    
+    const createElementCallCount = mockDocument.createElement.calls.count();
+    
+    // Trigger config again - should not reinitialize
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
+    (service as any).initializeIfProduction();
+    
+    // Should not create additional script elements
+    expect(mockDocument.createElement.calls.count()).toBe(createElementCallCount);
+  });
 });
