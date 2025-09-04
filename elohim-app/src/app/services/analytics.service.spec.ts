@@ -25,9 +25,7 @@ describe('AnalyticsService', () => {
       content: ''
     };
     
-    mockWindow = {
-      dataLayer: []
-    };
+    mockWindow = {};
     
     mockDocument = {
       createElement: jasmine.createSpy('createElement').and.callFake((tagName: string) => {
@@ -121,11 +119,24 @@ describe('AnalyticsService', () => {
     configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
     service = TestBed.inject(AnalyticsService);
     
+    // Verify dataLayer was initialized
+    expect(mockWindow.dataLayer).toEqual([]);
+    expect(typeof mockWindow.gtag).toBe('function');
+    
     // Execute the onload callback
     mockScript.onload();
     
     // Test that gtag function was created and works
     mockWindow.gtag('test');
     expect(mockWindow.dataLayer.length).toBeGreaterThan(2);
+  });
+
+  it('should preserve existing dataLayer if present', () => {
+    mockWindow.dataLayer = ['existing'];
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
+    service = TestBed.inject(AnalyticsService);
+    
+    // Verify existing dataLayer was preserved
+    expect(mockWindow.dataLayer).toEqual(['existing']);
   });
 });
