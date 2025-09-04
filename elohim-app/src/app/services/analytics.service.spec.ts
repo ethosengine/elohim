@@ -63,6 +63,10 @@ describe('AnalyticsService', () => {
     expect(mockScript.src).toBe('https://www.googletagmanager.com/gtag/js?id=G-NSL7PVP55B');
     expect(mockScript.async).toBe(true);
     expect(mockDocument.head.appendChild).toHaveBeenCalledWith(mockScript);
+    
+    // Test gtag function initialization
+    expect(mockWindow.dataLayer).toEqual([]);
+    expect(typeof mockWindow.gtag).toBe('function');
   });
 
   it('should NOT inject Google Analytics script in staging environment', () => {
@@ -111,5 +115,17 @@ describe('AnalyticsService', () => {
     const appendChildCalls = mockDocument.head.appendChild.calls.all();
     const metaAppendCall = appendChildCalls.find((call: any) => call.args[0] === mockMeta);
     expect(metaAppendCall).toBeUndefined();
+  });
+
+  it('should execute script onload callback and test gtag function', () => {
+    configService.getConfig.and.returnValue(of({ environment: 'production', logLevel: 'info' }));
+    service = TestBed.inject(AnalyticsService);
+    
+    // Execute the onload callback
+    mockScript.onload();
+    
+    // Test that gtag function was created and works
+    mockWindow.gtag('test');
+    expect(mockWindow.dataLayer.length).toBeGreaterThan(2);
   });
 });
