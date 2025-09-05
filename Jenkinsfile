@@ -507,7 +507,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     reportTitle: 'E2E Test Results',
                                     fileIncludePattern: 'cucumber-report.json',
                                     jsonReportDirectory: 'cypress/reports',
-                                    buildStatus: 'UNSTABLE',
+                                    buildStatus: 'FAILURE',
                                     failedFeaturesNumber: -1,
                                     failedScenariosNumber: -1,
                                     failedStepsNumber: -1,
