@@ -5,6 +5,19 @@ metadata:
   namespace: ethosengine
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      # Cache hashed static assets for 1 year
+      location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+      }
+      # Angular routing fallback - serve index.html for all non-static requests
+      location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+      }
 spec:
   ingressClassName: public
   rules:
