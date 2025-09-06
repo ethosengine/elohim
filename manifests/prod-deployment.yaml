@@ -18,6 +18,7 @@ spec:
       containers:
       - name: elohim-site
         image: harbor.ethosengine.com/ethosengine/elohim-site:BUILD_NUMBER_PLACEHOLDER
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
         volumeMounts:
