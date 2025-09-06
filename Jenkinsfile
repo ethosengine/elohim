@@ -414,8 +414,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             
                             // Deploy
                             sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
-                            
                             echo 'Staging deployment completed!'
                         }
                     }
