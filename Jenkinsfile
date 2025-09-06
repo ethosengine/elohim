@@ -105,9 +105,9 @@ spec:
                         checkout scm
                         
                         // Ensure clean git state to prevent cached workspace issues
+                        sh 'git config --global --add safe.directory $(pwd)'
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
-                        sh 'git config --global --add safe.directory $(pwd)'
                         
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
