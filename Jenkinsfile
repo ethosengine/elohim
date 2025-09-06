@@ -103,8 +103,18 @@ spec:
                 container('builder'){
                     script {
                         checkout scm
+                        
+                        // Ensure clean git state to prevent cached workspace issues
+                        sh 'git config --global --add safe.directory $(pwd)'
+                        sh 'git clean -fdx'
+                        sh 'git reset --hard HEAD'
+                        
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
+                        
+                        // Verify git state
+                        sh 'git rev-parse --short HEAD'
+                        sh 'git status'
                     }
                 }
             }
@@ -114,9 +124,6 @@ spec:
             steps {
                 container('builder'){
                     script {
-                        // Fix git safe.directory issue
-                        sh 'git config --global --add safe.directory $(pwd)'
-                        
                         echo "DEBUG - Setup Version: Starting"
                         echo "DEBUG - Branch: ${env.BRANCH_NAME}"
                         
