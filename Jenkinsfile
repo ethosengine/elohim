@@ -414,8 +414,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             
                             // Deploy
                             sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
-                            
                             echo 'Staging deployment completed!'
                         }
                     }
@@ -507,7 +507,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     reportTitle: 'E2E Test Results',
                                     fileIncludePattern: 'cucumber-report.json',
                                     jsonReportDirectory: 'cypress/reports',
-                                    buildStatus: 'UNSTABLE',
+                                    buildStatus: 'FAILURE',
                                     failedFeaturesNumber: -1,
                                     failedScenariosNumber: -1,
                                     failedStepsNumber: -1,
@@ -570,6 +570,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml" 
                             sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
+                            sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
                             
                             echo 'Production deployment completed!'
                         }
