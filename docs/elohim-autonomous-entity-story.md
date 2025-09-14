@@ -365,6 +365,8 @@ Every attack strengthens the network:
 
 The system becomes **illegible to power** while remaining **useful to people**:
 
+*"love, joy, peace, patience, kindness, generosity, faithfulness, gentleness, and self-control. There is no law against such things."* 
+
 **What authorities see**: 
 - Confusing mess of apps and informal arrangements
 - No clear entity to prosecute
