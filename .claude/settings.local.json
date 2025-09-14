@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__sonarqube__get_system_health",
+      "mcp__sonarqube__search_my_sonarqube_projects",
+      "mcp__sonarqube__search_sonar_issues_in_projects",
+      "mcp__sonarqube__get_project_quality_gate_status",
+      "Bash(claude mcp:*)",
+      "mcp__jenkins__getBuildLog",
+      "mcp__jenkins__getJobs",
+      "WebFetch(domain:staging.elohim.host)",
+      "Bash(git rev-parse:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
