@@ -7,12 +7,29 @@ import { Component, OnInit, ElementRef, Renderer2 } from '@angular/core';
   styleUrl: './hero.component.css'
 })
 export class HeroComponent implements OnInit {
+  isVideoVisible: boolean = false;
+  isDeepDiveVisible: boolean = false;
 
   constructor(private readonly el: ElementRef, private readonly renderer: Renderer2) {}
 
   ngOnInit() {
     this.setupScrollIndicator();
     this.setupHeroTitleInteraction();
+  }
+
+  toggleVideo() {
+    this.isVideoVisible = true;
+    this.isDeepDiveVisible = false;
+  }
+
+  toggleDeepDive() {
+    this.isDeepDiveVisible = true;
+    this.isVideoVisible = false;
+  }
+
+  hideVideo() {
+    this.isVideoVisible = false;
+    this.isDeepDiveVisible = false;
   }
 
   private setupScrollIndicator() {
