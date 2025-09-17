@@ -33,7 +33,7 @@ We've accepted money as if it were a law of nature rather than a technology we i
 Our governance systems are equally outdated in the computational age:
 
 - **Votes are binary and infrequent** - Complex preferences compressed into yes/no choices every few years
-- **Representation is geographic** - In an age where communities are increasingly digital and interest-based
+- **Representation is capturable** - Follows artificial political boundaries subject to manipulation rather than natural communities of shared values
 - **Feedback loops are broken** - Politicians can safely ignore public preferences between elections
 - **Complexity exceeds human processing** - Bills thousands of pages long that no single person fully understands, complication by design, leads to only those resourced to process such complications to asymmetrically benefit.
 
