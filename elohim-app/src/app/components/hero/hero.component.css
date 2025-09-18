@@ -19,13 +19,12 @@
   z-index: -10;
 }
 
-
 /* Space to atmosphere transition */
 .space-atmosphere-transition {
   position: relative;
   height: 200px;
   background: linear-gradient(180deg, var(--space-black) 0%, transparent 100%);
-  z-index: 1;
+  z-index: 0;
 }
 
 .hero-content {
@@ -36,8 +35,30 @@
   padding: 0 2rem;
 }
 
+/* Content container for smooth transitions */
+.content-container {
+  position: relative;
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Logo section */
+.logo-section {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.logo-section.hidden {
+  opacity: 0;
+  transform: translateY(-30px);
+  pointer-events: none;
+}
+
 .logo-container {
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
   animation: float 6s ease-in-out infinite;
 }
 
@@ -58,7 +79,7 @@
   color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin: 1.5rem 0;
+  margin: 0.75rem 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 8px rgba(255, 255, 255, 0.3);
   cursor: pointer;
   transition: all 0.3s ease;
@@ -78,9 +99,92 @@
   font-size: 1.5rem;
   color: rgba(255, 255, 255, 0.9);
   line-height: 1.6;
-  margin: 0;
+  margin: 0 0 2rem 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
+
+/* Button styles */
+.listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 12px 24px;
+  font-family: "Noto Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.listen-button:hover, .back-to-logo-button:hover, .deep-dive-button:hover, .intro-video-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
+}
+
+/* Video section */
+.video-section {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+/* Intro video - vertical transition */
+.intro-video {
+  transform: translateY(20px);
+}
+
+.intro-video.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+/* Deep dive video - horizontal transition */
+.deep-dive-video {
+  transform: translateX(30px);
+}
+
+.deep-dive-video.visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+}
+
+/* Video subtitle */
+.video-subtitle {
+  font-family: "Noto Sans", sans-serif;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0.75rem 0 0 0;
+  text-align: center;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+}
+
+/* Video button container */
+.video-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
@@ -114,6 +218,47 @@
   60% { transform: translateX(-50%) translateY(-5px); }
 }
 
+.hero-video {
+  width: 100%;
+  max-width: 700px;
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Desktop specific adjustments */
+@media (min-width: 769px) {
+  .hero {
+    align-items: flex-start;
+    padding-top: 4vh;
+  }
+
+  .hero-video {
+    max-width: 640px;
+  }
+
+  .hero-content {
+    max-width: 800px;
+  }
+
+  .content-container {
+    min-height: 400px;
+  }
+}
+
+.hero-video iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  border: none;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .hero-logo {
@@ -127,10 +272,27 @@
   
   .hero-subtitle {
     font-size: 1.2rem;
-    padding: 0 1rem;
+    margin-bottom: 1.5rem;
   }
   
   .hero-content {
     padding: 0 1rem;
+  }
+  
+  .content-container {
+    min-height: 400px;
+  }
+  
+  .hero-video {
+    max-width: 95vw;
+  }
+  
+  .listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+  
+  .video-buttons {
+    gap: 0.75rem;
   }
 }
