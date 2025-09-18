@@ -24,7 +24,7 @@
   position: relative;
   height: 200px;
   background: linear-gradient(180deg, var(--space-black) 0%, transparent 100%);
-  z-index: 1;
+  z-index: 0;
 }
 
 .hero-content {
@@ -58,7 +58,7 @@
 }
 
 .logo-container {
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
   animation: float 6s ease-in-out infinite;
 }
 
@@ -79,7 +79,7 @@
   color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin: 1.5rem 0;
+  margin: 0.75rem 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 8px rgba(255, 255, 255, 0.3);
   cursor: pointer;
   transition: all 0.3s ease;
@@ -233,15 +233,19 @@
 @media (min-width: 769px) {
   .hero {
     align-items: flex-start;
-    padding-top: 8vh;
+    padding-top: 4vh;
   }
-  
+
   .hero-video {
     max-width: 640px;
   }
-  
+
   .hero-content {
     max-width: 800px;
+  }
+
+  .content-container {
+    min-height: 400px;
   }
 }
 
