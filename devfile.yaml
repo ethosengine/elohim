@@ -39,6 +39,8 @@ components:
           value: /tmp/claude-config
         - name: NPM_CONFIG_CACHE
           value: /tmp/npm-cache
+        - name: CYPRESS_CACHE_FOLDER
+          value: /tmp/cypress-cache
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
       endpoints:
