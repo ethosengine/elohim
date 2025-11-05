@@ -126,9 +126,12 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        // Configure git safe directory before any git operations
+                        sh 'git config --global --add safe.directory "*"'
+
                         echo "DEBUG - Setup Version: Starting"
                         echo "DEBUG - Branch: ${env.BRANCH_NAME}"
-                        
+
                         // Validate VERSION file
                         if (!fileExists('VERSION')) {
                             error "VERSION file not found in workspace"
