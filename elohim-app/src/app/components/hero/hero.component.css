@@ -259,39 +259,97 @@
   border: none;
 }
 
+/* Light mode theme overrides */
+@media (prefers-color-scheme: light) {
+  .hero::before {
+    background: var(--space-black);
+  }
+
+  .space-atmosphere-transition {
+    background: linear-gradient(180deg, var(--space-black) 0%, transparent 100%);
+  }
+
+  .hero-logo {
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.2));
+  }
+
+  .hero-content h1 {
+    color: #1a1a1a;
+    text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .hero-content h1:hover {
+    color: rgba(0, 0, 0, 0.9);
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .hero-subtitle {
+    color: rgba(26, 26, 26, 0.9);
+    text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+  }
+
+  .video-subtitle {
+    color: rgba(26, 26, 26, 0.7);
+  }
+
+  .listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
+    background: rgba(255, 255, 255, 0.7);
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    color: #1a1a1a;
+  }
+
+  .listen-button:hover, .back-to-logo-button:hover, .deep-dive-button:hover, .intro-video-button:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .scroll-indicator svg {
+    fill: rgba(26, 26, 26, 0.7);
+  }
+
+  .scroll-indicator:hover svg {
+    fill: rgba(26, 26, 26, 1);
+  }
+
+  .hero-video {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .hero-logo {
     max-width: 300px;
   }
-  
+
   .hero-content h1 {
     font-size: 2rem;
     letter-spacing: 0.05em;
   }
-  
+
   .hero-subtitle {
     font-size: 1.2rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .hero-content {
     padding: 0 1rem;
   }
-  
+
   .content-container {
     min-height: 400px;
   }
-  
+
   .hero-video {
     max-width: 95vw;
   }
-  
+
   .listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
     padding: 10px 20px;
     font-size: 0.9rem;
   }
-  
+
   .video-buttons {
     gap: 0.75rem;
   }

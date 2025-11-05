@@ -96,22 +96,25 @@ spec:
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /review-.+/ }
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     changeRequest()
                 }
             }
             steps {
                 container('builder'){
                     script {
+                        // Configure git safe directory before any git operations
+                        sh 'git config --global --add safe.directory "*"'
+
                         checkout scm
-                        
+
                         // Ensure clean git state to prevent cached workspace issues
-                        sh 'git config --global --add safe.directory $(pwd)'
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
-                        
+
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
-                        
+
                         // Verify git state
                         sh 'git rev-parse --short HEAD'
                         sh 'git status'
@@ -124,9 +127,12 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        // Configure git safe directory before any git operations
+                        sh 'git config --global --add safe.directory "*"'
+
                         echo "DEBUG - Setup Version: Starting"
                         echo "DEBUG - Branch: ${env.BRANCH_NAME}"
-                        
+
                         // Validate VERSION file
                         if (!fileExists('VERSION')) {
                             error "VERSION file not found in workspace"
@@ -151,12 +157,16 @@ spec:
                         dir('elohim-app') {
                             sh "npm version '${baseVersion}' --no-git-tag-version"
                         }
-                        
+
+                        // Sanitize branch name for Docker tag (replace / with -)
+                        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+                        echo "DEBUG - Sanitized branch: '${sanitizedBranch}'"
+
                         // Create image tag
-                        def imageTag = (env.BRANCH_NAME == 'main') 
-                            ? baseVersion 
-                            : "${baseVersion}-${env.BRANCH_NAME}-${gitHash}"
-                        
+                        def imageTag = (env.BRANCH_NAME == 'main')
+                            ? baseVersion
+                            : "${baseVersion}-${sanitizedBranch}-${gitHash}"
+
                         echo "DEBUG - Image tag: '${imageTag}'"
                         
                         // Write build.env file
@@ -418,11 +428,27 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
-                            
+
+                            // Verify the image tag in the manifest
+                            sh """
+                                echo '==== Deployment manifest preview ===='
+                                grep 'image:' manifests/staging-deployment-${IMAGE_TAG}.yaml
+                                echo '===================================='
+                            """
+
                             // Deploy
                             sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
+
+                            // Verify the deployment is using the correct image
+                            sh """
+                                echo '==== Verifying deployed image ===='
+                                kubectl get deployment elohim-site-staging -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                echo ''
+                                echo '=================================='
+                            """
+
                             echo 'Staging deployment completed!'
                         }
                     }
