@@ -156,12 +156,16 @@ spec:
                         dir('elohim-app') {
                             sh "npm version '${baseVersion}' --no-git-tag-version"
                         }
-                        
+
+                        // Sanitize branch name for Docker tag (replace / with -)
+                        def sanitizedBranch = env.BRANCH_NAME.replaceAll('/', '-')
+                        echo "DEBUG - Sanitized branch: '${sanitizedBranch}'"
+
                         // Create image tag
-                        def imageTag = (env.BRANCH_NAME == 'main') 
-                            ? baseVersion 
-                            : "${baseVersion}-${env.BRANCH_NAME}-${gitHash}"
-                        
+                        def imageTag = (env.BRANCH_NAME == 'main')
+                            ? baseVersion
+                            : "${baseVersion}-${sanitizedBranch}-${gitHash}"
+
                         echo "DEBUG - Image tag: '${imageTag}'"
                         
                         // Write build.env file
