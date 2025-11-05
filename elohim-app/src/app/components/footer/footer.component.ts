@@ -9,4 +9,5 @@ import { environment } from '../../../environments/environment';
 })
 export class FooterComponent {
   gitHash = environment.gitHash;
+  githubCommitUrl = `https://github.com/ethosengine/elohim/commit/${environment.gitHash}`;
 }

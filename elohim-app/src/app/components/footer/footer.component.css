@@ -363,4 +363,17 @@ footer {
 .git-hash {
   font-size: 0.7rem;
   color: var(--tech-glow);
+  text-decoration: none;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+.git-hash:hover {
+  color: var(--tech-bright);
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.git-hash:focus {
+  outline: 2px solid var(--tech-bright);
+  outline-offset: 2px;
 }
