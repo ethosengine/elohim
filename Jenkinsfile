@@ -96,6 +96,7 @@ spec:
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /review-.+/ }
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     changeRequest()
                 }
             }
@@ -427,11 +428,27 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
-                            
+
+                            // Verify the image tag in the manifest
+                            sh """
+                                echo '==== Deployment manifest preview ===='
+                                grep 'image:' manifests/staging-deployment-${IMAGE_TAG}.yaml
+                                echo '===================================='
+                            """
+
                             // Deploy
                             sh "kubectl apply -f manifests/staging-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-site-staging -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site-staging -n ethosengine --timeout=300s'
+
+                            // Verify the deployment is using the correct image
+                            sh """
+                                echo '==== Verifying deployed image ===='
+                                kubectl get deployment elohim-site-staging -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                echo ''
+                                echo '=================================='
+                            """
+
                             echo 'Staging deployment completed!'
                         }
                     }
