@@ -7,18 +7,18 @@
 }
 
 :root {
-    /* Space theme colors */
+    /* Space theme colors - Dark Mode (Default) */
     --space-black: #000000;
     --atmosphere-dark: #0a0a0a;
     --atmosphere-mid: #1a1a2e;
     --atmosphere-light: #16213e;
     --text-light: #F3F4F6;
-    
+
     /* Accent colors for interactive elements */
     --primary: #6B46C1;
     --secondary: #EC4899;
     --accent: #10B981;
-    
+
     /* Footer earthy theme colors */
     --forest-dark: rgb(26, 35, 31);
     --forest-light: rgb(36, 49, 41);
@@ -28,6 +28,33 @@
     --tech-bright: rgba(127, 203, 238, 0.8);
     --earthy-orange: rgb(217, 124, 43);
     --earthy-orange-light: rgba(217, 124, 43, 0.8);
+}
+
+/* Light Theme - Activates based on device preference */
+@media (prefers-color-scheme: light) {
+    :root {
+        /* Sky theme colors - Light Mode */
+        --space-black: #e3f2fd;
+        --atmosphere-dark: #bbdefb;
+        --atmosphere-mid: #90caf9;
+        --atmosphere-light: #64b5f6;
+        --text-light: #1a1a1a;
+
+        /* Accent colors for interactive elements - adjusted for light background */
+        --primary: #5e35b1;
+        --secondary: #d81b60;
+        --accent: #00897b;
+
+        /* Footer lush green theme colors */
+        --forest-dark: rgb(46, 125, 50);
+        --forest-light: rgb(102, 187, 106);
+        --leaf-light: rgb(27, 94, 32);
+        --tech-glow: rgb(1, 87, 155);
+        --tech-accent: rgba(1, 87, 155, 0.15);
+        --tech-bright: rgba(1, 87, 155, 0.9);
+        --earthy-orange: rgb(230, 81, 0);
+        --earthy-orange-light: rgba(230, 81, 0, 0.8);
+    }
 }
 
 body {
@@ -50,7 +77,7 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
+    background:
         radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.9), transparent),
         radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
         radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,1), transparent),
@@ -74,6 +101,35 @@ body::before {
     50% { opacity: 0.85; }
 }
 
+/* Light mode: Replace stars with fluffy clouds and sun rays */
+@media (prefers-color-scheme: light) {
+    body::before {
+        background:
+            /* Fluffy clouds - white with soft edges */
+            radial-gradient(ellipse 80px 40px at 15% 20%, rgba(255,255,255,0.9), transparent),
+            radial-gradient(ellipse 60px 30px at 25% 22%, rgba(255,255,255,0.85), transparent),
+            radial-gradient(ellipse 70px 35px at 45% 15%, rgba(255,255,255,0.9), transparent),
+            radial-gradient(ellipse 50px 25px at 55% 17%, rgba(255,255,255,0.8), transparent),
+            radial-gradient(ellipse 90px 45px at 70% 25%, rgba(255,255,255,0.95), transparent),
+            radial-gradient(ellipse 65px 30px at 85% 28%, rgba(255,255,255,0.85), transparent),
+            /* More clouds scattered across */
+            radial-gradient(ellipse 55px 28px at 35% 45%, rgba(255,255,255,0.8), transparent),
+            radial-gradient(ellipse 75px 38px at 60% 50%, rgba(255,255,255,0.9), transparent),
+            radial-gradient(ellipse 60px 30px at 20% 65%, rgba(255,255,255,0.85), transparent),
+            radial-gradient(ellipse 70px 35px at 80% 60%, rgba(255,255,255,0.88), transparent);
+        background-repeat: repeat;
+        background-size: 600px 400px;
+        animation: cloudDrift 30s linear infinite;
+        mix-blend-mode: normal;
+        opacity: 0.7;
+    }
+
+    @keyframes cloudDrift {
+        0% { transform: translate3d(0, 0, 0); }
+        100% { transform: translate3d(50px, 0, 0); }
+    }
+}
+
 
 /* Smooth scrolling */
 html {
@@ -92,6 +148,13 @@ html {
 ::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, var(--primary), var(--secondary));
     border-radius: 4px;
+}
+
+/* Light mode scrollbar */
+@media (prefers-color-scheme: light) {
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+    }
 }
 
 /* Global float animation - used by hero component */
@@ -191,6 +254,19 @@ html {
     font-size: 1.3rem;
 }
 
+/* Light mode card styles */
+@media (prefers-color-scheme: light) {
+    .card {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .card:hover {
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+}
+
 
 /* Quote */
 .quote {
@@ -209,6 +285,14 @@ html {
     font-style: normal;
     margin-top: 1rem;
     opacity: 0.7;
+}
+
+/* Light mode quote styles */
+@media (prefers-color-scheme: light) {
+    .quote {
+        background: rgba(255, 255, 255, 0.5);
+        border-left-color: var(--secondary);
+    }
 }
 
 /* Vision Section */
@@ -230,6 +314,18 @@ html {
 .vision-item:hover {
     transform: scale3d(1.05, 1.05, 1);
     background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+}
+
+/* Light mode vision items */
+@media (prefers-color-scheme: light) {
+    .vision-item {
+        background: linear-gradient(135deg, rgba(94, 53, 177, 0.15), rgba(216, 27, 96, 0.15));
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .vision-item:hover {
+        background: linear-gradient(135deg, rgba(94, 53, 177, 0.25), rgba(216, 27, 96, 0.25));
+    }
 }
 
 /* CTA Section */
@@ -262,6 +358,21 @@ html {
 .cta-button:hover {
     transform: translate3d(0, -3px, 0);
     box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
+}
+
+/* Light mode CTA styles */
+@media (prefers-color-scheme: light) {
+    .cta {
+        background: linear-gradient(135deg, rgba(94, 53, 177, 0.2), rgba(216, 27, 96, 0.2));
+    }
+
+    .cta-button {
+        box-shadow: 0 10px 30px rgba(94, 53, 177, 0.3);
+    }
+
+    .cta-button:hover {
+        box-shadow: 0 15px 40px rgba(94, 53, 177, 0.4);
+    }
 }
 
 /* Footer */
