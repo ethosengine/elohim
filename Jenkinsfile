@@ -102,16 +102,18 @@ spec:
             steps {
                 container('builder'){
                     script {
+                        // Configure git safe directory before any git operations
+                        sh 'git config --global --add safe.directory "*"'
+
                         checkout scm
-                        
+
                         // Ensure clean git state to prevent cached workspace issues
-                        sh 'git config --global --add safe.directory $(pwd)'
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
-                        
+
                         echo "Building branch: ${env.BRANCH_NAME}"
                         echo "Change request: ${env.CHANGE_ID ?: 'None'}"
-                        
+
                         // Verify git state
                         sh 'git rev-parse --short HEAD'
                         sh 'git status'
