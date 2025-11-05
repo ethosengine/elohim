@@ -80,11 +80,16 @@ Then('the footer should display the expected git hash', () => {
 Then('the git hash should match the deployed version', () => {
   // Get the expected git hash from environment variable
   const expectedGitHash = Cypress.env('EXPECTED_GIT_HASH');
-  
+
   if (expectedGitHash) {
-    cy.get('[data-cy="git-hash"]').should('contain', expectedGitHash);
+    cy.log(`Expected git hash: ${expectedGitHash}`);
+    cy.get('[data-cy="git-hash"]').then(($el) => {
+      const actualHash = $el.text().trim();
+      cy.log(`Actual git hash on page: ${actualHash}`);
+      expect(actualHash, `Git hash mismatch! Expected ${expectedGitHash} but found ${actualHash} on staging site`).to.equal(expectedGitHash);
+    });
   } else {
-    // If no expected hash provided, just verify it looks like a git hash (7-8 alphanumeric chars)
-    cy.get('[data-cy="git-hash"]').should('match', /^[a-f0-9]{7,8}$/);
+    // FAIL LOUDLY if no expected hash provided - deployment validation requires this!
+    throw new Error('EXPECTED_GIT_HASH environment variable is not set! Cannot validate deployment.');
   }
 });
