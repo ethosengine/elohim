@@ -101,32 +101,11 @@ body::before {
     50% { opacity: 0.85; }
 }
 
-/* Light mode: Replace stars with fluffy clouds and sun rays */
+/* Light mode: Clear blue sky without clouds */
 @media (prefers-color-scheme: light) {
     body::before {
-        background:
-            /* Fluffy clouds - white with soft edges */
-            radial-gradient(ellipse 80px 40px at 15% 20%, rgba(255,255,255,0.9), transparent),
-            radial-gradient(ellipse 60px 30px at 25% 22%, rgba(255,255,255,0.85), transparent),
-            radial-gradient(ellipse 70px 35px at 45% 15%, rgba(255,255,255,0.9), transparent),
-            radial-gradient(ellipse 50px 25px at 55% 17%, rgba(255,255,255,0.8), transparent),
-            radial-gradient(ellipse 90px 45px at 70% 25%, rgba(255,255,255,0.95), transparent),
-            radial-gradient(ellipse 65px 30px at 85% 28%, rgba(255,255,255,0.85), transparent),
-            /* More clouds scattered across */
-            radial-gradient(ellipse 55px 28px at 35% 45%, rgba(255,255,255,0.8), transparent),
-            radial-gradient(ellipse 75px 38px at 60% 50%, rgba(255,255,255,0.9), transparent),
-            radial-gradient(ellipse 60px 30px at 20% 65%, rgba(255,255,255,0.85), transparent),
-            radial-gradient(ellipse 70px 35px at 80% 60%, rgba(255,255,255,0.88), transparent);
-        background-repeat: repeat;
-        background-size: 600px 400px;
-        animation: cloudDrift 30s linear infinite;
-        mix-blend-mode: normal;
-        opacity: 0.7;
-    }
-
-    @keyframes cloudDrift {
-        0% { transform: translate3d(0, 0, 0); }
-        100% { transform: translate3d(50px, 0, 0); }
+        /* Hide the stars overlay for a clean, clear blue sky */
+        display: none;
     }
 }
 
