@@ -1,0 +1,8 @@
+{
+  "files": [
+    {
+      "path": "deployment/staging-validation.feature",
+      "category": "deployment"
+    }
+  ]
+}
