@@ -1,6 +1,14 @@
 {
   "files": [
     {
+      "path": "core/platform-architecture.feature",
+      "category": "core"
+    },
+    {
+      "path": "value-scanner/care-economy.feature",
+      "category": "value-scanner"
+    },
+    {
       "path": "deployment/staging-validation.feature",
       "category": "deployment"
     }
