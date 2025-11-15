@@ -30,16 +30,21 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   }
 
   getIcon(): string {
-    switch (this.currentTheme) {
-      case 'light':
-        return '☀️';
-      case 'dark':
-        return '🌙';
-      case 'device':
-        return '💻';
-      default:
-        return '💻';
+    // Show sun/moon based on actual effective theme
+    const effectiveTheme = this.getEffectiveTheme();
+    return effectiveTheme === 'light' ? '☀️' : '🌙';
+  }
+
+  isAutoMode(): boolean {
+    return this.currentTheme === 'device';
+  }
+
+  private getEffectiveTheme(): 'light' | 'dark' {
+    if (this.currentTheme === 'device') {
+      // Check system preference
+      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
+    return this.currentTheme as 'light' | 'dark';
   }
 
   getTooltip(): string {
@@ -47,9 +52,9 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
       case 'light':
         return 'Light mode - Click to switch to dark';
       case 'dark':
-        return 'Dark mode - Click to switch to device default';
+        return 'Dark mode - Click to switch to auto';
       case 'device':
-        return 'Device default - Click to switch to light';
+        return 'Auto mode - Click to switch to light';
       default:
         return 'Toggle theme';
     }
