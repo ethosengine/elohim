@@ -71,6 +71,14 @@ describe('ModuleViewerComponent', () => {
       'getNode'
     ]);
 
+    // Set up default mock behaviors
+    mockDocumentGraphService.getNodesByType.and.callFake((type: string) => {
+      if (type === 'epic') return [mockEpicNode as any];
+      if (type === 'feature') return [mockFeatureNode as any];
+      return [];
+    });
+    mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
+
     mockActivatedRoute = {
       params: of({ id: 'value-scanner' })
     };
@@ -97,13 +105,6 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should load value-scanner module on init', () => {
-    mockDocumentGraphService.getNodesByType.and.callFake((type: string) => {
-      if (type === 'epic') return [mockEpicNode as any];
-      if (type === 'feature') return [mockFeatureNode as any];
-      return [];
-    });
-    mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
-
     fixture.detectChanges();
 
     expect(component.moduleName).toBe('Value Scanner: Care Economy');
@@ -112,13 +113,6 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should parse epic sections correctly', () => {
-    mockDocumentGraphService.getNodesByType.and.callFake((type: string) => {
-      if (type === 'epic') return [mockEpicNode as any];
-      if (type === 'feature') return [mockFeatureNode as any];
-      return [];
-    });
-    mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
-
     fixture.detectChanges();
 
     expect(component.interleavedSections.length).toBeGreaterThan(0);
@@ -126,13 +120,6 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should interleave scenarios with epic sections', () => {
-    mockDocumentGraphService.getNodesByType.and.callFake((type: string) => {
-      if (type === 'epic') return [mockEpicNode as any];
-      if (type === 'feature') return [mockFeatureNode as any];
-      return [];
-    });
-    mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
-
     fixture.detectChanges();
 
     const hasScenarios = component.interleavedSections.some(s => s.type === 'scenario');
@@ -148,7 +135,7 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should handle missing epic gracefully', () => {
-    mockDocumentGraphService.getNodesByType.and.returnValue([]);
+    mockDocumentGraphService.getNodesByType.and.callFake(() => []);
 
     fixture.detectChanges();
 
