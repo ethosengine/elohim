@@ -373,7 +373,7 @@ footer {
     .hero h1 {
         font-size: 2.5rem;
     }
-    
+
     .hero p {
         font-size: 1.2rem;
     }
@@ -385,4 +385,135 @@ footer {
     .card-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Manual Theme Overrides - These take precedence over media queries */
+
+/* Light Theme Override - Applied when user manually selects light theme */
+body[data-theme="light"] {
+    --space-black: #e3f2fd;
+    --atmosphere-dark: #bbdefb;
+    --atmosphere-mid: #90caf9;
+    --atmosphere-light: #64b5f6;
+    --text-light: #1a1a1a;
+    --primary: #5e35b1;
+    --secondary: #d81b60;
+    --accent: #00897b;
+    --forest-dark: rgb(46, 125, 50);
+    --forest-light: rgb(102, 187, 106);
+    --leaf-light: rgb(27, 94, 32);
+    --tech-glow: rgb(1, 87, 155);
+    --tech-accent: rgba(1, 87, 155, 0.15);
+    --tech-bright: rgba(1, 87, 155, 0.9);
+    --earthy-orange: rgb(230, 81, 0);
+    --earthy-orange-light: rgba(230, 81, 0, 0.8);
+}
+
+body[data-theme="light"]::before {
+    display: none;
+}
+
+body[data-theme="light"] ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme="light"] .card {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body[data-theme="light"] .card:hover {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+body[data-theme="light"] .quote {
+    background: rgba(255, 255, 255, 0.5);
+    border-left-color: var(--secondary);
+}
+
+body[data-theme="light"] .vision-item {
+    background: linear-gradient(135deg, rgba(94, 53, 177, 0.15), rgba(216, 27, 96, 0.15));
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body[data-theme="light"] .vision-item:hover {
+    background: linear-gradient(135deg, rgba(94, 53, 177, 0.25), rgba(216, 27, 96, 0.25));
+}
+
+body[data-theme="light"] .cta {
+    background: linear-gradient(135deg, rgba(94, 53, 177, 0.2), rgba(216, 27, 96, 0.2));
+}
+
+body[data-theme="light"] .cta-button {
+    box-shadow: 0 10px 30px rgba(94, 53, 177, 0.3);
+}
+
+body[data-theme="light"] .cta-button:hover {
+    box-shadow: 0 15px 40px rgba(94, 53, 177, 0.4);
+}
+
+/* Dark Theme Override - Applied when user manually selects dark theme */
+/* Dark is already the default, so we just need to ensure it stays dark */
+body[data-theme="dark"] {
+    --space-black: #000000;
+    --atmosphere-dark: #0a0a0a;
+    --atmosphere-mid: #1a1a2e;
+    --atmosphere-light: #16213e;
+    --text-light: #F3F4F6;
+    --primary: #6B46C1;
+    --secondary: #EC4899;
+    --accent: #10B981;
+    --forest-dark: rgb(26, 35, 31);
+    --forest-light: rgb(36, 49, 41);
+    --leaf-light: rgb(201, 212, 197);
+    --tech-glow: rgb(127, 203, 238);
+    --tech-accent: rgba(127, 203, 238, 0.15);
+    --tech-bright: rgba(127, 203, 238, 0.8);
+    --earthy-orange: rgb(217, 124, 43);
+    --earthy-orange-light: rgba(217, 124, 43, 0.8);
+}
+
+body[data-theme="dark"]::before {
+    display: block;
+}
+
+body[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body[data-theme="dark"] .card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body[data-theme="dark"] .card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+body[data-theme="dark"] .quote {
+    background: rgba(255, 255, 255, 0.03);
+    border-left-color: var(--secondary);
+}
+
+body[data-theme="dark"] .vision-item {
+    background: linear-gradient(135deg, rgba(107, 70, 193, 0.1), rgba(236, 72, 153, 0.1));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body[data-theme="dark"] .vision-item:hover {
+    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+}
+
+body[data-theme="dark"] .cta {
+    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(236, 72, 153, 0.2));
+}
+
+body[data-theme="dark"] .cta-button {
+    box-shadow: 0 10px 30px rgba(107, 70, 193, 0.3);
+}
+
+body[data-theme="dark"] .cta-button:hover {
+    box-shadow: 0 15px 40px rgba(107, 70, 193, 0.4);
 }

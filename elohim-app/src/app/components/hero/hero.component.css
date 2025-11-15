@@ -354,3 +354,65 @@
     gap: 0.75rem;
   }
 }
+
+/* Manual Theme Overrides */
+body[data-theme="light"] .hero::before {
+  background: var(--space-black);
+}
+
+body[data-theme="light"] .space-atmosphere-transition {
+  background: linear-gradient(180deg, var(--space-black) 0%, transparent 100%);
+}
+
+body[data-theme="light"] .hero-logo {
+  filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.2));
+}
+
+body[data-theme="light"] .hero-content h1 {
+  color: #1a1a1a;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
+}
+
+body[data-theme="light"] .hero-content h1:hover {
+  color: rgba(0, 0, 0, 0.9);
+  text-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+body[data-theme="light"] .hero-subtitle {
+  color: rgba(26, 26, 26, 0.9);
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+}
+
+body[data-theme="light"] .video-subtitle {
+  color: rgba(26, 26, 26, 0.7);
+}
+
+body[data-theme="light"] .listen-button,
+body[data-theme="light"] .back-to-logo-button,
+body[data-theme="light"] .deep-dive-button,
+body[data-theme="light"] .intro-video-button {
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  color: #1a1a1a;
+}
+
+body[data-theme="light"] .listen-button:hover,
+body[data-theme="light"] .back-to-logo-button:hover,
+body[data-theme="light"] .deep-dive-button:hover,
+body[data-theme="light"] .intro-video-button:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+body[data-theme="light"] .scroll-indicator svg {
+  fill: rgba(26, 26, 26, 0.7);
+}
+
+body[data-theme="light"] .scroll-indicator:hover svg {
+  fill: rgba(26, 26, 26, 1);
+}
+
+body[data-theme="light"] .hero-video {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
