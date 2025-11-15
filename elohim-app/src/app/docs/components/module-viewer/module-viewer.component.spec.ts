@@ -92,7 +92,11 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should load value-scanner module on init', () => {
-    mockDocumentGraphService.getNodesByType.and.returnValue([mockEpicNode as any]);
+    mockDocumentGraphService.getNodesByType.and.callFake((type: string) => {
+      if (type === 'epic') return [mockEpicNode as any];
+      if (type === 'feature') return [mockFeatureNode as any];
+      return [];
+    });
     mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
 
     fixture.detectChanges();
