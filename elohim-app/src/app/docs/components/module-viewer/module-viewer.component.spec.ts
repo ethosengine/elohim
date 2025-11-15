@@ -91,7 +91,7 @@ describe('ModuleViewerComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            params: paramsSubject.asObservable()
+            params: paramsSubject
           }
         },
         { provide: DomSanitizer, useValue: mockDomSanitizer },
@@ -101,6 +101,7 @@ describe('ModuleViewerComponent', () => {
 
     fixture = TestBed.createComponent(ModuleViewerComponent);
     component = fixture.componentInstance;
+    fixture.detectChanges(); // Initialize component with route params
   });
 
   it('should create', () => {
@@ -108,7 +109,6 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should load value-scanner module on init', async () => {
-    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(component.moduleName).toBe('Value Scanner: Care Economy');
@@ -117,7 +117,6 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should parse epic sections correctly', async () => {
-    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(component.interleavedSections.length).toBeGreaterThan(0);
@@ -125,7 +124,6 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should interleave scenarios with epic sections', async () => {
-    fixture.detectChanges();
     await fixture.whenStable();
 
     const hasScenarios = component.interleavedSections.some(s => s.type === 'scenario');
@@ -143,7 +141,8 @@ describe('ModuleViewerComponent', () => {
   it('should handle missing epic gracefully', async () => {
     mockDocumentGraphService.getNodesByType.and.callFake(() => []);
 
-    fixture.detectChanges();
+    // Need to reload the component with new mock behavior
+    component.ngOnInit();
     await fixture.whenStable();
 
     expect(component.epic).toBeNull();
@@ -156,7 +155,8 @@ describe('ModuleViewerComponent', () => {
       return [];
     });
 
-    fixture.detectChanges();
+    // Need to reload the component with new mock behavior
+    component.ngOnInit();
     await fixture.whenStable();
 
     expect(component.feature).toBeNull();
