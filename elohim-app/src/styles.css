@@ -101,8 +101,16 @@ body::before {
     50% { opacity: 0.85; }
 }
 
-/* Light mode: Clear blue sky without clouds */
+/* Light mode: Clear blue sky without clouds and softer atmospheric gradients */
 @media (prefers-color-scheme: light) {
+    body {
+        background:
+            radial-gradient(ellipse at 20% 30%, rgba(255, 250, 205, 0.3) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 70%, rgba(135, 206, 235, 0.2) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 100%, rgba(195, 205, 180, 0.25) 0%, transparent 60%),
+            linear-gradient(135deg, var(--atmosphere-dark) 0%, var(--atmosphere-mid) 50%, var(--atmosphere-light) 100%);
+    }
+
     body::before {
         /* Hide the stars overlay for a clean, clear blue sky */
         display: none;
@@ -298,12 +306,12 @@ html {
 /* Light mode vision items */
 @media (prefers-color-scheme: light) {
     .vision-item {
-        background: linear-gradient(135deg, rgba(94, 53, 177, 0.15), rgba(216, 27, 96, 0.15));
+        background: linear-gradient(135deg, rgba(135, 206, 235, 0.2), rgba(255, 250, 205, 0.2));
         border: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     .vision-item:hover {
-        background: linear-gradient(135deg, rgba(94, 53, 177, 0.25), rgba(216, 27, 96, 0.25));
+        background: linear-gradient(135deg, rgba(135, 206, 235, 0.35), rgba(255, 250, 205, 0.35));
     }
 }
 
@@ -342,7 +350,7 @@ html {
 /* Light mode CTA styles */
 @media (prefers-color-scheme: light) {
     .cta {
-        background: linear-gradient(135deg, rgba(94, 53, 177, 0.2), rgba(216, 27, 96, 0.2));
+        background: linear-gradient(135deg, rgba(255, 250, 205, 0.4), rgba(195, 205, 180, 0.3));
     }
 
     .cta-button {
