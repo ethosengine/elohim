@@ -104,6 +104,7 @@ describe('ModuleViewerComponent', () => {
 
   it('should load value-scanner module on init', async () => {
     fixture.detectChanges();
+    paramsSubject.next({ id: 'value-scanner' });
     await fixture.whenStable();
 
     expect(component.moduleName).toBe('Value Scanner: Care Economy');
@@ -113,6 +114,7 @@ describe('ModuleViewerComponent', () => {
 
   it('should parse epic sections correctly', async () => {
     fixture.detectChanges();
+    paramsSubject.next({ id: 'value-scanner' });
     await fixture.whenStable();
 
     expect(component.interleavedSections.length).toBeGreaterThan(0);
@@ -121,6 +123,7 @@ describe('ModuleViewerComponent', () => {
 
   it('should interleave scenarios with epic sections', async () => {
     fixture.detectChanges();
+    paramsSubject.next({ id: 'value-scanner' });
     await fixture.whenStable();
 
     const hasScenarios = component.interleavedSections.some(s => s.type === 'scenario');
