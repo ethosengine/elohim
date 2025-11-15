@@ -1,0 +1,50 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ThemeToggleComponent } from './theme-toggle.component';
+import { ThemeService } from '../../services/theme.service';
+import { of } from 'rxjs';
+
+describe('ThemeToggleComponent', () => {
+  let component: ThemeToggleComponent;
+  let fixture: ComponentFixture<ThemeToggleComponent>;
+  let mockThemeService: jasmine.SpyObj<ThemeService>;
+
+  beforeEach(async () => {
+    mockThemeService = jasmine.createSpyObj('ThemeService', ['getTheme', 'cycleTheme']);
+    mockThemeService.getTheme.and.returnValue(of('device'));
+
+    await TestBed.configureTestingModule({
+      imports: [ThemeToggleComponent],
+      providers: [
+        { provide: ThemeService, useValue: mockThemeService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ThemeToggleComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should display device icon by default', () => {
+    component.currentTheme = 'device';
+    expect(component.getIcon()).toBe('💻');
+  });
+
+  it('should display sun icon in light mode', () => {
+    component.currentTheme = 'light';
+    expect(component.getIcon()).toBe('☀️');
+  });
+
+  it('should display moon icon in dark mode', () => {
+    component.currentTheme = 'dark';
+    expect(component.getIcon()).toBe('🌙');
+  });
+
+  it('should call cycleTheme when toggled', () => {
+    component.toggleTheme();
+    expect(mockThemeService.cycleTheme).toHaveBeenCalled();
+  });
+});

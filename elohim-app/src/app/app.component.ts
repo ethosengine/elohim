@@ -9,6 +9,7 @@ import { PathForwardComponent } from './components/path-forward/path-forward.com
 import { CallToActionComponent } from './components/call-to-action/call-to-action.component';
 import { FooterComponent } from './components/footer/footer.component';
 import { DebugBarComponent } from './components/debug-bar/debug-bar.component';
+import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 import { ConfigService } from './services/config.service';
 import { AnalyticsService } from './services/analytics.service';
 
@@ -16,6 +17,7 @@ import { AnalyticsService } from './services/analytics.service';
   selector: 'app-root',
   imports: [
     DebugBarComponent,
+    ThemeToggleComponent,
     HeroComponent,
     CrisisComponent,
     VisionComponent,
