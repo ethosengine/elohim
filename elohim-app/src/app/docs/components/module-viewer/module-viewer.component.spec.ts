@@ -103,8 +103,9 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should load value-scanner module on init', async () => {
-    paramsSubject.next({ id: 'value-scanner' });
-    fixture.detectChanges();
+    fixture.detectChanges(); // Initialize component and set up subscription
+    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
+    fixture.detectChanges(); // Process changes from loadModule
     await fixture.whenStable();
 
     expect(component.moduleName).toBe('Value Scanner: Care Economy');
@@ -113,8 +114,9 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should parse epic sections correctly', async () => {
-    paramsSubject.next({ id: 'value-scanner' });
-    fixture.detectChanges();
+    fixture.detectChanges(); // Initialize component and set up subscription
+    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
+    fixture.detectChanges(); // Process changes from loadModule
     await fixture.whenStable();
 
     expect(component.interleavedSections.length).toBeGreaterThan(0);
@@ -122,8 +124,9 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should interleave scenarios with epic sections', async () => {
-    paramsSubject.next({ id: 'value-scanner' });
-    fixture.detectChanges();
+    fixture.detectChanges(); // Initialize component and set up subscription
+    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
+    fixture.detectChanges(); // Process changes from loadModule
     await fixture.whenStable();
 
     const hasScenarios = component.interleavedSections.some(s => s.type === 'scenario');
@@ -140,9 +143,10 @@ describe('ModuleViewerComponent', () => {
 
   it('should handle missing epic gracefully', async () => {
     mockDocumentGraphService.getNodesByType.and.callFake(() => []);
-    paramsSubject.next({ id: 'value-scanner' });
 
-    fixture.detectChanges();
+    fixture.detectChanges(); // Initialize component and set up subscription
+    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
+    fixture.detectChanges(); // Process changes from loadModule
     await fixture.whenStable();
 
     expect(component.epic).toBeNull();
@@ -154,9 +158,10 @@ describe('ModuleViewerComponent', () => {
       if (type === 'epic') return [mockEpicNode as any];
       return [];
     });
-    paramsSubject.next({ id: 'value-scanner' });
 
-    fixture.detectChanges();
+    fixture.detectChanges(); // Initialize component and set up subscription
+    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
+    fixture.detectChanges(); // Process changes from loadModule
     await fixture.whenStable();
 
     expect(component.feature).toBeNull();
