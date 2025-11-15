@@ -13,7 +13,7 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   currentTheme: Theme = 'device';
   private themeSubscription?: Subscription;
 
-  constructor(private themeService: ThemeService) {}
+  constructor(private readonly themeService: ThemeService) {}
 
   ngOnInit(): void {
     this.themeSubscription = this.themeService.getTheme().subscribe(theme => {
