@@ -10,6 +10,8 @@ describe('DocsHomeComponent', () => {
   let mockDocumentGraphService: jasmine.SpyObj<DocumentGraphService>;
 
   const mockGraph: Partial<DocumentGraph> = {
+    nodes: new Map(),
+    relationships: new Map(),
     nodesByType: {
       epics: new Map([
         ['epic-1', {
@@ -18,6 +20,9 @@ describe('DocsHomeComponent', () => {
           title: 'Test Epic',
           description: 'Test description',
           tags: [],
+          sourcePath: '',
+          content: '',
+          relatedNodeIds: [],
           metadata: {},
           category: 'observer',
           featureIds: [],
@@ -33,6 +38,9 @@ describe('DocsHomeComponent', () => {
           title: 'Test Feature',
           description: 'Test description',
           tags: [],
+          sourcePath: '',
+          content: '',
+          relatedNodeIds: [],
           metadata: {},
           category: 'value-scanner',
           epicIds: [],
@@ -43,16 +51,24 @@ describe('DocsHomeComponent', () => {
       ]),
       scenarios: new Map()
     },
+    nodesByTag: new Map(),
+    nodesByCategory: new Map(),
+    adjacency: new Map(),
+    reverseAdjacency: new Map(),
     metadata: {
+      nodeCount: 2,
+      relationshipCount: 0,
+      lastBuilt: new Date(),
+      sources: {
+        epicPath: '',
+        featurePath: ''
+      },
       stats: {
         epicCount: 1,
         featureCount: 1,
         scenarioCount: 0,
-        totalNodes: 2,
         averageConnectionsPerNode: 0
-      },
-      version: '1.0',
-      lastUpdated: new Date()
+      }
     }
   } as DocumentGraph;
 

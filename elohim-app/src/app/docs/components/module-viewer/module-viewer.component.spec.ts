@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { ModuleViewerComponent } from './module-viewer.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
-import { EpicNode, FeatureNode, ScenarioNode } from '../../models';
+import { EpicNode, FeatureNode, ScenarioNode, NodeType } from '../../models';
 
 describe('ModuleViewerComponent', () => {
   let component: ModuleViewerComponent;
@@ -14,10 +14,13 @@ describe('ModuleViewerComponent', () => {
 
   const mockEpicNode: Partial<EpicNode> = {
     id: 'elohim-value-scanner-protocol',
-    type: 'epic' as const,
+    type: NodeType.EPIC,
     title: 'Value Scanner Protocol',
     description: 'Test epic description',
     tags: [],
+    sourcePath: '',
+    content: '',
+    relatedNodeIds: [],
     metadata: {},
     featureIds: ['care-economy'],
     relatedEpicIds: [],
@@ -27,10 +30,13 @@ describe('ModuleViewerComponent', () => {
 
   const mockFeatureNode: Partial<FeatureNode> = {
     id: 'care-economy',
-    type: 'feature' as const,
+    type: NodeType.FEATURE,
     title: 'Care Economy',
     description: 'Test feature description',
     tags: [],
+    sourcePath: '',
+    content: '',
+    relatedNodeIds: [],
     metadata: {},
     category: 'value-scanner',
     epicIds: ['elohim-value-scanner-protocol'],
@@ -41,12 +47,16 @@ describe('ModuleViewerComponent', () => {
 
   const mockScenarioNode: Partial<ScenarioNode> = {
     id: 'scenario-1',
-    type: 'scenario' as const,
+    type: NodeType.SCENARIO,
     title: 'Test Scenario',
     description: 'Test scenario description',
     tags: [],
+    sourcePath: '',
+    content: '',
+    relatedNodeIds: [],
     metadata: {},
     featureId: 'care-economy',
+    scenarioType: 'scenario',
     steps: [
       { keyword: 'Given', text: 'a test condition' },
       { keyword: 'When', text: 'an action occurs' },
