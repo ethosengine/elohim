@@ -7,8 +7,8 @@ export type Theme = 'light' | 'dark' | 'device';
   providedIn: 'root'
 })
 export class ThemeService {
-  private renderer: Renderer2;
-  private currentTheme$ = new BehaviorSubject<Theme>('device');
+  private readonly renderer: Renderer2;
+  private readonly currentTheme$ = new BehaviorSubject<Theme>('device');
 
   constructor(rendererFactory: RendererFactory2) {
     this.renderer = rendererFactory.createRenderer(null, null);
