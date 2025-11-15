@@ -36,7 +36,7 @@ components:
       mountSources: true
       env:
         - name: CLAUDE_CONFIG_DIR
-          value: /tmp/claude-config
+          value: /projects/.claude-config
         - name: NPM_CONFIG_CACHE
           value: /tmp/npm-cache
         - name: CYPRESS_CACHE_FOLDER
