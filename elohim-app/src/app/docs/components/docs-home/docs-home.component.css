@@ -79,12 +79,28 @@
   margin-bottom: 4rem;
 }
 
+.featured-section {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
+  border: 2px solid rgba(99, 102, 241, 0.2);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  margin-bottom: 5rem;
+}
+
 .section-title {
   font-size: 1.75rem;
   margin-bottom: 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.section-description {
+  color: #94a3b8;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  max-width: 700px;
 }
 
 .title-icon {
@@ -126,6 +142,35 @@
 .feature-card:hover {
   border-color: rgba(34, 197, 94, 0.5);
   box-shadow: 0 12px 32px rgba(34, 197, 94, 0.2);
+}
+
+.module-card {
+  position: relative;
+  border: 2px solid rgba(236, 72, 153, 0.3);
+}
+
+.module-card.featured {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+}
+
+.module-card:hover {
+  border-color: rgba(236, 72, 153, 0.6);
+  box-shadow: 0 12px 32px rgba(236, 72, 153, 0.3);
+}
+
+.card-badge {
+  position: absolute;
+  top: -0.75rem;
+  right: 1rem;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
 }
 
 .card-header {

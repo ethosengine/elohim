@@ -30,6 +30,13 @@ export const DOCS_ROUTES: Routes = [
           )
       },
       {
+        path: 'module/:id',
+        loadComponent: () =>
+          import('./components/module-viewer/module-viewer.component').then(
+            m => m.ModuleViewerComponent
+          )
+      },
+      {
         path: 'scenario/:id',
         loadComponent: () =>
           import('./components/scenario-detail/scenario-detail.component').then(
