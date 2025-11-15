@@ -1,8 +1,9 @@
-import { Component, OnInit, DestroyRef } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { EpicNode, FeatureNode, ScenarioNode, DocumentNode } from '../../models';
 
@@ -21,27 +22,33 @@ interface ModuleSection {
   templateUrl: './module-viewer.component.html',
   styleUrls: ['./module-viewer.component.css']
 })
-export class ModuleViewerComponent implements OnInit {
+export class ModuleViewerComponent implements OnInit, OnDestroy {
   moduleName: string = '';
   epic: EpicNode | null = null;
   feature: FeatureNode | null = null;
   scenarios: ScenarioNode[] = [];
   interleavedSections: ModuleSection[] = [];
 
+  private destroy$ = new Subject<void>();
+
   constructor(
     private route: ActivatedRoute,
     private documentGraphService: DocumentGraphService,
-    private sanitizer: DomSanitizer,
-    private destroyRef: DestroyRef
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
     this.route.params
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(takeUntil(this.destroy$))
       .subscribe(params => {
         const moduleId = params['id'];
         this.loadModule(moduleId);
       });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private loadModule(moduleId: string): void {
