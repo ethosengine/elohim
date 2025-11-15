@@ -1,0 +1,10 @@
+<button
+  class="theme-toggle"
+  (click)="toggleTheme()"
+  [attr.aria-label]="getTooltip()"
+  [title]="getTooltip()">
+  <span class="theme-icon">
+    {{ getIcon() }}
+    <span class="auto-indicator" *ngIf="isAutoMode()">A</span>
+  </span>
+</button>
