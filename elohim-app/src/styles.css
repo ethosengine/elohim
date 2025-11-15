@@ -45,15 +45,15 @@
         --secondary: #d81b60;
         --accent: #00897b;
 
-        /* Footer lush green theme colors */
-        --forest-dark: rgb(46, 125, 50);
-        --forest-light: rgb(102, 187, 106);
-        --leaf-light: rgb(27, 94, 32);
-        --tech-glow: rgb(1, 87, 155);
-        --tech-accent: rgba(1, 87, 155, 0.15);
-        --tech-bright: rgba(1, 87, 155, 0.9);
-        --earthy-orange: rgb(230, 81, 0);
-        --earthy-orange-light: rgba(230, 81, 0, 0.8);
+        /* Footer soft meadow theme colors - desaturated for beautiful day aesthetic */
+        --forest-dark: rgb(195, 205, 180);
+        --forest-light: rgb(235, 240, 225);
+        --leaf-light: rgb(40, 55, 30);
+        --tech-glow: rgb(15, 85, 150);
+        --tech-accent: rgba(15, 85, 150, 0.15);
+        --tech-bright: rgba(15, 85, 150, 0.95);
+        --earthy-orange: rgb(175, 85, 30);
+        --earthy-orange-light: rgba(175, 85, 30, 0.8);
     }
 }
 
