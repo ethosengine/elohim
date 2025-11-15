@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -30,14 +31,17 @@ export class ModuleViewerComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private documentGraphService: DocumentGraphService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private destroyRef: DestroyRef
   ) {}
 
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
-      const moduleId = params['id'];
-      this.loadModule(moduleId);
-    });
+    this.route.params
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => {
+        const moduleId = params['id'];
+        this.loadModule(moduleId);
+      });
   }
 
   private loadModule(moduleId: string): void {
