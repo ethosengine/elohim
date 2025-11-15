@@ -9,7 +9,12 @@
       "mcp__jenkins__getBuildLog",
       "mcp__jenkins__getJobs",
       "WebFetch(domain:staging.elohim.host)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "Bash(tree cypress/e2e -L 3)",
+      "Bash(xargs -n 1 basename)",
+      "Bash(npm run build)",
+      "Bash(ng generate component components/home --skip-tests)",
+      "Bash(/projects/elohim/elohim-app/src/app/app.component.css)"
     ],
     "deny": [],
     "ask": []

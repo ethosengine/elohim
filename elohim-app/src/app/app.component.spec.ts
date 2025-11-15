@@ -1,12 +1,16 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
 import { AppComponent } from './app.component';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [provideHttpClient()]
+      providers: [
+        provideHttpClient(),
+        provideRouter([])
+      ]
     }).compileComponents();
   });
 
@@ -22,10 +26,10 @@ describe('AppComponent', () => {
     expect(app.title).toEqual('elohim-app');
   });
 
-  it('should render title', () => {
+  it('should render router outlet', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.textContent).toContain('Elohim Protocol');
+    expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 });

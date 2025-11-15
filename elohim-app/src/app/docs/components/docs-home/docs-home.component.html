@@ -1,0 +1,146 @@
+<div class="docs-home">
+  <!-- Welcome Section -->
+  <section class="welcome-section">
+    <h1 class="main-title">Welcome to Living Documentation</h1>
+    <p class="main-description">
+      Explore the Elohim Protocol through an interconnected graph of epics, features, and executable scenarios.
+      Navigate bidirectionally between vision and implementation.
+    </p>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📖</div>
+        <div class="stat-number">{{ stats.epicCount || 0 }}</div>
+        <div class="stat-label">Epics</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-number">{{ stats.featureCount || 0 }}</div>
+        <div class="stat-label">Features</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✓</div>
+        <div class="stat-number">{{ stats.scenarioCount || 0 }}</div>
+        <div class="stat-label">Scenarios</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔗</div>
+        <div class="stat-number">{{ stats.averageConnectionsPerNode | number:'1.1-1' }}</div>
+        <div class="stat-label">Avg Connections</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Learning Modules Section -->
+  <section class="content-section featured-section">
+    <h2 class="section-title">
+      <span class="title-icon">🎓</span>
+      Learning Modules - Integrated Story & Practice
+    </h2>
+    <p class="section-description">
+      Experience epics and scenarios together. Each module combines narrative context with executable scenarios.
+    </p>
+    <div class="card-grid">
+      <a routerLink="/docs/module/value-scanner" class="doc-card module-card featured">
+        <div class="card-badge">New</div>
+        <div class="card-header">
+          <span class="card-icon">🍓</span>
+          <span class="card-category">value-scanner</span>
+        </div>
+        <h3 class="card-title">Value Scanner: Care Economy</h3>
+        <p class="card-description">
+          Follow Tommy's strawberry purchase to understand how care becomes computable value.
+          Combines the epic story with practical scenarios.
+        </p>
+        <div class="card-meta">
+          <span class="meta-item">📖 Epic Story</span>
+          <span class="meta-item">🧪 5 Scenarios</span>
+          <span class="meta-item">⚡ Interleaved View</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Epics Section -->
+  <section class="content-section">
+    <h2 class="section-title">
+      <span class="title-icon">📖</span>
+      Epics - Vision & Narrative
+    </h2>
+    <div class="card-grid">
+      <a
+        *ngFor="let epic of epics"
+        [routerLink]="['/docs/epic', epic.id]"
+        class="doc-card epic-card"
+      >
+        <div class="card-header">
+          <span class="card-icon">{{ getCategoryIcon(getEpicCategory(epic)) }}</span>
+          <span class="card-category">{{ getEpicCategory(epic) }}</span>
+        </div>
+        <h3 class="card-title">{{ epic.title }}</h3>
+        <p class="card-description">{{ epic.description }}</p>
+        <div class="card-meta">
+          <span class="meta-item" *ngIf="epic.version">v{{ epic.version }}</span>
+          <span class="meta-item">{{ epic.featureIds.length }} features</span>
+          <span class="meta-item" *ngIf="epic.metadata?.['wordCount']">
+            {{ (epic.metadata['wordCount'] / 1000) | number:'1.0-1' }}k words
+          </span>
+        </div>
+        <div class="card-tags" *ngIf="epic.tags.length > 0">
+          <span *ngFor="let tag of epic.tags.slice(0, 3)" class="tag">{{ tag }}</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="content-section">
+    <h2 class="section-title">
+      <span class="title-icon">⚡</span>
+      Features - Testable Behaviors
+    </h2>
+    <div class="card-grid">
+      <a
+        *ngFor="let feature of features"
+        [routerLink]="['/docs/feature', feature.id]"
+        class="doc-card feature-card"
+      >
+        <div class="card-header">
+          <span class="card-icon">{{ getCategoryIcon(getFeatureCategory(feature)) }}</span>
+          <span class="card-category">{{ getFeatureCategory(feature) }}</span>
+        </div>
+        <h3 class="card-title">{{ feature.title }}</h3>
+        <p class="card-description">{{ feature.featureDescription }}</p>
+        <div class="card-meta">
+          <span class="meta-item">{{ feature.scenarioIds.length }} scenarios</span>
+          <span class="meta-item" *ngIf="feature.testStatus">
+            <span [class]="'status-badge status-' + feature.testStatus.status">
+              {{ feature.testStatus.status }}
+            </span>
+          </span>
+        </div>
+        <div class="card-tags" *ngIf="feature.tags.length > 0">
+          <span *ngFor="let tag of feature.tags.slice(0, 3)" class="tag">{{ tag }}</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Quick Actions -->
+  <section class="actions-section">
+    <h2 class="section-title">Explore</h2>
+    <div class="action-grid">
+      <a routerLink="/docs/graph" class="action-card">
+        <div class="action-icon">🕸️</div>
+        <h3>Graph Visualization</h3>
+        <p>Explore relationships visually</p>
+      </a>
+      <a routerLink="/docs/search" class="action-card">
+        <div class="action-icon">🔍</div>
+        <h3>Advanced Search</h3>
+        <p>Find across all documentation</p>
+      </a>
+    </div>
+  </section>
+</div>
