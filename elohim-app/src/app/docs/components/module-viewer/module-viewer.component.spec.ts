@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { ActivatedRoute } from '@angular/router';
 import { provideRouter } from '@angular/router';
 import { DomSanitizer } from '@angular/platform-browser';
-import { of } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 import { ModuleViewerComponent } from './module-viewer.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { EpicNode, FeatureNode, ScenarioNode, NodeType } from '../../models';
@@ -11,7 +11,7 @@ describe('ModuleViewerComponent', () => {
   let component: ModuleViewerComponent;
   let fixture: ComponentFixture<ModuleViewerComponent>;
   let mockDocumentGraphService: jasmine.SpyObj<DocumentGraphService>;
-  let mockActivatedRoute: any;
+  let paramsSubject: BehaviorSubject<any>;
 
   const mockEpicNode: Partial<EpicNode> = {
     id: 'elohim-value-scanner-protocol',
@@ -79,9 +79,7 @@ describe('ModuleViewerComponent', () => {
     });
     mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
 
-    mockActivatedRoute = {
-      params: of({ id: 'value-scanner' })
-    };
+    paramsSubject = new BehaviorSubject({ id: 'value-scanner' });
 
     const mockDomSanitizer = jasmine.createSpyObj('DomSanitizer', ['sanitize']);
     mockDomSanitizer.sanitize.and.returnValue('');
@@ -90,7 +88,7 @@ describe('ModuleViewerComponent', () => {
       imports: [ModuleViewerComponent],
       providers: [
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
-        { provide: ActivatedRoute, useValue: mockActivatedRoute },
+        { provide: ActivatedRoute, useValue: { params: paramsSubject.asObservable() } },
         { provide: DomSanitizer, useValue: mockDomSanitizer },
         provideRouter([])
       ]
