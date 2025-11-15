@@ -1,3 +1,4 @@
+@epic:elohim-public-observer-epic @category:deployment @status:implemented
 Feature: Staging Site Validation
   As a deployment pipeline
   I want to validate that the staging site is working correctly
