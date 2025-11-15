@@ -79,7 +79,7 @@ describe('ModuleViewerComponent', () => {
     });
     mockDocumentGraphService.getNode.and.returnValue(mockScenarioNode as any);
 
-    paramsSubject = new BehaviorSubject<any>({});
+    paramsSubject = new BehaviorSubject<any>({ id: 'value-scanner' });
 
     const mockDomSanitizer = jasmine.createSpyObj('DomSanitizer', ['sanitize']);
     mockDomSanitizer.sanitize.and.returnValue('');
@@ -88,7 +88,12 @@ describe('ModuleViewerComponent', () => {
       imports: [ModuleViewerComponent],
       providers: [
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
-        { provide: ActivatedRoute, useValue: { params: paramsSubject } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            params: paramsSubject.asObservable()
+          }
+        },
         { provide: DomSanitizer, useValue: mockDomSanitizer },
         provideRouter([])
       ]
@@ -103,9 +108,7 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should load value-scanner module on init', async () => {
-    fixture.detectChanges(); // Initialize component and set up subscription
-    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
-    fixture.detectChanges(); // Process changes from loadModule
+    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(component.moduleName).toBe('Value Scanner: Care Economy');
@@ -114,9 +117,7 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should parse epic sections correctly', async () => {
-    fixture.detectChanges(); // Initialize component and set up subscription
-    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
-    fixture.detectChanges(); // Process changes from loadModule
+    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(component.interleavedSections.length).toBeGreaterThan(0);
@@ -124,9 +125,7 @@ describe('ModuleViewerComponent', () => {
   });
 
   it('should interleave scenarios with epic sections', async () => {
-    fixture.detectChanges(); // Initialize component and set up subscription
-    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
-    fixture.detectChanges(); // Process changes from loadModule
+    fixture.detectChanges();
     await fixture.whenStable();
 
     const hasScenarios = component.interleavedSections.some(s => s.type === 'scenario');
@@ -144,9 +143,7 @@ describe('ModuleViewerComponent', () => {
   it('should handle missing epic gracefully', async () => {
     mockDocumentGraphService.getNodesByType.and.callFake(() => []);
 
-    fixture.detectChanges(); // Initialize component and set up subscription
-    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
-    fixture.detectChanges(); // Process changes from loadModule
+    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(component.epic).toBeNull();
@@ -159,9 +156,7 @@ describe('ModuleViewerComponent', () => {
       return [];
     });
 
-    fixture.detectChanges(); // Initialize component and set up subscription
-    paramsSubject.next({ id: 'value-scanner' }); // Emit params to trigger loadModule
-    fixture.detectChanges(); // Process changes from loadModule
+    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(component.feature).toBeNull();
