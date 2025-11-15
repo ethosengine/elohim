@@ -88,8 +88,8 @@ describe('ModuleViewerComponent', () => {
     // Create a proper DestroyRef mock that works with takeUntilDestroyed
     const mockDestroyRef: DestroyRef = {
       onDestroy: (callback: () => void) => {
-        // Store the callback but don't call it during tests
-        return;
+        // Return a no-op cleanup function
+        return () => {};
       }
     };
 
