@@ -124,32 +124,32 @@
 /* Light mode theme adjustments - softer, beautiful day colors */
 @media (prefers-color-scheme: light) {
   .constitutional-architecture {
-    background: linear-gradient(135deg, rgba(135, 206, 235, 0.15), rgba(255, 250, 205, 0.15));
-    border-color: rgba(94, 53, 177, 0.25);
+    background: linear-gradient(135deg, rgba(135, 206, 235, 0.3), rgba(255, 250, 205, 0.25));
+    border-color: rgba(25, 118, 210, 0.4);
   }
 
   .constitutional-architecture h3 {
-    color: #5e35b1;
+    color: #1976d2;
   }
 
   .layer-item {
-    background: linear-gradient(90deg, rgba(135, 206, 235, 0.2), rgba(255, 250, 205, 0.2));
-    border-left-color: #5e35b1;
+    background: linear-gradient(90deg, rgba(135, 206, 235, 0.35), rgba(255, 250, 205, 0.3));
+    border-left-color: #1976d2;
   }
 
   .layer-item:first-child {
     border-left-color: #c62828;
-    background: linear-gradient(90deg, rgba(220, 38, 38, 0.15), rgba(135, 206, 235, 0.15));
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.2), rgba(135, 206, 235, 0.25));
   }
 
   .layer-item:last-child {
     border-left-color: #00897b;
-    background: linear-gradient(90deg, rgba(0, 137, 123, 0.15), rgba(195, 205, 180, 0.2));
+    background: linear-gradient(90deg, rgba(0, 137, 123, 0.25), rgba(195, 205, 180, 0.3));
   }
 
   .flourishing-models {
-    background: linear-gradient(135deg, rgba(195, 205, 180, 0.25), rgba(255, 250, 205, 0.2));
-    border-color: rgba(0, 137, 123, 0.3);
+    background: linear-gradient(135deg, rgba(195, 205, 180, 0.4), rgba(255, 250, 205, 0.3));
+    border-color: rgba(0, 137, 123, 0.45);
   }
 
   .flourishing-models h3 {
@@ -157,20 +157,25 @@
   }
 
   .architecture-section {
-    background: linear-gradient(135deg, rgba(135, 206, 235, 0.15), rgba(195, 205, 180, 0.15));
-    border-color: rgba(94, 53, 177, 0.25);
+    background: linear-gradient(135deg, rgba(135, 206, 235, 0.3), rgba(195, 205, 180, 0.25));
+    border-color: rgba(25, 118, 210, 0.4);
   }
 
   .architecture-section h3 {
-    color: #5e35b1;
+    color: #1976d2;
   }
 
   .constitutional-layer {
-    background: linear-gradient(135deg, rgba(220, 38, 38, 0.1), rgba(239, 68, 68, 0.08));
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.15), rgba(239, 68, 68, 0.12));
+    border-color: #c62828;
+  }
+
+  .constitutional-layer h4 {
+    color: #c62828;
   }
 
   .runtime-layer {
-    background: linear-gradient(135deg, rgba(0, 137, 123, 0.1), rgba(195, 205, 180, 0.12));
+    background: linear-gradient(135deg, rgba(0, 137, 123, 0.15), rgba(195, 205, 180, 0.2));
     border-color: #00897b;
   }
 
@@ -179,8 +184,12 @@
   }
 
   .connection-explanation {
-    background: linear-gradient(135deg, rgba(255, 250, 205, 0.3), rgba(251, 191, 36, 0.15));
-    border-color: #f59e0b;
+    background: linear-gradient(135deg, rgba(255, 250, 205, 0.45), rgba(251, 191, 36, 0.25));
+    border-color: #f57c00;
+  }
+
+  .connection-explanation h4 {
+    color: #f57c00;
   }
 }
 

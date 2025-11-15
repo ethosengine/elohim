@@ -40,9 +40,9 @@
         --atmosphere-light: #64b5f6;
         --text-light: #1a1a1a;
 
-        /* Accent colors for interactive elements - adjusted for light background */
-        --primary: #5e35b1;
-        --secondary: #d81b60;
+        /* Accent colors for interactive elements - nature-inspired for beautiful day */
+        --primary: #1976d2;
+        --secondary: #f57c00;
         --accent: #00897b;
 
         /* Footer soft meadow theme colors - desaturated for beautiful day aesthetic */
@@ -244,12 +244,12 @@ html {
 /* Light mode card styles */
 @media (prefers-color-scheme: light) {
     .card {
-        background: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(0, 0, 0, 0.15);
     }
 
     .card:hover {
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.95);
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
     }
 }
@@ -277,7 +277,7 @@ html {
 /* Light mode quote styles */
 @media (prefers-color-scheme: light) {
     .quote {
-        background: rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.65);
         border-left-color: var(--secondary);
     }
 }
