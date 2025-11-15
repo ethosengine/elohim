@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { provideRouter } from '@angular/router';
+import { DomSanitizer } from '@angular/platform-browser';
 import { of } from 'rxjs';
 import { ModuleViewerComponent } from './module-viewer.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
@@ -74,11 +75,15 @@ describe('ModuleViewerComponent', () => {
       params: of({ id: 'value-scanner' })
     };
 
+    const mockDomSanitizer = jasmine.createSpyObj('DomSanitizer', ['sanitize']);
+    mockDomSanitizer.sanitize.and.returnValue('');
+
     await TestBed.configureTestingModule({
       imports: [ModuleViewerComponent],
       providers: [
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
+        { provide: DomSanitizer, useValue: mockDomSanitizer },
         provideRouter([])
       ]
     }).compileComponents();
