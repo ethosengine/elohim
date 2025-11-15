@@ -28,19 +28,20 @@ describe('ThemeToggleComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should display device icon by default', () => {
-    component.currentTheme = 'device';
-    expect(component.getIcon()).toBe('💻');
-  });
-
-  it('should display sun icon in light mode', () => {
+  it('should display sun or moon icon based on effective theme', () => {
     component.currentTheme = 'light';
     expect(component.getIcon()).toBe('☀️');
-  });
 
-  it('should display moon icon in dark mode', () => {
     component.currentTheme = 'dark';
     expect(component.getIcon()).toBe('🌙');
+  });
+
+  it('should show auto mode indicator when in device mode', () => {
+    component.currentTheme = 'device';
+    expect(component.isAutoMode()).toBe(true);
+
+    component.currentTheme = 'light';
+    expect(component.isAutoMode()).toBe(false);
   });
 
   it('should call cycleTheme when toggled', () => {
