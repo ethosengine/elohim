@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { provideRouter } from '@angular/router';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -102,30 +102,30 @@ describe('ModuleViewerComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load value-scanner module on init', fakeAsync(() => {
+  it('should load value-scanner module on init', async () => {
     fixture.detectChanges();
-    tick();
+    await fixture.whenStable();
 
     expect(component.moduleName).toBe('Value Scanner: Care Economy');
     expect(mockDocumentGraphService.getNodesByType).toHaveBeenCalledWith('epic');
     expect(mockDocumentGraphService.getNodesByType).toHaveBeenCalledWith('feature');
-  }));
+  });
 
-  it('should parse epic sections correctly', fakeAsync(() => {
+  it('should parse epic sections correctly', async () => {
     fixture.detectChanges();
-    tick();
+    await fixture.whenStable();
 
     expect(component.interleavedSections.length).toBeGreaterThan(0);
     expect(component.interleavedSections.some(s => s.type === 'epic')).toBe(true);
-  }));
+  });
 
-  it('should interleave scenarios with epic sections', fakeAsync(() => {
+  it('should interleave scenarios with epic sections', async () => {
     fixture.detectChanges();
-    tick();
+    await fixture.whenStable();
 
     const hasScenarios = component.interleavedSections.some(s => s.type === 'scenario');
     expect(hasScenarios).toBe(true);
-  }));
+  });
 
   it('should return correct CSS class for step keywords', () => {
     expect(component.getStepKeywordClass('Given')).toBe('step-given');
@@ -135,26 +135,26 @@ describe('ModuleViewerComponent', () => {
     expect(component.getStepKeywordClass('But')).toBe('step-and');
   });
 
-  it('should handle missing epic gracefully', fakeAsync(() => {
+  it('should handle missing epic gracefully', async () => {
     mockDocumentGraphService.getNodesByType.and.callFake(() => []);
 
     fixture.detectChanges();
-    tick();
+    await fixture.whenStable();
 
     expect(component.epic).toBeNull();
     expect(component.interleavedSections.length).toBe(0);
-  }));
+  });
 
-  it('should handle missing feature gracefully', fakeAsync(() => {
+  it('should handle missing feature gracefully', async () => {
     mockDocumentGraphService.getNodesByType.and.callFake((type: string) => {
       if (type === 'epic') return [mockEpicNode as any];
       return [];
     });
 
     fixture.detectChanges();
-    tick();
+    await fixture.whenStable();
 
     expect(component.feature).toBeNull();
     expect(component.scenarios.length).toBe(0);
-  }));
+  });
 });
