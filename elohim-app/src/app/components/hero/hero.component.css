@@ -274,8 +274,8 @@
   }
 
   .hero-content h1 {
-    color: #1a1a1a;
-    text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
+    color: #000000;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   }
 
   .hero-content h1:hover {
@@ -284,8 +284,8 @@
   }
 
   .hero-subtitle {
-    color: rgba(26, 26, 26, 0.9);
-    text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.85);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   .video-subtitle {
@@ -369,8 +369,8 @@ body[data-theme="light"] .hero-logo {
 }
 
 body[data-theme="light"] .hero-content h1 {
-  color: #1a1a1a;
-  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
+  color: #000000;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 body[data-theme="light"] .hero-content h1:hover {
@@ -379,8 +379,8 @@ body[data-theme="light"] .hero-content h1:hover {
 }
 
 body[data-theme="light"] .hero-subtitle {
-  color: rgba(26, 26, 26, 0.9);
-  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+  color: rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 body[data-theme="light"] .video-subtitle {

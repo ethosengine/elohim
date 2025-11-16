@@ -48,7 +48,7 @@
         /* Footer soft meadow theme colors - desaturated for beautiful day aesthetic */
         --forest-dark: rgb(195, 205, 180);
         --forest-light: rgb(235, 240, 225);
-        --leaf-light: rgb(40, 55, 30);
+        --leaf-light: rgb(15, 25, 12);
         --tech-glow: rgb(15, 85, 150);
         --tech-accent: rgba(15, 85, 150, 0.15);
         --tech-bright: rgba(15, 85, 150, 0.95);
@@ -401,7 +401,7 @@ body[data-theme="light"] {
     --accent: #00897b;
     --forest-dark: rgb(46, 125, 50);
     --forest-light: rgb(102, 187, 106);
-    --leaf-light: rgb(27, 94, 32);
+    --leaf-light: rgb(10, 30, 12);
     --tech-glow: rgb(1, 87, 155);
     --tech-accent: rgba(1, 87, 155, 0.15);
     --tech-bright: rgba(1, 87, 155, 0.9);
