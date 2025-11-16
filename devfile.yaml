@@ -43,6 +43,10 @@ components:
           value: /tmp/cypress-cache
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
+        - name: CHROME_BIN
+          value: /usr/local/bin/chrome
+        - name: CHROME_PATH
+          value: /opt/chrome-linux64/chrome  
       endpoints:
         - name: angular-dev
           targetPort: 4200

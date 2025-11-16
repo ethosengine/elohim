@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { provideRouter } from '@angular/router';
 import { DomSanitizer } from '@angular/platform-browser';
 import { BehaviorSubject } from 'rxjs';
 import { ModuleViewerComponent } from './module-viewer.component';
@@ -94,8 +93,7 @@ describe('ModuleViewerComponent', () => {
             params: paramsSubject
           }
         },
-        { provide: DomSanitizer, useValue: mockDomSanitizer },
-        provideRouter([])
+        { provide: DomSanitizer, useValue: mockDomSanitizer }
       ]
     }).compileComponents();
 
@@ -141,8 +139,14 @@ describe('ModuleViewerComponent', () => {
   it('should handle missing epic gracefully', async () => {
     mockDocumentGraphService.getNodesByType.and.callFake(() => []);
 
-    // Need to reload the component with new mock behavior
-    component.ngOnInit();
+    // Reset component state
+    component.epic = null;
+    component.feature = null;
+    component.scenarios = [];
+    component.interleavedSections = [];
+
+    // Trigger reload by emitting new params
+    paramsSubject.next({ id: 'value-scanner' });
     await fixture.whenStable();
 
     expect(component.epic).toBeNull();
@@ -155,8 +159,14 @@ describe('ModuleViewerComponent', () => {
       return [];
     });
 
-    // Need to reload the component with new mock behavior
-    component.ngOnInit();
+    // Reset component state
+    component.epic = null;
+    component.feature = null;
+    component.scenarios = [];
+    component.interleavedSections = [];
+
+    // Trigger reload by emitting new params
+    paramsSubject.next({ id: 'value-scanner' });
     await fixture.whenStable();
 
     expect(component.feature).toBeNull();

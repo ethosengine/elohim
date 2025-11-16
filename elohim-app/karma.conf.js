@@ -2,6 +2,9 @@
 // https://karma-runner.github.io/1.0/config/configuration-file.html
 
 module.exports = function (config) {
+  // Detect if we're in a headless environment (CI/CD, Eclipse Che, etc.)
+  const isHeadless = process.env.CI || process.env.DEVWORKSPACE_ID || process.env.CHE_WORKSPACE_ID;
+
   config.set({
     basePath: '',
     frameworks: ['jasmine', '@angular-devkit/build-angular'],
@@ -42,7 +45,21 @@ module.exports = function (config) {
       }
     },
     reporters: ['progress', 'kjhtml', 'coverage'],
-    browsers: ['Chrome'],
+    // Automatically use ChromeHeadless in CI/Eclipse Che, Chrome locally
+    browsers: [isHeadless ? 'ChromeHeadlessCI' : 'Chrome'],
+    customLaunchers: {
+      ChromeHeadlessCI: {
+        base: 'ChromeHeadless',
+        flags: [
+          '--headless=new',
+          '--no-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-setuid-sandbox',
+          '--disable-software-rasterizer'
+        ]
+      }
+    },
     restartOnFileChange: true
   });
 };
