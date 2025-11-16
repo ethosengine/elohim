@@ -274,33 +274,33 @@
   }
 
   .hero-content h1 {
-    color: #1a1a1a;
+    color: #1a1a1a !important;
     text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
   }
 
   .hero-content h1:hover {
-    color: rgba(0, 0, 0, 0.9);
+    color: rgba(0, 0, 0, 0.9) !important;
     text-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
   }
 
   .hero-subtitle {
-    color: rgba(26, 26, 26, 0.9);
+    color: rgba(26, 26, 26, 0.9) !important;
     text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
   }
 
   .video-subtitle {
-    color: rgba(26, 26, 26, 0.7);
+    color: rgba(26, 26, 26, 0.7) !important;
   }
 
   .listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
-    background: rgba(255, 255, 255, 0.7);
-    border: 2px solid rgba(0, 0, 0, 0.2);
-    color: #1a1a1a;
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 2px solid rgba(0, 0, 0, 0.3) !important;
+    color: #1a1a1a !important;
   }
 
   .listen-button:hover, .back-to-logo-button:hover, .deep-dive-button:hover, .intro-video-button:hover {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(0, 0, 0, 0.4) !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
 
@@ -355,7 +355,7 @@
   }
 }
 
-/* Manual Theme Overrides */
+/* Manual Theme Overrides - Light Mode */
 body[data-theme="light"] .hero::before {
   background: var(--space-black);
 }
@@ -369,39 +369,39 @@ body[data-theme="light"] .hero-logo {
 }
 
 body[data-theme="light"] .hero-content h1 {
-  color: #1a1a1a;
+  color: #1a1a1a !important;
   text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
 }
 
 body[data-theme="light"] .hero-content h1:hover {
-  color: rgba(0, 0, 0, 0.9);
+  color: rgba(0, 0, 0, 0.9) !important;
   text-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
 body[data-theme="light"] .hero-subtitle {
-  color: rgba(26, 26, 26, 0.9);
+  color: rgba(26, 26, 26, 0.9) !important;
   text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
 }
 
 body[data-theme="light"] .video-subtitle {
-  color: rgba(26, 26, 26, 0.7);
+  color: rgba(26, 26, 26, 0.7) !important;
 }
 
 body[data-theme="light"] .listen-button,
 body[data-theme="light"] .back-to-logo-button,
 body[data-theme="light"] .deep-dive-button,
 body[data-theme="light"] .intro-video-button {
-  background: rgba(255, 255, 255, 0.7);
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  color: #1a1a1a;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 2px solid rgba(0, 0, 0, 0.3) !important;
+  color: #1a1a1a !important;
 }
 
 body[data-theme="light"] .listen-button:hover,
 body[data-theme="light"] .back-to-logo-button:hover,
 body[data-theme="light"] .deep-dive-button:hover,
 body[data-theme="light"] .intro-video-button:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(0, 0, 0, 0.4) !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
@@ -415,4 +415,68 @@ body[data-theme="light"] .scroll-indicator:hover svg {
 
 body[data-theme="light"] .hero-video {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* Device Mode with Light Preference */
+@media (prefers-color-scheme: light) {
+  body[data-theme="device"] .hero::before {
+    background: var(--space-black);
+  }
+
+  body[data-theme="device"] .space-atmosphere-transition {
+    background: linear-gradient(180deg, var(--space-black) 0%, transparent 100%);
+  }
+
+  body[data-theme="device"] .hero-logo {
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.2));
+  }
+
+  body[data-theme="device"] .hero-content h1 {
+    color: #1a1a1a !important;
+    text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5), 0 0 8px rgba(0, 0, 0, 0.1);
+  }
+
+  body[data-theme="device"] .hero-content h1:hover {
+    color: rgba(0, 0, 0, 0.9) !important;
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  }
+
+  body[data-theme="device"] .hero-subtitle {
+    color: rgba(26, 26, 26, 0.9) !important;
+    text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+  }
+
+  body[data-theme="device"] .video-subtitle {
+    color: rgba(26, 26, 26, 0.7) !important;
+  }
+
+  body[data-theme="device"] .listen-button,
+  body[data-theme="device"] .back-to-logo-button,
+  body[data-theme="device"] .deep-dive-button,
+  body[data-theme="device"] .intro-video-button {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 2px solid rgba(0, 0, 0, 0.3) !important;
+    color: #1a1a1a !important;
+  }
+
+  body[data-theme="device"] .listen-button:hover,
+  body[data-theme="device"] .back-to-logo-button:hover,
+  body[data-theme="device"] .deep-dive-button:hover,
+  body[data-theme="device"] .intro-video-button:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  body[data-theme="device"] .scroll-indicator svg {
+    fill: rgba(26, 26, 26, 0.7);
+  }
+
+  body[data-theme="device"] .scroll-indicator:hover svg {
+    fill: rgba(26, 26, 26, 1);
+  }
+
+  body[data-theme="device"] .hero-video {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
 }

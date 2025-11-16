@@ -1,10 +1,11 @@
-import { Component, OnInit, ElementRef, Renderer2 } from '@angular/core';
+import { Component, OnInit, ElementRef, Renderer2, ViewEncapsulation } from '@angular/core';
 
 @Component({
   selector: 'app-hero',
   imports: [],
   templateUrl: './hero.component.html',
-  styleUrl: './hero.component.css'
+  styleUrl: './hero.component.css',
+  encapsulation: ViewEncapsulation.None
 })
 export class HeroComponent implements OnInit {
   isVideoVisible: boolean = false;
