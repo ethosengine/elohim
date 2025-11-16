@@ -289,27 +289,27 @@
   }
 
   .video-subtitle {
-    color: rgba(26, 26, 26, 0.7);
+    color: #000000;
   }
 
   .listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
-    background: rgba(255, 255, 255, 0.7);
-    border: 2px solid rgba(0, 0, 0, 0.2);
-    color: #1a1a1a;
+    background: rgba(0, 0, 0, 0.75);
+    border: 2px solid rgba(0, 0, 0, 0.9);
+    color: #ffffff;
   }
 
   .listen-button:hover, .back-to-logo-button:hover, .deep-dive-button:hover, .intro-video-button:hover {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(0, 0, 0, 0.3);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(0, 0, 0, 1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   }
 
   .scroll-indicator svg {
-    fill: rgba(26, 26, 26, 0.7);
+    fill: #000000;
   }
 
   .scroll-indicator:hover svg {
-    fill: rgba(26, 26, 26, 1);
+    fill: rgba(0, 0, 0, 0.8);
   }
 
   .hero-video {
@@ -384,33 +384,33 @@ body[data-theme="light"] .hero-subtitle {
 }
 
 body[data-theme="light"] .video-subtitle {
-  color: rgba(26, 26, 26, 0.7);
+  color: #000000;
 }
 
 body[data-theme="light"] .listen-button,
 body[data-theme="light"] .back-to-logo-button,
 body[data-theme="light"] .deep-dive-button,
 body[data-theme="light"] .intro-video-button {
-  background: rgba(255, 255, 255, 0.7);
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  color: #1a1a1a;
+  background: rgba(0, 0, 0, 0.75);
+  border: 2px solid rgba(0, 0, 0, 0.9);
+  color: #ffffff;
 }
 
 body[data-theme="light"] .listen-button:hover,
 body[data-theme="light"] .back-to-logo-button:hover,
 body[data-theme="light"] .deep-dive-button:hover,
 body[data-theme="light"] .intro-video-button:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.3);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.9);
+  border-color: rgba(0, 0, 0, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 body[data-theme="light"] .scroll-indicator svg {
-  fill: rgba(26, 26, 26, 0.7);
+  fill: #000000;
 }
 
 body[data-theme="light"] .scroll-indicator:hover svg {
-  fill: rgba(26, 26, 26, 1);
+  fill: rgba(0, 0, 0, 0.8);
 }
 
 body[data-theme="light"] .hero-video {
