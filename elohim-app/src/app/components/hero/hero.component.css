@@ -274,8 +274,8 @@
   }
 
   .hero-content h1 {
-    color: #000000;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    color: #000000 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
   }
 
   .hero-content h1:hover {
@@ -284,18 +284,18 @@
   }
 
   .hero-subtitle {
-    color: #000000;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    color: #000000 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
   }
 
   .video-subtitle {
-    color: #000000;
+    color: #000000 !important;
   }
 
   .listen-button, .back-to-logo-button, .deep-dive-button, .intro-video-button {
-    background: rgba(0, 0, 0, 0.75);
-    border: 2px solid rgba(0, 0, 0, 0.9);
-    color: #ffffff;
+    background: rgba(0, 0, 0, 0.75) !important;
+    border: 2px solid rgba(0, 0, 0, 0.9) !important;
+    color: #ffffff !important;
   }
 
   .listen-button:hover, .back-to-logo-button:hover, .deep-dive-button:hover, .intro-video-button:hover {
@@ -422,8 +422,8 @@ body[data-theme="light"] .hero-logo {
 }
 
 body[data-theme="light"] .hero-content h1 {
-  color: #000000;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  color: #000000 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
 }
 
 body[data-theme="light"] .hero-content h1:hover {
@@ -432,21 +432,21 @@ body[data-theme="light"] .hero-content h1:hover {
 }
 
 body[data-theme="light"] .hero-subtitle {
-  color: #000000;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  color: #000000 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
 }
 
 body[data-theme="light"] .video-subtitle {
-  color: #000000;
+  color: #000000 !important;
 }
 
 body[data-theme="light"] .listen-button,
 body[data-theme="light"] .back-to-logo-button,
 body[data-theme="light"] .deep-dive-button,
 body[data-theme="light"] .intro-video-button {
-  background: rgba(0, 0, 0, 0.75);
-  border: 2px solid rgba(0, 0, 0, 0.9);
-  color: #ffffff;
+  background: rgba(0, 0, 0, 0.75) !important;
+  border: 2px solid rgba(0, 0, 0, 0.9) !important;
+  color: #ffffff !important;
 }
 
 body[data-theme="light"] .listen-button:hover,
