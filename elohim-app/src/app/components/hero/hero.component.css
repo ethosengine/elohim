@@ -469,3 +469,67 @@ body[data-theme="light"] .scroll-indicator:hover svg {
 body[data-theme="light"] .hero-video {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
+
+/* Device Mode with Light Preference - HIGH CONTRAST */
+@media (prefers-color-scheme: light) {
+  body[data-theme="device"] .hero::before {
+    background: var(--space-black);
+  }
+
+  body[data-theme="device"] .space-atmosphere-transition {
+    background: linear-gradient(180deg, var(--space-black) 0%, transparent 100%);
+  }
+
+  body[data-theme="device"] .hero-logo {
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.2));
+  }
+
+  body[data-theme="device"] .hero-content h1 {
+    color: #000000 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  body[data-theme="device"] .hero-content h1:hover {
+    color: rgba(0, 0, 0, 0.9);
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  }
+
+  body[data-theme="device"] .hero-subtitle {
+    color: #000000 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  body[data-theme="device"] .video-subtitle {
+    color: #000000 !important;
+  }
+
+  body[data-theme="device"] .listen-button,
+  body[data-theme="device"] .back-to-logo-button,
+  body[data-theme="device"] .deep-dive-button,
+  body[data-theme="device"] .intro-video-button {
+    background: rgba(0, 0, 0, 0.75) !important;
+    border: 2px solid rgba(0, 0, 0, 0.9) !important;
+    color: #ffffff !important;
+  }
+
+  body[data-theme="device"] .listen-button:hover,
+  body[data-theme="device"] .back-to-logo-button:hover,
+  body[data-theme="device"] .deep-dive-button:hover,
+  body[data-theme="device"] .intro-video-button:hover {
+    background: rgba(0, 0, 0, 0.9) !important;
+    border-color: rgba(0, 0, 0, 1) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  body[data-theme="device"] .scroll-indicator svg {
+    fill: #000000;
+  }
+
+  body[data-theme="device"] .scroll-indicator:hover svg {
+    fill: rgba(0, 0, 0, 0.8);
+  }
+
+  body[data-theme="device"] .hero-video {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+}
