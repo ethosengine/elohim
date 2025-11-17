@@ -218,6 +218,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 sh """
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
+                                    sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.alpha.ts
                                 """
                                 
                                 sh 'npm run build'
@@ -450,6 +451,56 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             """
 
                             echo 'Staging deployment completed!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Alpha') {
+            when {
+                expression { return env.BRANCH_NAME.contains('alpha') }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying to Alpha: ${IMAGE_TAG}"
+
+                            // Validate configmap
+                            sh '''
+                                kubectl get configmap elohim-config-alpha -n ethosengine || {
+                                    echo "❌ ERROR: elohim-config-alpha ConfigMap missing"
+                                    exit 1
+                                }
+                            '''
+
+                            // Update deployment manifest
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment.yaml > manifests/alpha-deployment-${IMAGE_TAG}.yaml"
+
+                            // Verify the image tag in the manifest
+                            sh """
+                                echo '==== Deployment manifest preview ===='
+                                grep 'image:' manifests/alpha-deployment-${IMAGE_TAG}.yaml
+                                echo '===================================='
+                            """
+
+                            // Deploy
+                            sh "kubectl apply -f manifests/alpha-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-site-alpha -n ethosengine"
+                            sh 'kubectl rollout status deployment/elohim-site-alpha -n ethosengine --timeout=300s'
+
+                            // Verify the deployment is using the correct image
+                            sh """
+                                echo '==== Verifying deployed image ===='
+                                kubectl get deployment elohim-site-alpha -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                echo ''
+                                echo '=================================='
+                            """
+
+                            echo 'Alpha deployment completed!'
                         }
                     }
                 }

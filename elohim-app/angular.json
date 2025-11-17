@@ -74,6 +74,27 @@
                 }
               ]
             },
+            "alpha": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.alpha.ts"
+                }
+              ]
+            },
             "development": {
               "optimization": false,
               "extractLicenses": false,
@@ -100,6 +121,9 @@
             },
             "staging": {
               "buildTarget": "elohim-app:build:staging"
+            },
+            "alpha": {
+              "buildTarget": "elohim-app:build:alpha"
             }
           },
           "defaultConfiguration": "development"
