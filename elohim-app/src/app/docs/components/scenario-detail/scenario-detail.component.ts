@@ -76,8 +76,8 @@ export class ScenarioDetailComponent implements OnInit {
   feature: FeatureNode | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private documentGraphService: DocumentGraphService
+    private readonly route: ActivatedRoute,
+    private readonly documentGraphService: DocumentGraphService
   ) {}
 
   ngOnInit(): void {

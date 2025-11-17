@@ -1,8 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { DocumentGraphService } from '../../services/document-graph.service';
 
 @Component({
@@ -17,8 +16,8 @@ export class DocsLayoutComponent implements OnInit {
   isGraphBuilding = true;
 
   constructor(
-    private documentGraphService: DocumentGraphService,
-    private router: Router
+    private readonly documentGraphService: DocumentGraphService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {

@@ -61,8 +61,8 @@ export class SearchComponent implements OnInit {
   hasSearched = false;
 
   constructor(
-    private route: ActivatedRoute,
-    private documentGraphService: DocumentGraphService
+    private readonly route: ActivatedRoute,
+    private readonly documentGraphService: DocumentGraphService
   ) {}
 
   ngOnInit(): void {

@@ -1,5 +1,4 @@
-import { EpicNode, EpicSection, EmbeddedReference } from '../models';
-import { NodeType } from '../models';
+import { EpicNode, EpicSection, EmbeddedReference, NodeType } from '../models';
 
 /**
  * Parser for Markdown epic documents
@@ -17,7 +16,7 @@ export class MarkdownParser {
     const contentStart = frontmatter ? this.findContentStart(lines) : 0;
 
     // Extract title from first heading or filename
-    const title = this.extractTitle(lines, contentStart) || this.getTitleFromPath(sourcePath);
+    const title = this.extractTitle(lines, contentStart) ?? this.getTitleFromPath(sourcePath);
 
     // Extract sections
     const sections = this.extractSections(lines, contentStart);
@@ -48,9 +47,9 @@ export class MarkdownParser {
       content,
       relatedNodeIds: [...featureIds, ...relatedEpicIds],
       metadata,
-      authors: frontmatter?.['authors'] || [],
-      version: frontmatter?.['version'] || '1.0',
-      category: frontmatter?.['category'] || this.inferCategory(title, tags),
+      authors: frontmatter?.['authors'] ?? [],
+      version: frontmatter?.['version'] ?? '1.0',
+      category: frontmatter?.['category'] ?? this.inferCategory(title, tags),
       featureIds,
       relatedEpicIds,
       markdownContent: content,
@@ -71,7 +70,7 @@ export class MarkdownParser {
     const frontmatter: Record<string, any> = {};
 
     for (const line of frontmatterLines) {
-      const match = line.match(/^(\w+):\s*(.+)$/);
+      const match = /^(\w+):\s*(.+)$/.exec(line);
       if (match) {
         const [, key, value] = match;
         // Handle arrays (comma-separated or bracket notation)
@@ -99,7 +98,7 @@ export class MarkdownParser {
    */
   private static extractTitle(lines: string[], startIndex: number): string | null {
     for (let i = startIndex; i < lines.length; i++) {
-      const match = lines[i].match(/^#\s+(.+)$/);
+      const match = /^#\s+(.+)$/.exec(lines[i]);
       if (match) return match[1].trim().replace(/\*\*/g, '');
     }
     return null;
@@ -123,7 +122,7 @@ export class MarkdownParser {
     let currentSection: EpicSection | null = null;
 
     for (let i = startIndex; i < lines.length; i++) {
-      const headingMatch = lines[i].match(/^(#{1,6})\s+(.+)$/);
+      const headingMatch = /^(#{1,6})\s+(.+)$/.exec(lines[i]);
 
       if (headingMatch) {
         // Save previous section if exists

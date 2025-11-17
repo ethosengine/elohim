@@ -33,7 +33,7 @@ export class DocumentGraphService {
   private readonly EPIC_MANIFEST = 'assets/docs/manifest.json';
   private readonly FEATURE_MANIFEST = 'assets/features/manifest.json';
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   /**
    * Initialize and build the documentation graph

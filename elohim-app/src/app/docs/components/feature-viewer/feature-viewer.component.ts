@@ -77,8 +77,8 @@ export class FeatureViewerComponent implements OnInit {
   relatedEpics: EpicNode[] = [];
 
   constructor(
-    private route: ActivatedRoute,
-    private documentGraphService: DocumentGraphService
+    private readonly route: ActivatedRoute,
+    private readonly documentGraphService: DocumentGraphService
   ) {}
 
   ngOnInit(): void {

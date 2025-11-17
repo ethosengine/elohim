@@ -29,12 +29,12 @@ export class ModuleViewerComponent implements OnInit, OnDestroy {
   scenarios: ScenarioNode[] = [];
   interleavedSections: ModuleSection[] = [];
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private route: ActivatedRoute,
-    private documentGraphService: DocumentGraphService,
-    private sanitizer: DomSanitizer
+    private readonly route: ActivatedRoute,
+    private readonly documentGraphService: DocumentGraphService,
+    private readonly sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -100,18 +100,18 @@ export class ModuleViewerComponent implements OnInit, OnDestroy {
     // Strategy: Interleave scenarios between major epic sections
     let scenarioIndex = 0;
 
-    for (let i = 0; i < sections.length; i++) {
+    for (const section of sections) {
       // Add epic section
       this.interleavedSections.push({
         type: 'epic',
-        title: sections[i].title,
-        content: this.renderMarkdown(sections[i].content),
-        level: sections[i].level
+        title: section.title,
+        content: this.renderMarkdown(section.content),
+        level: section.level
       });
 
       // After certain sections, insert a related scenario
       // Insert scenarios after major sections (h2 level)
-      if (sections[i].level === 2 && scenarioIndex < this.scenarios.length) {
+      if (section.level === 2 && scenarioIndex < this.scenarios.length) {
         const scenario = this.scenarios[scenarioIndex];
         this.interleavedSections.push({
           type: 'scenario',
@@ -145,7 +145,7 @@ export class ModuleViewerComponent implements OnInit, OnDestroy {
     let currentSection: { title: string; content: string; level: number } | null = null;
 
     for (const line of lines) {
-      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+      const headingMatch = /^(#{1,6})\s+(.+)$/.exec(line);
 
       if (headingMatch) {
         // Save previous section
@@ -188,14 +188,14 @@ export class ModuleViewerComponent implements OnInit, OnDestroy {
       .split('\n\n')
       .filter(para => para.trim())
       .map(para => {
-        if (!para.match(/^<(pre|code)/)) {
+        if (!/^<(pre|code)/.exec(para)) {
           return `<p>${para.replace(/\n/g, '<br>')}</p>`;
         }
         return para;
       })
       .join('\n');
 
-    return this.sanitizer.sanitize(1, html) || '';
+    return this.sanitizer.sanitize(1, html) ?? '';
   }
 
   getStepKeywordClass(keyword: string): string {

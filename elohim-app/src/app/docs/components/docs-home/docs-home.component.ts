@@ -17,7 +17,7 @@ export class DocsHomeComponent implements OnInit {
   scenarios: ScenarioNode[] = [];
   stats: any = {};
 
-  constructor(private documentGraphService: DocumentGraphService) {}
+  constructor(private readonly documentGraphService: DocumentGraphService) {}
 
   ngOnInit(): void {
     const graph = this.documentGraphService.getGraph();
@@ -31,11 +31,11 @@ export class DocsHomeComponent implements OnInit {
   }
 
   getEpicCategory(epic: EpicNode): string {
-    return epic.category || 'general';
+    return epic.category ?? 'general';
   }
 
   getFeatureCategory(feature: FeatureNode): string {
-    return feature.category || 'general';
+    return feature.category ?? 'general';
   }
 
   getCategoryIcon(category: string): string {

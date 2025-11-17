@@ -1,5 +1,4 @@
-import { FeatureNode, ScenarioNode, GherkinStep, GherkinBackground, ScenarioExamples } from '../models';
-import { NodeType } from '../models';
+import { FeatureNode, ScenarioNode, GherkinStep, GherkinBackground, ScenarioExamples, NodeType } from '../models';
 
 /**
  * Parser for Gherkin .feature files
@@ -22,7 +21,7 @@ export class GherkinParser {
     if (tags.length > 0) currentLine++;
 
     // Extract feature header
-    const featureMatch = lines[currentLine]?.match(/^Feature:\s*(.+)$/);
+    const featureMatch = /^Feature:\s*(.+)$/.exec(lines[currentLine] ?? '');
     if (!featureMatch) {
       throw new Error(`Invalid feature file: ${sourcePath}`);
     }
@@ -34,7 +33,7 @@ export class GherkinParser {
     const descriptionLines: string[] = [];
     while (
       currentLine < lines.length &&
-      !lines[currentLine].match(/^\s*(Scenario|Background|Scenario Outline|@)/)
+      !/^\s*(Scenario|Background|Scenario Outline|@)/.exec(lines[currentLine])
     ) {
       const line = lines[currentLine].trim();
       if (line) descriptionLines.push(line);
@@ -45,12 +44,12 @@ export class GherkinParser {
 
     // Parse background if present
     let background: GherkinBackground | undefined;
-    if (lines[currentLine]?.match(/^\s*Background:/)) {
+    if (/^\s*Background:/.exec(lines[currentLine] ?? '')) {
       currentLine++;
       const bgSteps: GherkinStep[] = [];
       while (
         currentLine < lines.length &&
-        !lines[currentLine].match(/^\s*(Scenario|Scenario Outline|@)/)
+        !/^\s*(Scenario|Scenario Outline|@)/.exec(lines[currentLine])
       ) {
         const step = this.parseStep(lines[currentLine]);
         if (step) bgSteps.push(step);
@@ -66,7 +65,7 @@ export class GherkinParser {
       const scenarioTags = this.extractTags(lines[currentLine]);
       if (scenarioTags.length > 0) currentLine++;
 
-      const scenarioMatch = lines[currentLine]?.match(/^\s*(Scenario|Scenario Outline):\s*(.+)$/);
+      const scenarioMatch = /^\s*(Scenario|Scenario Outline):\s*(.+)$/.exec(lines[currentLine] ?? '');
       if (!scenarioMatch) {
         currentLine++;
         continue;
@@ -80,7 +79,7 @@ export class GherkinParser {
       const steps: GherkinStep[] = [];
       while (
         currentLine < lines.length &&
-        !lines[currentLine].match(/^\s*(Scenario|Scenario Outline|Examples|@)/)
+        !/^\s*(Scenario|Scenario Outline|Examples|@)/.exec(lines[currentLine])
       ) {
         const step = this.parseStep(lines[currentLine]);
         if (step) steps.push(step);
@@ -89,9 +88,9 @@ export class GherkinParser {
 
       // Parse examples for scenario outlines
       let examples: ScenarioExamples[] | undefined;
-      if (scenarioType === 'scenario_outline' && lines[currentLine]?.match(/^\s*Examples:/)) {
+      if (scenarioType === 'scenario_outline' && /^\s*Examples:/.exec(lines[currentLine] ?? '')) {
         examples = this.parseExamples(lines, currentLine);
-        while (currentLine < lines.length && !lines[currentLine].match(/^\s*(Scenario|@)/)) {
+        while (currentLine < lines.length && !/^\s*(Scenario|@)/.exec(lines[currentLine])) {
           currentLine++;
         }
       }
@@ -141,7 +140,7 @@ export class GherkinParser {
   }
 
   private static parseStep(line: string): GherkinStep | null {
-    const stepMatch = line.match(/^\s*(Given|When|Then|And|But)\s+(.+)$/);
+    const stepMatch = /^\s*(Given|When|Then|And|But)\s+(.+)$/.exec(line);
     if (!stepMatch) return null;
 
     return {
@@ -159,7 +158,7 @@ export class GherkinParser {
     let currentLine = startLine + 1;
 
     // Parse header row
-    const headerMatch = lines[currentLine]?.match(/^\s*\|(.+)\|/);
+    const headerMatch = /^\s*\|(.+)\|/.exec(lines[currentLine] ?? '');
     if (headerMatch) {
       examples.headers = headerMatch[1].split('|').map(h => h.trim());
       currentLine++;
@@ -167,7 +166,7 @@ export class GherkinParser {
 
     // Parse data rows
     while (currentLine < lines.length) {
-      const rowMatch = lines[currentLine]?.match(/^\s*\|(.+)\|/);
+      const rowMatch = /^\s*\|(.+)\|/.exec(lines[currentLine] ?? '');
       if (!rowMatch) break;
 
       examples.rows.push(rowMatch[1].split('|').map(c => c.trim()));
@@ -178,7 +177,7 @@ export class GherkinParser {
   }
 
   private static extractTags(line: string): string[] {
-    const tagMatch = line?.match(/^\s*(@[\w-]+(?:\s+@[\w-]+)*)/);
+    const tagMatch = /^\s*(@[\w-]+(?:\s+@[\w-]+)*)/.exec(line ?? '');
     if (!tagMatch) return [];
 
     return tagMatch[1]

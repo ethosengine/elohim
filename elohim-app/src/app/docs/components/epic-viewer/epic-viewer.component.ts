@@ -18,9 +18,9 @@ export class EpicViewerComponent implements OnInit {
   renderedContent: SafeHtml = '';
 
   constructor(
-    private route: ActivatedRoute,
-    private documentGraphService: DocumentGraphService,
-    private sanitizer: DomSanitizer
+    private readonly route: ActivatedRoute,
+    private readonly documentGraphService: DocumentGraphService,
+    private readonly sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -72,14 +72,14 @@ export class EpicViewerComponent implements OnInit {
       // Paragraphs (basic)
       .split('\n\n')
       .map(para => {
-        if (!para.match(/^<(h[1-6]|pre|ul|ol)/)) {
+        if (!/^<(h[1-6]|pre|ul|ol)/.exec(para)) {
           return `<p>${para}</p>`;
         }
         return para;
       })
       .join('\n');
 
-    this.renderedContent = this.sanitizer.sanitize(1, html) || '';
+    this.renderedContent = this.sanitizer.sanitize(1, html) ?? '';
   }
 
   getSectionAnchors(): { title: string; anchor: string; level: number }[] {
