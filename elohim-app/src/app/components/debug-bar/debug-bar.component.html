@@ -1,4 +1,4 @@
 <div class="debug-bar" *ngIf="showDebugBar">
-  <span class="debug-label">STAGING</span>
+  <span class="debug-label">{{environmentLabel}}</span>
   <span class="debug-info">Environment: {{config?.environment}} | Log Level: {{config?.logLevel}}</span>
 </div>
