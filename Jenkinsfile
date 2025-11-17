@@ -411,6 +411,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Deploy to Staging') {
+            when {
+                anyOf {
+                    branch 'staging'
+                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                }
+            }
             steps {
                 container('builder'){
                     script {
@@ -459,7 +466,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy to Alpha') {
             when {
-                expression { return env.BRANCH_NAME.contains('alpha') }
+                anyOf {
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME.contains('alpha') }
+                }
             }
             steps {
                 container('builder'){
