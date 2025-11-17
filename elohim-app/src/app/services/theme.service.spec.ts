@@ -5,9 +5,9 @@ describe('ThemeService', () => {
   let service: ThemeService;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({});
     service = TestBed.inject(ThemeService);
-    localStorage.clear();
   });
 
   it('should be created', () => {
