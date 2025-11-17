@@ -11,6 +11,7 @@ import { ConfigService, AppConfig } from '../../services/config.service';
 export class DebugBarComponent implements OnInit {
   config: AppConfig | null = null;
   showDebugBar = false;
+  environmentLabel = '';
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -18,7 +19,9 @@ export class DebugBarComponent implements OnInit {
     this.configService.getConfig().subscribe({
       next: (config) => {
         this.config = config;
-        this.showDebugBar = this.config.environment === 'staging';
+        const nonProdEnvironments = ['staging', 'alpha'];
+        this.showDebugBar = nonProdEnvironments.includes(this.config.environment);
+        this.environmentLabel = this.config.environment.toUpperCase();
       },
       error: () => {
         this.showDebugBar = false;
