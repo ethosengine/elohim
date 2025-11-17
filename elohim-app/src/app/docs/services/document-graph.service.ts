@@ -10,8 +10,7 @@ import {
   ScenarioNode,
   NodeRelationship,
   RelationshipType,
-  createBidirectionalRelationship,
-  GraphMetadata
+  createBidirectionalRelationship
 } from '../models';
 import { GherkinParser, MarkdownParser } from '../parsers';
 

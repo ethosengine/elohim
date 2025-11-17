@@ -76,7 +76,7 @@ export class MarkdownParser {
         // Handle arrays (comma-separated or bracket notation)
         if (value.includes(',') || value.startsWith('[')) {
           frontmatter[key] = value
-            .replace(/[\[\]]/g, '')
+            .replace(/[[\]]/g, '')
             .split(',')
             .map(v => v.trim());
         } else {
@@ -258,7 +258,7 @@ export class MarkdownParser {
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/(^-)|(-$)/g, '');
   }
 
   /**
@@ -282,7 +282,7 @@ export class MarkdownParser {
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '_')
       .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '');
+      .replace(/(^_)|(_$)/g, '');
 
     return `${type}_${normalized}`;
   }
