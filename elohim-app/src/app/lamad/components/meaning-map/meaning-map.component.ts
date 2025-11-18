@@ -71,7 +71,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes = Array.from(graph.nodes.values());
+    const allNodes = Array.from(graph.nodes.values()) as DocumentNode[];
     const contentNodes = DocumentNodeAdapter.fromDocumentNodes(allNodes);
 
     // Get affinity stats
