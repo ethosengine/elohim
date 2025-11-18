@@ -30,7 +30,10 @@
   <div *ngIf="!isLoading" class="categories">
     <div *ngFor="let category of categories" class="category-section">
       <!-- Category header -->
-      <div class="category-header" (click)="toggleCategory(category)">
+      <button class="category-header"
+              (click)="toggleCategory(category)"
+              (keydown.enter)="toggleCategory(category)"
+              type="button">
         <div class="category-info">
           <span class="category-icon">{{ category.icon }}</span>
           <h2 class="category-name">{{ category.displayName }}</h2>
@@ -41,24 +44,26 @@
           <div class="affinity-bar-container">
             <div
               class="affinity-bar-fill"
-              [style.width.%]="getAffinityPercentage(category.stats?.averageAffinity || 0)"
-              [ngClass]="getAffinityColorClass(getAffinityLevel(category.stats?.averageAffinity || 0))">
+              [style.width.%]="getAffinityPercentage(category.stats?.averageAffinity ?? 0)"
+              [ngClass]="getAffinityColorClass(getAffinityLevel(category.stats?.averageAffinity ?? 0))">
             </div>
           </div>
           <span class="affinity-percentage">
-            {{ getAffinityPercentage(category.stats?.averageAffinity || 0) }}%
+            {{ getAffinityPercentage(category.stats?.averageAffinity ?? 0) }}%
           </span>
           <span class="expand-icon">{{ category.expanded ? '▼' : '▶' }}</span>
         </div>
-      </div>
+      </button>
 
       <!-- Category content nodes -->
       <div *ngIf="category.expanded" class="category-content">
-        <div
+        <button
           *ngFor="let node of category.nodes"
           class="content-node-card"
           [ngClass]="getAffinityColorClass(node.affinityLevel)"
-          (click)="viewContent(node)">
+          (click)="viewContent(node)"
+          (keydown.enter)="viewContent(node)"
+          type="button">
 
           <div class="node-header">
             <div class="node-type-badge">
@@ -89,7 +94,7 @@
               [ngClass]="getAffinityColorClass(node.affinityLevel)">
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   </div>

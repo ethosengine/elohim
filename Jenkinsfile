@@ -250,6 +250,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 not {
                     anyOf {
                         expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                         expression { return env.BRANCH_NAME.contains('alpha') }
                     }
                 }
@@ -479,6 +480,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 anyOf {
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     expression { return env.BRANCH_NAME.contains('alpha') }
                 }
             }
@@ -533,6 +535,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 anyOf {
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
                     expression { return env.BRANCH_NAME.contains('alpha') }
                 }

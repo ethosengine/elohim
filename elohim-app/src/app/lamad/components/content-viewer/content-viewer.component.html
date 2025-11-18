@@ -115,10 +115,12 @@
     <div *ngIf="relatedNodes.length > 0" class="related-section">
       <h2>🔗 Related Content</h2>
       <div class="related-grid">
-        <div
+        <button
           *ngFor="let relatedNode of relatedNodes"
           class="related-card"
-          (click)="viewRelatedContent(relatedNode)">
+          (click)="viewRelatedContent(relatedNode)"
+          (keydown.enter)="viewRelatedContent(relatedNode)"
+          type="button">
           <div class="related-header">
             <span class="related-type">{{ relatedNode.contentType }}</span>
             <span class="related-affinity">
@@ -127,7 +129,7 @@
           </div>
           <h3 class="related-title">{{ relatedNode.title }}</h3>
           <p class="related-description">{{ relatedNode.description }}</p>
-        </div>
+        </button>
       </div>
     </div>
   </div>
