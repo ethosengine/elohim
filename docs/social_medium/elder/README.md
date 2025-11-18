@@ -3,52 +3,65 @@ epic: social_medium
 user_type: elder
 archetype_name: "Elder"
 epic_domain: "Digital Communication - Relationship-centered social media"
-governance_scope: [TO_BE_DEFINED]
-related_users: [TO_BE_DEFINED]
+governance_scope: [individual, family, neighborhood, community, affinity_network, cultural_linguistic]
+related_users: [child, content_creator, community_moderator]
 ---
 
 # Elder - Social Medium
 
 ## Archetype
 
-[**TODO**: Define the archetype for this user type. Describe who they are, their role in the social_medium epic, age/demographics if relevant, and their relationship to the protocol.]
+An elder user represents older adults (typically 65+) who seek meaningful connection, wish to share accumulated wisdom, and desire to remain engaged with family and community. In the Social Medium context, elders maintain dignity and autonomy while being protected from exploitation. The system adapts to their needs without infantilizing them, ensuring bad actors can't exploit cognitive changes while preserving full agency and participation.
+
+Key characteristics:
+- Age range: Typically 65+ years old, though wisdom-keeper role can begin earlier
+- Rich life experience and accumulated knowledge to share
+- May face isolation due to distance from family, mobility limitations, or life transitions
+- Needs protection from financial scams, romance cons, and health fraud
+- Values genuine connection over superficial interaction
+- Often has traditional skills, cultural knowledge, or historical memory to contribute
+- Maintains full autonomy while receiving appropriate protection
 
 ## Core Needs
 
-[**TODO**: Identify 3-5 core needs this user type has that the social_medium epic addresses:]
-
-- **Need 1**: Description
-- **Need 2**: Description
-- **Need 3**: Description
-- **Need 4**: Description
-- **Need 5**: Description
+- **Dignity-Preserving Protection**: Safety from scammers and fraudsters without feeling controlled or infantilized
+- **Meaningful Intergenerational Connection**: Real relationships with children, grandchildren, and younger community members
+- **Wisdom Sharing**: Opportunities to contribute knowledge, mentor others, and be valued for experience
+- **Accessible Interface**: Design that accommodates changing abilities without condescension
+- **Community Participation**: Engagement in neighborhood and civic life at their own pace and comfort level
 
 ## Key Relationships
 
-[**TODO**: List the key relationships this user type has with other users, agents, or system components:]
-
-- **related_user_1**: Description of relationship
-- **related_user_2**: Description of relationship
-- **agent_type**: Description of how they interact with Elohim agents
+- **child**: Provides wisdom, mentorship, and intergenerational connection; learns from and delights in younger generations
+- **content_creator**: Shares life stories, traditional skills, cultural memory; may create content documenting wisdom
+- **community_moderator**: Serves as elder wisdom in community spaces; receives support from moderators
+- **Family members**: Maintains connection across distances; shares in family life despite geographic separation
+- **Elohim Guardian Agent**: Protected by agents that block exploitation while preserving autonomy and genuine relationships
 
 ## Relevant Governance Layers
 
-[**TODO**: Determine which governance layers are relevant for this user type based on the principle of subsidiarity. Not all users operate at all layers.]
-
 ### Geographic/Political
 
-- **layer_name**: Brief description of what happens at this layer for this user
+- **individual**: Personal autonomy, dignity, privacy, and protection from exploitation
+- **family**: Connection with children, grandchildren, extended family across distances
+- **neighborhood**: Local community participation, mutual aid, elder wisdom sharing
+- **community**: Civic engagement, community decision-making, preservation of institutional memory
 
 ### Functional
 
-- **layer_name**: Brief description of functional domain relevance
+- **affinity_network**: Hobby groups, support communities, interest-based connection
+- **cultural_linguistic**: Cultural preservation, language maintenance, traditional knowledge sharing
 
 ## Implementation Notes
 
-[**TODO**: Add any specific considerations for implementing scenarios for this user type:]
-
-- Key technical requirements
-- Privacy considerations
-- Interface design needs
-- Data handling requirements
-- Unique constraints or opportunities
+- **Scam Prevention**: Fraudulent messages never reach elders; prevented through web of trust verification
+- **Genuine Connection Preserved**: All real relationships work normally; only bad actors are blocked
+- **Adaptive Interface**: Font sizes, contrast, voice options adjust to needs without requiring technical skill
+- **No Ageism**: System doesn't assume incompetence; provides protection while respecting agency
+- **Wisdom Surfacing**: Elders' knowledge and experience are actively valued and surfaced to those who need it
+- **Loneliness Prevention**: System gently suggests connection opportunities without being pushy
+- **Health Integration**: Connection with healthcare providers, medication reminders, but always respecting privacy
+- **Legacy Preservation**: Tools to document life stories, family history, traditional skills for future generations
+- **Cognitive Support**: If cognitive changes occur, protection increases without removing autonomy
+- **Community Value**: Elders recognized as assets, not burdens; contributions earn respect and reach
+- **Emergency Support**: Quick access to family and emergency services when needed
