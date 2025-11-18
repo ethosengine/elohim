@@ -45,12 +45,12 @@
           <div class="affinity-bar-container">
             <div
               class="affinity-bar-fill"
-              [style.width.%]="getAffinityPercentage(category.stats?.averageAffinity || 0)"
-              [ngClass]="getAffinityColorClass(getAffinityLevel(category.stats?.averageAffinity || 0))">
+              [style.width.%]="getAffinityPercentage(category.stats?.averageAffinity ?? 0)"
+              [ngClass]="getAffinityColorClass(getAffinityLevel(category.stats?.averageAffinity ?? 0))">
             </div>
           </div>
           <span class="affinity-percentage">
-            {{ getAffinityPercentage(category.stats?.averageAffinity || 0) }}%
+            {{ getAffinityPercentage(category.stats?.averageAffinity ?? 0) }}%
           </span>
           <span class="expand-icon">{{ category.expanded ? '▼' : '▶' }}</span>
         </div>

@@ -19,9 +19,9 @@ export class DocumentNodeAdapter {
       description: node.description,
       content: node.content,
       contentFormat: this.determineContentFormat(node),
-      tags: node.tags || [],
+      tags: node.tags ?? [],
       sourcePath: node.sourcePath,
-      relatedNodeIds: node.relatedNodeIds || [],
+      relatedNodeIds: node.relatedNodeIds ?? [],
       metadata: { ...node.metadata },
     };
 
@@ -68,7 +68,7 @@ export class DocumentNodeAdapter {
   ): ContentNode {
     return {
       ...base,
-      content: epic.markdownContent || epic.content,
+      content: epic.markdownContent ?? epic.content,
       contentFormat: 'markdown',
       metadata: {
         ...base.metadata,
@@ -81,8 +81,8 @@ export class DocumentNodeAdapter {
       },
       relatedNodeIds: [
         ...base.relatedNodeIds,
-        ...(epic.featureIds || []),
-        ...(epic.relatedEpicIds || []),
+        ...(epic.featureIds ?? []),
+        ...(epic.relatedEpicIds ?? []),
       ],
     };
   }
@@ -96,7 +96,7 @@ export class DocumentNodeAdapter {
   ): ContentNode {
     return {
       ...base,
-      content: feature.gherkinContent || feature.content,
+      content: feature.gherkinContent ?? feature.content,
       contentFormat: 'gherkin',
       metadata: {
         ...base.metadata,
@@ -109,8 +109,8 @@ export class DocumentNodeAdapter {
       },
       relatedNodeIds: [
         ...base.relatedNodeIds,
-        ...(feature.epicIds || []),
-        ...(feature.scenarioIds || []),
+        ...(feature.epicIds ?? []),
+        ...(feature.scenarioIds ?? []),
       ],
     };
   }
@@ -138,7 +138,7 @@ export class DocumentNodeAdapter {
       relatedNodeIds: [
         ...base.relatedNodeIds,
         scenario.featureId,
-        ...(scenario.epicIds || []),
+        ...(scenario.epicIds ?? []),
       ],
     };
   }

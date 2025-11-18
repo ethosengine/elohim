@@ -85,7 +85,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     // Group nodes by category
     const categoryMap = new Map<string, ContentNode[]>();
     contentNodes.forEach((node) => {
-      const category = (node.metadata?.['category'] as string) || 'uncategorized';
+      const category = (node.metadata?.['category'] ?? 'uncategorized') as string;
       if (!categoryMap.has(category)) {
         categoryMap.set(category, []);
       }
@@ -107,7 +107,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
           displayName: this.getCategoryDisplayName(categoryName),
           icon: this.getCategoryIcon(categoryName),
           nodes: nodesWithAffinity,
-          stats: stats.byCategory.get(categoryName) || null,
+          stats: stats.byCategory.get(categoryName) ?? null,
           expanded: true, // Default to expanded
         };
       }
