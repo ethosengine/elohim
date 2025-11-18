@@ -1,0 +1,175 @@
+@epic:value_scanner
+@user_type:middle_aged
+@governance_layer:community
+@related_users:adult,senior,parent,grandparent,worker,caregiver
+@related_layers:neighborhood,municipality,workplace_organizational,family
+@elohim_agents:personal_agent,community_elohim
+
+Feature: Community Layer Value Recognition for Middle-Aged Adult
+  As a middle-aged adult in the value scanner system
+  Operating at the community governance layer
+  I want to participate in community governance as both participant and leader
+  So that I can leverage my accumulated experience to shape care economy systems and mentor the next generation
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the middle-aged user "Robert" is registered in the system
+    And Robert is 52 years old with decades of professional and care experience
+    And the community governance context is active
+    And community_elohim coordinates community care economy
+    And Robert has accumulated substantial care contributions and social capital
+
+  Scenario: Community leadership positions recognize accumulated care experience
+    Given Robert has decades of care economy participation
+    And he has demonstrated capability through managing complex responsibilities
+    And community needs experienced leadership
+    When community_elohim identifies leadership opportunities
+    Then it should recognize Robert's accumulated care contributions as leadership qualification
+    And surface opportunities: community boards, policy advisory roles, initiative leadership
+    And connect his care experience to governance credibility
+    And help him understand that his lived experience is valuable wisdom
+    And match leadership opportunities to his capacity and interests
+    And prevent exploitation of middle-aged adults' sense of responsibility
+    And support meaningful community contribution without burnout
+
+  Scenario: Community care policy advocacy informed by personal experience
+    Given Robert manages multigenerational care and work-life balance
+    And he's learned what community systems help and what fails
+    And policy could be improved based on his experience
+    When community_elohim connects him to policy advocacy
+    Then it should surface opportunities to influence care economy policy
+    And help him translate personal experience into policy recommendations
+    And connect him to boards, councils, and advocacy organizations
+    And recognize that his voice matters because he's lived the complexity
+    And support him in advocating for elder care resources, work-family policies, and care infrastructure
+    And channel his accumulated wisdom toward system improvement
+    And demonstrate that care economy includes policy transformation
+
+  Scenario: Mentoring younger adults in care economy navigation
+    Given Robert has learned to navigate work-care balance over decades
+    And younger adults are earlier in their journey
+    And his experience could help others avoid struggles
+    When community_elohim coordinates mentoring
+    Then it should connect Robert with younger adults seeking guidance
+    And recognize his mentoring as valuable care contribution
+    And support him in sharing knowledge about care economy practices
+    And help younger generation learn from his experience
+    And value his mentoring in community care tokens
+    And prevent him from being exploited for free emotional labor
+    And build intergenerational knowledge transfer
+
+  Scenario: Community resource coordination supports multigenerational care
+    Given Robert coordinates care across multiple generations
+    And community resources exist but are hard to navigate
+    And he needs eldercare support, young adult resources, and family services
+    When community_elohim coordinates resources
+    Then it should connect Robert to relevant community support services
+    And surface eldercare programs for his parents
+    And identify young adult support programs for his children
+    And connect him to caregiver support groups
+    And reduce time spent researching and coordinating resources
+    And demonstrate that community infrastructure should serve caregivers
+    And make visible the resources built through care economy
+
+  Scenario: Community governance voice weighted by care contributions
+    Given Robert has made substantial care contributions over decades
+    And his care work demonstrates community investment
+    When community_elohim supports governance participation
+    Then his accumulated care contributions should give him standing
+    And his voice in community decisions should reflect his investment
+    And governance processes should actively solicit his input
+    And his experience managing complexity should be valued in community planning
+    And care tokens should connect to community governance participation
+    And demonstrate that care economy participation creates civic voice
+    And prevent governance dominated by those without care experience
+
+  Scenario: Community care economy education delivered by experienced practitioners
+    Given Robert has decades of care economy participation
+    And many community members don't understand care economy principles
+    And his experience makes him credible educator
+    When community_elohim identifies education opportunities
+    Then it should connect Robert to community education initiatives
+    And recognize him as qualified to teach care economy practices
+    And support him in leading workshops, presentations, or courses
+    And value his teaching as community care contribution
+    And help community members learn from practitioners, not just theorists
+    And build community care economy literacy through peer education
+    And demonstrate that care economy spreads through experienced advocates
+
+  Scenario: Community networks provide backup support for care crises
+    Given Robert manages complex care demands that could face crisis
+    And care crises happen: parent hospitalization, child emergency, personal illness
+    And community networks could provide emergency support
+    When community_elohim builds crisis resilience
+    Then it should connect Robert to community members who could help in crisis
+    And identify backup support for his various care responsibilities
+    And ensure he's not isolated when crisis hits
+    And recognize that his care contributions create reciprocal crisis support
+    And build community resilience through mutual aid networks
+    And demonstrate that care economy participation provides safety net
+    And prevent care crisis from becoming catastrophic
+
+  Scenario: Community care infrastructure advocacy based on user needs
+    Given Robert uses community care services and sees gaps
+    And he understands what infrastructure would help families like his
+    And community planning should be informed by user experience
+    When community_elohim connects user experience to infrastructure planning
+    Then it should channel Robert's feedback to community planning processes
+    And surface gaps: "No adult day care available for aging parents in this community"
+    And help him advocate for infrastructure that serves caregivers
+    And connect his voice to community decision-makers
+    And ensure community care systems are designed by those who use them
+    And build care infrastructure based on actual caregiver needs
+    And demonstrate that users should shape systems
+
+  Scenario: Community leadership balanced with existing care demands
+    Given Robert has capacity for community contribution
+    And community leadership opportunities are abundant
+    And he also carries substantial family and work responsibilities
+    When community_elohim coordinates his community participation
+    Then it should help him balance community leadership with other demands
+    And prevent over-commitment that would overwhelm him
+    And surface when community demands exceed healthy boundaries
+    And support him in choosing leadership roles that match his capacity
+    And recognize that sustainable participation requires limits
+    And prevent community from exploiting his sense of responsibility
+    And support meaningful contribution without burnout
+
+  Scenario: Community care economy connects personal and collective transformation
+    Given Robert participates in care economy personally
+    And his position enables him to influence broader systems
+    And personal and systemic change reinforce each other
+    When community_elohim supports his participation
+    Then it should help him see connections between personal care and system change
+    And surface opportunities to advocate professionally for care economy principles
+    And support him in spreading care economy through his networks
+    And recognize that his generation can drive mainstream adoption
+    And help him leverage professional, economic, and political position
+    And build movement for care economy transformation
+    And demonstrate that personal practice and systemic advocacy work together
+
+  Scenario: Community intergenerational connection facilitated by middle-aged bridge
+    Given Robert connects to multiple generations: children, peers, parents
+    And he understands needs and perspectives across age ranges
+    And community thrives through intergenerational connection
+    When community_elohim leverages his intergenerational position
+    Then it should recognize him as bridge between generations
+    And support him in facilitating intergenerational community programs
+    And help younger and older community members connect through him
+    And value his translation between generational perspectives
+    And build community cohesion through intergenerational care
+    And demonstrate that middle-aged adults uniquely enable community integration
+    And strengthen community through lifecycle diversity
+
+  Scenario: Community participation builds resources for Robert's own aging
+    Given Robert is preparing for his own eventual care needs
+    And community participation now builds networks for later
+    And care economy operates on long-term reciprocity
+    When community_elohim helps Robert plan for aging
+    Then it should help him see that current community participation builds future support
+    And recognize that relationships now will remain as he ages
+    And surface how care tokens accumulate toward future care
+    And support him in building community that will serve his aging
+    And demonstrate that care economy investment pays forward
+    And help him prepare for aging with dignity through community connection
+    And recognize that community care is lifecycle reciprocity

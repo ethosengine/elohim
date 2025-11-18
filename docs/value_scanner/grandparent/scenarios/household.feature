@@ -1,0 +1,155 @@
+@epic:value_scanner
+@user_type:grandparent
+@governance_layer:household
+@related_users:senior,partner,spouse,retired
+@related_layers:individual,family,neighborhood,community
+@elohim_agents:personal_agent,household_elohim
+
+Feature: Household Layer Value Recognition for Grandparent
+  As a grandparent coordinating care work within my household
+  Operating at the household governance layer
+  I want fair distribution of grandparenting labor and household impact
+  So that care for grandchildren enhances rather than strains our household
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the grandparent user "Margaret" is registered in the system
+    And Margaret is married to "Robert" who is also retired
+    And they share a household with joint resources and decisions
+    And Margaret provides 25 hours/week grandchild care
+    And Robert has his own retirement activities and interests
+    And the household governance context is active
+    And the household_elohim coordinates care work distribution
+
+  Scenario: Distributing grandparenting labor equitably between partners
+    Given both Margaret and Robert are retired and available
+    And Margaret currently does most of the grandchild care
+    When the household_elohim tracks care contributions
+    Then it should show Margaret's 25 hours/week of grandchild care
+    And it should show Robert's care contributions (if any)
+    And it should identify if care labor is unequally distributed
+    And it should facilitate discussion about equitable distribution
+    And both partners should contribute to grandparenting
+    And Margaret should not bear sole burden of care work
+    And household care economy should be equitable
+
+  Scenario: Coordinating household schedule around grandparenting commitments
+    Given Margaret provides childcare three days per week
+    And this affects household availability and flexibility
+    When the household plans activities and commitments
+    Then the household_elohim should coordinate around care schedule
+    And it should recognize grandparenting as household commitment
+    And it should help both partners plan around care days
+    And household decisions should account for care obligations
+    And Margaret's care work should be treated as serious commitment
+    And the household should operate as team around grandparenting
+
+  Scenario: Household resource allocation for grandparenting expenses
+    Given grandparenting involves costs (activities, supplies, treats, transportation)
+    And Margaret and Robert share household finances
+    When the household budgets for grandparenting expenses
+    Then the household_elohim should track all grandparenting costs
+    And it should help budget for these as household expenses
+    And it should distinguish between household costs and reimbursable family costs
+    And both partners should agree on grandparenting spending
+    And household resources should support care provision without strain
+    And financial planning should include grandparenting expenses
+
+  Scenario: Maintaining household identity and couple time amid care work
+    Given Margaret and Robert are navigating retirement together
+    And they have their own relationship and household life
+    When Margaret provides substantial grandchild care
+    Then the household_elohim should protect couple time
+    And it should ensure grandparenting doesn't consume all household capacity
+    And it should help maintain balance between care and relationship
+    And Margaret and Robert should have time as a couple
+    And household identity should extend beyond grandparenting
+    And the system should support healthy household boundaries
+
+  Scenario: Household space and logistics for grandchild care
+    Given Margaret cares for grandchildren in their household
+    And this requires child-friendly space and supplies
+    When the household_elohim tracks space usage
+    Then it should recognize household space devoted to grandchild care
+    And it should help maintain appropriate supplies (toys, books, safety items)
+    And it should coordinate space needs with household preferences
+    And both partners should agree on household modifications for care
+    And home should serve both grandparenting and household needs
+    And space allocation should be mutually agreed
+
+  Scenario: Impact of care work on household energy and capacity
+    Given Margaret is 68 and active grandchild care is physically demanding
+    And 25 hours/week of childcare affects household energy
+    When the household_elohim monitors capacity
+    Then it should track if care work is affecting Margaret's well-being
+    And it should recognize when care burden is too high
+    And it should help household discuss sustainable care levels
+    And Robert should understand and support Margaret's capacity
+    And household should be able to negotiate care boundaries with family
+    And both partners' well-being should be protected
+
+  Scenario: Household decision-making about grandparenting commitments
+    Given grandparenting commitments affect both household members
+    And decisions should be made jointly
+    When the family requests additional care or changes
+    Then the household_elohim should facilitate joint decision-making
+    And both Margaret and Robert should agree on care commitments
+    And household should speak with one voice to family
+    And care arrangements should serve household needs and capacity
+    And neither partner should unilaterally commit to care
+    And household governance should be respected by extended family
+
+  Scenario: Reciprocal care between Margaret and Robert as they age
+    Given Margaret and Robert are both aging
+    And they will increasingly need to care for each other
+    When the household_elohim tracks household care patterns
+    Then it should recognize reciprocal care between partners
+    And it should show how they support each other's well-being
+    And it should value care they provide to each other
+    And household care economy should include partner care
+    And both should accumulate care tokens for caring for each other
+    And the system should support their aging together with dignity
+
+  Scenario: Household participation in multigenerational care coordination
+    Given Margaret provides care both to grandchildren and her elderly mother
+    And Robert provides support to his own aging family
+    When the household coordinates all care obligations
+    Then the household_elohim should track all family care commitments
+    And it should help balance multiple care responsibilities
+    And it should prevent household care burden from becoming excessive
+    And both partners should understand total household care load
+    And household should be able to set sustainable boundaries
+    And care obligations should be manageable and sustainable
+
+  Scenario: Household transportation logistics for care provision
+    Given Margaret transports grandchildren to activities and appointments
+    And this uses household vehicle and resources
+    When the household_elohim tracks transportation
+    Then it should recognize transportation as care work
+    And it should track vehicle use, gas costs, wear and tear
+    And it should coordinate transportation between partners
+    And it should help determine when family should reimburse costs
+    And household transportation resources should be managed fairly
+    And both partners should share transportation care labor
+
+  Scenario: Retirement planning affected by grandparenting commitments
+    Given Margaret and Robert had retirement plans and dreams
+    And substantial grandparenting changes household capacity for travel and activities
+    When the household plans retirement lifestyle
+    Then the household_elohim should help balance care and retirement goals
+    And it should ensure grandparenting doesn't entirely subsume retirement plans
+    And it should help negotiate sustainable care arrangements
+    And both partners should be able to enjoy retirement
+    And household should maintain autonomy over retirement choices
+    And grandparenting should enhance rather than replace retirement
+
+  Scenario: Household health management while providing care
+    Given both Margaret and Robert have health considerations
+    And Margaret's care work requires physical and mental energy
+    When the household_elohim monitors health impacts
+    Then it should track whether care work affects Margaret's health
+    And it should ensure both partners maintain health appointments and self-care
+    And it should alert if care burden is compromising well-being
+    And household health should be prioritized alongside care provision
+    And both partners should support each other's health management
+    And the system should enable sustainable care without health sacrifice
