@@ -1,0 +1,101 @@
+<div class="mission-map-container">
+  <!-- Header with overall stats -->
+  <div class="mission-header">
+    <h1>📚 Learning Mission Map</h1>
+    <p class="subtitle">Your personalized path through the Elohim Protocol documentation</p>
+
+    <div class="overall-stats">
+      <div class="stat-card">
+        <div class="stat-value">{{ overallStats.totalNodes }}</div>
+        <div class="stat-label">Total Content</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ overallStats.engagedCount }}</div>
+        <div class="stat-label">Explored</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ getAffinityPercentage(overallStats.averageAffinity) }}%</div>
+        <div class="stat-label">Avg Affinity</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading mission map...</p>
+  </div>
+
+  <!-- Category sections -->
+  <div *ngIf="!isLoading" class="categories">
+    <div *ngFor="let category of categories" class="category-section">
+      <!-- Category header -->
+      <div class="category-header" (click)="toggleCategory(category)">
+        <div class="category-info">
+          <span class="category-icon">{{ category.icon }}</span>
+          <h2 class="category-name">{{ category.displayName }}</h2>
+          <span class="node-count">({{ category.nodes.length }})</span>
+        </div>
+
+        <div class="category-stats">
+          <div class="affinity-bar-container">
+            <div
+              class="affinity-bar-fill"
+              [style.width.%]="getAffinityPercentage(category.stats?.averageAffinity || 0)"
+              [ngClass]="getAffinityColorClass(getAffinityLevel(category.stats?.averageAffinity || 0))">
+            </div>
+          </div>
+          <span class="affinity-percentage">
+            {{ getAffinityPercentage(category.stats?.averageAffinity || 0) }}%
+          </span>
+          <span class="expand-icon">{{ category.expanded ? '▼' : '▶' }}</span>
+        </div>
+      </div>
+
+      <!-- Category content nodes -->
+      <div *ngIf="category.expanded" class="category-content">
+        <div
+          *ngFor="let node of category.nodes"
+          class="content-node-card"
+          [ngClass]="getAffinityColorClass(node.affinityLevel)"
+          (click)="viewContent(node)">
+
+          <div class="node-header">
+            <div class="node-type-badge">
+              <span class="type-icon">{{ getContentTypeIcon(node.contentType) }}</span>
+              <span class="type-label">{{ getContentTypeDisplay(node.contentType) }}</span>
+            </div>
+
+            <div class="affinity-indicator">
+              <div class="affinity-circle" [ngClass]="getAffinityColorClass(node.affinityLevel)">
+                {{ getAffinityPercentage(node.affinity) }}
+              </div>
+            </div>
+          </div>
+
+          <h3 class="node-title">{{ node.title }}</h3>
+          <p class="node-description">{{ node.description }}</p>
+
+          <div class="node-meta">
+            <span *ngFor="let tag of node.tags.slice(0, 3)" class="tag">
+              #{{ tag }}
+            </span>
+          </div>
+
+          <div class="affinity-bar-mini">
+            <div
+              class="affinity-bar-fill"
+              [style.width.%]="getAffinityPercentage(node.affinity)"
+              [ngClass]="getAffinityColorClass(node.affinityLevel)">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div *ngIf="!isLoading && categories.length === 0" class="empty-state">
+    <p>No content available yet. Add some documentation to get started!</p>
+  </div>
+</div>

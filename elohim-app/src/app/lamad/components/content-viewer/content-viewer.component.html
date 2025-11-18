@@ -1,0 +1,136 @@
+<div class="content-viewer-container">
+  <!-- Loading state -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading content...</p>
+  </div>
+
+  <!-- Error state -->
+  <div *ngIf="error && !isLoading" class="error-state">
+    <h2>⚠️ {{ error }}</h2>
+    <button class="btn-primary" (click)="backToMap()">Back to Mission Map</button>
+  </div>
+
+  <!-- Content -->
+  <div *ngIf="node && !isLoading" class="content">
+    <!-- Header -->
+    <div class="content-header">
+      <button class="back-button" (click)="backToMap()">← Back to Map</button>
+
+      <div class="header-main">
+        <div class="content-type-badge">
+          <span class="type-icon">{{ getContentTypeIcon() }}</span>
+          <span class="type-label">{{ getContentTypeDisplay() }}</span>
+        </div>
+
+        <h1 class="content-title">{{ node.title }}</h1>
+        <p class="content-description">{{ node.description }}</p>
+
+        <div class="content-meta">
+          <span *ngIf="getMetadataCategory()" class="meta-item">
+            📁 {{ getMetadataCategory() }}
+          </span>
+          <span *ngIf="getMetadataAuthors()" class="meta-item">
+            ✍️ {{ getMetadataAuthors() }}
+          </span>
+          <span *ngIf="getMetadataVersion()" class="meta-item">
+            🏷️ v{{ getMetadataVersion() }}
+          </span>
+        </div>
+
+        <div class="tags" *ngIf="node.tags.length > 0">
+          <span *ngFor="let tag of node.tags" class="tag">#{{ tag }}</span>
+        </div>
+      </div>
+
+      <!-- Affinity controls -->
+      <div class="affinity-panel">
+        <div class="affinity-display">
+          <div class="affinity-circle" [ngClass]="'affinity-' + getAffinityLevel()">
+            {{ getAffinityPercentage() }}%
+          </div>
+          <div class="affinity-label">Your Affinity</div>
+        </div>
+
+        <div class="affinity-controls">
+          <button class="btn-affinity" (click)="adjustAffinity(-0.1)" [disabled]="affinity <= 0">
+            - Decrease
+          </button>
+          <button class="btn-affinity" (click)="adjustAffinity(0.1)" [disabled]="affinity >= 1">
+            + Increase
+          </button>
+        </div>
+
+        <div class="quick-actions">
+          <button class="btn-quick" (click)="setAffinity(0.5)" [ngClass]="{'active': affinity >= 0.4 && affinity <= 0.6}">
+            📚 Practicing
+          </button>
+          <button class="btn-quick" (click)="setAffinity(1.0)" [ngClass]="{'active': affinity > 0.9}">
+            ✅ Mastered
+          </button>
+        </div>
+
+        <div class="affinity-bar">
+          <div
+            class="affinity-bar-fill"
+            [style.width.%]="getAffinityPercentage()"
+            [ngClass]="'affinity-' + getAffinityLevel()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="content-body">
+      <!-- Markdown content -->
+      <div
+        *ngIf="node.contentFormat === 'markdown'"
+        class="markdown-content"
+        [innerHTML]="renderMarkdown(node.content)">
+      </div>
+
+      <!-- Gherkin content -->
+      <div
+        *ngIf="node.contentFormat === 'gherkin'"
+        class="gherkin-content">
+        <pre [innerHTML]="renderGherkin(node.content)"></pre>
+      </div>
+
+      <!-- Plain text content -->
+      <div
+        *ngIf="node.contentFormat === 'plaintext'"
+        class="plaintext-content">
+        <pre>{{ node.content }}</pre>
+      </div>
+
+      <!-- HTML content -->
+      <div
+        *ngIf="node.contentFormat === 'html'"
+        class="html-content"
+        [innerHTML]="node.content">
+      </div>
+    </div>
+
+    <!-- Related content -->
+    <div *ngIf="relatedNodes.length > 0" class="related-section">
+      <h2>🔗 Related Content</h2>
+      <div class="related-grid">
+        <div
+          *ngFor="let relatedNode of relatedNodes"
+          class="related-card"
+          (click)="viewRelatedContent(relatedNode)">
+          <div class="related-header">
+            <span class="related-type">{{ relatedNode.contentType }}</span>
+            <span class="related-affinity">
+              {{ getRelatedNodeAffinity(relatedNode.id) }}%
+            </span>
+          </div>
+          <h3 class="related-title">{{ relatedNode.title }}</h3>
+          <p class="related-description">{{ relatedNode.description }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Note: removed Math.round reference that was invalid in template -->

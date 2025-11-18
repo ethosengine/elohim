@@ -5,13 +5,13 @@ import { FormsModule } from '@angular/forms';
 import { DocumentGraphService } from '../../services/document-graph.service';
 
 @Component({
-  selector: 'app-docs-layout',
+  selector: 'app-lamad-layout',
   standalone: true,
   imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
-  templateUrl: './docs-layout.component.html',
-  styleUrls: ['./docs-layout.component.css']
+  templateUrl: './lamad-layout.component.html',
+  styleUrls: ['./lamad-layout.component.css']
 })
-export class DocsLayoutComponent implements OnInit {
+export class LamadLayoutComponent implements OnInit {
   searchQuery = '';
   isGraphBuilding = true;
 
@@ -21,14 +21,14 @@ export class DocsLayoutComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Build the documentation graph on initialization
+    // Build the content graph for Lamad learning platform
     this.documentGraphService.buildGraph().subscribe({
       next: graph => {
-        console.log('Graph built successfully', graph.metadata);
+        console.log('Lamad content graph built successfully', graph.metadata);
         this.isGraphBuilding = false;
       },
       error: err => {
-        console.error('Failed to build graph:', err);
+        console.error('Failed to build content graph:', err);
         this.isGraphBuilding = false;
       }
     });
@@ -36,7 +36,7 @@ export class DocsLayoutComponent implements OnInit {
 
   onSearch(): void {
     if (this.searchQuery.trim()) {
-      this.router.navigate(['/docs/search'], {
+      this.router.navigate(['/lamad/search'], {
         queryParams: { q: this.searchQuery }
       });
     }

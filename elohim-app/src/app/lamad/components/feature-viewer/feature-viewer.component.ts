@@ -12,7 +12,7 @@ import { FeatureNode, ScenarioNode, EpicNode } from '../../models';
     <div class="feature-viewer" *ngIf="feature">
       <div class="feature-header">
         <div class="breadcrumb">
-          <a routerLink="/docs">Home</a> / <span>Feature</span>
+          <a routerLink="/lamad">Home</a> / <span>Feature</span>
         </div>
         <h1 class="feature-title">{{feature.title}}</h1>
         <div class="feature-meta">

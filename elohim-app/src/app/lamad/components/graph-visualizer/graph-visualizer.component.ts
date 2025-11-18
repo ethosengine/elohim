@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
           <li>Zoom and pan controls</li>
           <li>Filter by type, tag, and category</li>
         </ul>
-        <a routerLink="/docs" class="back-link">← Back to Documentation</a>
+        <a routerLink="/lamad" class="back-link">← Back to Documentation</a>
       </div>
     </div>
   `,

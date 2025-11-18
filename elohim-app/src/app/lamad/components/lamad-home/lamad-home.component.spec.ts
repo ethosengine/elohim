@@ -1,13 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { DocsHomeComponent } from './docs-home.component';
+import { BehaviorSubject } from 'rxjs';
+import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
+import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { DocumentGraph } from '../../models';
 
-describe('DocsHomeComponent', () => {
-  let component: DocsHomeComponent;
-  let fixture: ComponentFixture<DocsHomeComponent>;
-  let mockDocumentGraphService: jasmine.SpyObj<DocumentGraphService>;
+describe('LamadHomeComponent', () => {
+  let component: LamadHomeComponent;
+  let fixture: ComponentFixture<LamadHomeComponent>;
+  let mockDocumentGraphService: any;
+  let mockAffinityService: any;
+  let graphSubject: BehaviorSubject<DocumentGraph | null>;
+  let changesSubject: BehaviorSubject<void>;
 
   const mockGraph: Partial<DocumentGraph> = {
     nodes: new Map(),
@@ -73,18 +78,39 @@ describe('DocsHomeComponent', () => {
   } as DocumentGraph;
 
   beforeEach(async () => {
-    mockDocumentGraphService = jasmine.createSpyObj('DocumentGraphService', ['getGraph']);
-    mockDocumentGraphService.getGraph.and.returnValue(mockGraph as DocumentGraph);
+    graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph as DocumentGraph);
+    changesSubject = new BehaviorSubject<void>(undefined);
+
+    mockDocumentGraphService = {
+      getGraph: jasmine.createSpy('getGraph').and.returnValue(mockGraph as DocumentGraph),
+      graph$: graphSubject.asObservable()
+    };
+
+    mockAffinityService = {
+      getStats: jasmine.createSpy('getStats').and.returnValue({
+        totalNodes: 2,
+        engagedNodes: 1,
+        averageAffinity: 0.5,
+        distribution: {
+          unseen: 1,
+          low: 0,
+          medium: 0,
+          high: 1
+        }
+      }),
+      changes$: changesSubject.asObservable()
+    };
 
     await TestBed.configureTestingModule({
-      imports: [DocsHomeComponent],
+      imports: [LamadHomeComponent],
       providers: [
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
+        { provide: AffinityTrackingService, useValue: mockAffinityService },
         provideRouter([])
       ]
     }).compileComponents();
 
-    fixture = TestBed.createComponent(DocsHomeComponent);
+    fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
   });
 
@@ -101,7 +127,7 @@ describe('DocsHomeComponent', () => {
   });
 
   it('should handle null graph gracefully', () => {
-    mockDocumentGraphService.getGraph.and.returnValue(null);
+    graphSubject.next(null);
     fixture.detectChanges();
 
     expect(component.epics.length).toBe(0);

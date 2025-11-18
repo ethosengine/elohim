@@ -1,0 +1,49 @@
+<div class="lamad-container">
+  <!-- Header -->
+  <header class="lamad-header">
+    <div class="lamad-header-content">
+      <div class="lamad-logo">
+        <a routerLink="/lamad" class="logo-link">
+          <h1>📚 Lamad</h1>
+        </a>
+        <p class="subtitle">Learning Platform - Where Understanding is Earned</p>
+      </div>
+
+      <nav class="lamad-nav">
+        <a routerLink="/lamad" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
+        <a routerLink="/lamad/map" routerLinkActive="active">Meaning Map</a>
+        <a routerLink="/" class="back-link">← Back to Site</a>
+      </nav>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-container">
+      <form (ngSubmit)="onSearch()" class="search-form">
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          name="search"
+          placeholder="Search content across Lamad..."
+          class="search-input"
+        />
+        <button type="submit" class="search-button">🔍</button>
+      </form>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isGraphBuilding" class="loading-state">
+    <div class="spinner"></div>
+    <p>Building content graph...</p>
+  </div>
+
+  <!-- Main Content -->
+  <main class="lamad-main" *ngIf="!isGraphBuilding">
+    <router-outlet></router-outlet>
+  </main>
+
+  <!-- Footer -->
+  <footer class="lamad-footer">
+    <p>Lamad Learning Platform | Where Understanding is Earned | Powered by Elohim Protocol</p>
+  </footer>
+</div>

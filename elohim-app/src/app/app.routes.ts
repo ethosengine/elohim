@@ -7,8 +7,8 @@ export const routes: Routes = [
       import('./components/home/home.component').then(m => m.HomeComponent)
   },
   {
-    path: 'docs',
+    path: 'lamad',
     loadChildren: () =>
-      import('./docs/docs.routes').then(m => m.DOCS_ROUTES)
+      import('./lamad/lamad.routes').then(m => m.LAMAD_ROUTES)
   }
 ];

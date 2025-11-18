@@ -1,0 +1,131 @@
+<div class="lamad-home">
+  <!-- Welcome Section -->
+  <section class="welcome-section">
+    <h1 class="main-title">Welcome to Lamad</h1>
+    <p class="main-description">
+      Learn the Elohim Protocol through a guided journey of discovery.
+      Track your affinity, earn attestations, and unlock deeper understanding as you explore.
+    </p>
+
+    <!-- Primary Action -->
+    <div class="primary-action">
+      <a routerLink="/lamad/map" class="cta-button">
+        <span class="cta-icon">🗺️</span>
+        <div class="cta-content">
+          <div class="cta-title">View Meaning Map</div>
+          <div class="cta-subtitle">Begin your journey toward understanding</div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📖</div>
+        <div class="stat-number">{{ stats.epicCount || 0 }}</div>
+        <div class="stat-label">Epics</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-number">{{ stats.featureCount || 0 }}</div>
+        <div class="stat-label">Features</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✓</div>
+        <div class="stat-number">{{ stats.scenarioCount || 0 }}</div>
+        <div class="stat-label">Scenarios</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔗</div>
+        <div class="stat-number">{{ stats.averageConnectionsPerNode | number:'1.1-1' }}</div>
+        <div class="stat-label">Avg Connections</div>
+      </div>
+    </div>
+
+    <!-- Affinity Stats -->
+    <div *ngIf="affinityStats" class="affinity-section">
+      <h2 class="section-subtitle">Your Progress</h2>
+      <div class="affinity-stats-grid">
+        <div class="affinity-stat-card">
+          <div class="affinity-stat-label">Explored Content</div>
+          <div class="affinity-stat-value">{{ affinityStats.engagedNodes }} / {{ affinityStats.totalNodes }}</div>
+          <div class="affinity-stat-bar">
+            <div
+              class="affinity-stat-bar-fill"
+              [style.width.%]="(affinityStats.engagedNodes / affinityStats.totalNodes) * 100">
+            </div>
+          </div>
+        </div>
+        <div class="affinity-stat-card">
+          <div class="affinity-stat-label">Average Affinity</div>
+          <div class="affinity-stat-value">{{ (affinityStats.averageAffinity * 100) | number:'1.0-0' }}%</div>
+          <div class="affinity-stat-bar">
+            <div
+              class="affinity-stat-bar-fill high"
+              [style.width.%]="affinityStats.averageAffinity * 100">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distribution -->
+      <div class="distribution-section">
+        <h3 class="distribution-title">Affinity Distribution</h3>
+        <div class="distribution-bars">
+          <div class="distribution-bar">
+            <div class="distribution-label">Unseen</div>
+            <div class="distribution-bar-container">
+              <div
+                class="distribution-bar-fill unseen"
+                [style.width.%]="(affinityStats.distribution.unseen / affinityStats.totalNodes) * 100">
+              </div>
+            </div>
+            <div class="distribution-count">{{ affinityStats.distribution.unseen }}</div>
+          </div>
+          <div class="distribution-bar">
+            <div class="distribution-label">Low</div>
+            <div class="distribution-bar-container">
+              <div
+                class="distribution-bar-fill low"
+                [style.width.%]="(affinityStats.distribution.low / affinityStats.totalNodes) * 100">
+              </div>
+            </div>
+            <div class="distribution-count">{{ affinityStats.distribution.low }}</div>
+          </div>
+          <div class="distribution-bar">
+            <div class="distribution-label">Medium</div>
+            <div class="distribution-bar-container">
+              <div
+                class="distribution-bar-fill medium"
+                [style.width.%]="(affinityStats.distribution.medium / affinityStats.totalNodes) * 100">
+              </div>
+            </div>
+            <div class="distribution-count">{{ affinityStats.distribution.medium }}</div>
+          </div>
+          <div class="distribution-bar">
+            <div class="distribution-label">High</div>
+            <div class="distribution-bar-container">
+              <div
+                class="distribution-bar-fill high"
+                [style.width.%]="(affinityStats.distribution.high / affinityStats.totalNodes) * 100">
+              </div>
+            </div>
+            <div class="distribution-count">{{ affinityStats.distribution.high }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Actions -->
+  <section class="actions-section">
+    <h2 class="section-title">Explore</h2>
+    <div class="action-grid">
+      <a routerLink="/lamad/search" class="action-card">
+        <div class="action-icon">🔍</div>
+        <h3>Search</h3>
+        <p>Find content across all documentation</p>
+      </a>
+    </div>
+  </section>
+</div>
