@@ -23,14 +23,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private graphService: DocumentGraphService,
-    private affinityService: AffinityTrackingService
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly graphService: DocumentGraphService,
+    private readonly affinityService: AffinityTrackingService
   ) {}
 
   ngOnInit(): void {
@@ -253,7 +253,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataCategory(): string | null {
     if (!this.node?.metadata?.['category']) return null;
-    return this.node.metadata['category'] as string;
+    return this.node.metadata['category'];
   }
 
   /**
@@ -273,7 +273,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataVersion(): string | null {
     if (!this.node?.metadata?.['version']) return null;
-    return this.node.metadata['version'] as string;
+    return this.node.metadata['version'];
   }
 
   /**
