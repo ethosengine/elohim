@@ -38,6 +38,21 @@ footer {
   text-align: center;
 }
 
+/* Docs link styling */
+.docs-link {
+  color: var(--tech-bright);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.docs-link:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--tech-accent);
+}
+
 /* Footer container */
 .footer-container {
   max-width: 800px;
