@@ -292,4 +292,25 @@ describe('LamadHomeComponent', () => {
     expect(html).toContain('gherkin-keyword');
     expect(html).toContain('gherkin-tag');
   });
+
+  it('should get current position in path', () => {
+    fixture.detectChanges();
+    component.selectedNode = mockContentNode;
+    component.pathNodes = [
+      { node: mockContentNode, order: 0, depth: 0, category: 'vision', affinity: 0.5, affinityLevel: 'medium' }
+    ];
+
+    const position = component.getCurrentPosition();
+
+    expect(position).toBe(1);
+  });
+
+  it('should return 0 for current position when no node selected', () => {
+    fixture.detectChanges();
+    component.selectedNode = null;
+
+    const position = component.getCurrentPosition();
+
+    expect(position).toBe(0);
+  });
 });

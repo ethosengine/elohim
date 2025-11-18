@@ -221,6 +221,14 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Get current position in the learning path (1-indexed)
+   */
+  getCurrentPosition(): number {
+    if (!this.selectedNode) return 0;
+    return this.pathNodes.findIndex(pn => pn.node.id === this.selectedNode?.id) + 1;
+  }
+
+  /**
    * Render markdown content (simple version)
    */
   renderMarkdown(content: string): string {
