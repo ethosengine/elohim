@@ -1,5 +1,5 @@
 ---
-node_type: organization
+node_type: book
 org_id: the_ministry_for_the_future
 name: "The Ministry for the Future"
 url: "https://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb"

@@ -1,9 +1,9 @@
 ---
-node_type: organization
-org_id: transitiontowns
-name: "TransitionTowns"
-url: "https://www.youtube.com/@TransitionTowns"
-gem_id: "DjEzHjDNO9erfZxz4P6b"
+node_type: book
+org_id: the_collapse_of_complex_societies
+name: "The Collapse of Complex Societies"
+url: "https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0"
+gem_id: "ss9WkKEJ55XMAKBTmw6F"
 
 # Epic relationships (NO DUPLICATION NEEDED)
 primary_epic: governance
@@ -11,7 +11,7 @@ related_epics: []
 
 epic_relationships:
   governance:
-    inspiration: "[How TransitionTowns inspires the governance epic]"
+    inspiration: "[How The Collapse of Complex Societies inspires the governance epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,13 +31,13 @@ edge_types:
   - operates_at_layer
 ---
 
-# TransitionTowns
+# The Collapse of Complex Societies
 
 ## Description
 
-An international movement of communities reimagining and rebuilding our world.
+Political disintegration is a persistent feature of world history. The Collapse of Complex Societies, though written by an archaeologist, will therefore strike a chord throughout the social sciences. Any explanation of societal collapse carries lessons not just for the study of ancient societies, bu…
 
-**Publisher:** YouTube
+**Publisher:** Google Books
 
 ## Vision Alignment
 
@@ -50,7 +50,7 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ### Primary Epic: governance
 
-[Detailed explanation of how TransitionTowns relates to and inspires the governance epic]
+[Detailed explanation of how The Collapse of Complex Societies relates to and inspires the governance epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -65,7 +65,7 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://www.youtube.com/@TransitionTowns
+- **Website:** https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 

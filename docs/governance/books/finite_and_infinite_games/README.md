@@ -1,9 +1,9 @@
 ---
-node_type: organization
-org_id: future_thinkers_daniel_schmachtenberger_the_existential_game
-name: "Future Thinkers - Daniel Schmachtenberger - The Existential Game"
-url: "https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA"
-gem_id: "cJfrbjpKw7dvOeBQ6ELX"
+node_type: book
+org_id: finite_and_infinite_games
+name: "Finite and Infinite Games"
+url: "https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd"
+gem_id: "Mh4DOAfmPZlWbXRvRqrd"
 
 # Epic relationships (NO DUPLICATION NEEDED)
 primary_epic: governance
@@ -11,7 +11,7 @@ related_epics: []
 
 epic_relationships:
   governance:
-    inspiration: "[How Future Thinkers - Daniel Schmachtenberger - The Existential Game inspires the governance epic]"
+    inspiration: "[How Finite and Infinite Games inspires the governance epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,13 +31,13 @@ edge_types:
   - operates_at_layer
 ---
 
-# Future Thinkers - Daniel Schmachtenberger - The Existential Game
+# Finite and Infinite Games
 
 ## Description
 
-Daniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes with Daniel Schmachtenberger: http://futurethinkers.org/daniel…
+“There are at least two kinds of games,” states James P. Carse as he begins this extraordinary book. “One could be called finite; the other infinite. A finite game is played for the purpose of winning, an infinite game for the purpose of continuing the play.”Finite games are the familiar contests of…
 
-**Publisher:** Google Podcasts
+**Publisher:** Google Books
 
 ## Vision Alignment
 
@@ -50,7 +50,7 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ### Primary Epic: governance
 
-[Detailed explanation of how Future Thinkers - Daniel Schmachtenberger - The Existential Game relates to and inspires the governance epic]
+[Detailed explanation of how Finite and Infinite Games relates to and inspires the governance epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -65,7 +65,7 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA
+- **Website:** https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 

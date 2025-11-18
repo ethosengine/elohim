@@ -1,17 +1,17 @@
 ---
-node_type: organization
-org_id: not_just_bikes
-name: "Not Just Bikes"
-url: "https://www.youtube.com/c/notjustbikes"
-gem_id: "RUCapCsCIvKnykbjdI9y"
+node_type: article
+org_id: new__public
+name: "New_ Public"
+url: "https://newpublic.substack.com/"
+gem_id: "DxQNBtCrd9MWKWx0Wmb1"
 
 # Epic relationships (NO DUPLICATION NEEDED)
-primary_epic: governance
+primary_epic: social_medium
 related_epics: []
 
 epic_relationships:
-  governance:
-    inspiration: "[How Not Just Bikes inspires the governance epic]"
+  social_medium:
+    inspiration: "[How New_ Public inspires the social_medium epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,13 +31,13 @@ edge_types:
   - operates_at_layer
 ---
 
-# Not Just Bikes
+# New_ Public
 
 ## Description
 
-Stories of great urban planning and urban experiences from the Netherlands and beyond. There are a lot of reasons why Dutch cities are so great; it’s not just bikes. Unfortunately I’ve been overwhelmed with emails and DMs, and I can’t answer most of them anymore. If you really think you need to con…
+​Email us your stories at hello@newpublic.org with 'Flash Fiction' in the subject line. Deadline: 9/1/21. Theme: Social Media Word Limit: 500 words
 
-**Publisher:** YouTube
+**Publisher:** newpublic.substack.com
 
 ## Vision Alignment
 
@@ -48,9 +48,9 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ## Multi-Epic Inspiration
 
-### Primary Epic: governance
+### Primary Epic: social_medium
 
-[Detailed explanation of how Not Just Bikes relates to and inspires the governance epic]
+[Detailed explanation of how New_ Public relates to and inspires the social_medium epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -65,14 +65,14 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://www.youtube.com/c/notjustbikes
+- **Website:** https://newpublic.substack.com/
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 
 ## Graph Connections
 
 ### Inspires Epics
-- `governance` - Primary focus and location
+- `social_medium` - Primary focus and location
 
 ### Inspires Users
 - `[epic:user_type]` - [how/why]

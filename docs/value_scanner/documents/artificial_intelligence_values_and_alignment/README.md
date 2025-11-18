@@ -1,5 +1,5 @@
 ---
-node_type: organization
+node_type: document
 org_id: artificial_intelligence_values_and_alignment
 name: "Artificial Intelligence, Values and Alignment"
 url: "https://www.deepmind.com/publications/artificial-intelligence-values-and-alignment"

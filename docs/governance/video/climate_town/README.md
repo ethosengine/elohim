@@ -1,9 +1,9 @@
 ---
-node_type: organization
-org_id: finite_and_infinite_games
-name: "Finite and Infinite Games"
-url: "https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd"
-gem_id: "Mh4DOAfmPZlWbXRvRqrd"
+node_type: video
+org_id: climate_town
+name: "Climate Town"
+url: "https://www.youtube.com/c/ClimateTown"
+gem_id: "MSf7QuXhlPPBepxvpCcy"
 
 # Epic relationships (NO DUPLICATION NEEDED)
 primary_epic: governance
@@ -11,7 +11,7 @@ related_epics: []
 
 epic_relationships:
   governance:
-    inspiration: "[How Finite and Infinite Games inspires the governance epic]"
+    inspiration: "[How Climate Town inspires the governance epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,13 +31,14 @@ edge_types:
   - operates_at_layer
 ---
 
-# Finite and Infinite Games
+# Climate Town
 
 ## Description
 
-“There are at least two kinds of games,” states James P. Carse as he begins this extraordinary book. “One could be called finite; the other infinite. A finite game is played for the purpose of winning, an infinite game for the purpose of continuing the play.”Finite games are the familiar contests of…
+Rollie Williams and a ragtag team of climate communicators, creatives and comedians are here to examine climate change in a way that doesn’t make you want to eat a cyanide pill. Get informed about the climate crisis before the weather does it for you.
+Patreon if you’re feeling crazy - https://www.patreon.com/ClimateTown…
 
-**Publisher:** Google Books
+**Publisher:** YouTube
 
 ## Vision Alignment
 
@@ -50,7 +51,7 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ### Primary Epic: governance
 
-[Detailed explanation of how Finite and Infinite Games relates to and inspires the governance epic]
+[Detailed explanation of how Climate Town relates to and inspires the governance epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -65,7 +66,7 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd
+- **Website:** https://www.youtube.com/c/ClimateTown
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 

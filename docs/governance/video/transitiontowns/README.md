@@ -1,9 +1,9 @@
 ---
-node_type: organization
-org_id: the_permaculture_principles
-name: "The Permaculture Principles"
-url: "https://youtu.be/0mwRAf3z9ag"
-gem_id: "qXY8N5ABHNtFW4BHb43D"
+node_type: video
+org_id: transitiontowns
+name: "TransitionTowns"
+url: "https://www.youtube.com/@TransitionTowns"
+gem_id: "DjEzHjDNO9erfZxz4P6b"
 
 # Epic relationships (NO DUPLICATION NEEDED)
 primary_epic: governance
@@ -11,7 +11,7 @@ related_epics: []
 
 epic_relationships:
   governance:
-    inspiration: "[How The Permaculture Principles inspires the governance epic]"
+    inspiration: "[How TransitionTowns inspires the governance epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,11 +31,11 @@ edge_types:
   - operates_at_layer
 ---
 
-# The Permaculture Principles
+# TransitionTowns
 
 ## Description
 
-The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren’s 12 principle ver...
+An international movement of communities reimagining and rebuilding our world.
 
 **Publisher:** YouTube
 
@@ -50,7 +50,7 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ### Primary Epic: governance
 
-[Detailed explanation of how The Permaculture Principles relates to and inspires the governance epic]
+[Detailed explanation of how TransitionTowns relates to and inspires the governance epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -65,7 +65,7 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://youtu.be/0mwRAf3z9ag
+- **Website:** https://www.youtube.com/@TransitionTowns
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 

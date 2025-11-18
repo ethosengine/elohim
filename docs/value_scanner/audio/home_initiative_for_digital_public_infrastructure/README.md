@@ -1,5 +1,5 @@
 ---
-node_type: organization
+node_type: audio
 org_id: home_initiative_for_digital_public_infrastructure
 name: "Home - Initiative for Digital Public Infrastructure"
 url: "https://publicinfrastructure.org/"

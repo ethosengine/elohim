@@ -1,9 +1,9 @@
 ---
-node_type: organization
-org_id: climate_town
-name: "Climate Town"
-url: "https://www.youtube.com/c/ClimateTown"
-gem_id: "MSf7QuXhlPPBepxvpCcy"
+node_type: audio
+org_id: future_thinkers_daniel_schmachtenberger_the_existential_game
+name: "Future Thinkers - Daniel Schmachtenberger - The Existential Game"
+url: "https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA"
+gem_id: "cJfrbjpKw7dvOeBQ6ELX"
 
 # Epic relationships (NO DUPLICATION NEEDED)
 primary_epic: governance
@@ -11,7 +11,7 @@ related_epics: []
 
 epic_relationships:
   governance:
-    inspiration: "[How Climate Town inspires the governance epic]"
+    inspiration: "[How Future Thinkers - Daniel Schmachtenberger - The Existential Game inspires the governance epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,14 +31,13 @@ edge_types:
   - operates_at_layer
 ---
 
-# Climate Town
+# Future Thinkers - Daniel Schmachtenberger - The Existential Game
 
 ## Description
 
-Rollie Williams and a ragtag team of climate communicators, creatives and comedians are here to examine climate change in a way that doesn’t make you want to eat a cyanide pill. Get informed about the climate crisis before the weather does it for you.
-Patreon if you’re feeling crazy - https://www.patreon.com/ClimateTown…
+Daniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes with Daniel Schmachtenberger: http://futurethinkers.org/daniel…
 
-**Publisher:** YouTube
+**Publisher:** Google Podcasts
 
 ## Vision Alignment
 
@@ -51,7 +50,7 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ### Primary Epic: governance
 
-[Detailed explanation of how Climate Town relates to and inspires the governance epic]
+[Detailed explanation of how Future Thinkers - Daniel Schmachtenberger - The Existential Game relates to and inspires the governance epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -66,7 +65,7 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://www.youtube.com/c/ClimateTown
+- **Website:** https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 

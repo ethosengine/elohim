@@ -1,9 +1,9 @@
 ---
-node_type: organization
-org_id: future_scouts_international_learning_program_social_app_and_handbook
-name: "Future Scouts International learning program, Social App and Handbook"
-url: "https://futurescouts.cc/"
-gem_id: "q7bwHxmEmdsZGIEGySpd"
+node_type: video
+org_id: the_permaculture_principles
+name: "The Permaculture Principles"
+url: "https://youtu.be/0mwRAf3z9ag"
+gem_id: "qXY8N5ABHNtFW4BHb43D"
 
 # Epic relationships (NO DUPLICATION NEEDED)
 primary_epic: governance
@@ -11,7 +11,7 @@ related_epics: []
 
 epic_relationships:
   governance:
-    inspiration: "[How Future Scouts International learning program, Social App and Handbook inspires the governance epic]"
+    inspiration: "[How The Permaculture Principles inspires the governance epic]"
     parallel_work: []
 
 # What they demonstrate
@@ -31,13 +31,13 @@ edge_types:
   - operates_at_layer
 ---
 
-# Future Scouts International learning program, Social App and Handbook
+# The Permaculture Principles
 
 ## Description
 
-The Future Scouts offer an international learning program, the Future Scouts App & the Future Scouts Handbook of 21st Century Survival Skills.
+The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren’s 12 principle ver...
 
-**Publisher:** Future Scouts
+**Publisher:** YouTube
 
 ## Vision Alignment
 
@@ -50,7 +50,7 @@ How this organization's work aligns with the Elohim Protocol vision:
 
 ### Primary Epic: governance
 
-[Detailed explanation of how Future Scouts International learning program, Social App and Handbook relates to and inspires the governance epic]
+[Detailed explanation of how The Permaculture Principles relates to and inspires the governance epic]
 
 **Parallel Work:**
 - [What they're doing that parallels this epic]
@@ -65,7 +65,7 @@ How this organization demonstrates this principle in practice
 
 ## Key Resources
 
-- **Website:** https://futurescouts.cc/
+- **Website:** https://youtu.be/0mwRAf3z9ag
 - **Key reading:** [Links to important content]
 - **People:** [Key figures]
 
