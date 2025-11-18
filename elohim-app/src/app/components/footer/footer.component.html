@@ -56,6 +56,7 @@
     
     <!-- Build Info -->
     <div class="build-info">
+      <a [href]="githubReleaseUrl" data-cy="release-version" class="git-hash" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'View release on GitHub'">v{{ version }}</a>
       <a [href]="githubCommitUrl" data-cy="git-hash" class="git-hash" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'View commit ' + gitHash + ' on GitHub'">{{ gitHash }}</a>
     </div>
     

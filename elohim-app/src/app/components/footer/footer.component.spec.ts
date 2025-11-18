@@ -24,13 +24,30 @@ describe('FooterComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('should initialize version from environment', () => {
+    expect(component.version).toBe(environment.version);
+  });
+
   it('should initialize gitHash from environment', () => {
     expect(component.gitHash).toBe(environment.gitHash);
+  });
+
+  it('should construct githubReleaseUrl with version', () => {
+    const expectedUrl = `https://github.com/ethosengine/elohim/releases/v${environment.version}`;
+    expect(component.githubReleaseUrl).toBe(expectedUrl);
   });
 
   it('should construct githubCommitUrl with gitHash', () => {
     const expectedUrl = `https://github.com/ethosengine/elohim/commit/${environment.gitHash}`;
     expect(component.githubCommitUrl).toBe(expectedUrl);
+  });
+
+  it('should render release version link in template', () => {
+    const compiled = fixture.nativeElement;
+    const releaseLink = compiled.querySelector('[data-cy="release-version"]');
+    expect(releaseLink).toBeTruthy();
+    expect(releaseLink.textContent.trim()).toBe(`v${environment.version}`);
+    expect(releaseLink.getAttribute('href')).toBe(component.githubReleaseUrl);
   });
 
   it('should render git hash link in template', () => {

@@ -9,6 +9,8 @@ import { environment } from '../../../environments/environment';
   styleUrl: './footer.component.css'
 })
 export class FooterComponent {
+  version = environment.version;
   gitHash = environment.gitHash;
+  githubReleaseUrl = `https://github.com/ethosengine/elohim/releases/v${environment.version}`;
   githubCommitUrl = `https://github.com/ethosengine/elohim/commit/${environment.gitHash}`;
 }
