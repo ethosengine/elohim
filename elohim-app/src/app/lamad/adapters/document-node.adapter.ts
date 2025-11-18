@@ -50,7 +50,7 @@ export class DocumentNodeAdapter {
       title: node.title,
       description: node.description,
       tags: node.tags,
-      sourcePath: node.sourcePath || '',
+      sourcePath: node.sourcePath ?? '',
       content: node.content,
       relatedNodeIds: node.relatedNodeIds,
       metadata: node.metadata,

@@ -40,12 +40,12 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     engagedCount: 0,
   };
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private graphService: DocumentGraphService,
-    private affinityService: AffinityTrackingService,
-    private router: Router
+    private readonly graphService: DocumentGraphService,
+    private readonly affinityService: AffinityTrackingService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -71,7 +71,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes = Array.from(graph.nodes.values()) as DocumentNode[];
+    const allNodes = Array.from(graph.nodes.values());
     const contentNodes = DocumentNodeAdapter.fromDocumentNodes(allNodes);
 
     // Get affinity stats
@@ -115,8 +115,8 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
     // Sort categories by average affinity (lowest first)
     this.categories.sort((a, b) => {
-      const aAvg = a.stats?.averageAffinity || 0;
-      const bAvg = b.stats?.averageAffinity || 0;
+      const aAvg = a.stats?.averageAffinity ?? 0;
+      const bAvg = b.stats?.averageAffinity ?? 0;
       return aAvg - bAvg;
     });
   }

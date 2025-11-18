@@ -25,7 +25,10 @@
              class="path-item"
              [class.selected]="selectedNode?.id === pathNode.node.id"
              [class.depth-1]="pathNode.depth === 1"
-             (click)="selectNode(pathNode.node)">
+             (click)="selectNode(pathNode.node)"
+             (keydown.enter)="selectNode(pathNode.node)"
+             tabindex="0"
+             role="button">
 
           <!-- Node Info -->
           <div class="path-item-content">
@@ -68,7 +71,11 @@
 
       <!-- TOP: Graph Visualization -->
       <section class="graph-section" [class.collapsed]="!isGraphExpanded">
-        <div class="graph-header" (click)="toggleGraph()">
+        <div class="graph-header"
+             (click)="toggleGraph()"
+             (keydown.enter)="toggleGraph()"
+             tabindex="0"
+             role="button">
           <h3 class="graph-title">
             <span class="graph-icon">📊</span>
             At-a-Glance Overview

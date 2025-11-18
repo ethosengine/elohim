@@ -32,7 +32,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   isGraphExpanded = true;
   isLoading = true;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly graphService: DocumentGraphService,
@@ -261,7 +261,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     // Line breaks
     html = html.replace(/\n/g, '<br>');
 
-    return this.sanitizer.sanitize(1, html) || '';
+    return this.sanitizer.sanitize(1, html) ?? '';
   }
 
   /**
@@ -292,7 +292,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       })
       .join('');
 
-    return this.sanitizer.sanitize(1, html) || '';
+    return this.sanitizer.sanitize(1, html) ?? '';
   }
 
   /**
