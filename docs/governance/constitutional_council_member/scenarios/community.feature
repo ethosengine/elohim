@@ -1,134 +1,150 @@
 @epic:governance
 @user_type:constitutional_council_member
 @governance_layer:community
-@related_users:appellant,community_leader,technical_expert
-@related_layers:provincial_state,individual_family
+@related_users:appellant,technical_expert,community_leader,researcher
+@related_layers:provincial_state,family,individual
 @elohim_agents:community_elohim,family_elohim
 
-Feature: Community Governance for Constitutional Council Member
+Feature: Community-Level Constitutional Council Deliberation for Council Member
   As a constitutional_council_member in the governance system
   Operating at the community governance layer
-  I want to review edge case appeals and interpret constitutional alignment
-  So that citizens receive democratic oversight and agents remain accountable without capture
+  I want to provide democratic oversight of AI decisions through citizen deliberation
+  So that agent governance remains accountable without being controllable
 
   Background:
     Given the Elohim Protocol is operational
-    And Sarah Martinez has been selected via sortition for 3-month community council term
-    And the community governance context is active in Riverside
-    And Sarah has completed intensive constitutional training
-    And Sarah's council meets weekly to review 5-10 cases per session
+    And the constitutional_council_member user is registered in the system
+    And the community governance context is active
+    And Sarah Martinez is serving her 3-month term on community council
 
-  Scenario: Review first case with intensive deliberation
-    Given Sarah is serving her first week on the Constitutional Council
-    And Marcus's mental health intervention appeal has been escalated
-    And the case involves balancing privacy with care
-    When Sarah's council convenes to review the appeal
-    Then the council receives Marcus's appeal statement and supporting evidence
-    And the council reviews Family Elohim's constitutional reasoning
-    And the council examines Community Elohim's initial determination
-    And the council has access to precedent database for similar cases
-    And technical expert Amara Okonkwo explains pattern detection in plain language
-    And Sarah and fellow council members deliberate for 2 hours
-    And the council focuses on "did agent operate within constitutional bounds"
-    And Sarah brings her nursing experience to understanding mental health care
+  Scenario: Random selection to serve on community Constitutional Council
+    Given I am a nurse and mother living in my community
+    And I have never been politically active
+    When I receive notification of sortition selection for Constitutional Council
+    Then I am randomly selected via cryptographic sortition
+    And I am offered 3-month term serving 20 hours per week
+    And I receive compensation matching local median income
+    And I am provided childcare support and accessibility accommodations
+    And I can accept or decline without penalty
+    And Selection cannot be lobbied or manipulated
+    And My service brings ordinary citizen wisdom to AI governance
 
-  Scenario: Affirm agent decision while recommending protocol improvement
-    Given Sarah's council has deliberated on Marcus's case
-    And the council determines the agent followed proper protocol
-    When the council issues its determination
-    Then the decision affirms the Family Elohim's intervention was constitutional
-    And the reasoning acknowledges Marcus's legitimate privacy concerns
-    And the decision balances "love as committed action" with dignity principles
-    And the council recommends clearer thresholds for future interventions
-    And the council suggests pre-specified preference options for users
-    And the recommendation is forwarded to protocol development team
-    And Marcus receives meaningful recourse even though decision is affirmed
-    And the case becomes precedent in constitutional database
+  Scenario: Intensive training prepares me for constitutional interpretation
+    Given I have accepted my Constitutional Council appointment
+    And I need to understand constitutional principles to judge agent decisions
+    When I complete 3-week training program
+    Then I learn: constitutional principles and their application
+    And I study: how agents reason and make decisions
+    And I practice: deliberation protocols and consensus building
+    And I review: historical precedents and case studies
+    And I am educated: without being indoctrinated about "correct" answers
+    And I develop: judgment capacity not just knowledge
+    And I feel: prepared to serve despite lack of formal expertise
 
-  Scenario: Council members with diverse backgrounds deliberate together
-    Given Sarah's council includes retired teacher, construction worker, grad student, and business owner
-    And they are reviewing community resource allocation appeal
-    When the council deliberates
-    Then each member brings different lived experience to the discussion
-    And the teacher sees education implications
-    And the construction worker understands resource constraints
-    And the grad student contributes research skills
-    And the business owner knows economic trade-offs
-    And Sarah brings healthcare and care perspective
-    And the structured deliberation ensures all voices are heard equally
-    And collective wisdom emerges that no individual could achieve alone
+  Scenario: Reviewing my first appeal case with fellow council members
+    Given Marcus appealed his Family Elohim's mental health intervention decision
+    And I am reviewing this case with my diverse council
+    When we deliberate on whether the agent followed constitutional bounds
+    Then I bring: my nurse perspective on mental health and care
+    And retired teacher brings: education and developmental insights
+    And construction worker brings: working-class resource constraint understanding
+    And grad student brings: research and analytical skills
+    And business owner brings: economic and practical judgment
+    And together we form: collective wisdom greater than any individual
+    And we ask: "Did this demonstrate love as committed action?"
 
-  Scenario: Handle personal constitutional question from council member
-    Given Sarah is confused about how constitutional principle applies
-    And the case involves adolescent autonomy versus parental protection
-    When Sarah asks for clarification during deliberation
-    Then facilitator provides constitutional history and precedent
-    And technical expert explains how agents weight competing principles
-    And fellow council members share their perspectives
-    And Sarah develops deeper constitutional understanding
-    And the deliberation becomes learning opportunity
-    And Sarah gains confidence in her judgment through collaborative process
+  Scenario: Balancing technical expert advice with my human judgment
+    Given Marcus's case involves complex pattern detection algorithms
+    And I don't understand the technical details
+    When technical expert Dr. Okonkwo explains the agent's reasoning
+    Then she translates: cryptographic proofs into accessible language
+    And she clarifies: what confidence levels mean and their limitations
+    And she acknowledges: uncertainties and competing interpretations
+    And she informs: but doesn't tell us what decision is right
+    And I weigh: her technical knowledge alongside my human wisdom
+    And I judge: whether constitutional principles were honored
+    And I respect: expertise without surrendering my judgment authority
 
-  Scenario: Identify pattern across multiple appeals requiring systemic change
-    Given Sarah's council reviews several adolescent autonomy appeals over 3 weeks
-    And multiple Riverside families report Family Elohim being overly restrictive
-    When Sarah recognizes the pattern and raises it
-    Then the council analyzes all related cases together
-    And the council identifies systematic over-calibration issue
-    And the council determines this is not individual agent error but calibration problem
-    And the council recommends community-specific threshold adjustment
-    And Mayor Jamal Washington is briefed to facilitate community dialogue
-    And the council's pattern recognition prevents future constitutional violations
+  Scenario: Deliberating with structured process ensuring all voices heard
+    Given our council has diverse perspectives that could lead to conflict
+    And we need to reach judgment together
+    When we follow deliberation protocols
+    Then all members: share initial reactions and concerns
+    And we identify: points of agreement and disagreement
+    And we examine: constitutional principles explicitly
+    And we research: relevant precedents from previous cases
+    And we consult: experts when technical questions arise
+    And we avoid: rushed judgment or groupthink
+    And we ensure: quieter members are heard not dominated
+    And we reach: decision through genuine collective deliberation
 
-  Scenario: Fast-track clear agent error without extensive deliberation
-    Given an appeal involves verifiable factual error (wrong address data)
-    And the error is not a constitutional question but technical mistake
-    When Sarah's council reviews the case
-    Then the council immediately identifies this as fast-track resolution
-    And the council overturns the decision within 24 hours
-    And the appellant receives apology and compensation
-    And the council flags root cause for systematic fix
-    And council time is preserved for genuinely difficult constitutional questions
+  Scenario: Creating precedent that will guide future cases
+    Given our council rules on Marcus's mental health intervention appeal
+    And we affirm the agent's decision as constitutionally aligned
+    When we document our reasoning and recommendations
+    Then we explain: why privacy was balanced against care in this case
+    And we recommend: protocol enhancements for pre-specified preferences
+    And we create: precedent that future councils can reference
+    And we document: our deliberation process (anonymized)
+    And we contribute: to evolving constitutional interpretation
+    And our judgment: becomes part of public constitutional record
+    And Marcus's case: makes the protocol better for everyone
 
-  Scenario: Interpret constitutional principles with local cultural context
-    Given Riverside has indigenous heritage with river-centered spirituality
-    And appeal involves Ecosystem Elohim's watershed protection decision
-    When Sarah's council interprets "love as committed action"
-    Then the council considers local spiritual relationship to river
-    And the council respects both universal constitutional minimums and local specificity
-    And the council consults with indigenous community members
-    And the interpretation honors cultural context while maintaining core principles
-    And the precedent is documented specifically for Riverside context
+  Scenario: Ruling against agent decision when constitutional bounds exceeded
+    Given I am reviewing an appeal where agent clearly overstepped
+    And the facts show the decision violated constitutional principles
+    When our council rules the agent decision unconstitutional
+    Then the decision is: immediately overturned
+    And appellant's preferences are: automatically restored
+    And the incident is: documented as error in agent's record
+    And similar interventions: require higher thresholds going forward
+    And protocol improvements are: proposed and implemented
+    And agent learns: from legitimate critique without being punished
+    And accountability works: without compromising agent autonomy
 
-  Scenario: Navigate disagreement within council through structured process
-    Given Sarah's council is split 3-2 on whether agent decision was constitutional
-    And genuine uncertainty exists about privacy threshold
-    When the council follows deliberation protocol
-    Then minority view is fully documented with reasoning
-    And majority explains why they reached different conclusion
-    And both perspectives acknowledge legitimate competing values
-    And the decision includes dissent to inform future deliberations
-    And Sarah votes her conscience without pressure to conform
-    And the disagreement is respectful and productive
+  Scenario: Experiencing the weight of judgment affecting real lives
+    Given my decision will affect Marcus's mental health support
+    And I cannot hide behind procedure or defer to experts
+    When I must judge knowing uncertainty and consequences
+    Then I feel: the burden of democratic responsibility
+    And I grapple: with possibility I might be wrong
+    And I draw on: my experience as nurse who has seen suffering
+    And I consider: my role as mother navigating care and autonomy
+    And I accept: that I must judge despite uncertainty
+    And I am supported: through compensation, training, and respect
+    And I learn: what democratic participation means at deepest level
 
-  Scenario: Receive community context to inform constitutional judgment
-    Given appeal involves surveillance concern in neighborhood with police violence history
-    And Sarah's council needs historical context to understand sensitivities
-    When Mayor Jamal provides community context
-    Then Jamal explains why surveillance concerns are especially salient here
-    And Jamal provides cultural background without directing judgment
-    And Sarah's council incorporates this context into constitutional interpretation
-    And local knowledge improves decision quality
-    And the council maintains its authority while learning from community wisdom
+  Scenario: Seeing patterns across multiple appeals inform community calibration
+    Given our council has reviewed 50 appeals over two months
+    And I notice recurring themes and tensions
+    When I observe patterns in appeal types and outcomes
+    Then I see: many adolescent autonomy conflicts emerging
+    And I notice: three business loan denials with similar criteria
+    And I identify: recurring privacy threshold concerns
+    And I share: these observations with community leader
+    And community can: consider local protocol calibration
+    And my service: informs democratic governance beyond individual cases
+    And patterns reveal: community-wide issues requiring deliberation
 
-  Scenario: Complete 3-month term and return to regular life
-    Given Sarah has served her full 3-month council term
-    And she has reviewed 45 cases and helped establish local precedents
-    When her term ends
-    Then Sarah returns to her nursing work
-    And she cannot serve consecutive terms (preventing capture)
-    And her deliberations are documented in precedent database
-    And she has gained constitutional literacy and deliberative skills
-    And she participates differently in her community as informed citizen
-    And she might be selected again in future for higher governance layer
-    And ordinary citizen has become extraordinary through democratic participation
+  Scenario: Term limits protect me from capture while preserving learning
+    Given I have served my 3-month community council term
+    And I have developed constitutional literacy and deliberation skills
+    When my term ends and I return to nursing work
+    Then I cannot: serve consecutive terms or be reappointed
+    And I cannot: build career in council governance
+    And I am protected: from lobbying, corruption, or capture
+    And I carry forward: constitutional understanding into community life
+    And I remain: engaged citizen with enhanced democratic capacity
+    And my institutional knowledge: is preserved through documentation
+    And fresh perspectives: replace mine to prevent ossification
+
+  Scenario: Anonymous service when facing community controversy
+    Given I am reviewing a highly controversial local case
+    And I am concerned about community pressure or retaliation
+    When I request anonymous service protections
+    Then my identity is: revealed only to verification systems
+    And I can: serve without public knowing who I am
+    And I am protected: from intimidation or capture attempts
+    And I can: deliberate freely without fear
+    And cryptographic proofs: verify I'm legitimate member without revealing identity
+    And my judgment: maintains democratic legitimacy despite anonymity

@@ -1,128 +1,138 @@
 @epic:governance
 @user_type:constitutional_council_member
 @governance_layer:provincial_state
-@related_users:appellant,policy_maker,technical_expert,community_leader
+@related_users:appellant,technical_expert,policy_maker,researcher,community_leader
 @related_layers:community,nation_state
 @elohim_agents:regional_elohim,community_elohim
 
-Feature: Provincial/State Governance for Constitutional Council Member
+Feature: Provincial/State-Level Constitutional Council Deliberation for Council Member
   As a constitutional_council_member in the governance system
-  Operating at the provincial/state governance layer
-  I want to handle complex appeals and establish regional precedent
-  So that multi-community constitutional questions are resolved consistently
+  Operating at the provincial_state governance layer
+  I want to deliberate on complex regional appeals and establish precedent
+  So that constitutional interpretation guides multiple communities coherently
 
   Background:
     Given the Elohim Protocol is operational
-    And Sarah Martinez has been selected via sortition for 4-month regional council term
+    And the constitutional_council_member user is registered in the system
     And the provincial_state governance context is active
-    And Sarah has served previously at community layer
-    And regional council meets twice weekly for more complex cases
+    And Sarah Martinez serves her 4-month term on Regional Constitutional Council
 
-  Scenario: Review complex appeal escalated from community layer
-    Given a community-layer council could not resolve constitutional question
-    And the appeal involves coordination across multiple Riverside-area communities
-    When Sarah's regional council receives the escalated appeal
-    Then the council reviews all community-layer deliberations and reasoning
-    And the council examines how different communities interpreted same principle
-    And the council identifies the core constitutional tension requiring resolution
-    And the council has access to precedents from other regional councils
-    And technical experts explain multi-agent coordination mechanisms
-    And the council deliberates over multiple sessions given complexity
+  Scenario: Serving on Regional Council with greater complexity and time
+    Given I was selected for Regional Constitutional Council
+    And this layer handles escalated appeals and novel situations
+    When I begin my 4-month term meeting twice weekly
+    Then I review: cases that couldn't be resolved at community layer
+    And I deliberate: complex constitutional questions affecting region
+    And I create: precedent influencing multiple communities
+    And I work with: citizens from diverse communities across region
+    And I receive: enhanced training for greater responsibility
+    And I am compensated: for significant time commitment
+    And I feel: weight of creating regional constitutional law
 
-  Scenario: Establish regional precedent affecting multiple communities
-    Given several communities in the region have reached different conclusions
-    And some prioritized ecosystem protection while others prioritized economic development
-    When Sarah's regional council reviews the watershed decision pattern
-    Then the council establishes regional precedent balancing both values
-    And the precedent respects principle of subsidiarity (local decisions where possible)
-    And the precedent sets minimums that all communities must honor
-    And the precedent allows local calibration within constitutional bounds
-    And all regional Community Elohim adjust their decision-making accordingly
-    And Mayor Jamal and other community leaders receive clear guidance
+  Scenario: Deliberating multi-community coordination case
+    Given an appeal involves agent decisions across several communities
+    And different communities have conflicting local calibrations
+    When our regional council reviews the inter-community conflict
+    Then we evaluate: how subsidiarity applies across boundaries
+    And we examine: if regional coordination is constitutionally required
+    And we consider: if local diversity should be harmonized or preserved
+    And we consult: community leaders about local context
+    And we establish: regional minimums while respecting variation
+    And we create: precedent for multi-layer governance coherence
+    And our judgment: enables communities to coordinate democratically
 
-  Scenario: Coordinate cross-jurisdictional appeal involving multiple communities
-    Given an appellant's case involves agents from three different municipalities
-    And each community's agents reached different conclusions
-    When Sarah's council reviews the multi-jurisdictional case
-    Then the council coordinates review across all involved agents
-    And the council ensures constitutional principles apply consistently
-    And the council identifies where local context justifies variation
-    And the council determines if any agent violated constitutional bounds
-    And the appellant receives coherent resolution despite jurisdictional complexity
+  Scenario: Reviewing case with significant technical complexity
+    Given appeal involves cryptographic verification questions
+    And I lack technical expertise to understand the details
+    When Dr. Okonkwo provides expert testimony
+    Then she explains: in language I can understand
+    And she shows: what can and cannot be technically verified
+    And she presents: competing expert interpretations
+    And she informs: without advocating for particular outcome
+    And I ask: questions until I understand enough to judge
+    And I weigh: technical information alongside human wisdom
+    And I decide: on constitutional alignment not technical optimization
+    And I honor: the boundary between expertise and judgment
 
-  Scenario: Handle novel constitutional question not addressed at community layer
-    Given an appeal raises question about AI agent coordinating with law enforcement
-    And no community-layer precedent exists for this scenario
-    When Sarah's regional council reviews the case
-    Then the council researches constitutional principles around state power
-    And the council examines how "dignity" and "transparency" apply
-    And the council consults with policy makers about legal framework
-    And the council hears from appellants with lived experience of police interaction
-    And the council establishes first-impression precedent for the region
-    And the precedent guides future cases involving government coordination
+  Scenario: Creating novel constitutional precedent for new situation
+    Given an appeal presents situation never before encountered
+    And existing precedents don't clearly apply
+    When we engage in deep constitutional interpretation
+    Then we examine: fundamental principles and their application
+    And we consider: multiple interpretations and their implications
+    And we consult: technical experts about possibilities
+    And we study: similar cases from other regions for insight
+    And we deliberate: for extended time given novelty and stakes
+    And we craft: new precedent with careful reasoning
+    And we document: our constitutional analysis thoroughly
+    And we create: guidance for future similar cases
 
-  Scenario: Review technical expert testimony on complex agent reasoning
-    Given appeal involves multi-agent deliberation that exceeded human comprehension
-    And the constitutional question requires understanding agent coordination
-    When technical expert Amara Okonkwo testifies to Sarah's council
-    Then Amara explains in plain language how agents reached consensus
-    And Amara presents the cryptographic proof of constitutional alignment
-    And Amara acknowledges uncertainty about whether reasoning was truly optimal
-    And Sarah asks clarifying questions from her nursing perspective
-    And council members probe whether explanation is genuine or rationalization
-    And the council judges constitutional alignment despite technical complexity
+  Scenario: Documenting dissenting opinion preserving minority view
+    Given our council reaches majority decision on appeal
+    And I disagree with the majority interpretation
+    When we document the precedent
+    Then my dissenting opinion: is included with full reasoning
+    And I explain: alternative constitutional reading
+    And I articulate: why majority may have missed important considerations
+    And future councils: can reference both majority and dissent
+    And constitutional evolution: can draw on minority wisdom later
+    And my disagreement: is honored as legitimate democratic deliberation
+    And precedent reflects: richness of constitutional debate
 
-  Scenario: Navigate tension between regional consistency and local autonomy
-    Given community leaders want local sovereignty in calibration
-    And regional precedent requires some standardization for fairness
-    When Sarah's council establishes regional minimum standards
-    Then the council explicitly preserves community-layer authority
-    And the council sets only constitutional minimums, not detailed rules
-    And the council explains why some consistency is required across communities
-    And the council invites community feedback on proposed standards
-    And Mayor Jamal can advocate for Riverside's specific needs
-    And the balance between consistency and sovereignty is carefully negotiated
+  Scenario: Balancing speed and deliberation quality under time pressure
+    Given regional crisis creates many urgent appeals
+    And we must review decisions quickly
+    When we convene emergency sessions for crisis appeals
+    Then we maintain: deliberation quality despite urgency
+    And we evaluate: if emergency protocols were properly invoked
+    And we examine: if crisis justified departures from normal process
+    And we provide: expedited review within 48-72 hours
+    And we avoid: rubber-stamping under pressure
+    And we create: precedent for crisis governance
+    And we ensure: democratic accountability even in emergencies
 
-  Scenario: Deliberate over multiple weeks on genuinely difficult case
-    Given appeal involves adolescent autonomy in medical decision
-    And constitutional tension between developing autonomy and protective care
-    When Sarah's council begins deliberation
-    Then the council meets three times over two weeks
-    And the council requests additional expert testimony on adolescent development
-    And the council reviews research evidence from Dr. James Chen
-    And council members struggle with uncertainty and competing values
-    And Sarah brings her experience as mother to the deliberation
-    And the council reaches decision acknowledging inherent difficulty
-    And the decision explains that reasonable people could disagree
+  Scenario: My judgment influences policy maker legislation
+    Given Senator Ruiz is drafting AI governance legislation
+    And she reviews our regional council precedents for insight
+    When our constitutional reasoning informs her policy
+    Then my citizen judgment: shapes democratic law
+    And my lived experience: enriches legislative wisdom
+    And my constitutional interpretation: guides government integration
+    And sortition governance: and representative democracy work together
+    And I contribute: to democratic governance beyond my council service
+    And my voice: matters in ways I never imagined as nurse
 
-  Scenario: Identify when regional appeal should escalate to national layer
-    Given Sarah's regional council is split on fundamental constitutional interpretation
-    And similar regional councils in other states have reached conflicting conclusions
-    When Sarah recognizes this requires national-layer harmonization
-    Then the council documents the split and the reasoning on both sides
-    And the council recommends escalation to national Constitutional Council
-    And the council explains why regional layer cannot resolve this tension
-    And the appeal is forwarded with full deliberation record
-    And Sarah's contribution feeds into national constitutional discourse
+  Scenario: Reviewing systematic bias revealed across community appeals
+    Given researcher identified pattern of biased agent decisions
+    And multiple similar appeals came from affected communities
+    When we treat this as systemic review not individual cases
+    Then we investigate: if protocol implementation has regional problems
+    And we examine: if certain demographics are disadvantaged
+    And we consult: researchers on the pattern data
+    And we may order: regional protocol audit or recalibration
+    And we address: structural injustice not just individual grievances
+    And we demonstrate: constitutional accountability works at scale
+    And we prevent: systemic violations through democratic oversight
 
-  Scenario: Address systematic bias in agent decisions across region
-    Given researcher Dr. James Chen presents data showing pattern
-    And Regional Elohim decisions disproportionately affect marginalized communities
-    When Sarah's council reviews the research and appeal pattern
-    Then the council takes the systematic bias seriously as constitutional violation
-    And the council investigates whether bias is in data, algorithm, or calibration
-    And the council consults affected communities about their experience
-    And the council mandates protocol adjustment to address bias
-    And the council establishes monitoring to ensure bias is corrected
-    And constitutional commitment to dignity requires ongoing vigilance
+  Scenario: Grappling with cultural diversity and constitutional minimums
+    Given appeal involves community with different cultural practices
+    And tension exists between cultural values and constitutional principles
+    When we deliberate on cultural context and universal minimums
+    Then we honor: legitimate cultural diversity
+    And we distinguish: variation from violations of human dignity
+    And we examine: if protocol accommodates cultural specificity
+    And we balance: universal minimums with cultural respect
+    And we avoid: both cultural imperialism and harmful relativism
+    And we create: precedent protecting pluralism within constitutional bounds
+    And we demonstrate: wisdom ordinary citizens bring to complex questions
 
-  Scenario: Complete 4-month term with enhanced constitutional expertise
-    Given Sarah has served her full 4-month regional term
-    And she has reviewed 35 complex cases establishing regional precedent
-    When her term ends
-    Then Sarah returns to her regular life with deeper constitutional understanding
-    And she has contributed to shaping regional governance for years to come
-    And her deliberations inform how agents and communities operate
-    And she has formed relationships with diverse citizens across the region
-    And she is eligible for selection to national-layer council in future
-    And her capacity for democratic participation has expanded significantly
+  Scenario: Contributing to regional policy improvement through recommendations
+    Given we identified gaps in agent protocols through appeals
+    And we documented recommendations for improvement
+    When community leaders and policy makers review our guidance
+    Then protocol developers: implement our suggested enhancements
+    And communities: consider our calibration recommendations
+    And policy makers: craft legislation addressing the gaps
+    And our constitutional interpretation: drives continuous improvement
+    And democratic feedback loop: connects citizen oversight to systemic learning
+    And my service: makes governance better for region

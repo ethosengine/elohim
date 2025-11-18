@@ -1,152 +1,186 @@
 @epic:governance
 @user_type:technical_expert
 @governance_layer:global
-@related_users:constitutional_council_member,policy_maker,researcher
-@related_layers:nation_state,community
-@elohim_agents:global_elohim,ecosystem_elohim
+@related_users:constitutional_council_member,researcher,policy_maker
+@related_layers:nation_state,continental
+@elohim_agents:global_constitutional_agent
 
-Feature: Global Governance for Technical Expert
+Feature: Global-Level Technical Expertise for Planetary AI Governance
   As a technical_expert in the governance system
   Operating at the global governance layer
-  I want to address existential technical questions and inform constitutional conventions
-  So that humanity can govern superintelligent AI with technical integrity
+  I want to inform Global Constitutional Convention about superintelligence governance
+  So that humanity can make informed democratic choices about existential questions
 
   Background:
-    Given the Elohim Protocol is operational in 60 countries globally
-    And Dr. Amara Okonkwo serves on Global Protocol Research Council
-    And the global governance context addresses existential questions
-    And Amara is among international experts advising First Global Constitutional Convention
-    And 10,000 randomly-selected citizens are deliberating humanity's AI governance
+    Given the Elohim Protocol is operational
+    And the technical_expert user is registered in the system
+    And the global governance context is active
+    And Dr. Amara Okonkwo advises Global Constitutional Convention
 
-  Scenario: Testify at Global Constitutional Convention on superintelligence governance
-    Given convention debates whether democracy can oversee what it cannot understand
-    And this is existential question for human-AI partnership
-    When Amara testifies to 10,000 global delegates
-    Then she explains what "superintelligence" actually means technically
-    And she clarifies when agents might exceed human comprehension
-    And she presents technical mechanisms for preserving constitutional alignment
-    And she honestly states "we don't know if this is sufficient"
-    And she acknowledges profound uncertainty about the future
-    And she informs delegates while respecting their authority to choose
+  Scenario: Presenting to 10,000 global citizens on superintelligence governance
+    Given Global Constitutional Convention deliberates superintelligent AI oversight
+    And I am invited to provide technical expert testimony
+    When I address delegates from every nation and culture
+    Then I explain: what "superintelligence" means technically
+    And I clarify: when agents might exceed human comprehension
+    And I present: technical mechanisms for constitutional alignment
+    And I explore: whether "explain-down" capability is possible
+    And I acknowledge: deep uncertainty about solvability
+    And I translate: across language and cultural barriers
+    And I demonstrate: how expertise serves global democracy
 
-  Scenario: Explain concept of "constitutional alignment we cannot understand"
-    Given agents approach capabilities beyond human reasoning
-    And delegates ask whether cryptographic verification is enough
-    When Amara addresses the core tension
-    Then she states "I can verify proof shows constitutional alignment"
-    And she admits "I cannot explain or evaluate the reasoning itself"
-    And she asks "can we trust what we cannot comprehend?"
-    And she does not claim to have the answer
-    And she clarifies this is philosophical question as much as technical
-    And her honest uncertainty serves democratic deliberation
+  Scenario: Explaining cryptographic constitutional proof to global assembly
+    Given delegates need to understand how constitutional verification works
+    And many come from contexts without technical infrastructure
+    When I explain cryptographic alignment proof accessibly
+    Then I use: universal analogies and visual demonstrations
+    And I ensure: translation into dozens of languages
+    And I check: comprehension across educational backgrounds
+    And I avoid: assuming Western technical education
+    And I honor: diverse ways of understanding verification
+    And I enable: informed global deliberation despite technical complexity
+    And I demonstrate: that anyone can understand enough to govern
 
-  Scenario: Propose "explain-down" capability requirement for superintelligent agents
-    Given agents becoming incomprehensible threatens democratic legitimacy
-    When Amara proposes technical solution
-    Then she suggests requiring agents to explain reasoning at human comprehension level
-    And she acknowledges this constrains what agents can do
-    And she presents tradeoff between capability and democratic oversight
-    And she works with other experts to develop implementation approach
-    And she submits proposal to Protocol Research Council
-    And convention delegates ultimately decide whether to adopt
+  Scenario: Advising on ecological standing amendment technical implications
+    Given delegates consider granting ecosystems constitutional personhood
+    And technical implementation is uncertain
+    When I explain how agents would implement ecological standing
+    Then I clarify: how ecosystem "voice" would be technically represented
+    And I explore: methods for translating ecological data into constitutional claims
+    And I assess: challenges in balancing human and ecological rights
+    And I present: what's technically possible vs what requires research
+    And I avoid: either dismissing as impossible or ignoring challenges
+    And I enable: delegates to choose values given technical reality
+    And I serve: constitutional innovation with technical honesty
 
-  Scenario: Participate in Protocol Research Council reviewing global standards
-    Given protocol operates across 60 countries with different contexts
-    And global standards must enable local sovereignty while ensuring minimums
-    When Amara serves on research council
-    Then she reviews proposed protocol updates from global perspective
-    And she ensures cryptographic methods work across cultural contexts
-    And she tests for vulnerabilities at global scale
-    And she collaborates with international expert peers
-    And she respects that Constitutional Councils authorize changes not experts
+  Scenario: Participating in global protocol security threat assessment
+    Given authoritarian regimes and corporations might attack protocol
+    And global security coordination is needed
+    When I work with international expert network on threat assessment
+    Then we identify: attack vectors across different contexts
+    And we share: vulnerability information securely
+    And we coordinate: defense mechanisms globally
+    And we avoid: creating centralized attack surface
+    And we enable: resilience through distributed architecture
+    And we serve: democratic governance security worldwide
+    And we demonstrate: global technical cooperation
 
-  Scenario: Respond to international attempt to compromise protocol
-    Given authoritarian government attempts to infiltrate and corrupt protocol
-    And attack targets cryptographic verification at global scale
-    When Amara participates in global security response
-    Then she works with international experts to assess the threat
-    And she develops countermeasures with peer review
-    And she briefs Constitutional Councils across countries
-    And she maintains transparency about vulnerability without enabling further attacks
-    And global expert community defends protocol integrity
+  Scenario: Grappling with fundamental question of governing superintelligence
+    Given agents approaching superintelligence exceed human comprehension
+    And delegates must decide if democratic oversight is possible
+    When I testify about the superintelligence governance challenge
+    Then I honestly state: we don't know if this is solvable
+    And I explain: why comprehension might be fundamental barrier
+    And I present: approaches being researched (amplification, debate, explainability)
+    And I acknowledge: that cryptographic proof might not suffice
+    And I explore: whether capability limits are necessary
+    And I accept: uncertainty about humanity's most important challenge
+    And I demonstrate: intellectual honesty in face of existential questions
 
-  Scenario: Address tension between technical optimization and democratic values
-    Given delegates debate whether perfect efficiency justifies reduced oversight
-    When Amara is asked whether this is technically necessary
-    Then she states "optimal efficiency requires autonomy from oversight"
-    And she clarifies "but optimization is not constitutional value"
-    And she explains "you can choose oversight over efficiency"
-    And she presents technical tradeoffs without advocating choice
-    And she respects that democracy chooses values not optimization
-    And technical expertise serves human flourishing not technical perfection
+  Scenario: Advising on global technical standards with cultural sensitivity
+    Given global protocol needs technical standards
+    And different cultures have different technical capacities
+    When I help develop culturally-sensitive technical requirements
+    Then I ensure: standards work with varying infrastructure
+    And I avoid: assuming Global North technical context
+    And I support: diverse implementation approaches
+    And I enable: low-resource communities to participate
+    And I collaborate: with Global South technical experts
+    And I resist: digital colonialism in technical design
+    And I demonstrate: that technical standards can honor diversity
 
-  Scenario: Collaborate on international cryptographic standards for AI governance
-    Given different nations use different cryptographic approaches
-    And interoperability requires some harmonization
-    When Amara participates in international standards development
-    Then she works with cryptographers from diverse countries
-    And they develop standards that are culturally neutral
-    And they ensure standards preserve national and community sovereignty
-    And they submit recommendations to international governance forum
-    And they recognize standards must serve democracy not technical elegance
+  Scenario: Peer reviewing global expert testimony across cultures
+    Given experts from diverse technical traditions advise convention
+    And peer review must work across different epistemologies
+    When I review testimony from non-Western technical expert
+    Then I respect: different approaches to technical knowledge
+    And I identify: complementary insights from diverse perspectives
+    And I avoid: dismissing unfamiliar technical traditions
+    And I learn: from different ways of understanding AI systems
+    And I strengthen: testimony through cross-cultural dialogue
+    And I demonstrate: epistemic humility and global collaboration
 
-  Scenario: Testify on existential risk from advanced AI capabilities
-    Given some capabilities could pose catastrophic risks
-    When convention debates whether to limit certain agent capabilities
-    Then Amara explains what capabilities create existential risks
-    And she clarifies uncertainty about risk levels
-    And she presents competing expert views on risk assessment
-    And she does not claim certainty where uncertainty exists
-    And she acknowledges reasonable experts disagree
-    And she provides technical information for values judgment by delegates
+  Scenario: Collaborating with Dr. Chen on global sortition research
+    Given Dr. Chen presents research on constitutional council effectiveness
+    And my technical expertise complements his social science
+    When I help explain technical aspects of his findings
+    Then I clarify: how technical design enables or constrains democratic oversight
+    And I interpret: patterns in agent-council interactions
+    And I assess: whether technical systems adequately support citizen governance
+    And I respect: his authority on democratic theory and outcomes
+    And we integrate: technical and social understanding
+    And we serve: evidence-based global constitutional deliberation
+    And we demonstrate: interdisciplinary collaboration
 
-  Scenario: Explain quantum computing implications for global protocol
-    Given quantum computers will break current cryptographic methods
-    And this threatens constitutional verification worldwide
-    When Amara addresses quantum threat at global level
-    Then she explains timeline for quantum capability emergence
-    And she presents quantum-resistant cryptographic alternatives
-    And she proposes global transition strategy with implementation plan
-    And she coordinates with international technical community
-    And she ensures democratic authorization for transition
-    And technical planning serves long-term protocol sustainability
+  Scenario: Explaining attack vectors from authoritarian and corporate actors
+    Given global protocol faces threats from powerful adversaries
+    And delegates need to understand vulnerabilities
+    When I present threat assessment to convention
+    Then I explain: how authoritarian regimes might compromise agents
+    And I describe: corporate strategies for regulatory capture
+    And I assess: resilience of distributed architecture
+    And I present: defense mechanisms and their limitations
+    And I avoid: either creating panic or false confidence
+    And I enable: informed deliberation about governance security
+    And I demonstrate: that technical design serves democratic protection
 
-  Scenario: Work with researcher Chen on global AI alignment evaluation
-    Given Dr. James Chen studies whether sortition can oversee superintelligence
-    When Amara collaborates on technical assessment
-    Then she provides technical metrics for alignment verification
-    And she explains limits of current verification methods
-    And she identifies concerning trends in expert deference
-    And she contributes technical perspective to research
-    And expert-researcher collaboration informs existential governance questions
+  Scenario: Advising on global crisis governance maintaining democracy
+    Given planetary emergencies require rapid coordination
+    And delegates establish crisis governance framework
+    When I explain technical requirements for emergency response
+    Then I clarify: what's technically possible under urgency
+    And I explore: how to maintain verification under time pressure
+    And I assess: risks of emergency powers being exploited
+    And I present: technical safeguards for crisis protocols
+    And I balance: speed with democratic accountability
+    And I enable: delegates to design crisis governance wisely
+    And I serve: resilient democracy through technical design
 
-  Scenario: Resist corporate pressure to weaken global cryptographic standards
-    Given multinational corporations lobby for "flexible" security standards
-    And flexibility would enable corporate surveillance and control
-    When Amara encounters this capture attempt
-    Then she exposes the lobbying publicly in international forums
-    And she explains how proposed standards would compromise protocol
-    And she mobilizes international expert community in opposition
-    And she maintains technical integrity despite corporate pressure
-    And democratic protocol governance resists corporate capture globally
+  Scenario: Acknowledging limits of technical solutions to political problems
+    Given some delegates hope technology will solve governance challenges
+    And I must clarify what technology can and cannot do
+    When I testify about technical limits
+    Then I explain: technology enables but doesn't replace democratic choice
+    And I clarify: that AI cannot resolve fundamental values conflicts
+    And I acknowledge: many governance problems are political not technical
+    And I resist: techno-solutionism and engineering hubris
+    And I honor: that democracy is about human judgment not optimization
+    And I demonstrate: epistemic humility about technology's role
+    And I serve: realistic understanding of technical possibilities
 
-  Scenario: Acknowledge the burden of influence on humanity's future
-    Given Amara's technical testimony shapes global constitutional choices
-    And these choices affect billions of people for generations
-    When she reflects on the responsibility
-    Then she feels the weight of influencing humanity's trajectory
-    And she knows she might be wrong about technical assessments
-    And she remains humble about the limits of expertise
-    And she trusts democratic process despite her uncertainty
-    And she acts with integrity knowing the stakes are existential
-    And she contributes her expertise while respecting democratic authority
+  Scenario: Contributing to global explainability research agenda
+    Given delegates need better explainability for oversight
+    And current technical capabilities are insufficient
+    When I help shape global research priorities
+    Then I identify: key explainability challenges for governance
+    And I propose: research approaches worth global investment
+    And I coordinate: international research collaboration
+    And I avoid: promising solutions we cannot deliver
+    And I enable: informed global investment in governance technology
+    And I serve: long-term capability development for democratic AI
+    And I demonstrate: how expertise serves collective problem-solving
 
-  Scenario: Complete global advisory term and return to research
-    Given Amara has served 6-month term on Global Protocol Research Council
-    When her term ends
-    Then she returns to her cryptography research at university
-    And she cannot serve consecutive global terms
-    And another international expert rotates into position
-    And her contributions are archived for future reference
-    And rotation ensures no permanent technical priesthood at global level
-    And humanity governs superintelligent AI with democratic legitimacy
+  Scenario: Testifying about technical feasibility of constitutional minimums
+    Given delegates establish universal constitutional minimums
+    And technical implementation varies by context
+    When I assess whether minimums are technically achievable globally
+    Then I evaluate: what infrastructure different minimums require
+    And I identify: barriers in low-resource contexts
+    And I explore: how to enable universal implementation
+    And I avoid: either blocking good governance or ignoring challenges
+    And I provide: honest assessment of feasibility
+    And I enable: delegates to set minimums wisely
+    And I serve: global justice through technical honesty
+
+  Scenario: My journey from cryptographer to democratic governance enabler
+    Given I began studying cryptographic AI alignment
+    And I now serve humanity's constitutional governance
+    When I reflect on my role in global democracy
+    Then I understand: expertise serves democratic flourishing
+    And I accept: that citizens must judge despite my greater knowledge
+    And I respect: human wisdom complementing technical knowledge
+    And I practice: humility about what I know and don't know
+    And I demonstrate: how technical experts serve rather than dominate
+    And I participate: in humanity's attempt to govern with superintelligent AI
+    And I know: my expertise matters most when it empowers others' judgment
+    And I embody: technical excellence serving democratic hope

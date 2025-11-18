@@ -1,131 +1,174 @@
 @epic:governance
 @user_type:policy_maker
 @governance_layer:global
-@related_users:constitutional_council_member,technical_expert,researcher
-@related_layers:nation_state,community
-@elohim_agents:global_elohim,ecosystem_elohim
+@related_users:constitutional_council_member,researcher,technical_expert,policy_maker
+@related_layers:nation_state,continental
+@elohim_agents:global_constitutional_agent
 
-Feature: Global Governance for Policy Maker
+Feature: Global-Level Policy Making for AI Governance
   As a policy_maker in the governance system
   Operating at the global governance layer
-  I want to protect protocol sovereignty in international governance
-  So that democratic AI governance resists corporate and authoritarian capture globally
+  I want to participate in international AI governance frameworks
+  So that democratic governance can flourish globally and resist authoritarian capture
 
   Background:
-    Given the Elohim Protocol is operational in dozens of countries
-    And Senator Elena Ruiz participates in international AI governance forums
-    And the global governance context addresses cross-border coordination
-    And Elena champions democratic alternative to corporate and authoritarian AI models
+    Given the Elohim Protocol is operational
+    And the policy_maker user is registered in the system
+    And the global governance context is active
+    And Senator Elena Ruiz participates in international governance forums
 
-  Scenario: Advocate for protocol sovereignty in international treaty negotiations
-    Given international trade negotiations include AI governance provisions
-    And some nations propose centralizing AI regulation
-    When Elena represents US position in treaty talks
-    Then she advocates for protocol sovereignty as democratic principle
-    And she argues against mandating centralization that enables capture
-    And she proposes framework allowing diverse governance models
-    And she insists on interoperability without homogenization
-    And she builds coalition with democratic nations supporting protocol
-    And treaty preserves space for community-governed AI
+  Scenario: Advocating for protocol sovereignty in international forums
+    Given international organizations discuss AI regulation
+    And some proposals would mandate centralization
+    When I advocate for democratic governance principles
+    Then I argue: governments shouldn't mandate protocol architecture
+    And I promote: community sovereignty as democratic principle
+    And I defend: right of communities to adopt or reject protocol
+    And I present: evidence that protocol sovereignty works
+    And I resist: international regulation enabling authoritarian capture
+    And I build: coalition of democratic nations supporting autonomy
+    And I protect: space for democratic AI governance globally
 
-  Scenario: Resist regulatory arbitrage by multinational corporations
-    Given corporations seek most permissive jurisdiction for AI governance
-    And race-to-the-bottom dynamics threaten democratic oversight
-    When Elena coordinates with international counterparts
-    Then she proposes international standards for democratic AI governance
-    And she establishes constitutional minimums all signatories must meet
-    And she prevents corporations from evading oversight through jurisdiction shopping
-    And she creates enforcement mechanisms for treaty compliance
-    And she protects protocol from corporate regulatory arbitrage
+  Scenario: Participating in UN discussions on AI governance standards
+    Given United Nations addresses global AI governance
+    And standards will affect billions of people
+    When I represent my nation in UN deliberations
+    Then I share: experience with protocol in my country
+    And I advocate: for constitutional minimums as global standard
+    And I present: evidence about sortition governance effectiveness
+    And I promote: transparency and recourse as universal requirements
+    And I resist: standards that advantage authoritarian control
+    And I support: interoperability enabling coordination
+    And I work: toward global framework respecting diversity
 
-  Scenario: Learn from global Constitutional Convention to inform US policy
-    Given First Global Constitutional Convention passes Ecological Standing Amendment
-    And 10,000 citizens from around world voted to give ecosystems legal personhood
-    When Elena observes the convention proceedings
-    Then she watches global democratic deliberation at unprecedented scale
-    And she learns from citizens' constitutional reasoning
-    And she translates ecological standing into US federal legislation
-    And she operationalizes constitutional principles in statutory form
-    And she demonstrates how global sortition informs national representative democracy
+  Scenario: Opposing trade agreements compromising protocol sovereignty
+    Given trade negotiations may include digital governance provisions
+    And some proposals would restrict community autonomy
+    When I evaluate trade agreement implications
+    Then I identify: provisions threatening protocol sovereignty
+    And I oppose: requirements mandating centralization or backdoors
+    And I insist: on preserving community choice
+    And I coalition: with other nations defending autonomy
+    And I use: evidence showing protocol benefits economic wellbeing
+    And I resist: regulatory arbitrage through trade agreements
+    And I protect: democratic governance from corporate capture via trade
 
-  Scenario: Build international coalition resisting authoritarian AI governance
-    Given authoritarian governments propose surveillance-based AI control
-    And they argue this model provides "stability and efficiency"
-    When Elena participates in international AI governance summit
-    Then she exposes harms of authoritarian surveillance model
-    And she presents evidence that democratic protocol governance works
-    And she brings testimony from Constitutional Council members
-    And she shows protocol achieves accountability without oppression
-    And she builds coalition of democratic nations rejecting authoritarian approach
-    And democratic AI governance model gains international legitimacy
+  Scenario: Supporting protocol adoption in Global South nations
+    Given developing nations need technology transfer and support
+    And protocol shouldn't be Global North privilege
+    When I advocate for international development support
+    Then I promote: funding for Global South protocol infrastructure
+    And I support: technology transfer and capacity building
+    And I resist: digital colonialism disguised as development
+    And I ensure: Global South communities control their adoption
+    And I fund: mutual aid between wealthy and poor communities
+    And I work: toward global equity in democratic AI governance
+    And I recognize: that justice requires reducing inequality
 
-  Scenario: Address climate crisis coordination requiring global agent coordination
-    Given climate change requires coordination beyond national boundaries
-    And Ecosystem Elohim agents need to work across borders
-    When Elena participates in international climate governance
-    Then she proposes framework for cross-border ecosystem agent coordination
-    And she establishes protocols for transboundary watershed management
-    And she ensures climate coordination respects national sovereignty
-    And she creates mechanisms for resolving cross-border conflicts
-    And she demonstrates protocol can address existential global challenges
+  Scenario: Learning from diverse national approaches to protocol
+    Given different nations implemented protocol differently
+    And cultural context shapes governance outcomes
+    When I study international variations in implementation
+    Then I learn: from collectivist societies' community emphasis
+    And I examine: how different political systems integrate protocol
+    And I identify: universal patterns vs context-specific adaptations
+    And I share: lessons with other policy makers
+    And I adapt: my legislation based on international evidence
+    And I contribute: to global learning community
+    And I practice: epistemic humility about cultural diversity
 
-  Scenario: Protect protocol from international corporate lobbying
-    Given multinational corporations lobby international organizations
-    And corporations push for "harmonized regulation" that serves their interests
-    When Elena engages with World Trade Organization and UN
-    Then she exposes corporate capture attempts publicly
-    And she mobilizes grassroots opposition from protocol communities worldwide
-    And she brings Mayor Jamal and other community leaders to international forums
-    And she demonstrates that communities oppose corporate governance model
-    And she defeats regulatory capture at international scale
+  Scenario: Coordinating response to authoritarian threats to protocol
+    Given authoritarian regimes may attack protocol infrastructure
+    And democratic nations must respond collectively
+    When I participate in democratic coalition
+    Then we share: threat intelligence and defensive strategies
+    And we coordinate: mutual support for communities under threat
+    And we establish: sanctuary systems for protocol refugees
+    And we resist: authoritarian pressure through solidarity
+    And we provide: resources for communities defending sovereignty
+    And we demonstrate: that democracy protects itself
+    And we show: authoritarian capture is not inevitable
 
-  Scenario: Establish international research collaboration on protocol governance
-    Given protocol operates in diverse cultural and political contexts
-    When Elena secures funding for global research consortium
-    Then researcher Dr. James Chen leads international comparative study
-    And researchers from multiple countries evaluate protocol outcomes
-    And research examines whether democratic AI governance is culturally universal
-    And findings are published open access in multiple languages
-    And evidence informs international policy debates
-    And rigorous research strengthens case for democratic governance model
+  Scenario: Addressing global inequality in protocol access
+    Given research shows protocol adoption correlates with national wealth
+    And poor nations lack infrastructure for implementation
+    When I advocate for global equity in access
+    Then I promote: international funding mechanisms
+    And I support: technology transfer without strings attached
+    And I push: for open source hardware and software
+    And I challenge: intellectual property barriers to adoption
+    And I ensure: protocol doesn't exacerbate global inequality
+    And I work: for democratic AI governance as universal right
+    And I recognize: justice requires addressing structural barriers
 
-  Scenario: Navigate tension between national sovereignty and global coordination
-    Given nations want autonomy in AI governance
-    And global coordination is needed for cross-border challenges
-    When Elena proposes international framework
-    Then she applies principle of subsidiarity at global scale
-    And she establishes only constitutional minimums not comprehensive rules
-    And she preserves national, state, and community sovereignty
-    And she enables coordination without centralization
-    And she demonstrates federalism can work globally
+  Scenario: Participating in global constitutional convention as observer
+    Given Global Constitutional Convention convenes with 10,000 delegates
+    And I attend as policy maker observer not delegate
+    When I observe global deliberative democracy
+    Then I learn: from how diverse humanity deliberates together
+    And I see: what enables agreement despite profound disagreement
+    And I witness: ordinary citizens governing existential questions
+    And I prepare: to implement constitutional amendments in my nation
+    And I translate: global constitutional evolution into national law
+    And I am humbled: by wisdom of randomly-selected citizens
+    And I understand: my role as servant of democratic will
 
-  Scenario: Respond to global AI catastrophe risk requiring international cooperation
-    Given early warning system detects existential AI risk
-    And international coordination is needed within days
-    When Elena participates in emergency international response
-    Then she coordinates with other nations on protocol modifications
-    And she ensures democratic legitimacy is maintained despite urgency
-    And she brings Constitutional Council emergency session results to international forum
-    And she demonstrates democratic governance can respond to existential threats
-    And she prevents crisis from being exploited for authoritarian power grabs
+  Scenario: Crafting legislation enabling global constitutional amendments
+    Given Global Convention passed ecological standing amendment
+    And national law must operationalize this
+    When I translate constitutional evolution into legislation
+    Then I grant: legal personhood to ecosystems as constitution requires
+    And I update: property law to reflect ecological rights
+    And I modify: administrative procedure for ecosystem representation
+    And I ensure: national law aligns with global constitutional principle
+    And I demonstrate: how global and national governance coordinate
+    And I serve: democratic constitutional evolution
+    And I show: policy making as implementing citizen wisdom
 
-  Scenario: Advocate for universal human dignity as global constitutional minimum
-    Given different nations have different governance priorities
-    And cultural relativism creates tension with universal rights
-    When Elena participates in international human rights discussions
-    Then she advocates for dignity as non-negotiable constitutional minimum
-    And she argues protocol provides framework balancing universal and local
-    And she shows how diverse cultures can share core principles
-    And she builds consensus around constitutional minimums
-    And she establishes that democratic AI governance serves human flourishing globally
+  Scenario: Building international coalition resisting corporate capture
+    Given corporations lobby internationally for favorable regulation
+    And they use different nations to triangulate pressure
+    When I coordinate with international policy maker allies
+    Then we share: intelligence about lobbying tactics
+    And we coordinate: resistance to capture attempts
+    And we establish: transparency requirements for global lobbying
+    And we support: each other under corporate pressure
+    And we create: race-to-top rather than race-to-bottom
+    And we demonstrate: democratic solidarity across nations
+    And we protect: protocol sovereignty through collective action
 
-  Scenario: Position US as leader in democratic AI governance internationally
-    Given US has successfully implemented protocol at scale
-    And other nations are considering adoption
-    When Elena represents US at international summits
-    Then she shares evidence of protocol effectiveness
-    And she offers technical assistance to nations considering adoption
-    And she positions democratic governance as alternative to Chinese surveillance model
-    And she builds US soft power through governance innovation
-    And she demonstrates democratic values can lead in AI governance
-    And protocol becomes international model for democratic superintelligence governance
+  Scenario: Addressing existential AI risk through democratic governance
+    Given superintelligent AI poses existential threat
+    And democratic oversight might mitigate this risk
+    When I participate in global existential risk discussions
+    Then I argue: constitutional accountability reduces AI risk
+    And I present: evidence that sortition prevents elite capture
+    And I promote: transparency enabling global democratic oversight
+    And I support: recourse mechanisms providing adaptation
+    And I advocate: for protocol's distributed architecture increasing resilience
+    And I acknowledge: uncertainties about whether this suffices
+    And I work: toward governance frameworks for humanity's survival
+
+  Scenario: Promoting research on global AI governance effectiveness
+    Given we need evidence about what works across contexts
+    And global patterns require global research
+    When I support international research infrastructure
+    Then I fund: global research networks
+    And I promote: data sharing with privacy protection
+    And I support: global South researchers leading local studies
+    And I ensure: open access to findings
+    And I enable: cumulative knowledge building
+    And I use: evidence for global policy advocacy
+    And I demonstrate: policy making based on science not ideology
+
+  Scenario: My national experience informs global AI governance norms
+    Given my nation has years of protocol experience
+    And other nations learn from our successes and failures
+    When I share our experience in global forums
+    Then I provide: honest assessment of what worked
+    And I acknowledge: mistakes and challenges
+    And I share: legislative approaches that helped
+    And I describe: how we resisted capture
+    And I explain: how communities maintained sovereignty
+    And my testimony: informs global democratic governance development
+    And national experience: contributes to global wisdom

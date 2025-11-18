@@ -1,123 +1,149 @@
 @epic:governance
 @user_type:researcher
 @governance_layer:community
-@related_users:constitutional_council_member,appellant,community_leader
-@related_layers:provincial_state,individual_family
-@elohim_agents:community_elohim,family_elohim
+@related_users:constitutional_council_member,community_leader,appellant,technical_expert
+@related_layers:provincial_state,nation_state
+@elohim_agents:community_elohim
 
-Feature: Community Governance for Researcher
+Feature: Community-Level Governance Research for Researcher
   As a researcher in the governance system
   Operating at the community governance layer
-  I want to conduct intensive case studies and ethnographic observation
-  So that lived experience of democratic AI governance is rigorously documented
+  I want to conduct intensive case studies of how sortition governance works in practice
+  So that I can understand lived experience and inform democratic AI governance theory
 
   Background:
-    Given the Elohim Protocol is operational in Riverside community
-    And Dr. James Chen is conducting ethnographic research on sortition governance
+    Given the Elohim Protocol is operational
+    And the researcher user is registered in the system
     And the community governance context is active
-    And James has obtained informed consent and ethical review approval
-    And Riverside has granted research access with community data sovereignty
+    And Dr. James Chen is studying democratic innovation and AI governance
 
-  Scenario: Conduct intensive ethnographic observation in Riverside
-    Given James is spending 6 months embedded in Riverside
-    And he wants to understand how protocol works in practice
-    When James begins his fieldwork
-    Then he attends Constitutional Council meetings and observes deliberations
-    And he interviews appellants like Marcus about their appeal experiences
-    And he participates in community meetings about protocol calibration
-    And he observes how Mayor Jamal integrates protocol with city governance
-    And he documents both successes and failures honestly
-    And he captures lived experience that quantitative studies miss
+  Scenario: Conducting ethnographic research in Riverside community
+    Given I have selected Riverside (population 45,000) for intensive case study
+    And I have secured ethical approval and community consent
+    When I begin multi-month observation of protocol implementation
+    Then I can attend Constitutional Council meetings as observer
+    And I can interview appellants like Marcus about their appeal experience
+    And I can participate in community deliberations about protocol
+    And I can track resource flows and wellbeing indicators
+    And I can document challenges and successes as they emerge
+    And The community retains ownership of data about themselves
+    And My research serves community improvement not just academic publication
 
-  Scenario: Interview Constitutional Council member about deliberation experience
-    Given Sarah Martinez has completed her 3-month council term
-    And James wants to understand how citizens learn constitutional reasoning
-    When James interviews Sarah
-    Then he asks how she felt when first selected
-    And he explores how training prepared her without indoctrinating
-    And he documents how she navigated uncertainty in difficult cases
-    And he learns what influenced her judgment (expertise, peers, lived experience)
-    And he discovers how her nursing background shaped her constitutional interpretation
-    And he gains insight into citizen wisdom that expertise cannot capture
+  Scenario: Observing Constitutional Council deliberation in real-time
+    Given Community Constitutional Council is reviewing Marcus's mental health appeal
+    And I have permission to observe their deliberation
+    When I document how the council works through the case
+    Then I capture: argument patterns, member interactions, uncertainty navigation
+    And I analyze: how expertise influences judgment, how dissent gets resolved
+    And I examine: quality of deliberation, constitutional reasoning depth
+    And I observe: what enables effective citizen governance
+    And I document: dynamics that retrospective analysis would miss
+    And My research reveals how sortition democracy actually works
+    And Findings feed back to improve council support and training
 
-  Scenario: Document how appellant Marcus experiences appeal process
+  Scenario: Interviewing appellant about appeal experience and recourse
     Given Marcus appealed his Family Elohim's mental health intervention
-    And James is studying whether meaningful recourse builds trust
-    When James interviews Marcus at multiple timepoints
-    Then he documents Marcus's initial frustration and sense of privacy violation
-    And he tracks Marcus's experience through Community Elohim review
-    And he observes Marcus's interaction with Constitutional Council process
-    And he examines whether Marcus feels heard even when decision is affirmed
-    And he assesses how appeal experience affected Marcus's trust in protocol
-    And he contributes to understanding recourse effectiveness
+    And he has consented to research interview
+    When I ask about his experience of the appeal process
+    Then he shares: emotional impact of feeling violated then heard
+    And he describes: accessibility of appeal interface, dignity of process
+    And he explains: how explanation changed his understanding
+    And he reflects: reconciliation with agent through meaningful recourse
+    And I learn: what made the process feel legitimate despite initial anger
+    And I understand: lived experience that statistics cannot capture
+    And His story humanizes governance mechanisms for research audience
 
-  Scenario: Observe community dialogue about protocol calibration
-    Given Riverside is debating adolescent autonomy thresholds
-    And Mayor Jamal has convened deliberative assembly
-    When James observes the community process
-    Then he documents how diverse residents (parents, youth, elders) participate
-    And he analyzes how community reaches shared understanding across difference
-    And he examines whether marginalized voices are heard or excluded
-    And he tracks how deliberation leads to locally-calibrated protocol adjustment
-    And he captures community sovereignty and democratic participation in action
+  Scenario: Tracking community wellbeing indicators over time
+    Given Riverside adopted Elohim Protocol three years ago
+    And I am measuring community outcomes longitudinally
+    When I analyze wellbeing data before and after adoption
+    Then I examine: loneliness rates (down 12%), life satisfaction (up 8%)
+    And I track: crisis response effectiveness, economic resilience
+    And I monitor: social cohesion, trust in institutions, civic participation
+    And I conduct: comparison with similar communities without protocol
+    And I use: difference-in-differences analysis to isolate protocol effects
+    And I distinguish: what's protocol impact vs what's secular trend
+    And I provide: evidence about whether democratic AI governance works
 
-  Scenario: Study pattern of appeals to identify systematic issues
-    Given James has access to anonymized appeal data from Riverside
-    When he analyzes the appeal patterns over 18 months
-    Then he identifies that adolescent autonomy appeals cluster in certain neighborhoods
-    And he discovers correlation with socioeconomic factors
-    And he flags potential systematic bias requiring investigation
-    And he shares findings with Constitutional Council
-    And his research identifies problems that practitioners couldn't see from single cases
-    And research feeds back into protocol improvement
+  Scenario: Identifying implementation challenges through participant observation
+    Given I am embedded in Riverside for six months
+    And I observe daily reality of protocol implementation
+    When I encounter challenges residents and leaders face
+    Then I document: elderly residents struggling with technology
+    And I note: three Constitutional Council decisions that residents opposed
+    And I observe: recurring tension around adolescent autonomy
+    And I identify: gaps between theory and practice
+    And I analyze: what enables some communities to thrive while others struggle
+    And My research reveals: practical wisdom about implementation
+    And Findings help other communities avoid pitfalls Riverside encountered
 
-  Scenario: Document accessibility barriers for elderly residents
-    Given some Riverside elderly lack tech literacy and internet access
-    And James is studying equity of protocol access
-    When he interviews elderly residents and observes participation
-    Then he documents how paper appeal forms enable inclusion
-    And he examines whether human service windows provide adequate support
-    And he identifies remaining barriers (confusing language, intimidating process)
-    And he provides specific recommendations for accessibility improvement
-    And his research serves community's interest in universal access
+  Scenario: Collaborating with Mayor Jamal on participatory action research
+    Given I want research to serve community not just extract data
+    And Mayor Jamal wants evidence to improve local governance
+    When we co-design research questions and methods
+    Then community priorities shape what we study
+    And Local residents participate in data collection
+    And We jointly interpret findings considering context I might miss
+    And Research addresses actual needs not just academic curiosity
+    And Riverside learns from comparative findings across communities
+    And Results improve local implementation immediately
+    And Research relationship respects community autonomy and knowledge
 
-  Scenario: Compare Riverside with non-adopting neighbor community
-    Given Riverside adopted protocol three years ago
-    And adjacent community of similar demographics did not adopt
-    When James compares outcomes between the communities
-    Then he measures wellbeing indicators (loneliness, life satisfaction, trust)
-    And he finds Riverside shows 12% reduction in loneliness
-    And he documents improved crisis response in Riverside
-    And he also finds Riverside faces implementation challenges
-    And he provides honest assessment of both benefits and costs
-    And comparative analysis helps isolate protocol effects from secular trends
+  Scenario: Analyzing appeal patterns to understand constitutional interpretation
+    Given Riverside's Constitutional Council has reviewed 150 appeals over three years
+    And I have access to anonymized appeal data
+    When I analyze patterns in appeal types, outcomes, and reasoning
+    Then I identify: which decisions generate most appeals (adolescent autonomy)
+    And I examine: what predicts appeal success (constitutional strength, evidence quality)
+    And I track: how constitutional interpretation evolves through precedent
+    And I discover: whether marginalized communities have equal access to recourse
+    And I assess: if appeal process functions as democratic accountability mechanism
+    And My analysis reveals: how procedural justice works in practice
+    And Findings inform improvements to appeal accessibility and council training
 
-  Scenario: Publish research findings with community ownership
-    Given James has completed his Riverside ethnography
-    When he prepares research for publication
-    Then he shares draft with Riverside residents for accuracy review
-    And he ensures community members are not reduced to data points
-    And he acknowledges community contribution and agency
-    And he publishes open access so Riverside can access findings
-    And he returns research payments to Riverside community fund
-    And he respects community data sovereignty throughout
+  Scenario: Studying trust building through transparent governance
+    Given trust in institutions is central question for democratic AI
+    And Riverside provides natural experiment in transparency effects
+    When I measure trust over time and mechanisms that build it
+    Then I examine: whether seeing agent reasoning increases confidence
+    And I explore: if meaningful recourse builds trust more than perfect decisions
+    And I analyze: role of local Constitutional Council in legitimacy
+    And I investigate: whether transparency enables manipulation or builds confidence
+    And I track: how trust relationships between residents and agents evolve
+    And My research tests: whether democratic governance of AI creates sustainable trust
+    And Evidence informs: design of governance systems elsewhere
 
-  Scenario: Present findings at town hall for community benefit
-    Given James's research identifies both successes and areas for improvement
-    When he presents findings to Riverside at town hall
-    Then he shares positive outcomes (wellbeing improvements, trust building)
-    And he honestly reports failures (accessibility gaps, remaining biases)
-    And he provides actionable recommendations
-    And he answers community questions about his methods and findings
-    And he demonstrates that research serves community not just academic career
-    And Riverside uses his insights to improve local protocol implementation
+  Scenario: Documenting community-specific calibration process
+    Given Riverside calibrated privacy thresholds higher than protocol default
+    And this reflected community values and history
+    When I document how community calibration happened
+    Then I capture: deliberation process that led to calibration decision
+    And I analyze: how community exercised sovereignty within constitutional bounds
+    And I examine: role of community leader in facilitating values discussion
+    And I track: whether calibration actually served community better
+    And I study: how local diversity strengthens rather than fragments protocol
+    And My research demonstrates: subsidiarity in practice
+    And Findings support: community autonomy as democratic AI principle
 
-  Scenario: Contribute qualitative insights to complement quantitative studies
-    Given James's ethnography captures meaning and lived experience
-    And large-scale quantitative studies show statistical patterns
-    When James integrates qualitative and quantitative findings
-    Then he explains why appeals increased (not failure but accessible recourse)
-    And he contextualizes statistical patterns with human stories
-    And he provides depth that numbers alone cannot convey
-    And he demonstrates how Marcus's experience illustrates broader pattern
-    And mixed methods research provides both breadth and depth
+  Scenario: Ethical data practices respecting community sovereignty
+    Given I am studying Riverside residents and their governance
+    And I have access to sensitive information about their lives
+    When I conduct research following ethical protocols
+    Then I obtain: informed consent from all research participants
+    And I ensure: anonymization and privacy protection in publications
+    And I provide: community review of findings before publication (for accuracy)
+    And I share: research benefits with Riverside (payments support community fund)
+    And I respect: community right to revoke access if research becomes harmful
+    And I practice: research ethics aligned with dignity principles protocol embodies
+    And My methodology demonstrates: how to study communities without extracting from them
+
+  Scenario: Research findings immediately improve local governance
+    Given my research identified that Constitutional Council deliberations improve with certain information tools
+    And I shared findings with Mayor Jamal and council members
+    When community decides to implement recommended improvements
+    Then research serves practical improvement not just academic knowledge
+    And Rapid feedback loop connects insight to implementation
+    And Community sees research benefiting them directly
+    And Researcher-community trust strengthens through mutual value
+    And Knowledge serves flourishing not just publication
+    And Research demonstrates: scholarship in service of democracy

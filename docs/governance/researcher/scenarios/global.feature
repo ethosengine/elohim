@@ -1,133 +1,174 @@
 @epic:governance
 @user_type:researcher
 @governance_layer:global
-@related_users:constitutional_council_member,technical_expert,policy_maker
-@related_layers:national,community
-@elohim_agents:global_elohim,ecosystem_elohim
+@related_users:constitutional_council_member,policy_maker,technical_expert,researcher
+@related_layers:nation_state,continental
+@elohim_agents:global_constitutional_agent
 
-Feature: Global Governance for Researcher
+Feature: Global-Level Governance Research for Researcher
   As a researcher in the governance system
   Operating at the global governance layer
-  I want to conduct cross-cultural analysis and study constitutional conventions
-  So that universal patterns and cultural specificity are rigorously understood
+  I want to study protocol adoption and governance across all humanity
+  So that I can understand universal patterns and cultural variations in democratic AI
 
   Background:
-    Given the Elohim Protocol is operational in 60 countries
-    And Dr. James Chen leads international research consortium
+    Given the Elohim Protocol is operational
+    And the researcher user is registered in the system
     And the global governance context is active
-    And research examines whether democratic AI governance is culturally universal
-    And James coordinates with researchers across diverse cultural contexts
+    And Dr. James Chen participates in global research networks
 
-  Scenario: Lead international research consortium across cultures
-    Given protocol operates in individualist and collectivist cultures
-    And researchers in US, Japan, Kenya, Brazil, and Norway collaborate
-    When James coordinates global comparative study
-    Then researchers use common measurement instruments
-    And researchers adapt methods to cultural contexts
-    And research examines universal patterns vs cultural specificity
-    And findings are published in multiple languages
-    And global research reveals whether protocol principles are universal
+  Scenario: Global research network coordinating cross-cultural studies
+    Given protocol has been adopted in diverse nations worldwide
+    And I am part of international research consortium
+    When we coordinate parallel studies across continents
+    Then we examine: how cultural context shapes constitutional interpretation
+    And we compare: collectivist vs individualist societies' implementations
+    And we analyze: different political systems' integration patterns
+    And we identify: universal patterns vs cultural adaptations
+    And we share: methodologies and data (with appropriate protection)
+    And we test: whether democratic AI governance is Western innovation or universal possibility
+    And Our global collaboration reveals: humanity's shared and diverse governance approaches
 
-  Scenario: Study First Global Constitutional Convention as deliberative democracy experiment
-    Given 10,000 randomly-selected citizens from 180 countries convene
-    And this is largest sortition deliberation in human history
-    When James and research team observe the convention
-    Then they document how citizens deliberate across profound cultural difference
-    And they analyze what enables productive disagreement vs polarization
-    And they track how constitutional amendments emerge from deliberation
-    And they examine whether global sortition achieves democratic legitimacy
-    And they study whether wisdom emerges from diverse collective deliberation
+  Scenario: Analyzing Global Constitutional Convention deliberations
+    Given 10,000 randomly-selected global citizens convene every 7 years
+    And this is unprecedented experiment in planetary democracy
+    When I study the Global Constitutional Convention process
+    Then I examine: how citizens from radically different contexts deliberate together
+    And I analyze: what enables agreement despite profound disagreement
+    And I assess: quality of translation and cross-cultural understanding
+    And I explore: how amendments emerge from global collective wisdom
+    And I identify: power dynamics (Global North vs South, wealthy vs poor)
+    And I investigate: whether global sortition can produce legitimate law
+    And My research reveals: possibilities and limits of planetary democratic governance
 
-  Scenario: Analyze whether cultural context shapes constitutional interpretation
-    Given "dignity" means different things in different cultures
-    When James examines constitutional interpretation across countries
-    Then he finds universal agreement on core principles
-    And he discovers legitimate variation in how principles are applied
-    And he identifies that collectivist cultures emphasize community dignity
-    And he observes individualist cultures emphasize personal autonomy
-    And he documents how protocol enables both within constitutional bounds
+  Scenario: Comparative analysis of protocol adoption across 100+ nations
+    Given protocol has different adoption rates and outcomes globally
+    And I want to understand what predicts success across contexts
+    When I analyze adoption patterns and outcomes worldwide
+    Then I examine: economic factors (wealth, inequality, development stage)
+    And I assess: political factors (democracy, authoritarianism, stability)
+    And I explore: cultural factors (individualism, trust, religious tradition)
+    And I identify: historical factors (colonialism, technology access, institutional quality)
+    And I analyze: which factors are necessary, sufficient, or contingent
+    And My comparative research identifies: pathways to democratic AI governance
+    And Findings inform: international development and adoption strategies
 
-  Scenario: Testify at Global Constitutional Convention on superintelligence governance
-    Given convention debates whether sortition can oversee superintelligence
-    And James has researched this question for years
-    When James presents findings to 10,000 delegates
-    Then he shows councils currently work well with human-comprehensible agents
-    And he presents evidence that council confidence decreases as agent capability increases
-    And he documents concerning trend toward expert deference
-    And he also shows councils aware of danger actively resist it
-    And he concludes question remains open whether democracy can govern superintelligence
-    And his research informs existential constitutional question
+  Scenario: Studying global inequality in protocol access and benefits
+    Given I hypothesize protocol might exacerbate global inequality
+    And wealthy nations can afford infrastructure poor nations cannot
+    When I analyze distributional effects at global scale
+    Then I examine: adoption rates by national income and infrastructure
+    And I assess: whether benefits flow primarily to Global North
+    And I measure: whether protocol reduces or increases global inequality
+    And I explore: mechanisms of digital colonialism or democratic leveling
+    And I identify: barriers preventing equitable global adoption
+    And I advocate: for international funding and technology transfer
+    And My research serves: global justice by revealing inequities
 
-  Scenario: Examine whether Ecological Standing Amendment reflects cross-cultural wisdom
-    Given convention passed amendment giving ecosystems legal personhood
-    And this was controversial across different cultural traditions
-    When James analyzes deliberation and voting patterns
-    Then he finds indigenous communities strongly supported amendment
-    And he discovers surprising support from industrial nations
-    And he examines how delegates reached consensus across difference
-    And he documents that lived experience with ecological collapse drove convergence
-    And cross-cultural constitutional evolution is empirically captured
+  Scenario: Historical and comparative analysis contextualizing protocol
+    Given I want to understand what's genuinely novel vs reinventing wheels
+    And I study governance history and comparative political theory
+    When I contextualize Elohim Protocol in historical perspective
+    Then I compare: to Athenian democracy's sortition practices
+    And I examine: medieval communes' participatory governance
+    And I analyze: modern citizens' assemblies and deliberative innovations
+    And I explore: attempts to govern non-human powerful systems (corporations, markets)
+    And I identify: what ancient wisdom applies and what's unprecedented
+    And I assess: whether humanity has governed comparable complexity before
+    And My historical analysis reveals: patterns and lessons across millennia
 
-  Scenario: Study whether protocol governance works in authoritarian contexts
-    Given some protocol-adopting countries have authoritarian governments
-    When James examines protocol operation in diverse political systems
-    Then he finds protocol creates democratic spaces even under authoritarianism
-    And he documents that governments struggle to capture sortition councils
-    And he identifies attempted interference and resistance patterns
-    And he examines whether protocol becomes target for authoritarian suppression
-    And research reveals protocol's potential and limits as democratic tool
+  Scenario: Global data infrastructure with privacy and sovereignty protection
+    Given I need access to data across nations for research
+    And I must respect privacy, sovereignty, and data justice
+    When global research infrastructure is designed
+    Then I work with: federated data systems respecting national sovereignty
+    And I use: differential privacy protecting individual anonymity
+    And I ensure: community data ownership and benefit sharing
+    And I implement: ethical review and consent protocols
+    And I advocate: for open access to research findings
+    And I practice: data justice not data colonialism
+    And My methodology demonstrates: how to study globally while respecting locally
 
-  Scenario: Compare protocol governance to other democratic innovation models
-    Given many countries experiment with citizens assemblies and participatory budgeting
-    When James conducts comparative analysis across governance models
-    Then he examines sortition vs elected representatives
-    And he compares protocol councils to expert panels
-    And he evaluates participatory budgeting vs protocol resource allocation
-    And he finds each model has strengths and weaknesses
-    And he provides evidence for governance model selection
+  Scenario: Research on protocol as global existential risk mitigation
+    Given superintelligent AI poses existential risk to humanity
+    And I study whether democratic governance can address this risk
+    When I analyze protocol as existential risk mitigation strategy
+    Then I examine: whether constitutional accountability reduces AI risk
+    And I assess: whether sortition prevents elite capture of superintelligence
+    And I explore: whether transparency enables democratic oversight at scale
+    And I analyze: whether recourse mechanisms provide adaptation to unknown risks
+    And I investigate: whether protocol's distributed architecture increases resilience
+    And I conclude: honestly about uncertainties and limitations
+    And My research informs: humanity's response to its most important challenge
 
-  Scenario: Investigate global patterns in appeal resolution
-    Given millions of appeals processed worldwide over 7 years
-    When James analyzes global appeal database
-    Then he identifies universal patterns (mental health intervention appeals common)
-    And he discovers cultural variation (adolescent autonomy thresholds differ)
-    And he examines whether appeal success rates are equitable globally
-    And he flags systematic biases requiring attention
-    And global data reveals both universals and cultural specificity
+  Scenario: Global research ethics and decolonizing methodology
+    Given historical research often extracted from Global South for Global North benefit
+    And I want to practice ethical global research
+    When I design my research methodology and partnerships
+    Then I ensure: local researchers lead studies in their contexts
+    And I practice: equitable benefit sharing and co-authorship
+    And I support: capacity building in Global South institutions
+    And I challenge: Western-centric theories and methods
+    And I listen: to diverse epistemologies and knowledge systems
+    And I acknowledge: positionality and power in research relationships
+    And My practice embodies: research ethics aligned with protocol's dignity principles
 
-  Scenario: Provide research evidence to international policy forums
-    Given international organizations debate AI governance models
-    When James presents research at UN and World Economic Forum
-    Then he shows evidence that democratic protocol governance works
-    And he demonstrates this across diverse cultural contexts
-    And he contrasts with surveillance-based authoritarian model
-    And he presents with intellectual honesty about limitations
-    And research influences international governance discourse
+  Scenario: Contributing to global public discourse on AI governance
+    Given public understanding shapes political will for democratic AI
+    And I have findings that matter for global deliberation
+    When I engage in global public education and discourse
+    Then I write: accessible articles for general audiences
+    And I give: public lectures explaining research findings
+    And I participate: in media discussions with honesty about uncertainties
+    And I contribute: to democratic deliberation about governance alternatives
+    And I explain: what's at stake, what options exist, what evidence shows
+    And I avoid: false certainty or ideological advocacy
+    And My public engagement serves: informed democratic choice about AI governance
 
-  Scenario: Study generational effects in protocol-native youth globally
-    Given children worldwide are growing up with protocol
-    When James coordinates international study of protocol-native generation
-    Then researchers track youth civic development across cultures
-    And they compare protocol-exposed to non-exposed youth
-    And they find globally consistent pattern of enhanced democratic capacity
-    And they document cultural variation in how capacity manifests
-    And generational research reveals transformative potential
+  Scenario: Longitudinal global study tracking generational transformation
+    Given I study whether protocol transforms civic culture across generations
+    And Tommy's generation is growing up with democratic AI governance
+    When I track generational cohorts over 20-30 years
+    Then I examine: civic capacities (constitutional literacy, deliberation skills)
+    And I assess: political participation and democratic engagement
+    And I measure: relationship to AI and technology
+    And I explore: whether growing up with protocol creates different citizenship
+    And I analyze: intergenerational transmission of democratic culture
+    And I investigate: whether protocol's effects compound across generations
+    And My research captures: civilizational transformation over human timescales
 
-  Scenario: Examine whether trust in protocol generalizes across cultural contexts
-    Given trust is claimed to result from transparency and accountability
-    When James measures trust across diverse cultures
-    Then he finds trust building in individualist cultures (US, Europe)
-    And he discovers different trust dynamics in collectivist cultures (East Asia)
-    And he identifies that transparency means different things culturally
-    And he concludes trust mechanisms must adapt to cultural context
-    And cross-cultural research informs protocol design
+  Scenario: Global meta-analysis synthesizing all protocol research
+    Given hundreds of researchers have studied protocol worldwide
+    And I want to synthesize cumulative knowledge
+    When I conduct systematic review and meta-analysis
+    Then I identify: all rigorous studies meeting quality criteria
+    And I synthesize: findings across diverse contexts and methods
+    And I assess: overall evidence about effectiveness and limitations
+    And I examine: publication bias and selective reporting
+    And I identify: gaps in knowledge requiring further research
+    And I provide: comprehensive evidence base for global policy
+    And My meta-analysis serves: evidence-based democratic deliberation at planetary scale
 
-  Scenario: Publish comprehensive global assessment in Nature
-    Given James and consortium have decade of global data
-    When they prepare comprehensive assessment of democratic AI governance
-    Then they document methodology with full transparency
-    And they present findings about what works universally
-    And they show what requires cultural adaptation
-    And they acknowledge what remains uncertain
-    And they make dataset available for global research community
-    And they contribute definitive evidence for governance of superintelligent AI
+  Scenario: Research on cultural values and constitutional universality
+    Given protocol claims universal minimums while allowing cultural diversity
+    And I question whether "universal" reflects Western bias
+    When I study constitutional interpretation across radically different cultures
+    Then I examine: how different traditions understand dignity, care, autonomy
+    And I analyze: whether constitutional principles translate across worldviews
+    And I explore: legitimate cultural variation vs cultural relativism about harm
+    And I identify: truly universal minimums vs culturally specific instantiations
+    And I assess: whether protocol enables pluralism or imposes uniformity
+    And My research informs: global constitutional evolution that honors diversity
+    And Findings shape: how humanity governs together while respecting difference
+
+  Scenario: Presenting research at Global Constitutional Convention
+    Given convention delegates need evidence to inform constitutional decisions
+    And I am invited to present research on sortition effectiveness
+    When I address 10,000 randomly-selected citizens from around the world
+    Then I summarize: what research shows about democratic AI governance
+    And I present: honestly about successes, failures, and uncertainties
+    And I explain: the superintelligence governance legitimacy question
+    And I acknowledge: the limits of my knowledge and research
+    And I clarify: that delegates must make values choices research cannot resolve
+    And I serve: democracy by informing not replacing citizen judgment
+    And My scholarship demonstrates: how expertise serves rather than dominates democracy

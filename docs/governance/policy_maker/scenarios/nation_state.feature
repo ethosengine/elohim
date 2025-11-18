@@ -1,132 +1,166 @@
 @epic:governance
 @user_type:policy_maker
 @governance_layer:nation_state
-@related_users:constitutional_council_member,technical_expert,researcher,community_leader
+@related_users:constitutional_council_member,researcher,technical_expert,community_leader
 @related_layers:provincial_state,global
 @elohim_agents:national_elohim,regional_elohim
 
-Feature: National Governance for Policy Maker
+Feature: National-Level Policy Making for AI Governance
   As a policy_maker in the governance system
   Operating at the nation_state governance layer
-  I want to establish federal framework enabling democratic AI governance
-  So that protocol can serve all citizens while resisting corporate and authoritarian capture
+  I want to establish national framework for democratic AI governance
+  So that protocol can flourish while integrating with national law and institutions
 
   Background:
-    Given the Elohim Protocol is operational across multiple states
-    And Senator Elena Ruiz now chairs Senate Committee on AI and Digital Governance
+    Given the Elohim Protocol is operational
+    And the policy_maker user is registered in the system
     And the nation_state governance context is active
-    And Elena has championed protocol at state level and is scaling to federal policy
+    And Senator Elena Ruiz works on national AI governance legislation
 
-  Scenario: Craft federal funding program for equitable protocol access
-    Given poor communities and rural areas lack resources for adoption
-    And democratic governance tools must be universal not restricted by wealth
-    When Elena drafts National AI Infrastructure Act
-    Then she establishes federal grants for community protocol adoption
-    And she prioritizes funding for marginalized and under-resourced communities
-    And she treats protocol infrastructure like roads or electricity
-    And she includes research funding for rigorous outcome evaluation
-    And she ensures state sovereignty is preserved despite federal funding
-    And the legislation passes with bipartisan support
+  Scenario: Drafting Community AI Infrastructure Act for national funding
+    Given poor communities nationwide need infrastructure support
+    And I want equitable protocol access
+    When I draft national funding legislation
+    Then I provide: grants for community nodes and maintenance
+    And I fund: research evaluating protocol outcomes
+    And I support: technical assistance for poor communities
+    And I establish: sliding scale and cross-subsidization
+    And I treat: democratic AI governance as public infrastructure
+    And I defend: against claims of "picking winners"
+    And I argue: this enables democracy not market manipulation
 
-  Scenario: Defend protocol against corporate lobbying for regulatory capture
-    Given technology companies lobby Congress for favorable regulation
-    And lobbyists propose licensing requirements that create barriers to entry
-    When Elena testifies in committee hearing
-    Then she presents evidence from Riverside about protocol effectiveness
-    And she brings Mayor Jamal Washington to share community testimony
-    And she shows Constitutional Council precedents demonstrate democratic oversight
-    And she exposes how proposed regulation advantages corporate incumbents
-    And she argues for protocol sovereignty as democratic principle
-    And the capture attempt is defeated
+  Scenario: Defending legislation against corporate capture testimony
+    Given corporate lobbyists testify against my legislation
+    And they claim it "stifles innovation"
+    When I respond in committee hearing
+    Then I present: evidence from Riverside and research
+    And I show: protocol improves community outcomes
+    And I demonstrate: constitutional oversight working
+    And I compare: to corporate AI failures (surveillance, discrimination, no recourse)
+    And I argue: we're stifling extraction, enabling flourishing
+    And I maintain: that democracy deserves support
+    And committee votes: 8-5 in favor despite lobbying
 
-  Scenario: Translate Constitutional Council precedent into federal legislation
-    Given national Constitutional Council established privacy threshold precedent
-    And the precedent balanced mental health intervention with dignity rights
-    When Elena drafts Federal Digital Dignity Act
-    Then she translates constitutional principle into statutory language
-    And she references Constitutional Council reasoning in legislative findings
-    And she ensures federal law aligns with council interpretation
-    And she establishes that courts must recognize council precedents
-    And she operationalizes constitutional principles in federal government
+  Scenario: Creating Digital Constitutional Rights Amendment
+    Given protocol creates new forms of governance and rights
+    And constitutional recognition would strengthen legitimacy
+    When I propose national constitutional amendment
+    Then I recognize: sortition governance as legitimate democratic form
+    And I establish: right to appeal agent decisions
+    And I protect: community sovereignty over protocol adoption
+    And I enshrine: privacy protections and dignity guarantees
+    And amendment goes through: lengthy deliberative process
+    And if passed: transforms national constitutional framework
+    And protocol gains: highest legal recognition
 
-  Scenario: Establish interstate coordination framework
-    Given protocol operates seamlessly across state lines
-    And states have different legal frameworks creating coordination challenges
-    When Elena proposes Interstate AI Governance Compact
-    Then she establishes framework for recognizing protocol decisions across states
-    And she creates coordination mechanisms without federal overreach
-    And she preserves state and community sovereignty
-    And she enables citizens to move between states without losing continuity
-    And she balances federalism with need for national coherence
+  Scenario: Establishing federal-state coordination framework
+    Given protocol operates at multiple layers
+    And coordination is needed without centralization
+    When I create federal-state cooperation legislation
+    Then I establish: funding programs respecting state sovereignty
+    And I create: interstate coordination mechanisms
+    And I specify: federal role as support not control
+    And I protect: community and state autonomy
+    And I enable: national coherence with local diversity
+    And I demonstrate: federalism working for AI governance
 
-  Scenario: Resist federal surveillance mandate that would compromise protocol
-    Given national security officials propose mandatory backdoor access
-    And proposal claims need for law enforcement and counterterrorism
-    When Elena leads opposition to the mandate
-    Then she brings technical expert Amara Okonkwo to explain cryptographic impossibility
-    And Amara testifies that backdoors break constitutional verification
-    And Elena shows surveillance would enable authoritarian abuse
-    And Elena demonstrates Constitutional Councils provide accountability without backdoors
-    And Elena builds coalition with civil liberties and technology communities
-    And the surveillance mandate is defeated protecting protocol integrity
+  Scenario: Integrating protocol with national court system
+    Given judicial system must work with protocol governance
+    And judges need training and procedural guidance
+    When I work with judicial branch on integration
+    Then I support: judicial education about agent reasoning
+    And I establish: evidentiary standards for agent testimony
+    And I create: appeal pathways for council-court conflicts
+    And I ensure: due process protections maintained
+    And I respect: judicial independence
+    And I enable: protocol to function within legal framework
 
-  Scenario: Commission national research on protocol outcomes
-    Given Elena needs evidence to justify federal support and answer critics
-    When she directs National Science Foundation funding to protocol research
-    Then researcher Dr. James Chen receives grant for longitudinal study
-    And Elena requires open access publication and methodological rigor
-    And James evaluates effectiveness, equity, and long-term impacts
-    And James finds reduced loneliness, improved crisis response, and high trust
-    And Elena cites this research throughout legislative process
-    And evidence-based policy defeats uninformed opposition
+  Scenario: Addressing protocol implications for labor and employment law
+    Given protocol affects work and value recognition
+    And care work generates care tokens
+    When I update labor law for protocol economy
+    Then I clarify: status of care tokens vs traditional wages
+    And I address: worker protections in protocol-mediated work
+    And I ensure: fair labor standards apply
+    And I update: social insurance for protocol participants
+    And I protect: workers while enabling innovation
+    And law adapts: to new forms of value creation
 
-  Scenario: Integrate protocol with federal government systems
-    Given federal agencies need to coordinate with protocol agents
-    When Elena crafts Federal AI Coordination Act
-    Then she requires federal agencies to interoperate with protocol
-    And she establishes coordination as partnership not subordination
-    And she addresses taxation implications of care tokens and ValueFlow
-    And she clarifies how protocol relates to Social Security and Medicare
-    And she ensures government-protocol integration serves citizens
+  Scenario: Creating national crisis reserve funds for protocol resilience
+    Given crises may threaten protocol infrastructure
+    And rapid response funding is needed
+    When I establish emergency reserves
+    Then I fund: rapid scaling for refugee crises
+    And I support: attack response against corporate or authoritarian threats
+    And I provide: disaster recovery for damaged infrastructure
+    And reserves ensure: protocol survives shocks
+    And resilience: is built into national support
+    And democratic governance: can weather emergencies
 
-  Scenario: Address tension between federal standards and local autonomy
-    Given communities want sovereignty over protocol calibration
-    And federal consistency is needed for interstate coordination
-    When Elena establishes federal framework
-    Then she explicitly preserves community and state authority
-    And she sets only constitutional minimums not comprehensive rules
-    And she articulates principle of subsidiarity in legislation
-    And she consults widely with community leaders and councils
-    And she balances national unity with local diversity
+  Scenario: Testifying to National Constitutional Council on policy needs
+    Given National Council reviewing case with policy implications
+    And they request my perspective as policy maker
+    When I testify about legislative context
+    Then I explain: existing law and its limitations
+    And I describe: policy challenges protocol helps address
+    And I clarify: how council precedent would affect legislation
+    And I don't advocate: for particular constitutional interpretation
+    And I inform: their deliberation with policy expertise
+    And I demonstrate: collaboration between sortition and representative democracy
 
-  Scenario: Respond to protocol crisis requiring rapid legislative action
-    Given zero-day cryptographic vulnerability is discovered
-    And protocol security is compromised requiring immediate response
-    When Elena convenes emergency session
-    Then she works with technical experts to understand the threat
-    And she coordinates with Constitutional Councils on emergency protocols
-    And she crafts emergency legislation authorizing temporary measures
-    And she includes explicit sunset provisions preventing permanent power grab
-    And she maintains democratic legitimacy despite urgency
-    And democratic governance proves it can respond to existential threats
+  Scenario: Commissioning independent research on protocol effectiveness
+    Given I need evidence for policy evaluation
+    And research must be independent to be credible
+    When I establish national research program
+    Then I fund: rigorous evaluation by independent researchers
+    And I require: open access publication
+    And I support: longitudinal studies tracking long-term outcomes
+    And I enable: replication and peer review
+    And I demand: honest reporting including null results
+    And evidence base: supports informed democratic choice
+    And public funding: serves public knowledge
 
-  Scenario: Defend democratic legitimacy of sortition governance
-    Given congressional colleagues challenge Constitutional Council authority
-    And critics argue randomly-selected citizens lack expertise and accountability
-    When Elena explains sortition model in Senate floor speech
-    Then she articulates how random selection prevents capture
-    And she shows how stratified selection ensures demographic representation
-    And she explains that short terms prevent professional political class
-    And she demonstrates councils bring lived experience not policy expertise
-    And she argues sortition complements rather than replaces representative democracy
-    And she persuades skeptical colleagues of democratic legitimacy
+  Scenario: Responding to national security agencies' concerns
+    Given intelligence agencies claim protocol creates vulnerabilities
+    And they request backdoors or monitoring capabilities
+    When I evaluate security claims critically
+    Then I consult: cryptographers about technical impossibility
+    And I examine: whether concerns are legitimate or pretext
+    And I compare: risks of backdoors vs risks they claim to address
+    And I consider: historical abuse of security exceptions
+    And I establish: oversight mechanisms if special provisions needed
+    And I resist: security becoming excuse for unaccountable power
+    And I protect: democracy even under security claims
 
-  Scenario: Prepare constitutional amendment recognizing sortition governance
-    Given federal constitution does not explicitly address sortition councils
-    And formal recognition would strengthen democratic legitimacy
-    When Elena drafts proposed constitutional amendment
-    Then she establishes sortition governance as legitimate democratic form
-    And she clarifies relationship to existing federal government structures
-    And she preserves both representative and sortition democracy
-    And she begins process of building support for amendment
-    And she positions this as constitutional evolution not revolution
+  Scenario: Creating sunset provisions and mandatory review
+    Given laws should be evaluated not permanent
+    And I want to prevent ossification
+    When I include sunset clauses in legislation
+    Then laws expire: after 5-7 years unless renewed
+    And I force: regular review of whether laws serve purpose
+    And I create: opportunities to correct mistakes
+    And I prevent: captured legislation persisting forever
+    And democratic accountability: includes ability to reverse decisions
+
+  Scenario: Participating in national media discourse on AI governance
+    Given public understanding shapes political will
+    And my voice carries weight as committee chair
+    When I engage in public education
+    Then I explain: why democratic AI governance matters
+    And I describe: how protocol works and what's at stake
+    And I acknowledge: uncertainties and limitations
+    And I present: alternatives honestly (corporate control, heavy regulation, protocol)
+    And I make: case for democratic choice
+    And I avoid: partisan framing or ideological advocacy
+    And I serve: informed democratic deliberation
+
+  Scenario: Coordinating with international counterparts on AI governance
+    Given AI governance is global challenge
+    And national policies affect each other
+    When I work with international policy makers
+    Then we share: legislative approaches and evidence
+    And we coordinate: to resist regulatory arbitrage
+    And we establish: democratic governance norms
+    And we resist: race-to-bottom dynamics
+    And we protect: protocol sovereignty internationally
+    And we support: global democratic AI development

@@ -1,95 +1,143 @@
 @epic:governance
 @user_type:appellant
 @governance_layer:community
-@related_users:community_leader,constitutional_council_member
-@related_layers:individual_family,provincial_state
+@related_users:constitutional_council_member,community_leader,technical_expert
+@related_layers:family,district,municipality
 @elohim_agents:community_elohim,family_elohim
 
-Feature: Community Governance for Appellant
+Feature: Community-Level Appeal Process for Appellant
   As an appellant in the governance system
   Operating at the community governance layer
-  I want first-layer appeal review by Community Elohim within my local context
-  So that appeals are resolved quickly with understanding of community norms and resources
+  I want rapid, accessible appeals for Community Elohim decisions
+  So that local governance remains responsive and accountable to community members
 
   Background:
     Given the Elohim Protocol is operational
-    And the appellant user is registered in Riverside community
+    And the appellant user is registered in the system
     And the community governance context is active
-    And a Family Elohim decision has been appealed
+    And Community Elohim provides first-layer appeal review for Family Elohim decisions
 
-  Scenario: Immediate community-layer review of family agent decision
-    Given Marcus has appealed his Family Elohim's mental health intervention
-    And the appeal was submitted 30 minutes ago
-    When the Community Elohim reviews the appeal
-    Then the review completes within 90 seconds
-    And the Community Elohim examines Family Elohim's constitutional reasoning
-    And the Community Elohim considers local mental health resources availability
-    And the Community Elohim evaluates cultural norms around privacy and care
-    And the Community Elohim determines if Family Elohim followed proper protocol
-    And Marcus receives the Community Elohim's determination immediately
-    And the determination is explained in plain language
+  Scenario: First-layer appeal review within 24 hours
+    Given I appealed my Family Elohim's decision about mental health intervention
+    When Community Elohim conducts first-layer appeal review
+    Then the review happens within 24 hours of my appeal filing
+    And Community Elohim examines if Family Elohim decision was appropriate for local context
+    And They consider community resources available (mental health services, support networks)
+    And They evaluate if local cultural norms were respected
+    And They provide transparent reasoning for their review decision
+    And Most appeals are resolved at this layer through clarification or correction
+    And I receive immediate notification of the review outcome
 
-  Scenario: Community appeal affirms original decision with protocol enhancement
-    Given Marcus's appeal has been reviewed by Community Elohim
-    And the Family Elohim's decision was constitutionally sound
-    When Community Elohim issues its determination
-    Then the original decision is affirmed
-    And the reasoning acknowledges Marcus's legitimate privacy concerns
-    And the determination recommends pre-specified alert preferences feature
-    And the recommendation is forwarded to protocol development team
-    And Marcus is notified of both the affirmation and the recommendation
-    And Marcus can escalate to peer review if still unsatisfied
-
-  Scenario: Community layer resolves appeal through better explanation
-    Given an appellant is confused about agent decision
-    And the Family Elohim's initial explanation was too technical
+  Scenario: Community Elohim identifies clear error in Family Elohim decision
+    Given my Family Elohim made a decision based on incorrect data
+    And I appealed pointing out the factual error
     When Community Elohim reviews the appeal
-    Then Community Elohim provides clearer plain-language explanation
-    And Community Elohim shows counterfactual scenarios
-    And Community Elohim identifies communication failure not decision error
-    And the appellant gains understanding without escalation
-    And the appeal is resolved within hours
-    And the explanation method is documented for future improvement
+    Then they quickly identify the error in the original decision
+    And The decision is immediately corrected
+    And My preferences or outcomes are restored to proper state
+    And Family Elohim updates its reasoning based on correct information
+    And The error pattern is flagged for protocol improvement
+    And I receive apology and explanation of what went wrong
 
-  Scenario: Community detects pattern in multiple similar appeals
-    Given multiple Riverside residents appeal adolescent autonomy decisions
-    And the appeals all involve Family Elohim being overly restrictive
-    When Community Elohim reviews the pattern
-    Then Community Elohim identifies systematic over-calibration issue
-    And Community Elohim alerts the community Constitutional Council
-    And Community Elohim recommends community-specific calibration
-    And Mayor Jamal Washington is briefed on the pattern
-    And community dialogue is initiated about appropriate thresholds
-    And protocol calibration is adjusted for Riverside context
+  Scenario: Appeal reveals need for community-specific calibration
+    Given I appeal a privacy threshold that feels too low for my community
+    And multiple community members have filed similar appeals
+    When Community Constitutional Council reviews the pattern
+    Then they recognize this as community-wide concern not individual complaint
+    And They recommend community-specific calibration of privacy thresholds
+    And Community leader facilitates deliberation on local preferences
+    And Community residents participate in calibrating the protocol
+    And My appeal contributes to community self-governance
+    And Local sovereignty is exercised within constitutional bounds
 
-  Scenario: Fast-track resolution for clear agent error
-    Given a Family Elohim made a decision based on wrong address
-    And the error is factually verifiable
-    When Community Elohim reviews the appeal
-    Then Community Elohim immediately identifies the data error
-    And the decision is overturned within 24 hours
-    And the appellant is notified with apology for the error
-    And compensation is provided for any harm caused
-    And the root cause is flagged for systematic fix
-    And no further escalation is required
+  Scenario: Appealing community resource allocation decision
+    Given Community Elohim denied my small business loan application
+    And I believe the criteria were unfairly applied
+    When I appeal the economic decision
+    Then Community Constitutional Council reviews the resource allocation
+    And They evaluate if constitutional principles of care and equity were followed
+    And They examine if I had meaningful opportunity to present my case
+    And They consider community economic context and priorities
+    And They assess if the agent's risk analysis was sound or biased
+    And The appeal can result in decision reversal or modified evaluation criteria
+    And Local economic priorities are clarified through appeal precedents
 
-  Scenario: Consider local context in constitutional interpretation
-    Given Riverside has indigenous heritage with river-centered spirituality
-    And an appeal involves ecological intervention decision
-    When Community Elohim interprets constitutional principles
-    Then local cultural values about sacred relationship to river are considered
-    And constitutional principle "love as committed action" is interpreted locally
-    And Riverside's specific cultural context informs the determination
-    And the determination respects both universal minimums and local specificity
-    And precedent is documented for future Riverside cases
+  Scenario: Appeal includes community context testimony
+    Given I filed an appeal that requires local knowledge to understand
+    And the Constitutional Council needs community context
+    When Community Leader provides testimony about local circumstances
+    Then the leader explains relevant history, cultural factors, and relationships
+    And The context helps council understand what might seem unusual to outsiders
+    And The leader doesn't advocate for outcome, just provides information
+    And The council weighs local context alongside constitutional principles
+    And Community knowledge enriches constitutional interpretation
+    And My appeal benefits from those who understand our community deeply
 
-  Scenario: Escalate appeal when community layer cannot resolve
-    Given Marcus is not satisfied with Community Elohim's determination
-    And the constitutional question is genuinely contested
-    When Marcus requests peer review escalation
-    Then the appeal is immediately forwarded to Level 2 peer review
-    And three randomly-selected Family Elohim from other communities are assigned
-    And a Constitutional Council observer is notified
-    And Marcus is informed of the escalation timeline
-    And the peer review process begins within 72 hours
-    And Marcus's right to escalate is honored without penalty
+  Scenario: Unsuccessful appeal but protocol transparency builds trust
+    Given my appeal was reviewed and the agent's decision was affirmed
+    And I didn't get the outcome I wanted
+    When I receive the Constitutional Council's detailed reasoning
+    Then I can see that my appeal was genuinely considered not dismissed
+    And I understand the constitutional principles that were applied
+    And I see how my case compares to similar precedents
+    And I know I had meaningful recourse even though I didn't prevail
+    And The transparency helps me trust the process even in defeat
+    And Trust in community governance is maintained through honest engagement
+
+  Scenario: Appeal of community surveillance or monitoring practices
+    Given I believe Community Elohim monitors community members too intrusively
+    And I am concerned about surveillance overreach
+    When I appeal the monitoring practices
+    Then Constitutional Council evaluates if surveillance exceeds constitutional minimums
+    And They examine if monitoring serves legitimate care purposes
+    And They consider if less invasive methods could achieve same goals
+    And They assess if community members have visibility into what's monitored
+    And They evaluate if appeal and recourse mechanisms are working properly
+    And The appeal protects community from surveillance creep
+    And Privacy boundaries are actively defended not passively eroded
+
+  Scenario: Appealing community conflict mediation outcome
+    Given Community Elohim mediated a conflict between me and neighbors
+    And I believe the proposed resolution is unjust
+    When I appeal the mediation outcome
+    Then Constitutional Council reviews if mediation process was fair
+    And They evaluate if all parties had meaningful voice
+    And They examine if constitutional principles guided the resolution
+    And They consider if community harmony was balanced with individual justice
+    And They assess if cultural conflict resolution norms were respected
+    And The appeal can modify the resolution or offer alternative mediation
+    And Community learns how to balance harmony with individual rights
+
+  Scenario: Multiple appellants challenge same community decision
+    Given several community members appeal the same Community Elohim decision
+    And we all believe a community resource decision was unjust
+    When Constitutional Council reviews the multiple related appeals
+    Then they treat this as collective concern requiring community deliberation
+    And They evaluate if the decision violated community consensus
+    And They examine if community participation in the decision was adequate
+    And They may convene community assembly to deliberate the issue
+    And The appeals trigger democratic engagement not just individual recourse
+    And Community governance evolves through collective voice
+
+  Scenario: Appeal escalation path when community review insufficient
+    Given Community Elohim review upheld the original decision
+    And I remain convinced my constitutional rights were violated
+    When I choose to escalate beyond community layer
+    Then I can request peer agent review (three Family Elohim from other families)
+    And If still unsatisfied, I can escalate to Regional Constitutional Council
+    And Each layer brings fresh perspective and greater scrutiny
+    And The escalation path is accessible without legal expertise
+    And Timelines are maintained (peer review within 1 week, regional within 1 month)
+    And Higher layers don't just rubber-stamp lower decisions
+    And Genuine independent review happens at each escalation level
+
+  Scenario: Community appeal informs local policy development
+    Given my appeal revealed gaps in how Community Elohim handles certain situations
+    And Constitutional Council made recommendations for improvement
+    When Community Leader reviews appeal patterns and recommendations
+    Then the leader brings findings to city council for policy response
+    And Local ordinances may be updated to clarify boundaries
+    And Community protocol calibration may be proposed
+    And My individual appeal contributes to broader community governance
+    And Democratic feedback loop connects appeals to policy improvement
+    And Community becomes more responsive through listening to dissent

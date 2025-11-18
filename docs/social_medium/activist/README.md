@@ -3,52 +3,63 @@ epic: social_medium
 user_type: activist
 archetype_name: "Activist"
 epic_domain: "Digital Communication - Relationship-centered social media"
-governance_scope: [TO_BE_DEFINED]
-related_users: [TO_BE_DEFINED]
+governance_scope: [individual, community, district, municipality, nation_state, global, affinity_network, cultural_linguistic]
+related_users: [community_moderator, content_creator, refugee, displaced_person]
 ---
 
 # Activist - Social Medium
 
 ## Archetype
 
-[**TODO**: Define the archetype for this user type. Describe who they are, their role in the social_medium epic, age/demographics if relevant, and their relationship to the protocol.]
+An activist is a person engaged in organized efforts for social, political, environmental, or cultural change. In the Social Medium context, activists range from grassroots community organizers to international movement coordinators. They work across multiple governance layers to build solidarity, coordinate action, share evidence-based information, and create sustainable change while protecting themselves and their communities from suppression.
+
+Key characteristics:
+- Age range: Typically 18-70, but youth activists (16+) and elder wisdom-keepers also included
+- Operates across multiple governance layers simultaneously
+- Builds trust networks for rapid mobilization
+- Requires protection from institutional suppression
+- Needs to share evidence-based information that earns reach
+- Coordinates with diverse communities and movements
 
 ## Core Needs
 
-[**TODO**: Identify 3-5 core needs this user type has that the social_medium epic addresses:]
-
-- **Need 1**: Description
-- **Need 2**: Description
-- **Need 3**: Description
-- **Need 4**: Description
-- **Need 5**: Description
+- **Protected Communication**: Ability to organize without surveillance or suppression, with sanctuary protocols when threatened by state or corporate actors
+- **Earned Reach for Change**: Evidence-based messaging that can travel beyond immediate circles when validated by community trust and factual verification
+- **Cross-Layer Coordination**: Tools to organize at neighborhood level while connecting to district, national, and global movements
+- **Solidarity Networks**: Connection with other activists across cultural, linguistic, and geographic boundaries through affinity networks
+- **Sustainable Mobilization**: Ways to build lasting change without burnout, supported by community recognition of their contributions
 
 ## Key Relationships
 
-[**TODO**: List the key relationships this user type has with other users, agents, or system components:]
-
-- **related_user_1**: Description of relationship
-- **related_user_2**: Description of relationship
-- **agent_type**: Description of how they interact with Elohim agents
+- **community_moderator**: Works with moderators to maintain healthy spaces for organizing and prevent infiltration or disruption
+- **content_creator**: Collaborates with creators to produce compelling narratives that support movement goals while maintaining factual accuracy
+- **refugee**: Provides solidarity and support for displaced persons, often working on immigration and asylum issues
+- **displaced_person**: Advocates for rights and resources for those separated from their communities
+- **Elohim Protection Agent**: Interacts with agents that detect threats, coordinate sanctuary protocols, and protect organizing activities from suppression
 
 ## Relevant Governance Layers
 
-[**TODO**: Determine which governance layers are relevant for this user type based on the principle of subsidiarity. Not all users operate at all layers.]
-
 ### Geographic/Political
 
-- **layer_name**: Brief description of what happens at this layer for this user
+- **individual**: Personal safety, digital sovereignty, and activist identity management
+- **community**: Local organizing, community education, and grassroots mobilization
+- **district**: Coordinating action across neighborhoods, building broader coalitions
+- **municipality**: City-level policy advocacy, municipal governance engagement
+- **nation_state**: National campaigns, coordination with other regions, policy change at scale
+- **global**: International solidarity, cross-border movements, human rights coordination
 
 ### Functional
 
-- **layer_name**: Brief description of functional domain relevance
+- **affinity_network**: Movement building across geographies based on shared values and goals
+- **cultural_linguistic**: Cultural preservation advocacy, indigenous rights, language justice
+- **ecological_bioregional**: Environmental justice, climate action, bioregional organizing
 
 ## Implementation Notes
 
-[**TODO**: Add any specific considerations for implementing scenarios for this user type:]
-
-- Key technical requirements
-- Privacy considerations
-- Interface design needs
-- Data handling requirements
-- Unique constraints or opportunities
+- **Security First**: All activist scenarios must demonstrate sanctuary protocols, encrypted communication, and protection from surveillance
+- **Evidence Standards**: Messaging that travels beyond local circles requires verification and counter-evidence evaluation
+- **Burnout Prevention**: System should recognize contributions and prevent extractive patterns that lead to activist burnout
+- **Infiltration Resistance**: Web of trust and earned reach prevents bad actors from disrupting organizing spaces
+- **Rapid Response**: During crises, activists need ability to quickly mobilize networks while maintaining security
+- **Legal Protection**: Integration with legal aid networks, know-your-rights resources, and documentation of rights violations
+- **Cultural Sensitivity**: Support for diverse organizing traditions and tactics across cultures

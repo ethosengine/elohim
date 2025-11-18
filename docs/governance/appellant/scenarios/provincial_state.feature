@@ -1,120 +1,144 @@
 @epic:governance
 @user_type:appellant
 @governance_layer:provincial_state
-@related_users:constitutional_council_member,technical_expert,researcher
+@related_users:constitutional_council_member,technical_expert,policy_maker,researcher
 @related_layers:community,nation_state
 @elohim_agents:regional_elohim,community_elohim
 
-Feature: Provincial/State Governance for Appellant
+Feature: Provincial/State-Level Appeal Process for Appellant
   As an appellant in the governance system
   Operating at the provincial/state governance layer
-  I want regional Constitutional Council review for complex appeals
-  So that I receive human judgment from randomly-selected peers on constitutional alignment
+  I want appeals that establish regional constitutional precedent
+  So that complex cases and novel situations get proper deliberation and create guidance
 
   Background:
     Given the Elohim Protocol is operational
-    And the appellant is registered in the regional jurisdiction
-    And the provincial/state governance context is active
-    And Sarah Martinez serves on the Regional Constitutional Council
+    And the appellant user is registered in the system
+    And the provincial_state governance context is active
+    And Regional Constitutional Council handles escalated appeals and novel cases
 
-  Scenario: Constitutional Council review of escalated mental health appeal
-    Given Marcus's appeal has been reviewed by Community Elohim
-    And peer agent review has also been conducted
-    And the appeal raises novel constitutional questions about privacy thresholds
-    When the case is escalated to Regional Constitutional Council
-    Then Sarah Martinez and 4 fellow council members are assigned
-    And they receive full case documentation including all previous reviews
-    And they conduct two hours of deliberation without rushing
-    And they examine Family Elohim's constitutional reasoning
-    And they evaluate whether agent operated within constitutional bounds
-    And they consider Marcus's lived experience of dignity violation
-    And they create precedent that will guide future similar cases
+  Scenario: Escalated appeal reaches Regional Constitutional Council
+    Given my appeal couldn't be resolved at community layer
+    And I escalated to peer agent review which affirmed the decision
+    When I request Constitutional Council review at regional level
+    Then randomly-selected citizens from across the region review my case
+    And They include Sarah Martinez, a nurse serving her 3-month term
+    And They deliberate for substantive time (2+ hours for complex cases)
+    And They have access to technical experts to explain complex aspects
+    And They create precedent that affects multiple communities in the region
+    And I receive judgment within one month of reaching this layer
+    And The decision includes detailed constitutional reasoning
 
-  Scenario: Council deliberates with access to technical expertise
-    Given Constitutional Council is reviewing complex agent decision
-    And the case involves pattern detection algorithms
-    When the council needs technical clarification
-    Then technical expert Amara Okonkwo provides testimony
-    And Amara explains pattern detection in accessible language
-    And Amara acknowledges 15% uncertainty in suicide risk assessment
-    And Amara does not advocate for specific outcome
-    And the council asks critical questions about technical claims
-    And the council makes final judgment on constitutional alignment
-    And expert testimony informs but does not dominate the decision
+  Scenario: Appeal establishes novel constitutional precedent
+    Given my case involves a situation not previously addressed
+    And existing precedents don't clearly apply to my circumstances
+    When Regional Constitutional Council deliberates my case
+    Then they engage deeply with constitutional principles
+    And They consider multiple interpretations and their implications
+    And They consult technical experts about what's technically possible
+    And They examine similar cases from other regions for comparison
+    And They create new precedent with careful reasoning
+    And The precedent becomes part of public constitutional record
+    And Future similar cases reference my appeal's constitutional interpretation
 
-  Scenario: Create precedent with recommendations for protocol improvement
-    Given Constitutional Council has deliberated on Marcus's case
-    When the council issues its determination
-    Then the decision affirms agent followed constitutional bounds
-    But the council also identifies room for improvement
-    And the council recommends pre-specified alert preferences feature
-    And the council recommends clearer mental health intervention thresholds
-    And the council recommends post-intervention review including appellant perspective
-    And the precedent is published in public constitutional record
-    And protocol developers implement the recommendations
-    And Marcus sees his experience contributed to system improvement
+  Scenario: Appeal involves technical complexity requiring expert testimony
+    Given my appeal concerns cryptographic verification of agent reasoning
+    And I question whether the agent actually followed claimed constitutional principles
+    When Technical Expert Dr. Amara Okonkwo testifies to the Constitutional Council
+    Then she explains the cryptographic proof in accessible language
+    And She clarifies what confidence levels mean and their limitations
+    And She acknowledges uncertainties in the technical analysis
+    And She presents competing interpretations when experts disagree
+    And She informs but doesn't dictate the council's judgment
+    And The council weighs technical information alongside human wisdom
+    And I understand the technical basis of the decision through her explanation
 
-  Scenario: Respect appellant dignity even when affirming agent decision
-    Given Marcus appealed feeling violated by mental health intervention
-    And Constitutional Council determines agent decision was constitutional
-    When the council communicates its determination to Marcus
-    Then the council acknowledges Marcus's anger is legitimate
-    And the council explains they asked "did agent operate within bounds?" not "was Marcus wrong?"
-    And the council recognizes intervention saved life but also violated privacy
-    And the council treats dignity violation as real even when intervention justified
-    And Marcus's appeal is honored as meaningful participation
-    And Marcus receives the determination with reasoning transparency
+  Scenario: Cross-community appeal requiring regional coordination
+    Given my appeal involves agent decisions affecting multiple communities
+    And communities have different local calibrations creating conflict
+    When Regional Constitutional Council reviews the inter-community issue
+    Then they evaluate how subsidiarity principle applies across communities
+    And They examine if regional coordination is constitutionally required
+    And They consider if local diversity should be preserved or harmonized
+    And They may establish regional minimums while allowing local variation
+    And They create precedent for how communities coordinate at scale
+    And My appeal contributes to multi-layer governance coherence
 
-  Scenario: Establish regional precedent affecting multiple communities
-    Given multiple communities in the region have similar appeals
-    And all involve adolescent autonomy versus safety conflicts
-    When Constitutional Council reviews pattern across appeals
-    Then the council establishes regional precedent
-    And the precedent articulates "developing autonomy is constitutional value"
-    And the precedent balances safety with growth needs
-    And the precedent guides future agent decisions across region
-    And community leaders like Jamal Washington can reference it
-    And the precedent becomes part of constitutional database
+  Scenario: Appeal reveals systematic bias across multiple communities
+    Given similar appeals have been filed across many communities in the region
+    And a pattern suggests systematic issue not isolated incidents
+    When I file my appeal as part of this broader pattern
+    Then Regional Constitutional Council treats this as systemic review
+    And Researcher provides analysis of the appeal pattern data
+    And They investigate if protocol implementation has regional bias
+    And They examine if certain demographics are disproportionately affected
+    And They may order regional protocol audit or recalibration
+    And My individual appeal becomes part of systemic justice work
+    And Constitutional accountability operates at scale not just individual cases
 
-  Scenario: Transparent deliberation with documented reasoning
-    Given Constitutional Council deliberates on appellant's case
-    When the council reaches its determination
-    Then the decision is documented with clear reasoning
-    And the documentation includes constitutional principles at stake
-    And the documentation includes anonymized deliberation summary
-    And the documentation includes dissenting views if any
-    And the documentation is added to public precedent database
-    And researchers can study the deliberation patterns
-    And future councils can search and reference this case
+  Scenario: Appeal involving cultural specificity vs constitutional minimums
+    Given my community has cultural practices that differ from regional norms
+    And an agent decision applied regional default rather than local calibration
+    When I appeal based on cultural context
+    Then Regional Constitutional Council evaluates legitimate cultural diversity
+    And They distinguish between cultural variation and constitutional violations
+    And They examine if my community had ability to calibrate protocol appropriately
+    And They consider if agent should have recognized cultural context
+    And They balance universal human dignity with cultural specificity
+    And The precedent clarifies how constitutional minimums apply across cultures
+    And My appeal protects cultural diversity within constitutional framework
 
-  Scenario: Appeal timeline meets mandatory deadlines
-    Given Marcus's appeal was escalated to Constitutional Council
-    And the appeal was received by council 5 days ago
-    When Marcus checks appeal status
-    Then he sees council is on track to meet 3-week deadline
-    And he sees council scheduled deliberation session for next week
-    And he receives proactive updates if timeline might slip
-    And the system prioritizes urgent cases appropriately
-    And Marcus knows when to expect final determination
-    And the timely process demonstrates respect for his rights
+  Scenario: Appeal outcome influences provincial policy making
+    Given my appeal revealed gap between agent governance and state law
+    And Constitutional Council recommendations identify needed legal changes
+    When Senator Ruiz reviews appeal precedents for policy insights
+    Then she uses my case as evidence in legislative hearings
+    And She crafts legislation addressing the constitutional gap
+    And She cites the council's reasoning in justifying policy changes
+    And My individual appeal contributes to democratic policy improvement
+    And Constitutional governance and representative democracy work together
+    And Policy makers learn from Constitutional Council wisdom
 
-  Scenario: Appellant participation in council review
-    Given Constitutional Council is reviewing Marcus's case
-    When Marcus is invited to present his perspective
-    Then Marcus can participate orally, in writing, or via video
-    And language translation is provided if needed
-    And accessibility accommodations are available
-    And Marcus can have representative assist if desired
-    And council members listen without prejudgment
-    And Marcus feels genuinely heard by peers not distant bureaucrats
-    And the participation strengthens legitimacy of the process
+  Scenario: Appeal with significant regional impact gets extensive deliberation
+    Given my case could affect thousands of families across the region
+    And the constitutional question has major implications
+    When Regional Constitutional Council reviews my high-stakes appeal
+    Then they allocate substantial time (multiple sessions over weeks)
+    And They invite testimony from diverse community leaders
+    And They consult with technical experts on implementation implications
+    And They examine long-term consequences of different interpretations
+    And They consider dissenting views and minority perspectives
+    And They produce comprehensive written opinion with reasoning
+    And The thorough deliberation legitimates the significant precedent they create
 
-  Scenario: Protection from retaliation for filing appeal
-    Given Marcus filed appeal against Family Elohim decision
-    And months have passed since the appeal was resolved
-    When Marcus interacts with agents for other matters
-    Then his appeal history does not negatively bias agent decisions
-    And agents treat him with same care as non-appellants
-    And community members do not ostracize him for challenging agents
-    And appeals are treated as right not privilege
-    And Marcus faces no penalties for exercising recourse
+  Scenario: Dissenting opinion preserved in regional precedent
+    Given Regional Constitutional Council deliberates my appeal
+    And the council reaches majority decision but some members disagree
+    When the precedent is documented
+    Then dissenting opinions are included with their reasoning
+    And The dissent explains alternative constitutional interpretation
+    And Future councils can reference both majority and dissent
+    And Constitutional evolution can draw on minority wisdom later
+    And My appeal generates rich constitutional dialogue not just single answer
+    And Disagreement is honored as part of democratic deliberation
+
+  Scenario: Appeal precedent cited in research on democratic AI governance
+    Given my appeal created important regional precedent
+    And Dr. James Chen is researching constitutional council effectiveness
+    When he analyzes appeal patterns and outcomes
+    Then my case (anonymized) becomes research data
+    And The precedent illustrates how sortition governance works
+    And Research findings feed back into protocol improvement
+    And My appeal contributes to global understanding of democratic AI governance
+    And Individual justice and systemic learning happen together
+
+  Scenario: Rapid appeal review during regional crisis
+    Given a regional crisis requires many urgent agent decisions
+    And I need to appeal a crisis-related decision quickly
+    When Regional Constitutional Council convenes emergency session
+    Then they balance speed with deliberation quality
+    And They evaluate if emergency protocols were properly invoked
+    And They examine if crisis urgency justified departures from normal process
+    And They provide expedited review (48-72 hours) while maintaining rigor
+    And They create precedent for crisis governance
+    And My appeal ensures democratic accountability even under emergency conditions

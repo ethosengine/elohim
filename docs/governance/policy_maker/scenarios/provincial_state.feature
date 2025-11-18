@@ -1,131 +1,157 @@
 @epic:governance
 @user_type:policy_maker
 @governance_layer:provincial_state
-@related_users:constitutional_council_member,community_leader,researcher,technical_expert
+@related_users:constitutional_council_member,community_leader,technical_expert,researcher
 @related_layers:nation_state,community
 @elohim_agents:regional_elohim,community_elohim
 
-Feature: Provincial/State Governance for Policy Maker
+Feature: Provincial/State-Level Policy Making for AI Governance
   As a policy_maker in the governance system
-  Operating at the provincial/state governance layer
+  Operating at the provincial_state governance layer
   I want to create enabling legislation for democratic AI governance
-  So that communities can flourish with protocol while resisting corporate capture
+  So that protocol serves communities while integrating with existing law
 
   Background:
-    Given the Elohim Protocol is operational in multiple communities
-    And Senator Elena Ruiz chairs the State Senate AI Governance Committee
+    Given the Elohim Protocol is operational
+    And the policy_maker user is registered in the system
     And the provincial_state governance context is active
-    And Elena has been observing protocol adoption across the state for 3 years
+    And Senator Elena Ruiz chairs state AI governance committee
 
-  Scenario: Draft enabling legislation for community protocol adoption
-    Given Riverside and other communities want to adopt Elohim Protocol
-    And they need legal framework and public funding support
-    When Elena crafts the Community AI Infrastructure Act
-    Then she includes funding for community nodes and infrastructure
-    And she establishes legal recognition of Constitutional Council precedents
-    And she ensures poor communities have equitable access
-    And she protects local sovereignty from state overreach
-    And she consults with Mayor Jamal Washington on implementation needs
-    And the legislation enables rather than controls protocol adoption
+  Scenario: Crafting enabling legislation protecting protocol sovereignty
+    Given I want to support democratic AI governance
+    And I must integrate protocol with existing state law
+    When I draft AI governance legislation
+    Then I create: legal recognition of Constitutional Council authority
+    And I establish: state funding for community protocol infrastructure
+    And I mandate: interoperability between government systems and protocol
+    And I protect: communities from corporate capture attempts
+    And I ensure: equitable access for poor communities
+    And my legislation: enables rather than controls protocol
+    And I empower: community sovereignty within legal framework
 
-  Scenario: Defend protocol against corporate capture attempt
-    Given technology companies lobby for mandatory backdoor access
-    And lobbyists claim backdoors are needed for "safety and accountability"
-    When Elena receives the lobbying pressure
-    Then she consults technical expert Amara Okonkwo about feasibility
-    And Amara explains backdoors break constitutional verification cryptographically
-    And Elena brings testimony from Riverside showing democratic oversight works
-    And Elena exposes that "safety" rhetoric masks corporate control interests
-    And Elena publicly discloses all lobbying contacts and funding sources
-    And Elena defeats the backdoor mandate protecting protocol sovereignty
+  Scenario: Using research evidence to justify protocol support
+    Given I need to defend protocol against skeptical colleagues
+    And Dr. Chen's research provides rigorous evaluation
+    When I cite evidence in committee hearings
+    Then I present: data showing reduced loneliness and improved wellbeing
+    And I provide: evidence about successful crisis response
+    And I demonstrate: marginalized community access patterns
+    And I show: comparison with communities without protocol
+    And I address: limitations and challenges honestly
+    And evidence base: supports informed policy choice
+    And I maintain: scientific credibility through honest assessment
 
-  Scenario: Establish legal recognition of agent decisions in state courts
-    Given state courts are uncertain how to treat Constitutional Council precedents
-    And some judges dismiss agent reasoning as inadmissible
-    When Elena crafts Digital Constitutional Rights Amendment
-    Then she establishes council precedents as binding in protocol-related cases
-    And she requires courts to recognize agent constitutional reasoning
-    And she clarifies evidentiary standards for agent testimony
-    And she ensures due process protections remain intact
-    And she works with judicial branch to train judges on protocol
-    And courts can integrate protocol with legal system
+  Scenario: Hearing testimony from Mayor Jamal about implementation reality
+    Given I need ground truth about protocol in practice
+    And Riverside provides three years of experience
+    When Mayor Jamal testifies about community implementation
+    Then he shares: what works (community calibration, constitutional oversight)
+    And he describes: what struggles (elderly accessibility, controversy)
+    And he explains: factors predicting adoption success
+    And he provides: evidence countering corporate lobbyist claims
+    And his testimony: grounds policy in lived reality
+    And I learn: from practitioners not just theory
+    And community voices: inform state legislation
 
-  Scenario: Secure state funding for poor communities excluded by cost
-    Given communities like Riverside lack resources for protocol infrastructure
-    And democratic governance tools should be universal not luxury goods
-    When Elena includes funding in state budget
-    Then she allocates grants for community protocol adoption
-    And she establishes sliding scale fees based on community wealth
-    And she creates cross-subsidization from wealthy to poor communities
-    And she justifies spending as democracy infrastructure investment
-    And Elena ensures no community is excluded due to cost barriers
+  Scenario: Resisting corporate lobbying for regulatory capture
+    Given tech companies lobby for regulations favoring incumbents
+    And they push: backdoor mandates, centralization requirements, licensing barriers
+    When I defend protocol sovereignty against capture
+    Then I use: cryptographic impossibility arguments (backdoors break verification)
+    And I present: evidence that regulation would harm innovation
+    And I coalition: with community leaders showing grassroots opposition
+    And I reference: international examples of protocol sovereignty working
+    And I require: transparency about lobbying and funding
+    And I resist: well-funded pressure through political courage
+    And I protect: democratic governance from corporate control
 
-  Scenario: Learn from Constitutional Council precedents to inform legislation
-    Given state Constitutional Council established precedent on privacy thresholds
-    And the council balanced care and dignity in mental health intervention cases
-    When Elena drafts Digital Dignity Protection statute
-    Then she translates constitutional principle into statutory language
-    And she references specific council precedents in legislative findings
-    And she ensures statute aligns with constitutional interpretation
-    And she respects that councils interpret constitution, she implements through policy
-    And sortition democracy and representative democracy work as complementary systems
+  Scenario: Establishing legal recognition of Constitutional Council decisions
+    Given courts need to know how to treat council precedents
+    And government agencies must understand council authority
+    When I craft legislation recognizing council legitimacy
+    Then I establish: statutory basis for council decisions
+    And I specify: courts recognize precedents in protocol-related cases
+    And I ensure: agencies defer to council constitutional interpretation
+    And I maintain: judicial review for constitutional questions
+    And I create: legal framework for sortition governance
+    And councils gain: legitimacy within existing legal system
+    And new democratic form: integrates with traditional structures
 
-  Scenario: Coordinate with community leaders on implementation challenges
-    Given Mayor Jamal reports tension between protocol and state regulations
-    And state environmental law conflicts with ecosystem agent decisions
-    When Elena reviews the regulatory conflict
-    Then she consults with community leaders about ground truth
-    And she identifies where state regulation should defer to protocol
-    And she identifies where state standards provide necessary minimums
-    And she crafts legislation harmonizing state law with protocol
-    And she preserves community sovereignty while maintaining state interests
+  Scenario: Funding state grants for community protocol adoption
+    Given poor communities cannot afford protocol infrastructure
+    And equitable access requires public investment
+    When I secure state budget allocation for protocol support
+    Then I fund: grants for community nodes and maintenance
+    And I support: accessibility enhancements and education
+    And I provide: technical assistance for implementation
+    And I ensure: sliding scale and cross-subsidization
+    And I treat: protocol as democracy infrastructure deserving investment
+    And I prevent: digital divide excluding marginalized communities
+    And public funding: enables universal access to democratic governance tools
 
-  Scenario: Commission research on protocol effectiveness for evidence-based policy
-    Given Elena needs data to justify continued support and defend against critics
-    When she commissions Dr. James Chen to conduct evaluation study
-    Then she provides public funding requiring open access publication
-    And she requests rigorous methodology not promotional claims
-    And she asks for both positive outcomes and failures
-    And James delivers evidence showing reduced loneliness and improved wellbeing
-    And Elena cites this research in committee hearings
-    And evidence-based policy defeats ideological opposition
+  Scenario: Addressing protocol-tax law integration questions
+    Given protocol creates novel economic relationships
+    And tax implications are unclear
+    When I work with revenue department on clarification
+    Then we determine: tax treatment of care tokens
+    And we address: property tax implications of resource sharing
+    And we clarify: whether mutual aid counts for social safety net
+    And we create: certainty enabling protocol to function
+    And we avoid: creating impossible tax burdens
+    And we ensure: tax policy doesn't undermine protocol benefits
+    And legal clarity: supports implementation
 
-  Scenario: Address interstate coordination challenges
-    Given protocol operates across state borders
-    And neighboring states have different legal frameworks
-    When Elena encounters coordination problems
-    Then she proposes interstate compact recognizing protocol decisions
-    And she coordinates with legislators in neighboring states
-    And she establishes framework for cross-border agent coordination
-    And she ensures citizens can move between states without losing continuity
-    And she balances state sovereignty with need for harmonization
+  Scenario: Coordinating interstate recognition of protocol decisions
+    Given protocol operates across state boundaries
+    And consistency is needed for coordination
+    When I work on interstate compact for protocol recognition
+    Then we establish: mutual recognition of council decisions across states
+    And we create: conflict resolution mechanisms for disputes
+    And we maintain: state sovereignty and variation
+    And we enable: coordination without centralization
+    And we show: federalism working for AI governance
+    And states cooperate: while preserving local autonomy
 
-  Scenario: Integrate protocol with state social services
-    Given state welfare, healthcare, and education systems need to coordinate with agents
-    When Elena crafts integration legislation
-    Then she requires state agencies to interoperate with protocol
-    And she allows welfare benefits to flow through ValueFlow accounting
-    And she recognizes care tokens in economic support calculations
-    And she establishes coordination protocols not subordination
-    And she treats agents as peer partners with state agencies
+  Scenario: Responding to constituent concerns about AI governance
+    Given residents contact me about protocol experiences
+    And I am accountable through elections
+    When I maintain constituent engagement on AI governance
+    Then I hold: town halls in communities like Riverside
+    And I offer: office hours for people like Marcus to share experiences
+    And I conduct: surveys gathering feedback on legislation
+    And I respond: to concerns showing I'm listening
+    And I maintain: constituent services for protocol-related issues
+    And I remain: democratically accountable for policy choices
 
-  Scenario: Defend against authoritarian legislative proposals
-    Given opposition legislators propose mandatory surveillance for "public safety"
-    And proposal would compromise agent privacy protections
-    When Elena fights the surveillance mandate
-    Then she brings testimony from communities about surveillance harm
-    And she shows constitutional councils already provide accountability
-    And she exposes authoritarian implications of the proposal
-    And she builds coalition with civil liberties organizations
-    And she defeats the proposal protecting privacy rights
-    And democratic governance resists authoritarian capture
+  Scenario: Establishing liability framework for agent errors
+    Given agents will make mistakes
+    And someone must address harms
+    When I create liability and accountability legislation
+    Then I establish: protocol insurance pool for errors
+    And I specify: remedies for different types of mistakes
+    And I require: immediate correction and compensation
+    And I penalize: bad-faith attempts to corrupt agents
+    And I balance: accountability with innovation
+    And framework: enables learning from mistakes
+    And responsibility: is clear without stifling development
 
-  Scenario: Navigate electoral accountability while supporting long-term protocol development
-    Given Elena faces reelection campaign
-    And protocol is delivering results in communities like Riverside
-    When she campaigns on her protocol support
-    Then she presents data on improved community wellbeing
-    And she shares testimony from Mayor Jamal and residents
-    And she demonstrates protocol solves problems traditional governance struggled with
-    And she wins reelection with mandate to continue protocol support
-    And electoral accountability rewards effective democratic innovation
+  Scenario: Mandating transparency while protecting privacy
+    Given public needs visibility into protocol governance
+    And individuals need privacy protection
+    When I craft transparency requirements
+    Then I require: appeal outcomes and patterns be public
+    And I mandate: constitutional council precedents accessible
+    And I ensure: individual data privacy through anonymization
+    And I specify: security audit results must be disclosed
+    And I balance: transparency serving accountability with privacy protection
+    And requirements: enable democratic oversight without surveillance
+
+  Scenario: Learning from protocol outcomes to improve legislation
+    Given Constitutional Convention passed adolescent autonomy amendment
+    And this reflects accumulated precedents and appeals
+    When I translate constitutional evolution into state law
+    Then I craft: legislation operationalizing the amendment
+    And I update: state family law to reflect constitutional principle
+    And I modify: education policy honoring developing autonomy
+    And constitutional evolution: informs statutory law
+    And I demonstrate: how different democratic forms work together

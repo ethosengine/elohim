@@ -1,133 +1,149 @@
 @epic:governance
 @user_type:researcher
 @governance_layer:provincial_state
-@related_users:constitutional_council_member,policy_maker,community_leader
-@related_layers:community,nation_state
+@related_users:constitutional_council_member,policy_maker,technical_expert,community_leader
+@related_layers:community,nation_state,global
 @elohim_agents:regional_elohim,community_elohim
 
-Feature: Provincial/State Governance for Researcher
+Feature: Provincial/State-Level Governance Research for Researcher
   As a researcher in the governance system
   Operating at the provincial/state governance layer
-  I want to conduct quantitative comparison studies across communities
-  So that generalizable patterns and causal effects can be identified
+  I want to conduct comparative quantitative studies across many communities
+  So that I can identify patterns, test hypotheses, and provide generalizable findings
 
   Background:
-    Given the Elohim Protocol is operational in 150 communities across the state
-    And Dr. James Chen is conducting comparative quantitative research
+    Given the Elohim Protocol is operational
+    And the researcher user is registered in the system
     And the provincial_state governance context is active
-    And James has research access to anonymized data from multiple communities
-    And ethical review board has approved the research protocol
+    And Dr. James Chen is conducting large-scale comparative research
 
-  Scenario: Conduct large-scale quantitative study across 150 communities
-    Given some communities adopted protocol early, others late, some not at all
-    When James analyzes outcomes across all communities
-    Then he measures wellbeing indicators (loneliness, life satisfaction, social cohesion)
-    And he tracks appeal patterns and resolution rates
-    And he examines Constitutional Council decision consistency
-    And he compares protocol-adopting vs non-adopting communities
-    And he uses statistical methods to isolate protocol effects
-    And quantitative analysis enables generalization beyond single cases
+  Scenario: Comparing protocol adoption outcomes across hundreds of communities
+    Given I am studying all communities in the state that adopted Elohim Protocol
+    And I have comparison group of similar communities without adoption
+    When I analyze outcomes data from 200+ communities over 5 years
+    Then I examine: which communities adopted and which didn't (selection patterns)
+    And I measure: wellbeing, trust, economic resilience, social cohesion differences
+    And I use: difference-in-differences analysis to estimate causal effects
+    And I control: for demographics, economics, political culture confounds
+    And I identify: what predicts adoption success vs struggle
+    And I provide: statistical evidence about protocol effectiveness at scale
+    And I distinguish: average effects from heterogeneous effects across community types
 
-  Scenario: Use difference-in-differences to estimate protocol impact
-    Given communities adopted protocol at different times
-    And James can compare before-and-after within communities
-    When he conducts difference-in-differences analysis
-    Then he tracks communities before protocol adoption (baseline)
-    And he tracks same communities after adoption (treatment)
-    And he compares to non-adopting communities (control)
-    And he estimates causal effect of protocol on wellbeing
-    And he finds 8% improvement in life satisfaction and 12% reduction in loneliness
-    And statistical method strengthens causal inference
+  Scenario: Analyzing Regional Constitutional Council decision patterns
+    Given Sarah Martinez's Regional Council has reviewed 500+ appeals
+    And I have anonymized data on appeals, deliberations, and outcomes
+    When I analyze patterns in regional constitutional interpretation
+    Then I examine: which types of appeals succeed vs fail
+    And I track: consistency across different council compositions
+    And I identify: whether councils reach similar conclusions for similar cases
+    And I explore: how precedent influences subsequent decisions
+    And I assess: whether councils defer too much to technical experts
+    And I investigate: demographic patterns in council member influence
+    And My analysis reveals: whether sortition governance produces coherent law
 
-  Scenario: Identify which community characteristics predict successful adoption
-    Given protocol works better in some communities than others
-    When James analyzes predictors of adoption success
-    Then he examines demographics, socioeconomics, political culture, and history
-    And he finds communities with civic participation history succeed more
-    And he identifies that trust in institutions predicts adoption difficulty
-    And he discovers that indigenous communities calibrate differently but successfully
-    And he provides evidence-based guidance for future adoption efforts
+  Scenario: Natural experiment comparing communities with vs without protocol
+    Given some adjacent communities adopted protocol while neighbors didn't
+    And these communities are similar in demographics and economics
+    When I study outcomes comparing adopters to non-adopters
+    Then I isolate: protocol effects from confounding factors
+    And I measure: differences in wellbeing, crisis response, social cohesion
+    And I examine: spillover effects across community boundaries
+    And I analyze: why some communities adopted and others resisted
+    And I provide: quasi-experimental evidence about causality
+    And My findings distinguish: correlation from causation in protocol effects
+    And Evidence serves policymakers deciding whether to support adoption
 
-  Scenario: Analyze regional Constitutional Council decision consistency
-    Given regional councils review complex cases establishing precedent
-    And consistency is important for constitutional predictability
-    When James analyzes council decision patterns
-    Then he examines whether similar cases receive similar outcomes
-    And he identifies areas of high consistency (privacy thresholds)
-    And he identifies areas of high variation (cultural interpretation)
-    And he determines whether variation represents bias or legitimate context-specificity
-    And his findings help councils understand their own patterns
+  Scenario: Studying marginalized community access and outcomes
+    Given I hypothesize protocol might help or harm marginalized communities
+    And I need to rigorously test distributional effects
+    When I analyze outcomes by race, class, disability, immigration status
+    Then I examine: whether marginalized communities adopt at equal rates
+    And I assess: whether they face barriers to effective participation
+    And I measure: whether Constitutional Council service includes them proportionally
+    And I analyze: whether appeal outcomes differ by demographic group
+    And I investigate: whether protocol reduces or exacerbates inequality
+    And I provide: evidence about who benefits and who suffers from protocol
+    And My research serves: justice by making invisible inequities visible
 
-  Scenario: Study distributional effects across socioeconomic groups
-    Given justice requires understanding who benefits and who suffers
-    When James examines outcomes by demographic subgroups
-    Then he analyzes protocol effects for marginalized vs privileged communities
-    And he finds poor communities benefit more (improved resource access)
-    And he identifies remaining barriers for undocumented immigrants
-    And he discovers that elderly face accessibility challenges
-    And he flags systematic biases requiring correction
-    And research serves justice by revealing inequality
+  Scenario: Longitudinal study of Constitutional Council member development
+    Given I am tracking council members like Sarah over time
+    And I want to understand how service affects them
+    When I study council members before, during, and after service
+    Then I measure: constitutional literacy development
+    And I assess: deliberative skill acquisition
+    And I examine: civic confidence and participation changes
+    And I track: whether capabilities persist after service ends
+    And I explore: whether service affects children's civic development
+    And I analyze: whether sortition creates democratic capacity at population scale
+    And My research tests: whether citizen governance transforms citizens
 
-  Scenario: Evaluate whether Constitutional Council deliberation quality varies by composition
-    Given councils are stratified to match population demographics
-    When James analyzes how council composition affects outcomes
-    Then he examines whether gender, race, or class composition matters
-    And he finds diverse councils reach more thorough deliberations
-    And he identifies that working-class members bring crucial perspectives
-    And he discovers that councils with technical background don't necessarily decide better
-    And he validates democratic premise that lived experience equals expertise
+  Scenario: Analyzing technical expert influence on council decisions
+    Given councils rely on experts like Dr. Okonkwo for technical understanding
+    And I question whether experts dominate rather than inform
+    When I analyze correlation between expert testimony and council decisions
+    Then I examine: how often councils follow expert recommendations
+    And I identify: cases where councils override expert advice
+    And I assess: whether expert testimony quality predicts council confidence
+    And I explore: whether some experts influence more than others
+    And I investigate: warning signs of expert capture vs healthy advice
+    And My research reveals: whether technical-democratic balance is working
+    And Findings inform: expert testimony guidelines and council training
 
-  Scenario: Test hypothesis about transparency and trust relationship
-    Given transparency is claimed to build trust but might enable manipulation
-    When James examines transparency-trust relationship empirically
-    Then he measures transparency levels (appeal data, agent reasoning, council records)
-    And he measures trust levels (surveys, behavioral proxies)
-    And he finds positive correlation up to a threshold
-    And he identifies diminishing returns from excessive transparency
-    And he provides evidence for optimal transparency design
+  Scenario: Comparative methodology testing different governance models
+    Given I want to compare sortition councils to alternative governance approaches
+    And some regions use elected representatives, others expert panels, others algorithms
+    When I conduct systematic comparison across governance models
+    Then I examine: decision quality (outcomes, constitutional alignment, legitimacy)
+    And I assess: participation (who governs, how accessible, how diverse)
+    And I measure: trust (public confidence in decisions)
+    And I analyze: adaptability (responding to new challenges)
+    And I compare: costs (resources required vs benefits delivered)
+    And I provide: evidence about relative strengths of different models
+    And My research serves: democratic choice among governance alternatives
 
-  Scenario: Provide evidence for Senator Ruiz's policy proposals
-    Given Elena Ruiz needs data to justify state funding for protocol
-    When James prepares policy brief on research findings
-    Then he compiles evidence of protocol effectiveness
-    And he documents wellbeing improvements and cost-effectiveness
-    And he provides comparison to traditional governance approaches
-    And he writes accessible executive summary for legislative staff
-    And his rigorous research becomes evidence base for democratic policy
+  Scenario: Preregistration of hypotheses to prevent cherry-picking results
+    Given I want my research to be scientifically credible
+    And I know publication bias favors positive findings
+    When I design my regional study
+    Then I preregister: hypotheses before seeing the data
+    And I commit: to reporting all results not just flattering ones
+    And I plan: analysis methods in advance to prevent p-hacking
+    And I document: any deviations from preregistered plan with justification
+    And I publish: null results and failures alongside successes
+    And My methodological rigor maintains: scientific integrity over advocacy
+    And Credibility comes from: honesty about what works and what doesn't
 
-  Scenario: Collaborate with other researchers on multi-site study
-    Given protocol operates in multiple states with different contexts
-    When James coordinates multi-state research collaboration
-    Then he partners with researchers in California, Texas, and Vermont
-    And they use common measurement instruments for comparability
-    And they examine whether findings generalize across political cultures
-    And they publish collaborative analysis in peer-reviewed journal
-    And multi-site design strengthens external validity
+  Scenario: Providing evidence to Senator Ruiz for policy development
+    Given Senator Ruiz is drafting AI governance legislation
+    And she needs evidence about what regulatory approaches help vs harm
+    When I brief her committee on my regional research findings
+    Then I present: rigorous evaluation of protocol outcomes
+    And I explain: what factors predict successful adoption
+    And I provide: evidence about marginalized community access
+    And I offer: comparative findings about governance models
+    And I testify: honestly about limitations and uncertainties
+    And I maintain: independence by reporting truth not advocacy
+    And My research becomes: evidence base for democratic policy making
 
-  Scenario: Conduct natural experiment using geographic boundary
-    Given two adjacent communities are similar except one adopted protocol
-    And the boundary creates natural comparison
-    When James uses regression discontinuity design
-    Then he compares communities just on either side of boundary
-    And he isolates protocol effect by controlling for other differences
-    And he finds protocol community has better crisis response
-    And he documents both benefits and implementation costs
-    And natural experiment provides strong causal inference
+  Scenario: Identifying emerging issues through annual evaluation cycles
+    Given I analyze regional data annually to track trends
+    And I want to identify problems before they become crises
+    When I examine this year's patterns compared to previous years
+    Then I notice: appeal rates trending up (good—people know recourse exists)
+    And I identify: recurring adolescent autonomy conflicts emerging
+    And I detect: systematic issue with business loan evaluation criteria
+    And I recognize: elderly accessibility remaining challenging
+    And I flag: potential issues for community leaders and policymakers
+    And My timely analysis enables: proactive response to emerging challenges
+    And Research provides: early warning system for governance problems
 
-  Scenario: Identify emerging constitutional tensions requiring attention
-    Given James has data on appeal patterns across region
-    When he analyzes recurring appeal types over 3 years
-    Then he identifies increasing appeals about agent-AI coordination
-    And he flags emerging constitutional question about superintelligence oversight
-    And he alerts regional Constitutional Council to the pattern
-    And he publishes findings informing policy debate
-    And research provides early warning of governance challenges
-
-  Scenario: Publish findings with appropriate privacy protection
-    Given research data contains sensitive information
-    When James prepares publication
-    Then he uses differential privacy to protect individuals
-    And he aggregates data so no community can be identified when sensitive
-    And he makes anonymized data publicly available for replication
-    And he publishes open access in multiple formats
-    And he balances transparency with privacy protection
+  Scenario: Regional research consortium collaboration
+    Given I am part of network studying protocol across multiple regions
+    And we coordinate methods to enable comparison
+    When we conduct parallel studies with shared protocols
+    Then we can: pool data to increase statistical power
+    And we enable: replication across different contexts
+    And we identify: universal patterns vs context-specific findings
+    And we learn: from each other's methodological innovations
+    And we create: cumulative knowledge building across research community
+    And My regional work contributes to: global understanding of democratic AI governance

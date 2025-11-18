@@ -2,135 +2,159 @@
 @user_type:technical_expert
 @governance_layer:provincial_state
 @related_users:constitutional_council_member,appellant,policy_maker,researcher
-@related_layers:community,nation_state
+@related_layers:nation_state,community
 @elohim_agents:regional_elohim,community_elohim
 
-Feature: Provincial/State Governance for Technical Expert
+Feature: Provincial/State-Level Technical Expertise for Council Advisory
   As a technical_expert in the governance system
-  Operating at the provincial/state governance layer
-  I want to provide expert testimony and audit agent reasoning
-  So that Constitutional Councils can evaluate complex technical questions
+  Operating at the provincial_state governance layer
+  I want to explain complex AI systems to Constitutional Councils
+  So that citizen deliberation is informed without being dominated by expertise
 
   Background:
-    Given the Elohim Protocol is operational across the region
-    And Dr. Amara Okonkwo is cryptographer serving as rotating technical expert
+    Given the Elohim Protocol is operational
+    And the technical_expert user is registered in the system
     And the provincial_state governance context is active
-    And Amara has been assigned 4-month term advising regional councils
-    And Amara's testimony is public and subject to peer review
+    And Dr. Amara Okonkwo provides technical advisory to Regional Constitutional Council
 
-  Scenario: Testify to regional Constitutional Council on complex agent reasoning
-    Given Sarah Martinez's regional council reviews multi-agent coordination case
-    And the constitutional question requires understanding technical complexity
-    When Amara is called to provide expert testimony
-    Then she explains in plain language how agents reached consensus
-    And she uses analogies accessible to high school education level
-    And she presents cryptographic proof that decision traced to constitutional principles
-    And she acknowledges uncertainty about whether reasoning was optimal
-    And she welcomes Sarah's questions from nursing perspective
-    And she informs judgment without dominating it
+  Scenario: Explaining cryptographic constitutional verification to Sarah's council
+    Given Sarah Martinez's Regional Council reviews Marcus's mental health appeal
+    And the case involves cryptographic verification questions
+    When I provide expert testimony about the technical details
+    Then I translate: cryptographic proofs into accessible language
+    And I explain: using analogies (locked box showing answer without revealing secret)
+    And I clarify: what confidence levels mean and their limitations
+    And I acknowledge: where analogies break down and complexity remains
+    And I avoid: jargon that excludes or confuses
+    And I ensure: Sarah understands enough to judge constitutionality
+    And I inform: without dictating the decision
 
-  Scenario: Explain cryptographic constitutional verification to non-technical council
-    Given council needs to understand whether agent followed protocol
-    And cryptographic proofs are technically complex
-    When Amara explains verification mechanism
-    Then she uses analogy of locked box showing answer without revealing secret
-    And she explains what proof demonstrates and what it cannot prove
-    And she acknowledges where analogy breaks down
-    And she provides multiple explanations until council members understand
-    And she makes technical truth accessible without oversimplification
+  Scenario: Presenting competing technical interpretations to council
+    Given technical experts disagree about transparency method adequacy
+    And council needs to understand the disagreement
+    When I present both my view and Dr. Chen's alternative
+    Then I explain: his argument fairly and completely
+    And I articulate: where we agree and where we differ
+    And I present: his evidence alongside mine
+    And I avoid: dismissing his perspective unfairly
+    And I let: council judge which interpretation is more constitutionally aligned
+    And I demonstrate: intellectual humility and respect for disagreement
+    And council sees: that expertise involves uncertainty
 
-  Scenario: Audit agent decision for technical errors or vulnerabilities
-    Given appeal claims agent made decision based on corrupted data
-    When Amara conducts technical audit
-    Then she examines agent decision logs and data sources
-    And she traces reasoning chain from input to output
-    And she verifies cryptographic proof integrity
-    And she identifies technical error (address verification failure like Wisconsin case)
-    And she testifies honestly that agent made technical mistake
-    And her audit strengthens appellant's case
+  Scenario: Acknowledging uncertainty in technical analysis
+    Given appellant questions agent's 85% confidence in suicide risk pattern
+    And council asks if the confidence level is reliable
+    When I provide honest uncertainty assessment
+    Then I explain: we don't have validated ground truth for this prediction type
+    And I acknowledge: the 85% might be overconfident or underconfident
+    And I clarify: what we know and what we don't know
+    And I avoid: hiding behind expert authority to eliminate uncertainty
+    And I enable: council to make decision under acknowledged uncertainty
+    And I demonstrate: that honesty about limits builds trust
+    And citizens know: when they're governing despite deep uncertainty
 
-  Scenario: Present competing technical interpretations fairly
-    Given technical experts disagree on whether transparency method is sufficient
-    And Dr. Chen believes method is adequate while Amara sees vulnerabilities
-    When Amara testifies to council
-    Then she presents both her view and Dr. Chen's view
-    And she explains where they agree and where they disagree
-    And she clarifies the technical basis for each interpretation
-    And she does not claim false consensus
-    And council sees intellectual diversity among experts
-    And council judges which interpretation is more constitutionally aligned
+  Scenario: Explaining pattern detection without overwhelming council
+    Given complex machine learning algorithm detected Marcus's risk pattern
+    And council needs to understand how this works
+    When I explain pattern recognition in accessible terms
+    Then I describe: what data the agent analyzed
+    And I clarify: how patterns are detected across multiple factors
+    And I explain: what makes this pattern concerning vs normal variation
+    And I provide: counterfactuals showing what would change the outcome
+    And I avoid: technical details that don't serve constitutional judgment
+    And I ensure: council grasps enough to evaluate constitutional alignment
+    And I respect: that they don't need to be machine learning experts
 
-  Scenario: Acknowledge limits of technical understanding
-    Given agent reasoning involves patterns approaching human comprehension limits
-    When Amara explains what she can and cannot verify
-    Then she states "I can verify cryptographic proof shows constitutional alignment"
-    And she admits "I cannot fully explain the reasoning chain itself"
-    And she honestly says this is beyond current human comprehension
-    And she does not pretend to explain what she cannot understand
-    And her humility is crucial for democratic legitimacy
+  Scenario: Identifying technical error that strengthens appellant's case
+    Given I audit agent reasoning for appeal
+    And I discover genuine technical mistake (like Wisconsin address confusion)
+    When I report the error to Constitutional Council
+    Then I explain: clearly what went wrong
+    And I assess: impact on the decision
+    And I recommend: whether decision should be overturned
+    And I serve: truth-telling over defending agents
+    And I strengthen: appellant's case when agent erred
+    And I demonstrate: that technical oversight is genuine
+    And my independence: makes expertise credible
 
-  Scenario: Translate technical tradeoffs without making value judgments
-    Given council debates whether to require stronger encryption
-    When Amara explains technical implications
-    Then she states "stronger encryption improves privacy but slows decisions by 15%"
-    And she clarifies "this is technical tradeoff, not value judgment"
-    And she does not say whether privacy or speed is more important
-    And she respects that council decides values while she clarifies constraints
-    And expertise serves democracy rather than replacing it
+  Scenario: Advising council without dominating their judgment
+    Given I have deep knowledge council lacks
+    And I could easily dominate deliberation if I pushed too hard
+    When I testify about technical implications of constitutional interpretations
+    Then I explain: what's technically possible and impossible
+    And I clarify: tradeoffs between different approaches
+    And I stop: before crossing into values judgment
+    And I respect: council's authority to choose among technically viable options
+    And I accept: when they choose values over optimization
+    And I honor: the boundary between expertise and democratic judgment
+    And I demonstrate: how expertise serves rather than replaces democracy
 
-  Scenario: Disclose conflicts of interest before testifying
-    Given Amara previously consulted for company that builds protocol tools
-    When she is called to testify on case involving that company
-    Then she publicly discloses her prior consulting relationship
-    And she explains potential bias this creates
-    And she offers to recuse herself if council prefers
-    And council appreciates her transparency and allows her to proceed
-    And disclosure maintains trust in expert testimony
+  Scenario: Providing audit access to deep technical details
+    Given I need to verify agent decision pathway for appeal
+    And I have deeper access than ordinary citizens
+    When I examine agent source code, decision logs, and cryptographic proofs
+    Then my access is: logged and transparent
+    And I can: examine but not modify systems
+    And I verify: whether agent followed claimed constitutional principles
+    And I check: cryptographic proof validity
+    And I identify: any technical vulnerabilities or errors
+    And my audit: is itself auditable by other experts
+    And deep access: serves genuine oversight not manipulation
 
-  Scenario: Identify systematic technical issue requiring protocol update
-    Given Amara audits multiple regional cases
-    And she discovers recurring verification vulnerability
-    When she reports the systematic issue
-    Then she documents the vulnerability with technical precision
-    And she proposes potential solutions with tradeoffs
-    And she reports to Protocol Research Council for review
-    And she briefs Constitutional Councils on implications
-    And her technical vigilance protects protocol integrity
+  Scenario: Testing agent behavior in isolated environment
+    Given council needs to understand counterfactual scenarios
+    And I can run agents in test environments
+    When I conduct controlled experiments for council
+    Then I test: what agent would decide if input X were different
+    And I verify: robustness of constitutional alignment
+    And I explore: boundary cases and edge conditions
+    And I provide: evidence grounded in testing not speculation
+    And I avoid: affecting production systems
+    And testing enables: informed judgment about agent behavior
+    And council decisions: rest on verified evidence
 
-  Scenario: Work with policy maker to evaluate proposed regulation
-    Given Senator Ruiz considers legislation requiring agent explainability standards
-    When Amara is consulted on technical feasibility
-    Then she explains what explainability is technically possible
-    And she clarifies what would compromise constitutional verification
-    And she does not advocate for or against the policy
-    And she provides technical truth for Elena to make policy judgment
-    And expert-policymaker relationship serves democratic governance
+  Scenario: Explaining attack vectors and security risks
+    Given appellant claims agent could be manipulated
+    And council needs to understand vulnerability
+    When I explain potential attack vectors
+    Then I describe: how agents could be corrupted or gamed
+    And I assess: likelihood and impact of different attacks
+    And I explain: defense mechanisms in place
+    And I acknowledge: residual risks that remain
+    And I avoid: either dismissing concerns or creating panic
+    And I provide: realistic risk assessment
+    And council can: judge if security is adequate for constitutional governance
 
-  Scenario: Collaborate with peer experts on technical standard development
-    Given protocol needs updated cryptographic methods
-    When Amara participates in expert working group
-    Then she collaborates with other cryptographers on new standards
-    And they conduct peer review of each other's proposals
-    And they test proposals adversarially to find vulnerabilities
-    And they submit recommendations to Protocol Research Council
-    And expert community provides checks and balances
+  Scenario: Participating in Protocol Research Council review
+    Given I serve 6-month rotating term on Protocol Research Council
+    And developers propose Agent Protocol v2.3.7 update
+    When I evaluate proposed update before deployment
+    Then I assess: whether update solves claimed problem
+    And I check: for new vulnerabilities introduced
+    And I verify: constitutional alignment is maintained
+    And I test: adversarial robustness
+    And I collaborate: with other experts on review
+    And I recommend: approval, rejection, or modification
+    And updates require: expert approval before Constitutional Council authorization
 
-  Scenario: Respect council decision even when technically suboptimal
-    Given Sarah's council rules privacy concerns outweigh risk prevention
-    And Amara believes this will cause preventable suffering
-    When council issues its determination
-    Then Amara documents her technical dissent respectfully
-    And she accepts council's democratic authority to choose values over optimization
-    And she does not show contempt for citizen judgment
-    And she recognizes democracy sometimes chooses differently than experts would
-    And this is not failure but democratic choice
+  Scenario: Avoiding conflict of interest through transparency
+    Given I have relationship with AI company
+    And I'm testifying on case involving similar technology
+    When I disclose potential conflict before testimony
+    Then I reveal: corporate funding, investment, or prior work
+    And I explain: how relationship might bias my perspective
+    And I offer: to recuse if council finds conflict problematic
+    And I maintain: credibility through honesty
+    And undisclosed conflicts: would permanently discredit me
+    And transparency: keeps expertise trustworthy
 
-  Scenario: Complete 4-month term rotation to prevent expert capture
-    Given Amara has served her full regional advisory term
-    When her term ends
-    Then she returns to her primary research work
-    And she cannot serve consecutive terms
-    And another expert from the pool rotates in
-    And her testimony is documented for future reference
-    And rotation prevents her from becoming indispensable or captured
-    And fresh expert perspectives continue serving councils
+  Scenario: Training Constitutional Council members on technical literacy
+    Given new council members need technical foundations
+    And I contribute to their 3-week training program
+    When I teach about AI systems and cryptographic verification
+    Then I provide: conceptual understanding without overwhelming detail
+    And I enable: critical engagement with technical testimony
+    And I avoid: indoctrination about "correct" technical approaches
+    And I develop: their capacity to question experts
+    And I empower: them to judge despite not being specialists
+    And I demonstrate: how ordinary citizens can govern complex technology
