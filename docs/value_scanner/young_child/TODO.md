@@ -7,29 +7,29 @@ This file tracks which scenario files need to be created for the `young_child` u
 
 ### Geographic/Political Layers
 
-- [ ] `scenarios/individual.md` - Personal choice scenarios
+- [ ] `scenarios/individual.feature` - Personal choice scenarios
   - Example: Tommy choosing between cereals at the store
   - Example: Selecting a toy independently
   - Example: Personal preference expression
 
-- [ ] `scenarios/family.md` - Family-level scenarios
+- [ ] `scenarios/family.feature` - Family-level BDD scenarios
   - Example: Family shopping trip with shared values
   - Example: Parent verification of child's choices
   - Example: Family privacy boundaries
 
-- [ ] `scenarios/neighborhood.md` - Community-level scenarios (supervised)
+- [ ] `scenarios/neighborhood.feature` - Community-level scenarios (supervised)
   - Example: Trading cards with neighborhood kids
   - Example: Playground resource sharing
   - Example: Local store interaction with community context
 
 ### Functional Layers
 
-- [ ] `scenarios/educational.md` - Learning environment scenarios
+- [ ] `scenarios/educational.feature` - Learning environment scenarios
   - Example: School lunch choices
   - Example: Classroom supply selection
   - Example: Educational game rewards
 
-- [ ] `scenarios/ecological_bioregional.md` - Environmental awareness scenarios
+- [ ] `scenarios/ecological_bioregional.feature` - Environmental awareness scenarios
   - Example: Choosing local seasonal fruit
   - Example: Learning about food origins
   - Example: Age-appropriate sustainability concepts
