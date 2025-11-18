@@ -1,0 +1,32 @@
+{
+  "source": "keen.json",
+  "category": "documents",
+  "count": 1,
+  "sourceKeenId": "nvBCVtcYER7C9s3H6zxS",
+  "sourceTitle": "Consilience Garden",
+  "gems": [
+    {
+      "gemId": "NvRwhuqOOgBsR0we2Vl1",
+      "section": {
+        "sectionId": "317EW4pDAsHQBbd18uax",
+        "title": "Digital Governance and Democracy",
+        "description": "Abstract organizations exploring governance concepts of high-trust, highly technically literate government and society capable of applying open-minded and strategic thinking"
+      },
+      "text": "Artificial Intelligence, Values and Alignment \n\nhis paper looks at philosophical questions that arise in the context of AI alignment. It defends three propositions. First, normative and technical aspects of the AI alignment problem are interrelated, creating space for productive engagement between people working in both domains. Second, it is important to be clear about the goal of alignment. There are significant differences between AI that aligns with instructions, intentions, revealed preferences, ideal preferences, interests and values. A principle-based approach to AI alignment, which combines these elements in a systematic way, has considerable advantages in this context. Third, the central challenge for theorists is not to identify 'true' moral principles for AI; rather, it is to identify fair principles for alignment, that receive reflective endorsement despite widespread variation in people's moral beliefs. The final part of the paper explores three ways in which fair principles for AI alignment could potentially be identified.\n\nhttps://www.deepmind.com/publications/artificial-intelligence-values-and-alignment",
+      "metalink": {
+        "image": "https://assets-global.website-files.com/621d30e84caf0be3291dbf1c/621d346e395c98fb65f1185c_brand__symbol_white.svg",
+        "description": "This paper looks at philosophical questions that arise in the context of AI alignment. It defends three propositions. First, normative and technical aspects of the AI alignment problem are interrelated, creating space for productive engagement between people working in both domains. Second, it is…",
+        "publisher": "",
+        "title": "Artificial Intelligence, Values and Alignment",
+        "url": "https://www.deepmind.com/publications/artificial-intelligence-values-and-alignment"
+      },
+      "tags": [],
+      "contributor": "Matthew Dowell",
+      "tipImage": {
+        "bucketUrl": "https://www.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2FNvRwhuqOOgBsR0we2Vl1%2Ftip_images%2FbucketUrl_d97c6372-cbd7-409f-ab12-91a9daa611d8.webp?generation=1657144846474473&alt=media",
+        "isUserGenerated": false,
+        "externalUrl": ""
+      }
+    }
+  ]
+}

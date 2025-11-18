@@ -1,0 +1,28 @@
+{
+  "source": "keen.json",
+  "category": "articles",
+  "count": 1,
+  "sourceKeenId": "nvBCVtcYER7C9s3H6zxS",
+  "sourceTitle": "Consilience Garden",
+  "gems": [
+    {
+      "gemId": "DxQNBtCrd9MWKWx0Wmb1",
+      "section": {
+        "sectionId": "",
+        "title": "",
+        "description": ""
+      },
+      "text": "https://newpublic.substack.com/",
+      "metalink": {
+        "image": "https://cdn.substack.com/image/fetch/w_256,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fbucketeer-e05bbc84-baa3-437e-9518-adb32be77984.s3.amazonaws.com%2Fpublic%2Fimages%2F17c2e01f-171a-4e55-af08-8db1c5eff4bb_1067x1067.png",
+        "description": "​Email us your stories at hello@newpublic.org with 'Flash Fiction' in the subject line. Deadline: 9/1/21. Theme: Social Media Word Limit: 500 words",
+        "title": "New_ Public",
+        "url": "https://newpublic.substack.com/",
+        "publisher": "newpublic.substack.com"
+      },
+      "tags": [],
+      "contributor": "Matthew Dowell",
+      "tipImage": null
+    }
+  ]
+}
