@@ -1,0 +1,67 @@
+@epic:public_observer
+@user_type:community_organizer
+@governance_layer:educational
+@related_users:parent,activist,citizen,board_member
+@related_layers:district,municipality,community
+@elohim_agents:public_observer,education_elohim,coalition_elohim
+
+Feature: Education Justice Organizing for Community Organizer
+  As a community organizer in the public_observer system
+  Operating at the educational functional layer
+  I want to organize communities for equitable education access and quality
+  So that all students receive resources and opportunities regardless of neighborhood or background
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the community_organizer user is registered in the system
+    And the educational governance context is active
+
+  Scenario: Organizer documents opportunity gap for education equity campaign
+    Given gifted programs concentrate in predominantly white schools
+    And advanced placement courses lack availability in low-income schools
+    When the Observer provides education equity data
+    Then the organizer sees enrichment program distribution across district
+    And maps demographic patterns showing systematic disparities
+    And calculates opportunity gaps affecting thousands of students
+    And identifies organizing base of affected families
+    And educational inequality becomes documented basis for organizing
+
+  Scenario: Organizer creates accessible materials on school funding formula
+    Given parents don't understand why their school has fewer resources
+    And school funding formula is complex and opaque
+    When the organizer requests education materials from Observer
+    Then they receive plain-language explanation of funding sources
+    And see visual comparison of per-pupil spending across schools
+    And get breakdown of how formula creates inequities
+    And access talking points for advocating for funding changes
+    And technical education finance becomes accessible community knowledge
+
+  Scenario: Organizer builds coalition for culturally responsive curriculum
+    Given families want curriculum reflecting their communities' histories
+    And multiple cultural groups share this interest
+    When the organizer uses Observer to facilitate coalition building
+    Then they identify parents from different backgrounds with aligned goals
+    And coordinate around shared demands for curriculum inclusion
+    And help families develop specific proposals with supporting evidence
+    And organize testimony showcasing diverse community voices
+    And coalition transforms individual requests into collective power
+
+  Scenario: Organizer mobilizes parents against school closure targeting low-income neighborhoods
+    Given district proposes closing three schools in working-class areas
+    And claims it's necessary for "efficiency"
+    When the organizer uses Observer to analyze closure impacts
+    Then they show closures increase commute times for low-income families
+    And demonstrate stable enrollment contradicting district claims
+    And calculate cost of closure to affected communities
+    And organize parents to demand community-based solutions
+    And education organizing prevents harm to vulnerable students
+
+  Scenario: Organizer tracks implementation of restorative justice commitment
+    Given district adopted restorative justice to reduce suspensions
+    And the organizer's coalition of parents and students won the policy
+    When the Observer tracks implementation progress
+    Then the organizer monitors training of school staff
+    And sees suspension data by school, race, and disability status
+    And identifies schools not implementing restorative practices
+    And documents where implementation succeeds and changes outcomes
+    And policy victory leads to implementation accountability
