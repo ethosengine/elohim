@@ -1,0 +1,140 @@
+@epic:value_scanner
+@user_type:preteen
+@governance_layer:individual
+@related_users:child,teen,parent,student
+@related_layers:family,neighborhood,community,educational
+@elohim_agents:personal_agent
+
+Feature: Individual Layer Value Recognition for Preteen
+  As a preteen (ages 11-13) in the value scanner system
+  Operating at the individual governance layer
+  I want autonomy to manage real household responsibilities with dignity
+  So that my substantial care contributions are recognized and I develop capability under real constraints
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the preteen user "Marcus" is registered in the system
+    And Marcus is 12 years old
+    And the individual governance context is active
+    And Marcus's personal_agent is configured for real responsibility support
+    And Marcus manages $75 weekly grocery budget for himself and his sister Keisha
+    And parental oversight is calibrated for substantial autonomy
+
+  Scenario: Preteen exercises genuine autonomy in real economic decisions
+    Given Marcus has $75 budget for weekly groceries
+    And the budget is not hypothetical but actual family resource constraint
+    When Marcus uses the Value Scanner to plan weekly shopping
+    Then he should have full autonomy within budget boundaries
+    And his personal_agent should provide adult-level decision support
+    And the interface should treat him as capable, not as a child
+    And his choices should have real consequences for family survival
+    And the system should recognize he's not practicing but performing
+    And autonomy should be genuine, not simulated learning
+
+  Scenario: Managing real scarcity without shame or stigma
+    Given Marcus's family has limited economic resources
+    And $75/week must feed two people adequately
+    When Marcus shops under tight budget constraints
+    Then the personal_agent should help him maximize value with dignity
+    And budget tools should be presented as capability support, not poverty markers
+    And the system should never make him feel ashamed of constraints
+    And resourcefulness should be framed as valuable skill, not deprivation
+    And his capability to manage scarcity should be recognized as sophisticated
+    And no patronizing language about "limited budgets" should be used
+
+  Scenario: Personal agent provides collegial support for complex adult work
+    Given Marcus is performing work that adults get paid to do
+    And he needs sophisticated planning and analysis tools
+    When Marcus's personal_agent interacts with him
+    Then the relationship should be almost collegial
+    And the agent should provide information, analysis, and planning support
+    And the agent should say "You've kept nutrition above 90% for three weeks—excellent stewardship"
+    And emotional encouragement should acknowledge real difficulty of his work
+    And the agent should serve as genuine tool for real work
+    And the tone should respect his capability while supporting his needs
+
+  Scenario: Development of conscious values and identity around care
+    Given Marcus is forming conscious values and identity
+    And he is developing abstract thinking capacity
+    When Marcus makes repeated care decisions over time
+    Then he should be developing identity as capable caregiver
+    And his values around family responsibility should be consciously forming
+    And the system should support healthy identity development
+    And he should see himself as person who takes care of his family
+    And care economy principles should shape his developing worldview
+    And his self-concept should be as contributor, not burden
+
+  Scenario: Planning across time with sophisticated coordination tools
+    Given Marcus plans weekly meals for himself and Keisha
+    And he must coordinate ingredients across multiple meals
+    When Marcus uses planning features
+    Then he should have access to meal planning with nutritional analysis
+    And budget tracking should project across weeks
+    And shopping list optimization should be available
+    And inventory management should prevent waste
+    And multi-store price comparison should support best value finding
+    And planning tools should be professional-grade but accessible
+
+  Scenario: Nutrition management with safety net for critical thresholds
+    Given Marcus is responsible for his and Keisha's nutrition
+    And inadequate nutrition has serious consequences
+    When Marcus makes food choices over time
+    Then the personal_agent should track nutrition across meals and weeks
+    And the system should watch for nutrition falling below safe levels
+    And if nutrition drops below critical thresholds, adult intervention should be triggered
+    And Marcus should be supported in meeting nutritional needs
+    And the agent should proactively suggest nutritious affordable options
+    And safety nets should protect without undermining autonomy
+
+  Scenario: Recognition of substantial care labor as economically valuable
+    Given Marcus performs household management work
+    And similar work by adults would be compensated
+    When Marcus completes weekly shopping and meal planning
+    Then his care contributions should be valued at realistic economic rates
+    And care tokens should reflect genuine value of his work
+    And the system should make explicit that his labor is valuable
+    And recognition should communicate that he's doing skilled work
+    And his contributions should qualify family for community resources
+    And his stewardship should be evidence of capability, not exploitation
+
+  Scenario: Developmentally appropriate autonomy with emergency assistance
+    Given Marcus has substantial independence
+    And he is still only 12 years old
+    When Marcus uses the Value Scanner
+    Then he should have freedom to make real decisions
+    And emergency assistance options should be clearly visible
+    And the personal_agent should watch for stress exceeding healthy bounds
+    And crisis situations should trigger connection to adult support
+    And intervention should preserve his dignity and autonomy
+    And the goal should be supporting capability, not taking over
+
+  Scenario: Privacy protection for sensitive household circumstances
+    Given Marcus's household situation must be protected
+    And his family's economic constraints are private information
+    When Marcus's care contributions are tracked
+    Then his specific circumstances must not be broadcast
+    And data about shopping patterns must remain confidential
+    And community resource coordination should use anonymized data
+    And his privacy should be protected even while receiving support
+    And no stigmatizing exposure of family situation should occur
+
+  Scenario: Building abstract thinking through real economic complexity
+    Given Marcus is developing abstract thinking capacity
+    And he's managing genuinely complex resource coordination
+    When Marcus plans across time and context
+    Then he should be building sophisticated cognitive capabilities
+    And the personal_agent should support abstract planning
+    And he should understand opportunity costs through real experience
+    And complex systems thinking should develop through practice
+    And his cognitive development should be supported by real challenges
+    And abstract economic concepts should be learned through application
+
+  Scenario: Right to disconnect and data sovereignty maintained
+    Given Marcus uses the system for critical household functions
+    And constitutional constraints apply at all governance layers
+    When Marcus or his family choose to disconnect
+    Then the system must honor disconnection immediately
+    And alternative methods for household management must remain viable
+    And no dependency should be created that makes disconnection harmful
+    And data sovereignty must be preserved
+    And Marcus's right to not participate must be absolute
