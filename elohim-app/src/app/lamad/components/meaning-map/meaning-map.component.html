@@ -30,11 +30,10 @@
   <div *ngIf="!isLoading" class="categories">
     <div *ngFor="let category of categories" class="category-section">
       <!-- Category header -->
-      <div class="category-header"
-           (click)="toggleCategory(category)"
-           (keydown.enter)="toggleCategory(category)"
-           tabindex="0"
-           role="button">
+      <button class="category-header"
+              (click)="toggleCategory(category)"
+              (keydown.enter)="toggleCategory(category)"
+              type="button">
         <div class="category-info">
           <span class="category-icon">{{ category.icon }}</span>
           <h2 class="category-name">{{ category.displayName }}</h2>
@@ -54,18 +53,17 @@
           </span>
           <span class="expand-icon">{{ category.expanded ? '▼' : '▶' }}</span>
         </div>
-      </div>
+      </button>
 
       <!-- Category content nodes -->
       <div *ngIf="category.expanded" class="category-content">
-        <div
+        <button
           *ngFor="let node of category.nodes"
           class="content-node-card"
           [ngClass]="getAffinityColorClass(node.affinityLevel)"
           (click)="viewContent(node)"
           (keydown.enter)="viewContent(node)"
-          tabindex="0"
-          role="button">
+          type="button">
 
           <div class="node-header">
             <div class="node-type-badge">
@@ -96,7 +94,7 @@
               [ngClass]="getAffinityColorClass(node.affinityLevel)">
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   </div>

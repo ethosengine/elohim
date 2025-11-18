@@ -21,14 +21,13 @@
       </div>
 
       <nav class="path-nav">
-        <div *ngFor="let pathNode of pathNodes; let i = index"
-             class="path-item"
-             [class.selected]="selectedNode?.id === pathNode.node.id"
-             [class.depth-1]="pathNode.depth === 1"
-             (click)="selectNode(pathNode.node)"
-             (keydown.enter)="selectNode(pathNode.node)"
-             tabindex="0"
-             role="button">
+        <button *ngFor="let pathNode of pathNodes; let i = index"
+                class="path-item"
+                [class.selected]="selectedNode?.id === pathNode.node.id"
+                [class.depth-1]="pathNode.depth === 1"
+                (click)="selectNode(pathNode.node)"
+                (keydown.enter)="selectNode(pathNode.node)"
+                type="button">
 
           <!-- Node Info -->
           <div class="path-item-content">
@@ -52,7 +51,7 @@
           <div class="category-badge" *ngIf="pathNode.depth === 0">
             {{ getCategoryDisplay(pathNode.category) }}
           </div>
-        </div>
+        </button>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -71,19 +70,18 @@
 
       <!-- TOP: Graph Visualization -->
       <section class="graph-section" [class.collapsed]="!isGraphExpanded">
-        <div class="graph-header"
-             (click)="toggleGraph()"
-             (keydown.enter)="toggleGraph()"
-             tabindex="0"
-             role="button">
+        <button class="graph-header"
+                (click)="toggleGraph()"
+                (keydown.enter)="toggleGraph()"
+                type="button">
           <h3 class="graph-title">
             <span class="graph-icon">📊</span>
             At-a-Glance Overview
           </h3>
-          <button class="toggle-btn" [class.rotated]="!isGraphExpanded">
+          <span class="toggle-btn" [class.rotated]="!isGraphExpanded">
             ▼
-          </button>
-        </div>
+          </span>
+        </button>
 
         <div class="graph-content" *ngIf="isGraphExpanded && affinityStats">
           <!-- Stats Grid -->

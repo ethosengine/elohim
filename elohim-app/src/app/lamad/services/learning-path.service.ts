@@ -43,7 +43,7 @@ export class LearningPathService {
     { id: 'deployment/staging-validation.feature', category: 'technical', depth: 1 },
   ];
 
-  constructor(private graphService: DocumentGraphService) {
+  constructor(private readonly graphService: DocumentGraphService) {
     this.initializePath();
   }
 
