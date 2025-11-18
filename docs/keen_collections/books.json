@@ -1,0 +1,87 @@
+{
+  "source": "keen.json",
+  "category": "books",
+  "count": 4,
+  "sourceKeenId": "nvBCVtcYER7C9s3H6zxS",
+  "sourceTitle": "Consilience Garden",
+  "gems": [
+    {
+      "gemId": "q7bwHxmEmdsZGIEGySpd",
+      "section": {
+        "sectionId": "yZFAyQo0PIuR6DVnRzM9",
+        "title": "Shared Meaning",
+        "description": "Inspiration for making productive meaning in challenging times."
+      },
+      "text": "https://futurescouts.cc/ \nFuture Scouts (est. 2016) is an international decentralized scouting organization for 21st century learners of all ages and genders. We create experiences, invent tools and develop technologies that help youngsters, teens and adults become self-directed, lifelong learners.",
+      "metalink": {
+        "image": "https://futurescouts.cc/wp-content/uploads/2021/07/KALKI_Artboard-19-copy.png",
+        "description": "The Future Scouts offer an international learning program, the Future Scouts App & the Future Scouts Handbook of 21st Century Survival Skills.",
+        "publisher": "Future Scouts",
+        "title": "Future Scouts International learning program, Social App and Handbook",
+        "url": "https://futurescouts.cc/"
+      },
+      "tags": [],
+      "contributor": "Matthew Dowell",
+      "tipImage": null
+    },
+    {
+      "gemId": "Ds7Stmd6z7KuGHmYyGHr",
+      "section": {
+        "sectionId": "ipGovJPF2IebZwPbPceC",
+        "title": "Media and Books",
+        "description": "Further Reading"
+      },
+      "text": "#imagination\nhttps://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb",
+      "metalink": {
+        "image": "https://books.google.co.jp/books/content?id=VHZGzQEACAAJ&printsec=frontcover&img=1&zoom=1&imgtk=AFLRE71JrwFXj-TPdfWS0fW-JFbAeCjukRtgIRPHokruTsSG978-7q2AMEO-a4j2Tm6wd6G87_TDO7BzOcLDr5C9NB8fwLninh5K0G98hQKs_9lsDlQhu8rxBGDIJxC0-MjkliRkdsel",
+        "description": "ONE OF BARACK OBAMA’S FAVORITE BOOKS OF THE YEAR “The best science-fiction nonfiction novel I’ve ever read.” --Jonathan Lethem “If I could get policymakers, and citizens, everywhere to read just one book this year, it would be Kim Stanley Robinson’s The Ministry for the Future.” --Ezra Klein (…",
+        "title": "The Ministry for the Future",
+        "url": "https://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb",
+        "publisher": "Google Books"
+      },
+      "tags": [
+        "#imagination"
+      ],
+      "contributor": "Matthew Dowell",
+      "tipImage": null
+    },
+    {
+      "gemId": "ss9WkKEJ55XMAKBTmw6F",
+      "section": {
+        "sectionId": "ipGovJPF2IebZwPbPceC",
+        "title": "Media and Books",
+        "description": "Further Reading"
+      },
+      "text": "[Book] The Collapse of Complex Societies, By Joseph Tainter (1988)\n\nRecommended reading from conversation in Future Thinkers Podcast, Oct 16, 2017, Daniel Schmachtenberger - The Existential Game\n\n\n\nhttps://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0",
+      "metalink": {
+        "image": "https://books.google.com/books/content?id=YdW5wSPJXIoC&printsec=frontcover&img=1&zoom=1&edge=curl&imgtk=AFLRE716znFHBQ3EspcyqIq-YACrsMNzjtZsxyoYWaFdD13ClZIn82t1KhKBNBwMG5bVWPx1QxxXCZGZmFR8Te-h6albg3XB6jIlP2qv7Gy5kPn3XHTRDM0gJHJEbz4xUN-JEWE2XcOK",
+        "description": "Political disintegration is a persistent feature of world history. The Collapse of Complex Societies, though written by an archaeologist, will therefore strike a chord throughout the social sciences. Any explanation of societal collapse carries lessons not just for the study of ancient societies, bu…",
+        "title": "The Collapse of Complex Societies",
+        "url": "https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0",
+        "publisher": "Google Books"
+      },
+      "tags": [],
+      "contributor": "Matthew Dowell",
+      "tipImage": null
+    },
+    {
+      "gemId": "Mh4DOAfmPZlWbXRvRqrd",
+      "section": {
+        "sectionId": "ipGovJPF2IebZwPbPceC",
+        "title": "Media and Books",
+        "description": "Further Reading"
+      },
+      "text": "[Book] Finite and Infinite Games, By James Carse · 2013\nReccommended reading from Daniel Schmachtenberger, from conversation Future Thinkers Podcast, Oct 16, 2017, Daniel Schmachtenberger - The Existential Game\n\nThis is a great introduction into wondering what a world beyond game theory looks like. It short. \n\nhttps://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd",
+      "metalink": {
+        "image": "https://books.google.com/books/content?id=s_pxNAEACAAJ&printsec=frontcover&img=1&zoom=1&imgtk=AFLRE73x_4W9fjBAjRBey8PDlAgO_x_Zfn6KmBYdY0hFfA2BQgwzQe944Uad4bFzgkE4fFwW0CF6nPxJDq7LC-5Y-ivmx0esYhnJyEcOUNVIZt_ppGmxLzHW3CieoTW06sQhK7Pw8Bi0",
+        "description": "“There are at least two kinds of games,” states James P. Carse as he begins this extraordinary book. “One could be called finite; the other infinite. A finite game is played for the purpose of winning, an infinite game for the purpose of continuing the play.”Finite games are the familiar contests of…",
+        "title": "Finite and Infinite Games",
+        "url": "https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd",
+        "publisher": "Google Books"
+      },
+      "tags": [],
+      "contributor": "Matthew Dowell",
+      "tipImage": null
+    }
+  ]
+}
