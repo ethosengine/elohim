@@ -1,54 +1,86 @@
 ---
 epic: value_scanner
 user_type: senior
-archetype_name: "Senior"
+archetype_name: "Senior in Early Retirement"
 epic_domain: "Care Economy - Value recognition and exchange"
-governance_scope: [TO_BE_DEFINED]
-related_users: [TO_BE_DEFINED]
+governance_scope: [individual, household, family, neighborhood, community, municipality]
+related_users: [middle_aged, elderly, grandparent, retired, caregiver]
 ---
 
 # Senior - Value Scanner
 
 ## Archetype
 
-[**TODO**: Define the archetype for this user type. Describe who they are, their role in the value_scanner epic, age/demographics if relevant, and their relationship to the protocol.]
+Margaret is 68 years old, recently retired from a career in nursing, living on Social Security and a modest pension (~$32k/year), and discovering that retirement isn't the leisure fantasy she imagined. She uses the Value Scanner to manage her careful grocery budget ($150/week), maintain nutrition as her dietary needs change with age, coordinate care contributions to her grandchildren (picking them up from school, occasional meals), provide support to her own aging mother (age 92, in assisted living), and participate actively in community mutual aid networks. Her care contributions are substantial—childcare for grandchildren saves her daughter thousands annually, her community volunteering strengthens neighborhood resilience, her mother-care prevents institutional crisis—but traditional economics value her as "not working" because she's retired.
+
+Margaret represents the Early Retirement phase (ages 65-74) of the Value Scanner epic—the demographic transitioning from formal employment to different forms of care economy participation. She's discovering that retirement is actually liberation to perform care work that employment prevented: grandparenting, community volunteering, elder care, neighborhood building, civic engagement. The protocol serves her by making this care labor visible and valuable, connecting her to community resources, and ensuring her contributions are recognized rather than invisible.
+
+What distinguishes Margaret from both working-age adults and the elderly is this particular position: she has capability, experience, and time, but declining economic resources and beginning health constraints. She's navigating the transition from being primarily a provider (through employment and active parenting) to being both provider (care contributions) and beginning recipient (health care, community support). The Value Scanner helps her maintain dignity and agency by making her continued contributions visible while connecting her to support that recognizes her as a valued community member, not a dependent burden.
 
 ## Core Needs
 
-[**TODO**: Identify 3-5 core needs this user type has that the value_scanner epic addresses:]
+- **Making Retirement Care Contributions Visible**: Margaret needs recognition that her retirement doesn't mean she stopped contributing to collective flourishing. She provides ~15 hours/week of grandchild care (market value ~$15k/year), volunteers with community organizations (~10 hours/week), supports her mother's care needs (~8 hours/week), and participates in neighborhood mutual aid. The Value Scanner makes all this visible through care token accumulation. When community resources are allocated, when family decisions are made, when civic opportunities arise—Margaret's contributions are quantified and valued. She experiences herself as a productive member of society, not a retired has-been.
 
-- **Need 1**: Description
-- **Need 2**: Description
-- **Need 3**: Description
-- **Need 4**: Description
-- **Need 5**: Description
+- **Managing Fixed Income with Dignity**: Margaret's ~$32k/year requires careful resource management. Unlike working-age adults, she can't increase income through additional employment—her resources are largely fixed. She needs sophisticated budgeting tools that help her maintain quality of life within constraint: identifying sales, optimizing nutrition per dollar, reducing waste, coordinating bulk purchases with neighbors, accessing community food resources without stigma. Her personal_agent helps her maintain independence and dignity while managing real scarcity.
+
+- **Navigating Changing Health Needs**: Margaret's dietary and nutritional needs are changing with age—she needs more protein and calcium, less sodium, medications affect her appetite and digestion, she's managing early-stage diabetes. The Value Scanner helps her shop for changing health requirements while managing budget constraints. Her personal_agent tracks nutrition across time, suggests appropriate foods, flags concerning patterns, and helps her maintain health through diet. She's learning to care for her aging body with tools that support her agency.
+
+- **Staying Connected to Family and Community**: Margaret needs tools that keep her embedded in care economy networks rather than isolated. The Value Scanner coordinates her grandchild care with her daughter's needs, tracks her mother's care requirements, connects her to community mutual aid opportunities, and facilitates neighborhood resource sharing. She's experiencing that community membership continues throughout life—she's not preparing to exit society, she's participating in different ways.
+
+- **Building Care Economy Resources for Future Aging**: Margaret is watching her mother (age 92) navigate advanced aging and recognizing her own future. She needs to build care economy resources now that will serve her in 10-20 years—accumulating care tokens through current contributions, building community relationships that will remain strong as she ages, establishing patterns of reciprocal care. The protocol helps her prepare for her own eventual increased care needs by building care economy capital now.
 
 ## Key Relationships
 
-[**TODO**: List the key relationships this user type has with other users, agents, or system components:]
+**To Grandchildren**: Margaret provides substantial care for her grandchildren—school pickups, after-school care, occasional overnight stays, teaching and mentoring. The Value Scanner makes this care labor visible to her daughter, who can quantify the economic value and express genuine appreciation. Margaret's care tokens accumulate, building resources she can use for future needs. She's experiencing grandparenting not as leisure activity but as valuable care contribution to family flourishing.
 
-- **related_user_1**: Description of relationship
-- **related_user_2**: Description of relationship
-- **agent_type**: Description of how they interact with Elohim agents
+**To Adult Children**: Margaret's relationship with her daughter involves reciprocal care—Margaret provides childcare and support, her daughter provides assistance with technology, transportation for medical appointments, and planning for Margaret's future care needs. The family_elohim coordinates these reciprocal care flows, preventing the invisibility that could lead to resentment or imbalance. They're building multigenerational care economy patterns.
+
+**To Aging Mother**: Margaret provides significant care coordination for her mother in assisted living—managing medical appointments, handling financial matters, providing emotional support, advocating within care systems. This care work is substantial and skilled (Margaret's nursing background helps), but traditionally invisible. The Value Scanner makes it visible and valuable, recognizing that elder care is sophisticated care labor.
+
+**To Spouse/Partner**: If partnered, Margaret coordinates household care economy with her spouse—managing resources together, distributing labor, supporting each other's health, maintaining relationship quality, and planning for their aging together. The household_elohim helps them navigate retirement transitions and maintain equity.
+
+**To Community**: Margaret participates actively in community care economy—volunteering with food banks, participating in neighborhood mutual aid, serving on community boards, mentoring younger community members. Her accumulated care contributions give her standing in community governance. The community_elohim coordinates her participation, connecting her skills and time to community needs.
+
+**To Personal Agent**: Margaret's personal_agent helps her navigate retirement complexity—managing fixed income, tracking changing health needs, coordinating care across generations, staying connected to community, and planning for future aging. Their relationship is deep partnership—the agent provides information and coordination support while respecting Margaret's full autonomy.
 
 ## Relevant Governance Layers
 
-[**TODO**: Determine which governance layers are relevant for this user type based on the principle of subsidiarity. Not all users operate at all layers.]
-
 ### Geographic/Political
 
-- **layer_name**: Brief description of what happens at this layer for this user
+**Individual Layer**
+Margaret maintains full autonomy over her choices, values, and life direction. Retirement increases her freedom to shape her own life. Her personal_agent serves her individual flourishing while connecting her to care networks.
+
+**Household Layer**
+Margaret's household governance involves coordinating with spouse (if applicable) or managing independently. She's establishing retirement household patterns that balance care contributions with personal well-being.
+
+**Family Layer**
+Margaret participates in multigenerational family governance—supporting adult children, caring for grandchildren, coordinating her mother's care, and planning for her own future needs. The family_elohim coordinates these complex care flows.
+
+**Neighborhood Layer**
+Margaret actively participates in neighborhood care economy—she's present, available, and engaged in ways that working-age adults often can't be. Her neighborhood contributions strengthen local resilience and build the social capital she'll rely on as she ages.
+
+**Community Layer**
+Margaret engages community governance as experienced participant—her decades of community involvement give her knowledge and standing. She shapes policy, leads initiatives, mentors younger adults, and builds care economy infrastructure.
+
+**Municipality Layer**
+Margaret's care economy participation connects to municipal systems—senior services, food access programs, health care access, community resource allocation. Her voice in municipal governance reflects her lived experience and continued contributions.
 
 ### Functional
 
-- **layer_name**: Brief description of functional domain relevance
+**Educational Layer**
+Margaret might participate in continuing education (learning for enjoyment), teach or mentor (sharing accumulated knowledge), or access senior educational programs. She's learning that education continues throughout life and that her knowledge is valuable to share.
+
+**Ecological/Bioregional Layer**
+Margaret's care practices often align with ecological stewardship—she's from a generation that knows how to reduce waste, preserve food, buy quality that lasts. Her personal_agent might help her share these skills with younger generations while adapting to new sustainability practices.
 
 ## Implementation Notes
 
-[**TODO**: Add any specific considerations for implementing scenarios for this user type:]
+- **Technical**: Interface must accommodate aging-related needs—larger fonts, high contrast, simple navigation, voice interface options, slower pace. Tools for fixed-income budgeting, nutrition tracking for health conditions, medication interaction awareness, multi-household care coordination, community connection facilitation. Integration with health systems, family communication platforms, community resources. Personal_agent should be patient, clear, and supportive without being patronizing.
 
-- Key technical requirements
-- Privacy considerations
-- Interface design needs
-- Data handling requirements
-- Unique constraints or opportunities
+- **Privacy**: Margaret controls her own data with full autonomy. She might share care contribution data with family to demonstrate her value, participate in community resource coordination, or maintain complete privacy. Health data is particularly sensitive—she determines what's shared with doctors, family, or community supports.
+
+- **Interface**: Design for older adults—accessibility is critical. Clear visual hierarchy, simple interactions, forgiving error recovery, persistent rather than time-limited displays, audio support, minimal cognitive load. Recognition of care contributions should be meaningful and specific. Interface should feel respectful and empowering, never patronizing or infantilizing.
+
+- **Constraints**: Health and safety monitoring becomes important—if Margaret's nutrition falls concerning levels, if her activity patterns suggest problems, if her care burden becomes overwhelming, protocol should surface support options. But intervention must preserve autonomy and dignity—she's a capable adult, not someone to be managed.
+
+- **Opportunities**: Seniors are often society's most invisible and undervalued population despite substantial care contributions. The Value Scanner can make senior care labor visible at scale—grandchild care, elder care, community volunteering, neighborhood building, civic participation. If millions of seniors' care contributions became visible simultaneously, society might recognize that "retirement" is actually transition to different forms of valuable work. This could transform retirement policy, senior services, community development, and cultural attitudes about aging. Margaret's generation has time, capability, and motivation to build care economy infrastructure—they could be powerful advocates and practitioners who establish care economy as normal community practice.

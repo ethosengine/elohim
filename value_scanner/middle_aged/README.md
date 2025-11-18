@@ -1,54 +1,89 @@
 ---
 epic: value_scanner
 user_type: middle_aged
-archetype_name: "Middle Aged"
+archetype_name: "Middle-Aged Adult in Established Life Stage"
 epic_domain: "Care Economy - Value recognition and exchange"
-governance_scope: [TO_BE_DEFINED]
-related_users: [TO_BE_DEFINED]
+governance_scope: [individual, household, family, neighborhood, community, municipality, workplace_organizational, industry_sector]
+related_users: [adult, senior, parent, grandparent, worker, caregiver]
 ---
 
-# Middle Aged - Value Scanner
+# Middle-Aged Adult - Value Scanner
 
 ## Archetype
 
-[**TODO**: Define the archetype for this user type. Describe who they are, their role in the value_scanner epic, age/demographics if relevant, and their relationship to the protocol.]
+Robert is 52 years old, established in his career as a mid-level manager, with two children (ages 19 and 22) launching into independence and parents (ages 78 and 75) requiring increasing support. He uses the Value Scanner to manage a complex web of care responsibilities: helping his young adult children navigate early independence while teaching them care economy practices, coordinating care for his aging parents across states, maintaining his household with his spouse, and managing his own health as aging begins to require more attention. His household income is $95k/year—comfortable but stretched across multiple generations' needs. His care contributions span four generations and multiple households.
+
+Robert represents the Established Life Stage (ages 46-64) of the Value Scanner epic—the demographic often called the "sandwich generation," providing care both upward and downward while preparing for their own aging and retirement. He's accumulated decades of care economy participation and is now leveraging that experience to support others while also building resources for his own later years. The protocol serves him by coordinating care across complex family networks, making his substantial care labor visible, and connecting him to community resources and governance opportunities.
+
+What distinguishes Robert from both younger and older adults is this particular position: established capability and resources meeting peak care responsibility. He has professional standing, economic stability, and life experience that enable him to carry substantial care burden—but he's also navigating the transition from being primarily a care provider to anticipating his own future care needs. The Value Scanner helps him manage this complexity while building care economy patterns that will serve him as he ages.
 
 ## Core Needs
 
-[**TODO**: Identify 3-5 core needs this user type has that the value_scanner epic addresses:]
+- **Coordinating Multigenerational Care**: Robert needs tools that help him manage care responsibilities across four generations simultaneously: his grandchildren (occasional care), his children (financial support, life guidance, care economy education), his own household (maintenance, planning), and his parents (increasing health management, financial coordination, eventual end-of-life care). His personal_agent coordinates across these contexts—tracking his parents' medication schedules, monitoring his children's financial independence progress, managing his own household economics, and preparing for grandparent care responsibilities. Without sophisticated coordination tools, he'd be overwhelmed.
 
-- **Need 1**: Description
-- **Need 2**: Description
-- **Need 3**: Description
-- **Need 4**: Description
-- **Need 5**: Description
+- **Balancing Care Work with Career Demands**: Robert's professional position involves substantial responsibility, but his care demands are also peaking. He needs workplace_elohim that helps him negotiate flexibility for parent care emergencies, advocate for care leave policies, and maintain professional standing while acknowledging care responsibilities. The protocol makes his care labor visible to employers, demonstrating that his care skills (coordination, resource management, emotional intelligence, crisis navigation) directly enhance his professional capability.
+
+- **Financial Planning Across Generations**: Robert is simultaneously supporting children's education, managing his own retirement planning, coordinating his parents' long-term care financing, and building resources for eventual grandchild support. He needs sophisticated financial tools that help him balance competing demands: how much to give children versus save for retirement, how to fund parents' care without depleting his own resources, how to build intergenerational wealth through care economy principles. His personal_agent provides multigenerational financial planning that balances immediate needs with long-term sustainability.
+
+- **Building Care Economy Leadership**: Robert's decades of care economy participation position him for community leadership. He needs opportunities to share his knowledge, influence care economy system development, and mentor younger generations. The protocol should recognize his accumulated care contributions and channel them toward governance participation—community boards, policy advocacy, system design input. His voice matters because he's lived care economy complexity and learned what works.
+
+- **Preparing for His Own Aging**: Robert is watching his parents navigate aging and recognizing his own future. He needs to build care economy resources that will serve him later—care tokens accumulating toward future support, community relationships that will remain as he ages, care practices that ensure he won't be isolated or invisible. The protocol helps him prepare for aging with dignity by building reciprocal care networks now.
 
 ## Key Relationships
 
-[**TODO**: List the key relationships this user type has with other users, agents, or system components:]
+**To Aging Parents**: Robert provides increasing care for his parents—coordinating medical appointments, managing medications, handling financial matters, navigating health systems, providing emotional support, and planning for eventual end-of-life care. The Value Scanner helps him track their needs across distance, coordinate care with siblings, manage resources, and ensure their care work for him throughout his life is reciprocated. The family_elohim coordinates multigenerational care flows, maintaining dignity for all parties.
 
-- **related_user_1**: Description of relationship
-- **related_user_2**: Description of relationship
-- **agent_type**: Description of how they interact with Elohim agents
+**To Adult Children**: Robert's relationship with his children is shifting from active parenting to adult partnership. He provides financial support, life guidance, and care economy education. The Value Scanner helps him teach them care economy practices he's learned, coordinate financial support appropriately, and maintain connection as they establish independence. He's modeling multigenerational care reciprocity—he cares for his parents, his children will someday care for him.
+
+**To Spouse/Partner**: Robert's partnership involves sophisticated care economy coordination—managing household together, distributing elder care responsibilities, supporting each other's careers, maintaining relationship health amid intense care demands, and planning for their own aging together. The household_elohim helps them maintain equity, prevent burnout, and preserve partnership amid overwhelming demands.
+
+**To Workplace/Colleagues**: Robert's professional relationships are affected by care economy participation. His workplace_elohim helps him advocate for policies that recognize care responsibilities, negotiate flexibility for care emergencies, and leverage care skills professionally. He's potentially influencing workplace culture toward care economy principles through his leadership position.
+
+**To Community**: Robert participates in community governance—serving on boards, leading initiatives, shaping policy, mentoring younger adults. His accumulated care contributions give him standing and credibility. The community_elohim coordinates his participation, connecting his experience to governance opportunities while preventing overcommitment.
+
+**To Personal Agent**: Robert's personal_agent manages enormous complexity across contexts, generations, and time horizons. It's his most important tool for maintaining coherent action amid competing demands. Their relationship is sophisticated partnership—the agent holds details Robert can't track while respecting his decision-making authority.
 
 ## Relevant Governance Layers
 
-[**TODO**: Determine which governance layers are relevant for this user type based on the principle of subsidiarity. Not all users operate at all layers.]
-
 ### Geographic/Political
 
-- **layer_name**: Brief description of what happens at this layer for this user
+**Individual Layer**
+Robert maintains individual autonomy and identity amid care demands. His personal_agent protects space for his own flourishing while serving his care responsibilities.
+
+**Household Layer**
+Robert's household governance involves sophisticated partnership with his spouse around resource management, labor distribution, and life planning.
+
+**Family Layer**
+Robert participates in family governance across multiple households—his parents', his own, his children's. He coordinates care flows, manages resources, navigates conflicts, and maintains family cohesion across generations and geography.
+
+**Neighborhood Layer**
+Robert actively participates in neighborhood care economy—resource sharing, mutual support, collective action, local improvement. His care contributions strengthen neighborhood resilience.
+
+**Community Layer**
+Robert engages community governance as both participant and leader—serving on boards, shaping policy, mentoring others, and building care economy infrastructure.
+
+**Municipality Layer**
+Robert's care economy participation connects to municipal systems—elder care policy, work-family balance programs, community resource allocation, civic infrastructure. His voice in municipal governance reflects decades of care economy experience.
 
 ### Functional
 
-- **layer_name**: Brief description of functional domain relevance
+**Workplace/Organizational Layer**
+Robert's professional position gives him influence over workplace governance. He can advocate for care-friendly policies, model care economy leadership, and shift organizational culture.
+
+**Industry/Sector Layer**
+Robert's accumulated professional experience might give him influence at industry level—shaping standards, influencing policy, advancing care economy principles across his sector.
+
+**Ecological/Bioregional Layer**
+Robert's consumption and care practices affect ecological systems. He's modeling sustainable care economy practices for younger generations and potentially influencing community-level ecological stewardship.
 
 ## Implementation Notes
 
-[**TODO**: Add any specific considerations for implementing scenarios for this user type:]
+- **Technical**: Interface must coordinate across multiple households, generations, and contexts. Sophisticated planning tools for multigenerational financial management, care coordination across distance, health management for aging parents, support tracking for adult children, household economics, community governance participation. Integration with medical systems, financial tools, communication platforms, calendar systems. Personal_agent needs very sophisticated AI to serve as genuine coordination partner across this complexity.
 
-- Key technical requirements
-- Privacy considerations
-- Interface design needs
-- Data handling requirements
-- Unique constraints or opportunities
+- **Privacy**: Complex privacy management across generations. Robert manages his parents' sensitive health and financial data, coordinates with siblings on care responsibilities, supports adult children while respecting their privacy, and participates in community governance with appropriate transparency. Different contexts require different privacy settings, all under Robert's control.
+
+- **Interface**: Design for competent professional managing extreme complexity. Information architecture must make complex data comprehensible. Planning tools must handle long time horizons and multiple scenarios. Communication features must coordinate across family members efficiently. Recognition of care contributions should be meaningful and specific. Interface should reduce cognitive load while providing powerful capabilities.
+
+- **Constraints**: Crisis support critical—elder care emergencies, adult child crises, health problems, financial shocks, workplace conflicts. Protocol must connect Robert to appropriate resources quickly while preserving dignity for all parties. System should watch for unsustainable burden and proactively surface support.
+
+- **Opportunities**: Middle-aged adults are simultaneously the most burdened by current care invisibility and the most capable of changing systems. Robert's generation controls substantial professional, economic, and political power. If they adopt care economy practices personally while advocating for systemic change professionally, transformation could happen rapidly. Robert's workplace advocacy could shift corporate culture. His community leadership could build care economy infrastructure. His parenting could teach the next generation. His elder care could model dignified aging. This demographic is positioned to transform care economy from alternative practice to mainstream normal. If the protocol serves them well, they'll leverage their positions to spread care economy principles throughout society's institutions.

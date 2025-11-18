@@ -1,54 +1,83 @@
 ---
 epic: value_scanner
 user_type: grandparent
-archetype_name: "Grandparent"
+archetype_name: "Grandparent as Care Provider and Elder"
 epic_domain: "Care Economy - Value recognition and exchange"
-governance_scope: [TO_BE_DEFINED]
-related_users: [TO_BE_DEFINED]
+governance_scope: [individual, household, family, neighborhood, community]
+related_users: [senior, middle_aged, parent, child, elderly]
 ---
 
 # Grandparent - Value Scanner
 
 ## Archetype
 
-[**TODO**: Define the archetype for this user type. Describe who they are, their role in the value_scanner epic, age/demographics if relevant, and their relationship to the protocol.]
+Margaret is 68, recently retired from nursing, and discovering that her grandparenting role is actually substantial care work, not leisurely spoiling. She provides childcare for her daughter Sarah's children (Tommy, 5, and Emma, 8) three days a week while Sarah works—roughly 25 hours/week of active childcare. She also shops with and for the grandchildren, teaches them family traditions and values, provides respite care for Sarah when needed, and serves as developmental support across their growing years. In traditional economics, Margaret's contribution is invisible—she's "just grandma" spending time with grandkids because she loves them. But her care labor saves Sarah ~$1,500/month in childcare costs and provides developmental benefits no paid care could match.
+
+Margaret uses the Value Scanner to coordinate her grandparenting care work across family contexts. When she shops with Tommy, the scanner coordinates with his parents' values and boundaries—she can honor Sarah's preference for low-sugar foods while still letting Tommy experience choice and wonder. When she provides childcare, her care contributions accumulate care tokens that make visible her substantial economic and developmental contribution. When she coordinates with Sarah on the children's needs, the family_elohim helps them work as partners in child-rearing rather than the fraught mother-in-law dynamics that often plague multigenerational care.
+
+What distinguishes Margaret from both parents and other seniors is this particular role: she's providing care across generational boundaries, serving both her adult children (supporting their ability to work and thrive) and her grandchildren (providing developmental care and family continuity). She's also navigating the transition from being primarily a provider to eventually needing care herself—her grandparenting builds care economy capital that will matter when she's the one requiring support. The protocol serves her by making her care work visible, coordinating complex multigenerational dynamics, and recognizing that grandparenting is care economy participation, not just leisure activity.
 
 ## Core Needs
 
-[**TODO**: Identify 3-5 core needs this user type has that the value_scanner epic addresses:]
+- **Recognition for Substantial Care Contributions**: Margaret needs her grandparenting labor to be visible and valued as the sophisticated work it actually is. She's not "babysitting" (watching children temporarily)—she's providing developmental care, educational support, emotional nurturing, and practical childcare. Her 25 hours/week represents ~$1,500/month in economic value (market rate childcare) plus immeasurable developmental benefits (family continuity, intergenerational wisdom, unconditional love). The Value Scanner makes this visible through care token accumulation—her contribution to family flourishing is quantified and valued.
 
-- **Need 1**: Description
-- **Need 2**: Description
-- **Need 3**: Description
-- **Need 4**: Description
-- **Need 5**: Description
+- **Coordinating Across Generational Boundaries**: Margaret needs tools that help her provide care that aligns with her adult children's values while preserving her own grandparent identity. The family_elohim coordinates between Sarah's parenting choices (sugar limits, screen time rules, developmental goals) and Margaret's grandparenting relationship (special treats, indulgence, fun). She's learning to honor parental authority while maintaining her unique role—not second parent but valued elder providing different care dimensions.
+
+- **Teaching Intergenerational Care Economy**: Margaret needs to pass on care economy values and practices to her grandchildren. The Value Scanner helps her teach Tommy and Emma that care creates value, that elders have wisdom to share, that families are reciprocal care networks across generations. She's modeling care economy principles through her actions—caring for them, coordinating with their parents, participating in family governance—showing them what multigenerational flourishing looks like.
+
+- **Building Care Economy Capital for Her Own Aging**: Margaret is conscious that she's watching her own mother (92) navigate advanced aging—and she's preparing. Her care contributions now (grandparenting, community volunteering, family support) accumulate care tokens that will matter when she needs care. She's building reciprocal care relationships that will remain strong as she ages—her grandchildren learning to value elders, her community recognizing her contributions, her family understanding care flows reciprocally across time.
+
+- **Maintaining Identity Beyond Utility**: Margaret needs recognition that her value isn't only her care contributions—she's a person with her own interests, development, and flourishing. The protocol should help her balance grandparenting with her own life (hobbies, friendships, continued learning, community participation). She's not just "grandma" or "free childcare"—she's Margaret, whose care for family is one dimension of her continued life and growth.
 
 ## Key Relationships
 
-[**TODO**: List the key relationships this user type has with other users, agents, or system components:]
+**To Grandchildren**: Margaret's relationship with Tommy and Emma is her primary joy and care focus. She provides practical childcare, developmental support, family continuity, and unconditional love. The Value Scanner helps her coordinate with their developmental stages (Tommy's wonder-preservation, Emma's growing autonomy) while maintaining her unique grandparent role. She's teaching them care economy principles through example and experience.
 
-- **related_user_1**: Description of relationship
-- **related_user_2**: Description of relationship
-- **agent_type**: Description of how they interact with Elohim agents
+**To Adult Children**: Margaret's relationship with Sarah (and potentially other adult children) is shifting from parent-child to adult partnership. She provides substantial support (childcare, respite, wisdom) while respecting Sarah's parental authority. The family_elohim helps them navigate this complex dynamic—Margaret isn't subordinate (following Sarah's orders) or superior (overriding Sarah's choices), but partner in shared care work. The protocol makes both their contributions visible, building mutual respect and recognition.
+
+**To Aging Parents**: Margaret provides care coordination for her own mother (92) while also caring for grandchildren—the "sandwich generation" reality. She's simultaneously teaching the next generation about elder care (her grandchildren watching her care for her mother) while managing actual care labor across generations. The Value Scanner helps coordinate this complexity.
+
+**To Spouse/Partner**: If partnered, Margaret coordinates grandparenting with her spouse—distributing care labor, managing impact on their household, balancing grandparenting with their own retirement plans. The household_elohim helps them maintain equity and partnership while providing substantial family care.
+
+**To Community**: Margaret participates in community care economy beyond family—volunteering, elder engagement, neighborhood support. Her care contributions span family and community contexts. She's building care economy networks that will serve her as she ages.
+
+**To Personal Agent**: Margaret's personal_agent helps her coordinate complex multigenerational care, maintain her own well-being while providing substantial care to others, and navigate the grandparent role with wisdom. The agent serves her autonomy and flourishing while supporting her care contributions.
 
 ## Relevant Governance Layers
 
-[**TODO**: Determine which governance layers are relevant for this user type based on the principle of subsidiarity. Not all users operate at all layers.]
-
 ### Geographic/Political
 
-- **layer_name**: Brief description of what happens at this layer for this user
+**Individual Layer**
+Margaret maintains individual autonomy and identity—she's not defined entirely by grandparenting. Her personal_agent protects space for her own development, interests, and life even as she provides substantial care to family.
+
+**Household Layer**
+Margaret's household governance involves coordinating with spouse (if applicable) around grandparenting's impact on their lives, resources, and plans. They're navigating retirement together while providing family support.
+
+**Family Layer**
+Margaret participates in multigenerational family governance—she's simultaneously daughter (to her 92-year-old mother), mother (to Sarah and potentially others), and grandmother (to Tommy and Emma). The family_elohim coordinates these complex relationships and reciprocal care flows.
+
+**Neighborhood Layer**
+Margaret engages neighborhood care economy—her presence and availability as a retired person strengthens neighborhood resilience. She might coordinate with other grandparents, participate in neighborhood care, and build community relationships.
+
+**Community Layer**
+Margaret participates in community governance and care economy—volunteering, serving on boards, building care networks, mentoring younger community members. Her accumulated care contributions give her standing and voice.
 
 ### Functional
 
-- **layer_name**: Brief description of functional domain relevance
+**Educational Layer**
+Margaret participates in educational contexts through her grandchildren—understanding their schooling, supporting their learning, teaching family wisdom and values. She's an educator in informal but profound ways.
+
+**Ecological/Bioregional Layer**
+Margaret often carries traditional knowledge about sustainable living, food preservation, seasonal patterns, and careful resource use—wisdom valuable to ecological care economy. She might teach her grandchildren these practices.
 
 ## Implementation Notes
 
-[**TODO**: Add any specific considerations for implementing scenarios for this user type:]
+- **Technical**: Interface must accommodate aging-related needs (larger fonts, clear navigation, voice options) while supporting complex coordination (grandchild care scheduling, family communication, care contribution tracking, multi-household coordination). Personal_agent should help her navigate the grandparent role with wisdom—coordinating with parents' values, supporting grandchildren's development, maintaining her own well-being.
 
-- Key technical requirements
-- Privacy considerations
-- Interface design needs
-- Data handling requirements
-- Unique constraints or opportunities
+- **Privacy**: Margaret manages privacy across generations—she sees some information about her grandchildren (to provide care) but Sarah controls what's shared. Margaret might share her care contributions with family to demonstrate value, but maintains privacy over her own life details. The protocol helps her navigate these boundaries clearly.
+
+- **Interface**: Design for older adult providing active care—accessibility features (size, contrast, simplicity) combined with sophisticated coordination tools. Recognition of care contributions should feel meaningful and specific. Interface should support her feeling valued and effective as grandparent.
+
+- **Constraints**: Health monitoring becomes relevant—if Margaret's care burden exceeds her capacity, if her health limits her ability to provide safe childcare, if she's sacrificing her own well-being unsustainably, protocol should surface support options or help renegotiate care arrangements appropriately.
+
+- **Opportunities**: Grandparents provide enormous care economy value that's almost completely invisible in traditional economics. If the Value Scanner makes grandparent care labor visible at scale, society might recognize that elders aren't just "retired" (exited from productivity) but actively contributing to collective flourishing through essential care work. Margaret's generation could demonstrate that multigenerational care economy creates value for everyone—parents get essential support, children get developmental benefits, grandparents get purpose and connection, families get resilience, communities get stability. This could transform cultural attitudes about aging, family structure, childcare policy, and intergenerational relationships. Visible grandparent contributions might also shift retirement policy (recognizing caregiving work) and housing patterns (supporting multigenerational households).
