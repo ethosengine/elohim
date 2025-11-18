@@ -1,54 +1,106 @@
 ---
 epic: public_observer
 user_type: politician
-archetype_name: "Politician"
-epic_domain: "Civic Democracy - Public oversight and participation"
-governance_scope: [TO_BE_DEFINED]
-related_users: [TO_BE_DEFINED]
+archetype_name: "Elected Representative"
+epic_domain: "Civic Democracy - Public oversight and democratic participation"
+governance_scope: [municipality, district, provincial, state]
+related_users: [citizen, parent, activist, community_organizer, board_member, developer_interests]
 ---
 
 # Politician - Public Observer
 
 ## Archetype
 
-[**TODO**: Define the archetype for this user type. Describe who they are, their role in the public_observer epic, age/demographics if relevant, and their relationship to the protocol.]
+The politician archetype represents elected officials at various levels of government—city council members, mayors, county commissioners, state legislators, school board members who've professionalized beyond volunteer status. These are people who sought public office (ideally) to serve their communities and (realistically) navigate complex pressures: constituent demands, party expectations, donor relationships, media dynamics, special interest lobbying, bureaucratic constraints, and political ambition. Most enter office with genuine intent to improve their communities; systemic pressures and information asymmetry gradually erode many into either cynicism or capture by organized interests. Some maintain integrity against these pressures but struggle with overwhelming complexity and conflicting constituent needs.
+
+Politicians face a democratic paradox: they're supposed to represent broad public interest but they hear disproportionately from narrow interests—developers with lawyers, unions with organizers, activist groups with sophisticated advocacy capacity, wealthy donors with access. Average working families don't have lobbyists. Politicians may genuinely want to serve the quiet majority but have no efficient mechanism for understanding what they need. Town halls get dominated by loudest voices. Surveys are manipulated. Social media is toxic and unrepresentative. Staff resources are limited. The result is well-intentioned politicians relying on incomplete information and making decisions that may not align with actual constituent wellbeing because they simply don't see the full picture.
+
+Public Observers fundamentally change this information environment. For good-faith politicians, Observers become a mechanism for actually understanding constituent needs, impacts, and priorities—not just hearing from who shows up or who can afford lobbyists. Observers surface community patterns (which neighborhoods need infrastructure investment, which policies actually improve outcomes, whether campaign rhetoric matches governing reality), track accountability (are my votes aligned with stated values and constituent needs?), and facilitate genuine constituent engagement at scale. For bad-faith politicians captured by special interests, Observers create uncomfortable transparency—making it harder to serve donors while claiming to serve constituents, harder to hide impacts of decisions, harder to escape accountability for votes and commitments. The system doesn't assume politician intent; it makes actual behavior visible and lets constituents judge.
 
 ## Core Needs
 
-[**TODO**: Identify 3-5 core needs this user type has that the public_observer epic addresses:]
+- **Constituent Intelligence at Scale**: Politicians need to understand what their constituents actually need and care about, not just what lobbyists and loud voices demand. A city council member represents 50,000 people; maybe 20 attend typical meetings, mostly retirees and activists with time/capacity. What about working parents, shift workers, immigrants, disabled residents—people whose absence from meetings doesn't mean absence of needs? Observers surface constituent patterns from civic engagement, service usage, and community indicators: 230 families losing 90 minutes daily to bus delays, senior centers underutilized because of access barriers, small business struggling with permit complexity. This helps politicians align policy with actual constituent wellbeing rather than just who's loudest.
 
-- **Need 1**: Description
-- **Need 2**: Description
-- **Need 3**: Description
-- **Need 4**: Description
-- **Need 5**: Description
+- **Decision Impact Analysis**: Politicians need to understand real consequences of policy decisions before voting, not just glossy presentations from proponents and worst-case scenarios from opponents. A development proposal comes with rosy projections from developers and dire warnings from activists—what will actually happen? Observers provide evidence-based analysis: developer's track record on past projects, infrastructure impacts based on actual capacity, economic benefits distributed to whom, community costs and trade-offs. This helps politicians make informed decisions rather than just political calculations about who to please or offend.
+
+- **Accountability Partnership**: Good-faith politicians want accountability systems that help them keep commitments and build constituent trust. They make promises in campaigns, commitments in meetings, pledges to communities—then get overwhelmed by office demands and lose track. Observers serve as accountability partner: tracking commitments made, monitoring follow-through, alerting when deadlines approach, documenting delivery on promises. This helps politicians governed by integrity rather than just surviving by forgetting what they said. Politicians who want to be held accountable can use Observers as commitment tracking system; those who prefer to dodge accountability face unavoidable transparency.
+
+- **Coalition and Consensus Building**: Politicians need to build coalitions for policy initiatives—understanding who shares interests, who has concerns, where compromise is possible. Observers help by surfacing alignment patterns (which constituent groups care about this issue?), identifying stakeholders to engage, tracking negotiation positions and evolution, and facilitating multi-stakeholder deliberation. A politician championing affordable housing sees Observer data on coalition potential: tenant organizations, labor unions, faith communities, senior advocates all share interest—Observer facilitates bringing them to table for policy design.
+
+- **Protection from Manipulation**: Politicians are constant targets of manipulation—astroturf campaigns presenting as grassroots, coordinated lobbying presenting as citizen concern, misleading data from special interests, media hit pieces funded by opponents. Observers help politicians distinguish genuine constituent sentiment from manufactured pressure by: verifying whether campaigns are grassroots or astroturf, fact-checking claims in testimony and lobbying, tracking funding sources behind advocacy, and surfacing whether constituent communications are authentic or coordinated. A politician faces flood of emails opposing rent control, Observer reveals they're template messages from industry lobbying firm, helps politician distinguish from genuine constituent concern.
 
 ## Key Relationships
 
-[**TODO**: List the key relationships this user type has with other users, agents, or system components:]
+**To Citizens and Parents**: Politicians represent constituents and are accountable to them (in functional democracy). Citizens and parents are the ultimate source of democratic legitimacy and electoral accountability. Observers change this relationship by making politician votes and decisions visible to constituents in comprehensible ways, facilitating constituent input at scale (not just who attends meetings), and tracking whether politician actions align with constituent needs versus other pressures. This creates incentives for politicians to genuinely represent constituent interests and costs for those who prioritize donors or party over community. A council member sees Observer data showing their votes on housing policy harm working families in their district—faces electoral pressure to realign or explain.
 
-- **related_user_1**: Description of relationship
-- **related_user_2**: Description of relationship
-- **agent_type**: Description of how they interact with Elohim agents
+**To Activists and Organizers**: Politicians relate to activists and organizers as sources of constituent mobilization, policy expertise, and electoral support—or opposition. Sophisticated politicians build relationships with community organizations because they represent authentic constituent bases. Observers help politicians distinguish between: (1) activists who represent organized communities and should be taken seriously, (2) single-issue advocates with expertise but limited base, and (3) astroturf campaigns with funding but no authentic community support. This helps politicians prioritize engagement and understand when organized opposition or support is genuine versus manufactured.
+
+**To Board Members**: Politicians (especially at municipal and state levels) often interact with volunteer boards making consequential local decisions—school boards, planning commissions, housing authorities. Politicians may appoint board members, set board budgets and authority, or depend on boards implementing policies. Observers help by making board decisions visible to politicians (what's actually happening with school board budget decisions?), tracking coordination or conflict between political and board priorities, and surfacing when board capture or dysfunction requires political intervention.
+
+**To Journalists**: Politicians have complex relationships with journalists—needing coverage for communication and accountability, fearing negative framing or "gotcha" journalism. Honest politicians appreciate journalists who report accurately; dishonest ones fear exposure. Observers change media dynamics by providing fact base both journalists and politicians must reckon with—politicians can't as easily spin their records when Observers document votes and impacts, journalists can fact-check politician claims in real-time. This creates pressure for honesty and specificity over sound bites and evasion.
+
+**To Developer Interests**: Politicians constantly interact with business and development interests—sources of campaign funding, economic activity, jobs, tax revenue, but also potential sources of corruption and policy capture. Honest politicians want to balance economic development with community wellbeing; captured politicians prioritize developer profits while performing community concern. Observers make this distinction visible by: tracking campaign contributions from developers, monitoring votes on development projects against stated priorities, calculating actual community costs and benefits of projects, and exposing when politician rhetoric diverges from voting behavior. A politician who claims to support affordable housing but votes for luxury development subsidies faces Observer data making contradiction undeniable.
+
+**To Other Politicians**: Politicians collaborate and compete with colleagues in councils, legislatures, party structures. Observers affect these relationships by making vote trading and coalition building more visible, tracking which politicians actually deliver versus perform, and surfacing voting patterns and alignments. This can facilitate coalition building (seeing who shares priorities) but reduces backroom dealing that contradicts public commitments.
+
+**With Elohim Agents**:
+- **Public_observer agent**: Provides meeting documentation, constituent sentiment analysis, decision impact projections, accountability tracking
+- **Municipal_elohim agent**: Offers comprehensive view of municipal operations, budget analysis, policy implementation tracking, cross-department pattern recognition
+- **Constituent_elohim agent**: Aggregates constituent needs, priorities, and feedback from across civic engagement touchpoints
+- **Regional_elohim agent**: Provides comparison data from other jurisdictions, policy outcome analysis, best practice identification
 
 ## Relevant Governance Layers
 
-[**TODO**: Determine which governance layers are relevant for this user type based on the principle of subsidiarity. Not all users operate at all layers.]
-
 ### Geographic/Political
 
-- **layer_name**: Brief description of what happens at this layer for this user
+**Municipality Layer**
+City and town politicians (council members, mayors, commissioners) govern at the scale where most daily life infrastructure operates: local budgets, zoning and development, police and fire services, parks and recreation, local roads and transit, business licensing, housing policy within state constraints. Municipal politicians make consequential decisions affecting thousands or hundreds of thousands of residents but often have limited staff, conflicting pressures, and inadequate information. Observers help municipal politicians by: providing comprehensive view of municipal operations and needs, tracking implementation of policies they vote for, surfacing constituent priorities across diverse neighborhoods, analyzing budget trade-offs and impacts, and monitoring whether municipal bureaucracy is responsive to political direction. A council member uses Observer data to see which neighborhoods receive infrastructure investment, which are neglected—advocates for equity in budget process.
+
+**Provincial/State Layer**
+State legislators govern at larger scale with more complexity: state budgets allocating billions, legislation affecting millions, bureaucracies with thousands of employees, and pressure from sophisticated lobbying operations. State politicians often have better staff resources than municipal but face even more complexity and conflicting information. Observers help state politicians by: tracking policy implementation across multiple state agencies, analyzing statewide patterns and disparities, providing constituent impact analysis for legislation, surfacing alignment between local experiences and state policy, and monitoring whether state agencies deliver on legislative intent. A state legislator sees Observer data showing education funding formula creates massive disparities between districts—sponsors reform legislation with evidence of impact.
+
+**District Layer**
+For school board members who've become professional politicians (paid position, full-time work, political aspirations), the district layer requires understanding complex education systems, budgets, labor relations, and community needs. These politicians govern institutions affecting thousands of children and families with limited direct service experience. Observers help district politicians by: making school operations visible, tracking resource distribution and outcomes across schools, surfacing parent and teacher concerns, analyzing budget decisions and trade-offs, and monitoring implementation of board policies. A board member uses Observer data to see how transportation cuts affect specific families and neighborhoods—advocates for budget reprioritization.
 
 ### Functional
 
-- **layer_name**: Brief description of functional domain relevance
+**Educational Layer**
+Politicians at all levels engage with education: school board members governing districts, city politicians with budget authority over schools, state legislators setting education policy and funding. Education policy is technically complex, politically contentious, and deeply important to constituent families. Observers help education politicians by: translating education jargon and complexity, analyzing student outcome patterns and equity gaps, tracking resource distribution and spending, surfacing parent and teacher priorities, and monitoring whether education policies achieve stated goals. A state legislator champions education equity legislation using Observer data on resource gaps and outcome disparities across districts.
+
+**Ecological Layer**
+Environmental and climate policy increasingly demands political attention—constituents care about air quality, park access, climate adaptation, sustainability. Politicians need to balance environmental protection with economic development, short-term costs with long-term resilience. Observers help environmental politicians by: documenting environmental conditions and disparities, tracking climate and sustainability commitments against implementation, analyzing environmental policy impacts, surfacing constituent environmental priorities, and connecting local environmental decisions to regional patterns. A city council member sees Observer data on pollution concentration in low-income neighborhoods, champions environmental justice policy requiring equitable facility siting.
+
+**Workplace Layer**
+Labor and economic policy matters to politicians through: worker constituent needs, business community relationships, economic development priorities, municipal employment as major employer. Politicians balance worker interests with business interests, short-term economic activity with long-term community wellbeing. Observers help by: documenting wage and labor conditions, tracking economic development subsidy outcomes (jobs and tax revenue promised versus delivered), surfacing worker and employer perspectives, and analyzing economic policy impacts on different populations. A politician champions living wage ordinance using Observer data on local wage patterns and public subsidy to low-wage employers.
 
 ## Implementation Notes
 
-[**TODO**: Add any specific considerations for implementing scenarios for this user type:]
+- **Technical**:
+  - Politician dashboard showing: constituent sentiment and priorities, pending decisions and impact analysis, accountability tracking (commitments made and kept), voting record analysis and alignment with values
+  - Decision support tools: evidence-based impact analysis for legislation and policies, stakeholder mapping for coalition building, comparison data from other jurisdictions
+  - Constituent engagement platform: facilitating two-way communication at scale, town halls augmented with Observer data, constituent feedback aggregation and analysis
+  - Vote tracking and explanation: helping politicians explain votes to constituents with data and context, tracking vote alignment with stated priorities
+  - Campaign promise integration: tracking campaign commitments through governing, alerting when deadline approaches or conflict arises
+  - Integration with legislative and council management systems
 
-- Key technical requirements
-- Privacy considerations
-- Interface design needs
-- Data handling requirements
-- Unique constraints or opportunities
+- **Privacy**:
+  - Politicians are public figures—their votes, statements, and official actions are appropriately public and subject to scrutiny
+  - But politicians retain privacy in: personal family life unrelated to office, deliberative conversations needed for honest negotiation, whistleblower communications about corruption
+  - Observers track public behavior (votes, statements, meetings) not private life
+  - Protection from harassment while maintaining accountability—contact info for official business without exposing to abuse
+  - Distinction between legitimate criticism and coordinated harassment campaigns
+
+- **Interface**:
+  - Desktop and mobile: politicians need deep analysis for decision-making (desktop) but also constituent engagement on the go (mobile)
+  - Executive summary mode: politicians are time-constrained, need key information quickly with option to drill into detail
+  - Constituent communication tools: responding to constituent concerns with data, explaining votes and positions with evidence, town hall and public engagement support
+  - Comparison and learning from peers: how do other jurisdictions handle similar issues, which policies work, what do successful politicians do differently
+  - Accountability transparency: politicians can see their own accountability data before constituents do, allowing proactive explanation of votes and priorities rather than defensive reaction
+
+- **Democratic Health**:
+  - Politicians strengthen democracy when they genuinely represent constituent needs, make informed decisions, keep commitments, and accept accountability—Observers help good-faith politicians do this more effectively
+  - Observers also strengthen democracy by making bad-faith politicians visible—those captured by special interests, those who lie to constituents, those who prioritize personal benefit over public service face transparency they can't escape
+  - Failure modes to avoid: Creating paralysis where politicians can't make hard decisions for fear of accountability, enabling manipulation through selective data framing, replacing political judgment with technocratic metrics, facilitating harassment campaigns against politicians
+  - Success metrics: Better alignment between politician actions and constituent needs, increased constituent trust in responsive politicians, electoral accountability for unresponsive politicians, improved policy outcomes
+  - Key principle: Observers serve democratic accountability—they help good politicians serve better and make bad politicians visible, but don't replace the political work of representation, negotiation, judgment, and leadership
+  - Recognition that not all constituent preferences should be followed (tyranny of majority, informed leadership sometimes requires unpopular decisions)—Observers make decisions visible and politicians must explain, but democratic leadership isn't just polling
