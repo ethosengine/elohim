@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 import { ContentNode } from '../models/content-node.model';
 import { DocumentGraphService } from './document-graph.service';
 import { DocumentNodeAdapter } from '../adapters/document-node.adapter';
@@ -19,8 +19,8 @@ export interface PathNode {
   providedIn: 'root'
 })
 export class LearningPathService {
-  private pathSubject = new BehaviorSubject<PathNode[]>([]);
-  public path$ = this.pathSubject.asObservable();
+  private readonly pathSubject = new BehaviorSubject<PathNode[]>([]);
+  public readonly path$ = this.pathSubject.asObservable();
 
   /**
    * Default learning path order - the suggested sequence for understanding Elohim
@@ -43,7 +43,7 @@ export class LearningPathService {
     { id: 'deployment/staging-validation.feature', category: 'technical', depth: 1 },
   ];
 
-  constructor(private graphService: DocumentGraphService) {
+  constructor(private readonly graphService: DocumentGraphService) {
     this.initializePath();
   }
 
@@ -135,7 +135,7 @@ export class LearningPathService {
     if (path.length === 0) return 0;
 
     const engagedCount = path.filter(pn =>
-      (affinityMap.get(pn.node.id) || 0) > 0
+      (affinityMap.get(pn.node.id) ?? 0) > 0
     ).length;
 
     return (engagedCount / path.length) * 100;

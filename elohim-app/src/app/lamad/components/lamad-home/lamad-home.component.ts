@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Router, RouterModule } from '@angular/router';
 import { Subject, combineLatest } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -31,13 +32,14 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   isGraphExpanded = true;
   isLoading = true;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly graphService: DocumentGraphService,
     private readonly affinityService: AffinityTrackingService,
     private readonly pathService: LearningPathService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -221,9 +223,17 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Get current position in the learning path (1-indexed)
+   */
+  getCurrentPosition(): number {
+    if (!this.selectedNode) return 0;
+    return this.pathNodes.findIndex(pn => pn.node.id === this.selectedNode?.id) + 1;
+  }
+
+  /**
    * Render markdown content (simple version)
    */
-  renderMarkdown(content: string): string {
+  renderMarkdown(content: string): SafeHtml {
     if (!content) return '';
 
     let html = content;
@@ -251,19 +261,19 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     // Line breaks
     html = html.replace(/\n/g, '<br>');
 
-    return html;
+    return this.sanitizer.sanitize(1, html) ?? '';
   }
 
   /**
    * Render Gherkin content
    */
-  renderGherkin(content: string): string {
+  renderGherkin(content: string): SafeHtml {
     if (!content) return '';
 
     const lines = content.split('\n');
     const keywords = ['Feature:', 'Background:', 'Scenario:', 'Scenario Outline:', 'Given', 'When', 'Then', 'And', 'But', 'Examples:'];
 
-    return lines
+    const html = lines
       .map((line) => {
         const trimmed = line.trim();
         let className = '';
@@ -281,6 +291,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
         return `<div class="${className}">${this.escapeHtml(line)}</div>`;
       })
       .join('');
+
+    return this.sanitizer.sanitize(1, html) ?? '';
   }
 
   /**

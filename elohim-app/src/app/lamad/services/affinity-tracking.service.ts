@@ -24,14 +24,14 @@ export class AffinityTrackingService {
   private readonly AUTO_INCREMENT_DELTA = 0.2; // Bump on first view
   private readonly AUTO_INCREMENT_THRESHOLD = 0.01; // Only auto-increment if below this
 
-  private affinitySubject = new BehaviorSubject<UserAffinity>(
+  private readonly affinitySubject = new BehaviorSubject<UserAffinity>(
     this.loadFromStorage()
   );
-  private changeSubject = new BehaviorSubject<AffinityChangeEvent | null>(null);
+  private readonly changeSubject = new BehaviorSubject<AffinityChangeEvent | null>(null);
 
-  public affinity$: Observable<UserAffinity> =
+  public readonly affinity$: Observable<UserAffinity> =
     this.affinitySubject.asObservable();
-  public changes$: Observable<AffinityChangeEvent | null> =
+  public readonly changes$: Observable<AffinityChangeEvent | null> =
     this.changeSubject.asObservable();
 
   constructor() {}
@@ -42,8 +42,7 @@ export class AffinityTrackingService {
    * @returns Affinity value (0.0 to 1.0), defaults to 0.0
    */
   getAffinity(nodeId: string): number {
-    const affinity = this.affinitySubject.value.affinity[nodeId];
-    return affinity !== undefined ? affinity : 0.0;
+    return this.affinitySubject.value.affinity[nodeId] ?? 0.0;
   }
 
   /**
