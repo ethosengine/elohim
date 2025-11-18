@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elohim-config-alpha
+  namespace: ethosengine
+data:
+  config.json: |
+    {
+      "logLevel": "debug",
+      "environment": "alpha"
+    }

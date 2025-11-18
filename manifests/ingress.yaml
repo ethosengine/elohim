@@ -29,6 +29,16 @@ spec:
               number: 80
         path: /
         pathType: Prefix
+  - host: alpha.elohim.host
+    http:
+      paths:
+      - backend:
+          service:
+            name: elohim-site-alpha-service
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
   tls:
   - hosts:
     - elohim.host
@@ -36,3 +46,6 @@ spec:
   - hosts:
     - staging.elohim.host
     secretName: staging-elohim-site-tls-cert
+  - hosts:
+    - alpha.elohim.host
+    secretName: alpha-elohim-site-tls-cert
