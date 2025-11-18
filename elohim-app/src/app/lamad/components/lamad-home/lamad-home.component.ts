@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Router, RouterModule } from '@angular/router';
 import { Subject, combineLatest } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -37,7 +38,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     private readonly graphService: DocumentGraphService,
     private readonly affinityService: AffinityTrackingService,
     private readonly pathService: LearningPathService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -231,7 +233,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   /**
    * Render markdown content (simple version)
    */
-  renderMarkdown(content: string): string {
+  renderMarkdown(content: string): SafeHtml {
     if (!content) return '';
 
     let html = content;
@@ -259,19 +261,19 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     // Line breaks
     html = html.replace(/\n/g, '<br>');
 
-    return html;
+    return this.sanitizer.sanitize(1, html) || '';
   }
 
   /**
    * Render Gherkin content
    */
-  renderGherkin(content: string): string {
+  renderGherkin(content: string): SafeHtml {
     if (!content) return '';
 
     const lines = content.split('\n');
     const keywords = ['Feature:', 'Background:', 'Scenario:', 'Scenario Outline:', 'Given', 'When', 'Then', 'And', 'But', 'Examples:'];
 
-    return lines
+    const html = lines
       .map((line) => {
         const trimmed = line.trim();
         let className = '';
@@ -289,6 +291,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
         return `<div class="${className}">${this.escapeHtml(line)}</div>`;
       })
       .join('');
+
+    return this.sanitizer.sanitize(1, html) || '';
   }
 
   /**

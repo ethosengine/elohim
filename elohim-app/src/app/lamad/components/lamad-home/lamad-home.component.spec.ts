@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
+import { DomSanitizer } from '@angular/platform-browser';
 import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
@@ -131,12 +132,17 @@ describe('LamadHomeComponent', () => {
       getPathProgress: jasmine.createSpy('getPathProgress').and.returnValue(50)
     };
 
+    const mockSanitizer = {
+      sanitize: jasmine.createSpy('sanitize').and.callFake((context: any, value: string) => value)
+    };
+
     await TestBed.configureTestingModule({
       imports: [LamadHomeComponent],
       providers: [
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
         { provide: AffinityTrackingService, useValue: mockAffinityService },
         { provide: LearningPathService, useValue: mockLearningPathService },
+        { provide: DomSanitizer, useValue: mockSanitizer },
         provideRouter([])
       ]
     }).compileComponents();
