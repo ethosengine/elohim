@@ -6,76 +6,79 @@ This file tracks which scenario files need to be created for the `vulnerable_tem
 
 ## Instructions
 
-1. **Review README.md** to understand this user's archetype, needs, and relationships
-2. **Determine Relevant Layers**: Based on subsidiarity principle, identify which governance layers this user operates at
-3. **Create Scenario Files**: For each relevant layer, create a scenario file in `scenarios/[layer_name].md`
-4. **Update Checklist**: Check off items as scenario files are created
+1. **Review Global Documentation**: First, review `/docs/manifesto.md` and `/docs/hardware-spec.md` to understand the Elohim Protocol vision and technical foundation
+2. **Review README.md**: Then review this directory's README.md to understand this user's archetype, needs, and relationships
+3. **Determine Relevant Layers**: Based on subsidiarity principle, identify which governance layers this user operates at
+4. **Create BDD Feature Files**: For each relevant layer, create a Gherkin .feature file in `scenarios/[layer_name].feature` that captures practical, testable BDD implementation needs aligned with the manifesto and epic documentation
+5. **Update Checklist**: Check off items as feature files are created
 
-## Required Scenario Files
+## Required BDD Feature Files
 
 ### Geographic/Political Layers
 
-[**TODO**: Check which of these layers are relevant for vulnerable_temporary, then create scenario files accordingly]
+[**TODO**: Check which of these layers are relevant for vulnerable_temporary, then create Gherkin .feature files accordingly]
 
-- [ ] `scenarios/individual.md` - Personal/individual level scenarios
-- [ ] `scenarios/family.md` - Family unit scenarios
-- [ ] `scenarios/neighborhood.md` - Neighborhood level scenarios
-- [ ] `scenarios/community.md` - Local community scenarios
-- [ ] `scenarios/district.md` - District/ward level scenarios
-- [ ] `scenarios/municipality.md` - City/municipal level scenarios
-- [ ] `scenarios/county_regional.md` - County/regional level scenarios
-- [ ] `scenarios/provincial_state.md` - State/provincial level scenarios
-- [ ] `scenarios/nation_state.md` - National level scenarios
-- [ ] `scenarios/continental.md` - Continental/bloc level scenarios
-- [ ] `scenarios/global.md` - Global level scenarios
+- [ ] `scenarios/individual.feature` - Personal/individual level BDD scenarios
+- [ ] `scenarios/family.feature` - Family unit scenarios
+- [ ] `scenarios/neighborhood.feature` - Neighborhood level BDD scenarios
+- [ ] `scenarios/community.feature` - Local community scenarios
+- [ ] `scenarios/district.feature` - District/ward level BDD scenarios
+- [ ] `scenarios/municipality.feature` - City/municipal level BDD scenarios
+- [ ] `scenarios/county_regional.feature` - County/regional level BDD scenarios
+- [ ] `scenarios/provincial_state.feature` - State/provincial level BDD scenarios
+- [ ] `scenarios/nation_state.feature` - National level BDD scenarios
+- [ ] `scenarios/continental.feature` - Continental/bloc level BDD scenarios
+- [ ] `scenarios/global.feature` - Global level BDD scenarios
 
 ### Functional Layers
 
 [**TODO**: Check which of these functional domains are relevant for vulnerable_temporary]
 
-- [ ] `scenarios/workplace_organizational.md` - Workplace/organizational scenarios
-- [ ] `scenarios/educational.md` - Educational institution scenarios
-- [ ] `scenarios/ecological_bioregional.md` - Ecological/bioregional scenarios
-- [ ] `scenarios/cultural_linguistic.md` - Cultural/linguistic community scenarios
-- [ ] `scenarios/industry_sector.md` - Industry sector scenarios
-- [ ] `scenarios/affinity_network.md` - Affinity network scenarios
+- [ ] `scenarios/workplace_organizational.feature` - Workplace/organizational scenarios
+- [ ] `scenarios/educational.feature` - Educational institution scenarios
+- [ ] `scenarios/ecological_bioregional.feature` - Ecological/bioregional scenarios
+- [ ] `scenarios/cultural_linguistic.feature` - Cultural/linguistic community scenarios
+- [ ] `scenarios/industry_sector.feature` - Industry sector scenarios
+- [ ] `scenarios/affinity_network.feature` - Affinity network scenarios
 
-## Scenario File Format
+## BDD Feature File Format
 
-Each scenario file should follow this structure:
+Each .feature file should follow Gherkin BDD syntax with metadata tags:
 
-```yaml
----
-epic: value_scanner
-user_type: vulnerable_temporary
-governance_layer: [layer_name]
-scene: [specific_scene_name]
-related_users: [list_of_related_users]
-related_layers: [list_of_related_layers]
-interacts_with: [list_of_elohim_agents]
----
+```gherkin
+@epic:value_scanner
+@user_type:vulnerable_temporary
+@governance_layer:[layer_name]
+@related_users:[user1,user2]
+@related_layers:[layer1,layer2]
+@elohim_agents:[agent1,agent2]
 
-# [Layer Name] Scenario - Vulnerable Temporary
+Feature: [Layer Name] [Epic Context] for Vulnerable Temporary
+  As a vulnerable_temporary in the value_scanner system
+  Operating at the [layer_name] governance layer
+  I want to [core need/goal]
+  So that [benefit aligned with manifesto principles]
 
-## Context
+  Background:
+    Given the Elohim Protocol is operational
+    And the vulnerable_temporary user is registered in the system
+    And the [layer_name] governance context is active
 
-[Describe the situation and setting]
+  Scenario: [Specific testable scenario name]
+    Given [initial context/preconditions]
+    And [additional context if needed]
+    When [action or event occurs]
+    And [additional actions if needed]
+    Then [expected outcome]
+    And [protocol interactions]
+    And [value recognition/exchange occurs]
 
-## User Story
+  Scenario: [Another testable scenario]
+    Given [context]
+    When [action]
+    Then [outcome]
 
-[Tell the story of what happens in this scenario]
-
-## Governance Context
-
-[Explain how this governance layer operates in this scenario]
-
-## Protocol Interactions
-
-[Detail how the Elohim Protocol components interact in this scenario]
-
-## Outcomes
-
-[Describe what happens as a result]
+  # Additional scenarios as needed to cover user needs and protocol behaviors
 ```
 
 ## Implementation Priority
