@@ -182,12 +182,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Navigate to content viewer
    */
   viewContent(node: ContentNodeWithAffinity): void {
-    // Navigate to epic panes view for epics, regular content viewer for others
-    if (node.contentType === 'epic') {
-      this.router.navigate(['/lamad/epic', node.id]);
-    } else {
-      this.router.navigate(['/lamad/content', node.id]);
-    }
+    this.router.navigate(['/lamad/content', node.id]);
   }
 
   /**

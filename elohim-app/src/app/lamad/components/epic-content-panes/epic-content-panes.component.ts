@@ -175,7 +175,7 @@ export class EpicContentPanesComponent implements OnInit, OnDestroy {
   }
 
   viewRelatedEpic(epic: EpicNode): void {
-    this.router.navigate(['/lamad/epic', epic.id]);
+    this.router.navigate(['/lamad/content', epic.id]);
   }
 
   getFeatureStatusClass(feature: FeatureNode): string {

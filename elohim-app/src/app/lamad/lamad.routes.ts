@@ -23,13 +23,6 @@ export const LAMAD_ROUTES: Routes = [
           )
       },
       {
-        path: 'epic/:id',
-        loadComponent: () =>
-          import('./components/epic-content-panes/epic-content-panes.component').then(
-            m => m.EpicContentPanesComponent
-          )
-      },
-      {
         path: 'content/:id',
         loadComponent: () =>
           import('./components/content-viewer/content-viewer.component').then(
