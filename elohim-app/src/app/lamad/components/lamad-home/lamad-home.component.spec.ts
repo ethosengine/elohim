@@ -1,98 +1,101 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { DomSanitizer } from '@angular/platform-browser';
 import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { LearningPathService } from '../../services/learning-path.service';
-import { DocumentGraph } from '../../models';
-import { ContentNode } from '../../models/content-node.model';
+import { DocumentGraph, EpicNode, FeatureNode, ScenarioNode } from '../../models';
 
 describe('LamadHomeComponent', () => {
   let component: LamadHomeComponent;
   let fixture: ComponentFixture<LamadHomeComponent>;
   let mockDocumentGraphService: any;
   let mockAffinityService: any;
-  let mockLearningPathService: any;
   let graphSubject: BehaviorSubject<DocumentGraph | null>;
-  let pathSubject: BehaviorSubject<any[]>;
-  let affinitySubject: BehaviorSubject<any>;
   let changesSubject: BehaviorSubject<any>;
 
-  const mockContentNode: ContentNode = {
-    id: 'manifesto.md',
-    contentType: 'epic',
-    title: 'Elohim Manifesto',
-    description: 'The founding vision',
-    content: '# Test Content',
-    contentFormat: 'markdown',
-    tags: [],
+  const mockEpicNode: EpicNode = {
+    id: 'epic-social-medium-v1',
+    type: 'epic' as const,
+    title: 'Social Medium',
+    description: 'Building a decentralized social platform',
+    tags: ['social', 'platform'],
+    sourcePath: '/epics/social-medium.md',
+    content: '# Social Medium Epic',
     relatedNodeIds: [],
-    metadata: {
-      category: 'vision'
-    }
+    metadata: { category: 'social' },
+    category: 'social',
+    featureIds: ['feature-affinity-tracking', 'feature-content-graph'],
+    relatedEpicIds: [],
+    markdownContent: '# Social Medium Epic',
+    sections: []
   };
 
-  const mockPathNodes = [
-    {
-      node: mockContentNode,
-      order: 0,
-      depth: 0,
-      category: 'vision'
-    }
-  ];
+  const mockFeatureNode: FeatureNode = {
+    id: 'feature-affinity-tracking',
+    type: 'feature' as const,
+    title: 'Affinity Tracking',
+    description: 'Track user engagement and affinity',
+    tags: ['engagement'],
+    sourcePath: '/features/affinity-tracking.feature',
+    content: 'Feature: Affinity Tracking',
+    relatedNodeIds: [],
+    metadata: { category: 'social' },
+    category: 'social',
+    epicId: 'epic-social-medium-v1',
+    scenarioIds: [],
+    gherkinContent: 'Feature: Affinity Tracking'
+  };
+
+  const mockScenarioNode: ScenarioNode = {
+    id: 'scenario-track-view',
+    type: 'scenario' as const,
+    title: 'Track Content View',
+    description: 'Automatically track when user views content',
+    tags: ['tracking'],
+    sourcePath: '/features/affinity-tracking.feature',
+    content: 'Scenario: Track Content View',
+    relatedNodeIds: [],
+    metadata: {},
+    featureId: 'feature-affinity-tracking',
+    gherkinContent: 'Scenario: Track Content View'
+  };
 
   const mockGraph: Partial<DocumentGraph> = {
     nodes: new Map([
-      ['manifesto.md', {
-        id: 'manifesto.md',
-        type: 'epic' as const,
-        title: 'Elohim Manifesto',
-        description: 'The founding vision',
-        tags: [],
-        sourcePath: '',
-        content: '# Test Content',
-        relatedNodeIds: [],
-        metadata: { category: 'vision' },
-        category: 'vision',
-        featureIds: [],
-        relatedEpicIds: [],
-        markdownContent: '# Test Content',
-        sections: []
-      }]
+      ['epic-social-medium-v1', mockEpicNode],
+      ['feature-affinity-tracking', mockFeatureNode],
+      ['scenario-track-view', mockScenarioNode]
     ]),
     relationships: new Map(),
     nodesByType: {
-      epics: new Map(),
-      features: new Map(),
-      scenarios: new Map()
+      epics: new Map([['epic-social-medium-v1', mockEpicNode]]),
+      features: new Map([['feature-affinity-tracking', mockFeatureNode]]),
+      scenarios: new Map([['scenario-track-view', mockScenarioNode]])
     },
     nodesByTag: new Map(),
     nodesByCategory: new Map(),
     adjacency: new Map(),
     reverseAdjacency: new Map(),
     metadata: {
-      nodeCount: 1,
+      nodeCount: 3,
       relationshipCount: 0,
       lastBuilt: new Date(),
       sources: {
-        epicPath: '',
-        featurePath: ''
+        epicPath: '/epics',
+        featurePath: '/features'
       },
       stats: {
         epicCount: 1,
-        featureCount: 0,
-        scenarioCount: 0,
-        averageConnectionsPerNode: 0
+        featureCount: 1,
+        scenarioCount: 1,
+        averageConnectionsPerNode: 0.5
       }
     }
   } as DocumentGraph;
 
   beforeEach(async () => {
     graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph as DocumentGraph);
-    pathSubject = new BehaviorSubject<any[]>(mockPathNodes);
-    affinitySubject = new BehaviorSubject<any>({});
     changesSubject = new BehaviorSubject<any>(null);
 
     mockDocumentGraphService = {
@@ -106,34 +109,19 @@ describe('LamadHomeComponent', () => {
       incrementAffinity: jasmine.createSpy('incrementAffinity'),
       setAffinity: jasmine.createSpy('setAffinity'),
       getStats: jasmine.createSpy('getStats').and.returnValue({
-        totalNodes: 1,
-        engagedNodes: 1,
-        averageAffinity: 0.5,
+        totalNodes: 3,
+        engagedNodes: 2,
+        averageAffinity: 0.6,
         distribution: {
-          unseen: 0,
+          unseen: 1,
           low: 0,
           medium: 1,
-          high: 0
+          high: 1
         },
         byCategory: new Map(),
         byType: new Map()
       }),
-      affinity$: affinitySubject.asObservable(),
       changes$: changesSubject.asObservable()
-    };
-
-    mockLearningPathService = {
-      path$: pathSubject.asObservable(),
-      getPath: jasmine.createSpy('getPath').and.returnValue(mockPathNodes),
-      getNextNode: jasmine.createSpy('getNextNode').and.returnValue(null),
-      getPreviousNode: jasmine.createSpy('getPreviousNode').and.returnValue(null),
-      getNodePosition: jasmine.createSpy('getNodePosition').and.returnValue(0),
-      isInPath: jasmine.createSpy('isInPath').and.returnValue(true),
-      getPathProgress: jasmine.createSpy('getPathProgress').and.returnValue(50)
-    };
-
-    const mockSanitizer = {
-      sanitize: jasmine.createSpy('sanitize').and.callFake((context: any, value: string) => value)
     };
 
     await TestBed.configureTestingModule({
@@ -141,8 +129,6 @@ describe('LamadHomeComponent', () => {
       providers: [
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
         { provide: AffinityTrackingService, useValue: mockAffinityService },
-        { provide: LearningPathService, useValue: mockLearningPathService },
-        { provide: DomSanitizer, useValue: mockSanitizer },
         provideRouter([])
       ]
     }).compileComponents();
@@ -155,168 +141,141 @@ describe('LamadHomeComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load learning path on init', () => {
+  it('should load epics from graph on init', () => {
     fixture.detectChanges();
 
-    expect(component.pathNodes.length).toBe(1);
-    expect(component.pathNodes[0].node.title).toBe('Elohim Manifesto');
+    expect(component.epics.length).toBe(1);
+    expect(component.epics[0].title).toBe('Social Medium');
+    expect(component.epics[0].id).toBe('epic-social-medium-v1');
   });
 
-  it('should select first node on init', () => {
+  it('should load features from graph on init', () => {
     fixture.detectChanges();
 
-    expect(component.selectedNode).toBeTruthy();
-    expect(component.selectedNode?.id).toBe('manifesto.md');
+    expect(component.features.length).toBe(1);
+    expect(component.features[0].title).toBe('Affinity Tracking');
   });
 
-  it('should load affinity stats', () => {
+  it('should load scenarios from graph on init', () => {
+    fixture.detectChanges();
+
+    expect(component.scenarios.length).toBe(1);
+    expect(component.scenarios[0].title).toBe('Track Content View');
+  });
+
+  it('should load stats from graph metadata', () => {
+    fixture.detectChanges();
+
+    expect(component.stats).toBeTruthy();
+    expect(component.stats.epicCount).toBe(1);
+    expect(component.stats.featureCount).toBe(1);
+    expect(component.stats.scenarioCount).toBe(1);
+    expect(component.stats.averageConnectionsPerNode).toBe(0.5);
+  });
+
+  it('should load affinity stats on init', () => {
     fixture.detectChanges();
 
     expect(component.affinityStats).toBeTruthy();
-    expect(component.affinityStats?.totalNodes).toBe(1);
-    expect(component.affinityStats?.engagedNodes).toBe(1);
+    expect(component.affinityStats?.totalNodes).toBe(3);
+    expect(component.affinityStats?.engagedNodes).toBe(2);
+    expect(component.affinityStats?.averageAffinity).toBe(0.6);
+  });
+
+  it('should update affinity stats when affinity changes', () => {
+    fixture.detectChanges();
+
+    const newStats = {
+      totalNodes: 3,
+      engagedNodes: 3,
+      averageAffinity: 0.8,
+      distribution: {
+        unseen: 0,
+        low: 0,
+        medium: 1,
+        high: 2
+      },
+      byCategory: new Map(),
+      byType: new Map()
+    };
+    mockAffinityService.getStats.and.returnValue(newStats);
+
+    changesSubject.next({ nodeId: 'epic-social-medium-v1', newValue: 0.9 });
+
+    expect(component.affinityStats?.engagedNodes).toBe(3);
+    expect(component.affinityStats?.averageAffinity).toBe(0.8);
   });
 
   it('should handle null graph gracefully', () => {
     graphSubject.next(null);
     fixture.detectChanges();
 
-    expect(component.isLoading).toBe(true);
+    expect(component.epics.length).toBe(0);
+    expect(component.features.length).toBe(0);
+    expect(component.scenarios.length).toBe(0);
   });
 
-  it('should return correct affinity level', () => {
-    expect(component.getAffinityLevel(0)).toBe('unseen');
-    expect(component.getAffinityLevel(0.2)).toBe('low');
-    expect(component.getAffinityLevel(0.5)).toBe('medium');
-    expect(component.getAffinityLevel(0.8)).toBe('high');
-  });
-
-  it('should return correct affinity percentage', () => {
-    expect(component.getAffinityPercentage(0.5)).toBe(50);
-    expect(component.getAffinityPercentage(0.75)).toBe(75);
-    expect(component.getAffinityPercentage(1.0)).toBe(100);
-  });
-
-  it('should return correct content type icons', () => {
-    expect(component.getContentTypeIcon('epic')).toBe('📖');
-    expect(component.getContentTypeIcon('feature')).toBe('⚙️');
-    expect(component.getContentTypeIcon('scenario')).toBe('✓');
-    expect(component.getContentTypeIcon('unknown')).toBe('📄');
-  });
-
-  it('should return correct category display names', () => {
-    expect(component.getCategoryDisplay('vision')).toBe('Vision');
-    expect(component.getCategoryDisplay('core')).toBe('Core Concepts');
-    expect(component.getCategoryDisplay('advanced')).toBe('Advanced');
-    expect(component.getCategoryDisplay('systemic')).toBe('Systemic View');
-    expect(component.getCategoryDisplay('implementation')).toBe('Implementation');
-    expect(component.getCategoryDisplay('technical')).toBe('Technical');
-  });
-
-  it('should select node and track view', () => {
+  it('should get epic category', () => {
     fixture.detectChanges();
-    const node = mockContentNode;
+    const epic = component.epics[0];
 
-    component.selectNode(node);
+    const category = component.getEpicCategory(epic);
 
-    expect(component.selectedNode).toBe(node);
-    expect(mockAffinityService.trackView).toHaveBeenCalledWith(node.id);
+    expect(category).toBe('social');
   });
 
-  it('should toggle graph expansion', () => {
+  it('should return "general" for epic without category', () => {
+    const epicWithoutCategory: EpicNode = {
+      ...mockEpicNode,
+      category: undefined
+    };
+
+    const category = component.getEpicCategory(epicWithoutCategory);
+
+    expect(category).toBe('general');
+  });
+
+  it('should get feature category', () => {
     fixture.detectChanges();
-    const initialState = component.isGraphExpanded;
+    const feature = component.features[0];
 
-    component.toggleGraph();
+    const category = component.getFeatureCategory(feature);
 
-    expect(component.isGraphExpanded).toBe(!initialState);
+    expect(category).toBe('social');
   });
 
-  it('should adjust affinity', () => {
+  it('should return "general" for feature without category', () => {
+    const featureWithoutCategory: FeatureNode = {
+      ...mockFeatureNode,
+      category: undefined
+    };
+
+    const category = component.getFeatureCategory(featureWithoutCategory);
+
+    expect(category).toBe('general');
+  });
+
+  it('should return correct category icons', () => {
+    expect(component.getCategoryIcon('observer')).toBe('👁️');
+    expect(component.getCategoryIcon('value-scanner')).toBe('🔍');
+    expect(component.getCategoryIcon('autonomous-entity')).toBe('🤖');
+    expect(component.getCategoryIcon('social')).toBe('🌐');
+    expect(component.getCategoryIcon('deployment')).toBe('🚀');
+    expect(component.getCategoryIcon('general')).toBe('📄');
+  });
+
+  it('should return default icon for unknown category', () => {
+    expect(component.getCategoryIcon('unknown')).toBe('📄');
+  });
+
+  it('should unsubscribe on destroy', () => {
     fixture.detectChanges();
-    component.selectedNode = mockContentNode;
+    const destroySpy = spyOn(component['destroy$'], 'next');
+    const completeSpy = spyOn(component['destroy$'], 'complete');
 
-    component.adjustAffinity(0.1);
+    component.ngOnDestroy();
 
-    expect(mockAffinityService.incrementAffinity).toHaveBeenCalledWith(mockContentNode.id, 0.1);
-  });
-
-  it('should navigate to next node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-    const nextNode = { ...mockContentNode, id: 'next-node' };
-    mockLearningPathService.getNextNode.and.returnValue({ node: nextNode, order: 1, depth: 0, category: 'core' });
-
-    component.goToNext();
-
-    expect(mockLearningPathService.getNextNode).toHaveBeenCalledWith(mockContentNode.id);
-  });
-
-  it('should navigate to previous node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-    const prevNode = { ...mockContentNode, id: 'prev-node' };
-    mockLearningPathService.getPreviousNode.and.returnValue({ node: prevNode, order: 0, depth: 0, category: 'vision' });
-
-    component.goToPrevious();
-
-    expect(mockLearningPathService.getPreviousNode).toHaveBeenCalledWith(mockContentNode.id);
-  });
-
-  it('should check if has next node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-
-    const hasNext = component.hasNext();
-
-    expect(mockLearningPathService.getNextNode).toHaveBeenCalled();
-    expect(hasNext).toBe(false);
-  });
-
-  it('should check if has previous node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-
-    const hasPrev = component.hasPrevious();
-
-    expect(mockLearningPathService.getPreviousNode).toHaveBeenCalled();
-    expect(hasPrev).toBe(false);
-  });
-
-  it('should render markdown content', () => {
-    const markdown = '# Heading\n**Bold** text';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<h1>Heading</h1>');
-    expect(html).toContain('<strong>Bold</strong>');
-  });
-
-  it('should render gherkin content', () => {
-    const gherkin = 'Feature: Test\n@tag\nScenario: Test scenario';
-    const html = component.renderGherkin(gherkin);
-
-    expect(html).toContain('gherkin-keyword');
-    expect(html).toContain('gherkin-tag');
-  });
-
-  it('should get current position in path', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-    component.pathNodes = [
-      { node: mockContentNode, order: 0, depth: 0, category: 'vision', affinity: 0.5, affinityLevel: 'medium' }
-    ];
-
-    const position = component.getCurrentPosition();
-
-    expect(position).toBe(1);
-  });
-
-  it('should return 0 for current position when no node selected', () => {
-    fixture.detectChanges();
-    component.selectedNode = null;
-
-    const position = component.getCurrentPosition();
-
-    expect(position).toBe(0);
+    expect(destroySpy).toHaveBeenCalled();
+    expect(completeSpy).toHaveBeenCalled();
   });
 });
