@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { DocumentGraph, EpicNode, FeatureNode, ScenarioNode } from '../../models';
+import { DocumentGraph, EpicNode, FeatureNode, ScenarioNode, NodeType } from '../../models';
 
 describe('LamadHomeComponent', () => {
   let component: LamadHomeComponent;
@@ -16,7 +16,7 @@ describe('LamadHomeComponent', () => {
 
   const mockEpicNode: EpicNode = {
     id: 'epic-social-medium-v1',
-    type: 'epic' as const,
+    type: NodeType.EPIC,
     title: 'Social Medium',
     description: 'Building a decentralized social platform',
     tags: ['social', 'platform'],
@@ -33,7 +33,7 @@ describe('LamadHomeComponent', () => {
 
   const mockFeatureNode: FeatureNode = {
     id: 'feature-affinity-tracking',
-    type: 'feature' as const,
+    type: NodeType.FEATURE,
     title: 'Affinity Tracking',
     description: 'Track user engagement and affinity',
     tags: ['engagement'],
@@ -49,7 +49,7 @@ describe('LamadHomeComponent', () => {
 
   const mockScenarioNode: ScenarioNode = {
     id: 'scenario-track-view',
-    type: 'scenario' as const,
+    type: NodeType.SCENARIO,
     title: 'Track Content View',
     description: 'Automatically track when user views content',
     tags: ['tracking'],
@@ -61,7 +61,7 @@ describe('LamadHomeComponent', () => {
     gherkinContent: 'Scenario: Track Content View'
   };
 
-  const mockGraph: Partial<DocumentGraph> = {
+  const mockGraph: DocumentGraph = {
     nodes: new Map([
       ['epic-social-medium-v1', mockEpicNode],
       ['feature-affinity-tracking', mockFeatureNode],
@@ -92,14 +92,14 @@ describe('LamadHomeComponent', () => {
         averageConnectionsPerNode: 0.5
       }
     }
-  } as DocumentGraph;
+  };
 
   beforeEach(async () => {
-    graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph as DocumentGraph);
+    graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph);
     changesSubject = new BehaviorSubject<any>(null);
 
     mockDocumentGraphService = {
-      getGraph: jasmine.createSpy('getGraph').and.returnValue(mockGraph as DocumentGraph),
+      getGraph: jasmine.createSpy('getGraph').and.returnValue(mockGraph),
       graph$: graphSubject.asObservable()
     };
 
@@ -247,7 +247,7 @@ describe('LamadHomeComponent', () => {
   it('should return "general" for feature without category', () => {
     const featureWithoutCategory: FeatureNode = {
       ...mockFeatureNode,
-      category: undefined
+      category: 'general'
     };
 
     const category = component.getFeatureCategory(featureWithoutCategory);
