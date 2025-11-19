@@ -345,6 +345,9 @@
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   cursor: pointer;
   transition: transform .1s;
+  border: none;
+  padding: 0;
+  font-family: inherit;
 }
 
 .hexagon-chip:hover {
@@ -413,6 +416,9 @@
   cursor: pointer;
   transition: all .2s;
   box-shadow: 0 2px 4px rgba(0, 0, 0, .05);
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
 }
 
 .epic-card:hover {
@@ -640,6 +646,9 @@
   background: rgba(0, 0, 0, 0.5);
   z-index: 40;
   backdrop-filter: blur(2px);
+  border: none;
+  padding: 0;
+  cursor: default;
 }
 
 @media(max-width:768px) {

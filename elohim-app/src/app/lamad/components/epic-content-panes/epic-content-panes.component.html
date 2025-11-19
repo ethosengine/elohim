@@ -82,15 +82,12 @@
       </div>
 
       <div class="feature-grid" *ngIf="features.length > 0">
-        <div
+        <button
           *ngFor="let feature of features"
           class="feature-card"
           [class]="getFeatureStatusClass(feature)"
           (click)="viewFeature(feature)"
-          (keydown.enter)="viewFeature(feature)"
-          (keydown.space)="viewFeature(feature)"
-          tabindex="0"
-          role="button">
+          type="button">
           <div class="card-header">
             <h3 class="feature-title">{{ feature.title }}</h3>
             <span class="status-indicator" *ngIf="feature.testStatus">
@@ -106,7 +103,7 @@
               {{ feature.category }}
             </span>
           </div>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -124,15 +121,12 @@
       </div>
 
       <div class="scenario-list" *ngIf="scenarios.length > 0">
-        <div
+        <button
           *ngFor="let scenario of scenarios"
           class="scenario-card"
           [class]="getScenarioStatusClass(scenario)"
           (click)="viewScenario(scenario)"
-          (keydown.enter)="viewScenario(scenario)"
-          (keydown.space)="viewScenario(scenario)"
-          tabindex="0"
-          role="button">
+          type="button">
           <div class="card-header">
             <div class="scenario-type-badge">{{ scenario.scenarioType }}</div>
             <h3 class="scenario-title">{{ scenario.title }}</h3>
@@ -153,7 +147,7 @@
               Last run: {{ scenario.testStatus.lastRun | date: 'short' }}
             </span>
           </div>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -171,14 +165,11 @@
       </div>
 
       <div class="related-epic-grid" *ngIf="relatedEpics.length > 0">
-        <div
+        <button
           *ngFor="let relatedEpic of relatedEpics"
           class="epic-card"
           (click)="viewRelatedEpic(relatedEpic)"
-          (keydown.enter)="viewRelatedEpic(relatedEpic)"
-          (keydown.space)="viewRelatedEpic(relatedEpic)"
-          tabindex="0"
-          role="button">
+          type="button">
           <div class="card-header">
             <h3 class="epic-title">{{ relatedEpic.title }}</h3>
             <span class="category-badge" *ngIf="relatedEpic.category">
@@ -191,7 +182,7 @@
               {{ relatedEpic.featureIds.length }} feature{{ relatedEpic.featureIds.length !== 1 ? 's' : '' }}
             </span>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   </div>

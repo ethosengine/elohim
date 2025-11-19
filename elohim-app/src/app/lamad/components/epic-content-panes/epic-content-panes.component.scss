@@ -251,6 +251,9 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
 
   &:hover {
     transform: translateY(-2px);
@@ -340,6 +343,9 @@
   padding: 1.25rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
 
   &:hover {
     border-color: var(--primary-color, #1976d2);

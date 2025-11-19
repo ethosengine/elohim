@@ -9,15 +9,13 @@
   <div *ngIf="!isLoading" class="three-panel-layout">
 
     <!-- Mobile Sidebar Backdrop -->
-    <div class="sidebar-backdrop"
+    <button class="sidebar-backdrop"
          *ngIf="isSidebarOpen"
          (click)="closeSidebar()"
-         (keydown.enter)="closeSidebar()"
          (keydown.escape)="closeSidebar()"
-         tabindex="0"
-         role="button"
+         type="button"
          aria-label="Close sidebar">
-    </div>
+    </button>
 
     <!-- LEFT SIDEBAR: Navigation Menu -->
     <aside class="nav-sidebar" [class.open]="isSidebarOpen">
@@ -101,17 +99,14 @@
 
             <!-- Hexagon Grid -->
             <div class="hexagon-grid">
-              <div *ngFor="let node of allContentNodes"
+              <button *ngFor="let node of allContentNodes"
                    class="hexagon-chip"
                    [class]="'affinity-' + node.affinityLevel"
                    [title]="node.title + ' (' + getAffinityPercentage(node.affinity) + '%)'"
                    (click)="selectNode(node)"
-                   (keydown.enter)="selectNode(node)"
-                   (keydown.space)="selectNode(node)"
-                   tabindex="0"
-                   role="button"
+                   type="button"
                    [attr.aria-label]="node.title">
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -126,13 +121,10 @@
            <p class="home-subtitle">Explore the epics below to begin your journey.</p>
            
            <div class="epic-grid">
-             <div *ngFor="let item of sidebarNodes"
+             <button *ngFor="let item of sidebarNodes"
                   class="epic-card"
                   (click)="selectNode(item.node)"
-                  (keydown.enter)="selectNode(item.node)"
-                  (keydown.space)="selectNode(item.node)"
-                  tabindex="0"
-                  role="button"
+                  type="button"
                   [attr.aria-label]="item.node.title">
                 <div class="epic-card-header">
                   <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
@@ -149,7 +141,7 @@
                      </div>
                    </div>
                 </div>
-             </div>
+             </button>
            </div>
         </div>
 
