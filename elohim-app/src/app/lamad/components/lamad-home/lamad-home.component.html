@@ -28,29 +28,9 @@
                 (click)="selectNode(pathNode.node)"
                 (keydown.enter)="selectNode(pathNode.node)"
                 type="button">
-
-          <!-- Node Info -->
-          <div class="path-item-content">
-            <div class="path-item-header">
-              <span class="path-order">{{ i + 1 }}</span>
-              <span class="path-icon">{{ getContentTypeIcon(pathNode.node.contentType) }}</span>
-              <span class="path-title">{{ pathNode.node.title }}</span>
-            </div>
-
-            <!-- Affinity Indicator -->
-            <div class="affinity-indicator"
-                 [class.affinity-unseen]="pathNode.affinityLevel === 'unseen'"
-                 [class.affinity-low]="pathNode.affinityLevel === 'low'"
-                 [class.affinity-medium]="pathNode.affinityLevel === 'medium'"
-                 [class.affinity-high]="pathNode.affinityLevel === 'high'">
-              <div class="affinity-dot"></div>
-            </div>
-          </div>
-
-          <!-- Category Badge -->
-          <div class="category-badge" *ngIf="pathNode.depth === 0">
-            {{ getCategoryDisplay(pathNode.category) }}
-          </div>
+          <span class="path-order">{{ i + 1 }}</span>
+          <span class="path-icon">{{ getContentTypeIcon(pathNode.node.contentType) }}</span>
+          <span class="path-title">{{ pathNode.node.title }}</span>
         </button>
       </nav>
 
