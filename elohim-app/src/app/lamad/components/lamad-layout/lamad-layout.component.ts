@@ -3,6 +3,8 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/rou
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DocumentGraphService } from '../../services/document-graph.service';
+import { AffinityTrackingService } from '../../services/affinity-tracking.service';
+import { combineLatest } from 'rxjs';
 
 @Component({
   selector: 'app-lamad-layout',
@@ -14,9 +16,12 @@ import { DocumentGraphService } from '../../services/document-graph.service';
 export class LamadLayoutComponent implements OnInit {
   searchQuery = '';
   isGraphBuilding = true;
+  learningPathName = 'Elohim Protocol';
+  masteryPercentage = 0;
 
   constructor(
     private readonly documentGraphService: DocumentGraphService,
+    private readonly affinityTrackingService: AffinityTrackingService,
     private readonly router: Router
   ) {}
 
@@ -26,11 +31,20 @@ export class LamadLayoutComponent implements OnInit {
       next: graph => {
         console.log('Lamad content graph built successfully', graph.metadata);
         this.isGraphBuilding = false;
+        this.updateMasteryPercentage();
       },
       error: err => {
         console.error('Failed to build content graph:', err);
         this.isGraphBuilding = false;
       }
+    });
+
+    // Subscribe to affinity changes to update progress in real-time
+    combineLatest([
+      this.documentGraphService.graph$,
+      this.affinityTrackingService.affinity$
+    ]).subscribe(() => {
+      this.updateMasteryPercentage();
     });
   }
 
@@ -39,6 +53,15 @@ export class LamadLayoutComponent implements OnInit {
       this.router.navigate(['/lamad/search'], {
         queryParams: { q: this.searchQuery }
       });
+    }
+  }
+
+  private updateMasteryPercentage(): void {
+    const graph = this.documentGraphService.getGraph();
+    if (graph && graph.nodes.size > 0) {
+      const nodes = Array.from(graph.nodes.values());
+      const stats = this.affinityTrackingService.getStats(nodes);
+      this.masteryPercentage = Math.round(stats.averageAffinity * 100);
     }
   }
 }

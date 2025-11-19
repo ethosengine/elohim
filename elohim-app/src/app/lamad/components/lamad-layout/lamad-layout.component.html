@@ -9,6 +9,19 @@
         <p class="subtitle">Learning Platform - Where Understanding is Earned</p>
       </div>
 
+      <!-- Learning Path Progress Widget -->
+      <div class="learning-path-widget" *ngIf="!isGraphBuilding">
+        <div class="path-info">
+          <div class="path-name">{{ learningPathName }}</div>
+          <div class="path-progress">
+            <div class="progress-bar-container">
+              <div class="progress-bar" [style.width.%]="masteryPercentage"></div>
+            </div>
+            <div class="progress-text">{{ masteryPercentage }}% to mastery</div>
+          </div>
+        </div>
+      </div>
+
       <nav class="lamad-nav">
         <a routerLink="/lamad" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
         <a routerLink="/lamad/map" routerLinkActive="active">Meaning Map</a>
