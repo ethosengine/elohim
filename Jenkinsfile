@@ -249,6 +249,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 not {
                     anyOf {
+                        branch 'dev'
                         expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
                         expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                         expression { return env.BRANCH_NAME.contains('alpha') }
