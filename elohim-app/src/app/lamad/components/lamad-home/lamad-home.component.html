@@ -8,209 +8,200 @@
   <!-- Main Three-Panel Layout -->
   <div *ngIf="!isLoading" class="three-panel-layout">
 
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" 
+         *ngIf="isSidebarOpen" 
+         (click)="closeSidebar()">
+    </div>
+
     <!-- LEFT SIDEBAR: Navigation Menu -->
-    <aside class="nav-sidebar">
+    <aside class="nav-sidebar" [class.open]="isSidebarOpen">
       <div class="sidebar-header">
-        <h2 class="sidebar-title">Learning Path</h2>
-        <div class="path-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" [style.width.%]="getPathProgress()"></div>
-          </div>
-          <span class="progress-text">{{ getPathProgress() | number:'1.0-0' }}% explored</span>
-        </div>
+        <h2 class="sidebar-title">Elohim</h2>
+        <button class="close-sidebar-btn" (click)="toggleSidebar()">✕</button>
       </div>
 
       <nav class="path-nav">
-        <button *ngFor="let pathNode of pathNodes; let i = index"
+        <!-- Overview / Home Link -->
+        <button class="path-item overview-item"
+                [class.selected]="!selectedNode"
+                (click)="goHome()"
+                type="button">
+          <span class="path-icon">📊</span>
+          <span class="path-title">Overview</span>
+        </button>
+
+        <div class="nav-divider"></div>
+        <div class="nav-section-label">Epics</div>
+
+        <button *ngFor="let pathNode of sidebarNodes; let i = index"
                 class="path-item"
                 [class.selected]="selectedNode?.id === pathNode.node.id"
-                [class.depth-1]="pathNode.depth === 1"
                 (click)="selectNode(pathNode.node)"
                 (keydown.enter)="selectNode(pathNode.node)"
                 type="button">
-          <span class="path-order">{{ i + 1 }}</span>
           <span class="path-icon">{{ getContentTypeIcon(pathNode.node.contentType) }}</span>
           <span class="path-title">{{ pathNode.node.title }}</span>
         </button>
       </nav>
-
-      <!-- Sidebar Footer -->
-      <div class="sidebar-footer">
-        <a routerLink="/lamad/map" class="sidebar-link">
-          🗺️ View Full Map
-        </a>
-        <a routerLink="/lamad/search" class="sidebar-link">
-          🔍 Search Content
-        </a>
-      </div>
     </aside>
 
     <!-- RIGHT CONTENT AREA -->
     <main class="content-area">
 
-      <!-- TOP: Graph Visualization -->
-      <section class="graph-section" [class.collapsed]="!isGraphExpanded">
-        <button class="graph-header"
-                (click)="toggleGraph()"
-                (keydown.enter)="toggleGraph()"
-                type="button">
-          <h3 class="graph-title">
-            <span class="graph-icon">📊</span>
-            At-a-Glance Overview
-          </h3>
-          <span class="toggle-btn" [class.rotated]="!isGraphExpanded">
-            ▼
-          </span>
-        </button>
-
-        <div class="graph-content" *ngIf="isGraphExpanded && affinityStats">
-          <!-- Stats Grid -->
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Total Content</div>
-              <div class="stat-value">{{ affinityStats.totalNodes }}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Explored</div>
-              <div class="stat-value">{{ affinityStats.engagedNodes }}</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Avg Affinity</div>
-              <div class="stat-value">{{ (affinityStats.averageAffinity * 100) | number:'1.0-0' }}%</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Path Progress</div>
-              <div class="stat-value">{{ getPathProgress() | number:'1.0-0' }}%</div>
-            </div>
+      <!-- UNIFIED TOOLBAR -->
+      <header class="lamad-toolbar">
+        <!-- Left: Navigation Controls -->
+        <div class="toolbar-left">
+          <button class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Toggle Sidebar">
+            ☰
+          </button>
+          
+          <!-- Breadcrumbs -->
+          <div class="toolbar-breadcrumbs">
+             <button class="breadcrumb-link" (click)="goHome()">Home</button>
+             <ng-container *ngIf="selectedNode">
+               <span class="separator">/</span>
+               <span class="current-node">{{ selectedNode.title }}</span>
+             </ng-container>
           </div>
+        </div>
 
-          <!-- Affinity Distribution -->
-          <div class="distribution-viz">
-            <div class="distribution-bar-container">
-              <div class="distribution-segment unseen"
-                   [style.flex]="affinityStats.distribution.unseen"
-                   [title]="'Unseen: ' + affinityStats.distribution.unseen">
-              </div>
-              <div class="distribution-segment low"
-                   [style.flex]="affinityStats.distribution.low"
-                   [title]="'Low: ' + affinityStats.distribution.low">
-              </div>
-              <div class="distribution-segment medium"
-                   [style.flex]="affinityStats.distribution.medium"
-                   [title]="'Medium: ' + affinityStats.distribution.medium">
-              </div>
-              <div class="distribution-segment high"
-                   [style.flex]="affinityStats.distribution.high"
-                   [title]="'High: ' + affinityStats.distribution.high">
-              </div>
+        <!-- Right: Actions -->
+        <div class="toolbar-right">
+          <button class="icon-btn search-btn" (click)="toggleSearch()" [class.active]="isSearchOpen" aria-label="Search">
+            🔍
+          </button>
+        </div>
+      </header>
+
+      <!-- SEARCH OVERLAY -->
+      <div class="search-overlay" *ngIf="isSearchOpen">
+         <input type="text" placeholder="Search content..." class="search-input" autofocus>
+         <!-- Search results would go here -->
+      </div>
+
+      <!-- AT-A-GLANCE OVERVIEW (Collapsible Panel) -->
+      <section class="graph-section" [class.expanded]="isGraphExpanded">
+        <div class="graph-content" *ngIf="isGraphExpanded && affinityStats">
+          <div class="affinity-overview">
+            <!-- Learning Path Progress Circle -->
+            <div class="learning-progress-container">
+               <app-affinity-circle
+                 [affinity]="getPathProgress() / 100"
+                 [size]="100">
+               </app-affinity-circle>
+               <span class="progress-label">Mastery</span>
             </div>
-            <div class="distribution-legend">
-              <span class="legend-item">
-                <span class="legend-dot unseen"></span> Unseen
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot low"></span> Low
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot medium"></span> Medium
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot high"></span> High
-              </span>
+
+            <!-- Hexagon Grid -->
+            <div class="hexagon-grid">
+              <div *ngFor="let node of allContentNodes"
+                   class="hexagon-chip"
+                   [class]="'affinity-' + node.affinityLevel"
+                   [title]="node.title + ' (' + getAffinityPercentage(node.affinity) + '%)'"
+                   (click)="selectNode(node)">
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- CENTER: Content Viewer -->
-      <section class="content-viewer" *ngIf="selectedNode">
+      <!-- CENTER: Content Viewer or Home Placeholder -->
+      <section class="content-viewer">
 
-        <!-- Content Header -->
-        <header class="content-header">
-          <div class="content-meta">
-            <span class="content-type-badge">
-              {{ getContentTypeIcon(selectedNode.contentType) }}
-              {{ selectedNode.contentType }}
-            </span>
-            <span class="content-category" *ngIf="selectedNode.metadata?.['category']">
-              {{ selectedNode.metadata['category'] }}
-            </span>
-          </div>
+        <!-- Home Placeholder (Epic Panes) -->
+        <div *ngIf="!selectedNode" class="home-placeholder">
+           <h1 class="home-title">The Elohim Protocol</h1>
+           <p class="home-subtitle">Explore the epics below to begin your journey.</p>
+           
+           <div class="epic-grid">
+             <div *ngFor="let item of sidebarNodes" 
+                  class="epic-card"
+                  (click)="selectNode(item.node)">
+                <div class="epic-card-header">
+                  <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
+                  <h2 class="epic-title">{{ item.node.title }}</h2>
+                </div>
+                <p class="epic-desc">{{ item.node.description }}</p>
+                <div class="epic-meta">
+                   <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
+                   <div class="epic-affinity">
+                     <div class="mini-affinity-bar">
+                       <div class="mini-affinity-fill" 
+                            [style.width.%]="getAffinityPercentage(item.affinity)"
+                            [class]="'affinity-' + item.affinityLevel"></div>
+                     </div>
+                   </div>
+                </div>
+             </div>
+           </div>
+        </div>
 
-          <h1 class="content-title">{{ selectedNode.title }}</h1>
-
-          <p class="content-description" *ngIf="selectedNode.description">
-            {{ selectedNode.description }}
-          </p>
-
-          <!-- Affinity Controls -->
-          <div class="affinity-controls">
-            <div class="affinity-display">
-              <span class="affinity-label">Your Affinity:</span>
-              <div class="affinity-circle"
-                   [class.affinity-unseen]="getAffinityLevel(selectedAffinity) === 'unseen'"
-                   [class.affinity-low]="getAffinityLevel(selectedAffinity) === 'low'"
-                   [class.affinity-medium]="getAffinityLevel(selectedAffinity) === 'medium'"
-                   [class.affinity-high]="getAffinityLevel(selectedAffinity) === 'high'">
-                {{ getAffinityPercentage(selectedAffinity) }}%
-              </div>
+        <!-- Selected Content -->
+        <ng-container *ngIf="selectedNode">
+          <!-- Content Header -->
+          <header class="content-header">
+            <div class="content-meta">
+              <span class="content-type-badge">
+                {{ getContentTypeIcon(selectedNode.contentType) }}
+                {{ selectedNode.contentType }}
+              </span>
+              <span class="content-category" *ngIf="selectedNode.metadata?.['category']">
+                {{ selectedNode.metadata['category'] }}
+              </span>
             </div>
-            <div class="affinity-buttons">
-              <button (click)="adjustAffinity(-0.1)"
-                      [disabled]="selectedAffinity <= 0"
-                      class="affinity-btn decrease">
-                −
-              </button>
-              <button (click)="adjustAffinity(0.1)"
-                      [disabled]="selectedAffinity >= 1"
-                      class="affinity-btn increase">
-                +
-              </button>
+
+            <h1 class="content-title">{{ selectedNode.title }}</h1>
+
+            <p class="content-description" *ngIf="selectedNode.description">
+              {{ selectedNode.description }}
+            </p>
+          </header>
+
+          <!-- Content Body -->
+          <article class="content-body">
+            <!-- Markdown Content -->
+            <div *ngIf="selectedNode.contentFormat === 'markdown'"
+                 class="markdown-content"
+                 [innerHTML]="renderMarkdown(selectedNode.content)">
             </div>
-          </div>
-        </header>
 
-        <!-- Content Body -->
-        <article class="content-body">
-          <!-- Markdown Content -->
-          <div *ngIf="selectedNode.contentFormat === 'markdown'"
-               class="markdown-content"
-               [innerHTML]="renderMarkdown(selectedNode.content)">
-          </div>
+            <!-- Gherkin Content -->
+            <div *ngIf="selectedNode.contentFormat === 'gherkin'"
+                 class="gherkin-content"
+                 [innerHTML]="renderGherkin(selectedNode.content)">
+            </div>
 
-          <!-- Gherkin Content -->
-          <div *ngIf="selectedNode.contentFormat === 'gherkin'"
-               class="gherkin-content"
-               [innerHTML]="renderGherkin(selectedNode.content)">
-          </div>
+            <!-- Plain Text Content -->
+            <div *ngIf="selectedNode.contentFormat === 'plaintext'"
+                 class="plaintext-content">
+              {{ selectedNode.content }}
+            </div>
+          </article>
 
-          <!-- Plain Text Content -->
-          <div *ngIf="selectedNode.contentFormat === 'plaintext'"
-               class="plaintext-content">
-            {{ selectedNode.content }}
-          </div>
-        </article>
+          <!-- Content Footer: Navigation -->
+          <footer class="content-footer">
+            <button class="nav-btn prev"
+                    (click)="goToPrevious()"
+                    [disabled]="!hasPrevious()">
+              ← Previous
+            </button>
 
-        <!-- Content Footer: Navigation -->
-        <footer class="content-footer">
-          <button class="nav-btn prev"
-                  (click)="goToPrevious()"
-                  [disabled]="!hasPrevious()">
-            ← Previous
-          </button>
+            <div class="footer-info">
+              <span class="node-position">
+                {{ getCurrentPosition() }} of {{ pathNodes.length }}
+              </span>
+            </div>
 
-          <div class="footer-info">
-            <span class="node-position">
-              {{ getCurrentPosition() }} of {{ pathNodes.length }}
-            </span>
-          </div>
+            <button class="nav-btn next"
+                    (click)="goToNext()"
+                    [disabled]="!hasNext()">
+              Next →
+            </button>
+          </footer>
+        </ng-container>
 
-          <button class="nav-btn next"
-                  (click)="goToNext()"
-                  [disabled]="!hasNext()">
-            Next →
-          </button>
-        </footer>
       </section>
 
     </main>

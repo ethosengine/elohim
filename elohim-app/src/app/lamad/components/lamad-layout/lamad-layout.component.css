@@ -220,27 +220,38 @@
 @media (max-width: 768px) {
   .lamad-header {
     padding: 0.5rem 1rem;
+    /* Ensure header doesn't grow too tall */
+    height: 60px; 
+    display: flex;
+    align-items: center;
   }
 
   .lamad-header-content {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: flex-start;
+    flex-direction: row;
+    gap: 1rem;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
   }
 
   .lamad-logo h1 {
     font-size: 1rem;
+    white-space: nowrap;
   }
 
   .lamad-nav {
+    display: flex;
     gap: 0.5rem;
-    flex-wrap: wrap;
-    width: 100%;
+    overflow-x: auto; /* Allow horizontal scroll if needed */
+    flex: 1;
+    justify-content: flex-end; /* Push to right if space allows */
+    /* mask-image removed for safety */
   }
 
+  /* Hide Search on Mobile to save space */
   .search-container {
-    width: 100%;
-    order: 3;
+    display: none;
   }
 
   .search-form {
@@ -252,7 +263,8 @@
   }
 
   .toolbar-theme-toggle {
-    order: 2;
+    order: 0; /* Reset order */
+    margin-left: 0;
   }
 
   .toolbar-theme-toggle ::ng-deep .theme-toggle {

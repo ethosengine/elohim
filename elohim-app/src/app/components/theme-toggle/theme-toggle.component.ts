@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ThemeService, Theme } from '../../services/theme.service';
 import { Subscription } from 'rxjs';
@@ -10,6 +10,7 @@ import { Subscription } from 'rxjs';
   styleUrl: './theme-toggle.component.css'
 })
 export class ThemeToggleComponent implements OnInit, OnDestroy {
+  @Input() inline = false;
   currentTheme: Theme = 'device';
   private themeSubscription?: Subscription;
 

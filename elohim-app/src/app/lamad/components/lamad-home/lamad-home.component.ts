@@ -9,17 +9,25 @@ import { AffinityTrackingService } from '../../services/affinity-tracking.servic
 import { LearningPathService, PathNode } from '../../services/learning-path.service';
 import { ContentNode } from '../../models/content-node.model';
 import { AffinityStats } from '../../models/user-affinity.model';
+import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.component';
+import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
 @Component({
   selector: 'app-lamad-home',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, AffinityCircleComponent, ThemeToggleComponent],
   templateUrl: './lamad-home.component.html',
   styleUrls: ['./lamad-home.component.css']
 })
 export class LamadHomeComponent implements OnInit, OnDestroy {
   // Learning path
   pathNodes: PathNodeWithAffinity[] = [];
+  
+  // Sidebar nodes (Epics only)
+  sidebarNodes: PathNodeWithAffinity[] = [];
+  
+  // All nodes for "At a Glance"
+  allContentNodes: ContentNodeWithAffinity[] = [];
 
   // Currently selected content
   selectedNode: ContentNode | null = null;
@@ -29,8 +37,10 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   affinityStats: AffinityStats | null = null;
 
   // UI state
-  isGraphExpanded = true;
+  isGraphExpanded = false; // Default collapsed for better initial view
   isLoading = true;
+  isSidebarOpen = true;
+  isSearchOpen = false;
 
   private readonly destroy$ = new Subject<void>();
 
@@ -43,6 +53,9 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // Set initial sidebar state based on screen width
+    this.checkScreenSize();
+
     // Load graph and build path
     combineLatest([
       this.graphService.graph$,
@@ -54,15 +67,23 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
         if (graph && path.length > 0) {
           // Enrich path nodes with affinity data
           this.pathNodes = path.map(pn => this.enrichPathNode(pn));
+          
+          // Sidebar should only show peer items (Epics)
+          this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
+
+          // Enrich all nodes for the hexagon view
+          const allNodes = Array.from(graph.nodes.values());
+          // @ts-ignore - adapting DocumentNode to ContentNode shape roughly for now or using what we have
+          this.allContentNodes = allNodes.map(node => this.enrichContentNode({
+             ...node,
+             contentType: node.type,
+             contentFormat: 'markdown', // default fallback
+             relatedNodeIds: node.relatedNodeIds || [],
+             metadata: node.metadata || {}
+          } as unknown as ContentNode));
 
           // Calculate stats
-          const allNodes = Array.from(graph.nodes.values());
           this.affinityStats = this.affinityService.getStats(allNodes);
-
-          // Select first node if nothing selected
-          if (!this.selectedNode && this.pathNodes.length > 0) {
-            this.selectNode(this.pathNodes[0].node);
-          }
 
           this.isLoading = false;
         }
@@ -82,12 +103,60 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
           depth: pn.depth,
           category: pn.category
         }));
+        
+        // Refresh sidebar nodes
+        this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
+        
+        // Refresh all content nodes
+        if (this.allContentNodes.length > 0) {
+           this.allContentNodes = this.allContentNodes.map(node => this.enrichContentNode(node));
+        }
       });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private checkScreenSize(): void {
+    if (window.innerWidth < 768) {
+      this.isSidebarOpen = false;
+      this.isGraphExpanded = false;
+    }
+  }
+
+  /**
+   * Navigate to Home / Overview
+   */
+  goHome(): void {
+    this.selectedNode = null;
+    this.isGraphExpanded = true;
+    this.closeSidebar();
+    window.scrollTo(0, 0);
+  }
+
+  /**
+   * Toggle sidebar visibility
+   */
+  toggleSidebar(): void {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
+  /**
+   * Close sidebar (useful for mobile selection)
+   */
+  closeSidebar(): void {
+    if (window.innerWidth < 768) {
+      this.isSidebarOpen = false;
+    }
+  }
+
+  /**
+   * Toggle search
+   */
+  toggleSearch(): void {
+    this.isSearchOpen = !this.isSearchOpen;
   }
 
   /**
@@ -103,6 +172,18 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Enrich generic content node with affinity data
+   */
+  private enrichContentNode(node: ContentNode): ContentNodeWithAffinity {
+    const affinity = this.affinityService.getAffinity(node.id);
+    return {
+      ...node,
+      affinity,
+      affinityLevel: this.getAffinityLevel(affinity)
+    };
+  }
+
+  /**
    * Select a node to display in the content viewer
    */
   selectNode(node: ContentNode): void {
@@ -111,6 +192,12 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
     // Auto-track view
     this.affinityService.trackView(node.id);
+    
+    // Scroll to top
+    window.scrollTo(0, 0);
+
+    // Close sidebar on mobile
+    this.closeSidebar();
   }
 
   /**
@@ -304,13 +391,18 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       '<': '&lt;',
       '>': '&gt;',
       '"': '&quot;',
-      "'": '&#039;',
+      "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, (m) => map[m]);
+    return text.replace(/[&<>'"']/g, (m) => map[m]);
   }
 }
 
 interface PathNodeWithAffinity extends PathNode {
+  affinity: number;
+  affinityLevel: 'unseen' | 'low' | 'medium' | 'high';
+}
+
+interface ContentNodeWithAffinity extends ContentNode {
   affinity: number;
   affinityLevel: 'unseen' | 'low' | 'medium' | 'high';
 }
