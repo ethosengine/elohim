@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { DocumentGraph, EpicNode, FeatureNode, ScenarioNode, NodeType } from '../../models';
+import { DocumentGraph, DocumentNode, EpicNode, FeatureNode, ScenarioNode, NodeType } from '../../models';
 
 describe('LamadHomeComponent', () => {
   let component: LamadHomeComponent;
