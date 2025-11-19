@@ -125,7 +125,7 @@
       <div
         *ngFor="let epic of epics"
         class="epic-card"
-        [routerLink]="['/lamad', epic.id]">
+        [routerLink]="['/lamad', 'epic:' + epic.id]">
         <div class="epic-header">
           <span class="epic-icon">{{ getCategoryIcon(getEpicCategory(epic)) }}</span>
           <span class="epic-category">{{ getEpicCategory(epic) }}</span>

@@ -162,19 +162,27 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Navigate to a child node in the hierarchy
+   * Navigate to a child node in the hierarchy using composite identifiers
    */
   navigateToChild(child: ContentNode): void {
     if (this.navigationContext) {
-      // Build path: current path + child
-      const currentPath = this.navigationContext.pathSegments.map(s => s.urlSegment);
-      this.navigationService.navigateTo(child.id, {
-        parentPath: currentPath,
-        queryParams: this.navigationContext.queryParams
-      });
+      // Build composite parent path: "epic:id:feature:id"
+      const parentPath = this.navigationContext.pathSegments
+        .map(s => s.urlSegment)
+        .join(':');
+
+      // Navigate to child with composite identifier
+      this.navigationService.navigateTo(
+        child.contentType,
+        child.id,
+        {
+          parentPath: parentPath || undefined,
+          queryParams: this.navigationContext.queryParams
+        }
+      );
     } else {
-      // Fallback to direct navigation
-      this.router.navigate(['/lamad', child.id]);
+      // Fallback to direct navigation with composite identifier
+      this.router.navigate(['/lamad', `${child.contentType}:${child.id}`]);
     }
   }
 
@@ -186,14 +194,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Navigate to a breadcrumb
+   * Navigate to a breadcrumb using composite path
    */
-  navigateToBreadcrumb(path: string[]): void {
-    if (path.length === 0) {
+  navigateToBreadcrumb(compositePath: string): void {
+    if (!compositePath || compositePath.length === 0) {
       this.navigationService.navigateToHome();
     } else {
-      const urlPath = `/lamad/${path.join('/')}`;
-      this.router.navigate([urlPath], {
+      this.router.navigate([`/lamad/${compositePath}`], {
         queryParams: this.navigationContext?.queryParams || {}
       });
     }

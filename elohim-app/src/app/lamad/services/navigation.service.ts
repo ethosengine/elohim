@@ -6,28 +6,49 @@ import { DocumentGraphService } from './document-graph.service';
 import { DocumentNode, EpicNode, FeatureNode, ScenarioNode } from '../models';
 
 /**
- * Represents a single segment in the navigation path
+ * Represents a single segment in the composite identifier path
+ * Pattern: type:id:type:id:type:id...
  */
 export interface PathSegment {
+  /** Node type (epic, feature, scenario, etc.) */
+  type: string;
   /** Node ID */
   id: string;
-  /** The actual node */
-  node: DocumentNode;
-  /** URL segment (may be different from ID for readability) */
+  /** The actual node (null for collection views) */
+  node: DocumentNode | null;
+  /** Composite URL segment: "type:id" */
   urlSegment: string;
+}
+
+/**
+ * View mode based on composite identifier pattern
+ */
+export enum ViewMode {
+  /** Home page (no segments) */
+  HOME = 'home',
+  /** Node view: shows content + collections (even segments: type:id pairs) */
+  NODE = 'node',
+  /** Collection view: shows list of items (odd segments: ends with type) */
+  COLLECTION = 'collection'
 }
 
 /**
  * Context for the current navigation state
  */
 export interface NavigationContext {
-  /** Full path from root to current node */
+  /** Full path from root to current position */
   pathSegments: PathSegment[];
 
-  /** Current node being viewed */
+  /** View mode (home, node, or collection) */
+  viewMode: ViewMode;
+
+  /** Current node being viewed (null for collection views) */
   currentNode: DocumentNode | null;
 
-  /** Children of current node (for panes display) */
+  /** For collection views: the type of items to display */
+  collectionType: string | null;
+
+  /** Children/items to display (either node's children or collection items) */
   children: DocumentNode[];
 
   /** Parent node (null if at root) */
@@ -66,20 +87,45 @@ export class NavigationService {
   }
 
   /**
-   * Navigate to a node with optional path context
+   * Navigate to a node using composite identifier
+   * @param nodeType - Type of node (epic, feature, scenario)
+   * @param nodeId - ID of the node
+   * @param options - Optional parent path and query params
    */
   navigateTo(
+    nodeType: string,
     nodeId: string,
     options?: {
-      parentPath?: string[];
+      parentPath?: string; // Composite path like "epic:social-medium:feature:affinity"
       queryParams?: Record<string, any>;
     }
   ): void {
-    const pathSegments = options?.parentPath ? [...options.parentPath, nodeId] : [nodeId];
-    const urlPath = `/lamad/${pathSegments.join('/')}`;
+    const composite = options?.parentPath
+      ? `${options.parentPath}:${nodeType}:${nodeId}`
+      : `${nodeType}:${nodeId}`;
+
+    const urlPath = `/lamad/${composite}`;
 
     this.router.navigate([urlPath], {
       queryParams: options?.queryParams || {}
+    });
+  }
+
+  /**
+   * Navigate to a collection view
+   * @param collectionType - Type of items in collection (feature, scenario, etc.)
+   * @param parentPath - Parent composite path
+   */
+  navigateToCollection(
+    collectionType: string,
+    parentPath?: string,
+    queryParams?: Record<string, any>
+  ): void {
+    const composite = parentPath ? `${parentPath}:${collectionType}` : collectionType;
+    const urlPath = `/lamad/${composite}`;
+
+    this.router.navigate([urlPath], {
+      queryParams: queryParams || {}
     });
   }
 
@@ -95,15 +141,39 @@ export class NavigationService {
    */
   navigateUp(): void {
     const context = this.contextSubject.value;
-    if (!context || context.pathSegments.length <= 1) {
+    if (!context) {
+      this.navigateToHome();
+      return;
+    }
+
+    // If in collection view, go back to parent node
+    if (context.viewMode === ViewMode.COLLECTION) {
+      if (context.pathSegments.length === 0) {
+        this.navigateToHome();
+      } else {
+        const compositePath = context.pathSegments.map(s => s.urlSegment).join(':');
+        this.router.navigate([`/lamad/${compositePath}`], {
+          queryParams: context.queryParams
+        });
+      }
+      return;
+    }
+
+    // If in node view, go up one node level
+    if (context.pathSegments.length === 0) {
+      this.navigateToHome();
+      return;
+    }
+
+    if (context.pathSegments.length === 1) {
       this.navigateToHome();
       return;
     }
 
     const parentSegments = context.pathSegments.slice(0, -1);
-    const urlPath = `/lamad/${parentSegments.map(s => s.urlSegment).join('/')}`;
+    const compositePath = parentSegments.map(s => s.urlSegment).join(':');
 
-    this.router.navigate([urlPath], {
+    this.router.navigate([`/lamad/${compositePath}`], {
       queryParams: context.queryParams
     });
   }
@@ -116,54 +186,89 @@ export class NavigationService {
   }
 
   /**
-   * Parse URL path into navigation context
+   * Parse composite identifier URL into navigation context
+   * Pattern: epic:id:feature:id:scenario:id or epic:id:feature (collection view)
    */
-  parsePathSegments(segments: string[], queryParams: any = {}): NavigationContext | null {
+  parsePathSegments(urlPath: string, queryParams: any = {}): NavigationContext | null {
     const graph = this.graphService.getGraph();
     if (!graph) return null;
 
-    // If no segments, we're at home - show epics
-    if (segments.length === 0) {
+    // If no path, we're at home - show epics
+    if (!urlPath || urlPath.length === 0) {
       return {
         pathSegments: [],
+        viewMode: ViewMode.HOME,
         currentNode: null,
+        collectionType: null,
         children: Array.from(graph.nodesByType.epics.values()),
         parent: null,
         queryParams
       };
     }
 
-    // Parse each segment into PathSegment objects
+    // Parse composite identifier: "epic:social-medium:feature:affinity:scenario"
+    const parts = urlPath.split(':');
+
+    // Determine view mode
+    const isCollectionView = parts.length % 2 === 1; // Odd number = collection view
+    const viewMode = isCollectionView ? ViewMode.COLLECTION : ViewMode.NODE;
+
+    // Build path segments (type:id pairs)
     const pathSegments: PathSegment[] = [];
-    for (const urlSegment of segments) {
-      const node = this.findNodeByUrlSegment(urlSegment);
+    let currentNode: DocumentNode | null = null;
+    let parent: DocumentNode | null = null;
+
+    // Process type:id pairs
+    for (let i = 0; i < parts.length - (isCollectionView ? 1 : 0); i += 2) {
+      const type = parts[i];
+      const id = parts[i + 1];
+
+      if (!id) {
+        console.warn(`Invalid composite identifier: missing ID for type ${type}`);
+        return null;
+      }
+
+      const node = this.findNodeById(id);
       if (!node) {
-        console.warn(`Node not found for URL segment: ${urlSegment}`);
+        console.warn(`Node not found: ${type}:${id}`);
+        return null;
+      }
+
+      // Validate node type matches
+      if (node.type !== type) {
+        console.warn(`Type mismatch: expected ${type}, got ${node.type} for ID ${id}`);
         return null;
       }
 
       pathSegments.push({
-        id: node.id,
+        type,
+        id,
         node,
-        urlSegment
+        urlSegment: `${type}:${id}`
       });
+
+      parent = currentNode;
+      currentNode = node;
     }
 
-    // Get current node (last segment)
-    const currentSegment = pathSegments[pathSegments.length - 1];
-    const currentNode = currentSegment.node;
+    // Determine what to display
+    let children: DocumentNode[] = [];
+    let collectionType: string | null = null;
 
-    // Get parent node (second to last segment)
-    const parent = pathSegments.length > 1
-      ? pathSegments[pathSegments.length - 2].node
-      : null;
-
-    // Get children of current node
-    const children = this.getChildren(currentNode);
+    if (isCollectionView) {
+      // Collection view: show all items of the specified type under current node
+      collectionType = parts[parts.length - 1];
+      children = this.getChildrenOfType(currentNode, collectionType);
+    } else {
+      // Node view: show content + available collections
+      children = this.getChildren(currentNode!);
+    }
 
     return {
       pathSegments,
+      viewMode,
       currentNode,
+      collectionType,
       children,
       parent,
       queryParams
@@ -172,6 +277,7 @@ export class NavigationService {
 
   /**
    * Get children of a node based on its type and relationships
+   * Returns all types of children (features, scenarios, etc.)
    */
   private getChildren(node: DocumentNode): DocumentNode[] {
     const graph = this.graphService.getGraph();
@@ -205,39 +311,114 @@ export class NavigationService {
   }
 
   /**
-   * Find a node by URL segment (ID or slug)
+   * Get children of a specific type under a node (for collection views)
+   * @param node - Parent node (null for root-level collections like all epics)
+   * @param childType - Type of children to get (epic, feature, scenario)
    */
-  private findNodeByUrlSegment(urlSegment: string): DocumentNode | undefined {
-    // For now, URL segment is the node ID
-    // In the future, could support slugs or friendly URLs
-    return this.graphService.getNode(urlSegment);
+  private getChildrenOfType(node: DocumentNode | null, childType: string): DocumentNode[] {
+    const graph = this.graphService.getGraph();
+    if (!graph) return [];
+
+    // Root-level collection (e.g., /lamad/epic)
+    if (!node) {
+      switch (childType) {
+        case 'epic':
+          return Array.from(graph.nodesByType.epics.values());
+        case 'feature':
+          return Array.from(graph.nodesByType.features.values());
+        case 'scenario':
+          return Array.from(graph.nodesByType.scenarios.values());
+        default:
+          return [];
+      }
+    }
+
+    // Node-specific collection
+    switch (node.type) {
+      case 'epic': {
+        if (childType === 'feature') {
+          const epic = node as EpicNode;
+          return epic.featureIds
+            .map(id => graph.nodes.get(id))
+            .filter((n): n is DocumentNode => n !== undefined);
+        }
+        return [];
+      }
+
+      case 'feature': {
+        if (childType === 'scenario') {
+          const feature = node as FeatureNode;
+          return feature.scenarioIds
+            .map(id => graph.nodes.get(id))
+            .filter((n): n is DocumentNode => n !== undefined);
+        }
+        return [];
+      }
+
+      default:
+        return [];
+    }
   }
 
   /**
-   * Convert a node to a URL segment
+   * Find a node by ID
+   */
+  private findNodeById(id: string): DocumentNode | undefined {
+    return this.graphService.getNode(id);
+  }
+
+  /**
+   * Convert a node to a composite URL segment (type:id)
    */
   nodeToUrlSegment(node: DocumentNode): string {
-    // For now, use the node ID directly
-    // Future: could create URL-friendly slugs from titles
-    return node.id;
+    return `${node.type}:${node.id}`;
   }
 
   /**
    * Build breadcrumb trail from path segments
+   * Shows: Home > Epic: Social Medium > Feature: Affinity > Scenario: Emma
    */
-  getBreadcrumbs(context: NavigationContext): Array<{ label: string; path: string[] }> {
-    const breadcrumbs: Array<{ label: string; path: string[] }> = [
-      { label: 'Home', path: [] }
+  getBreadcrumbs(context: NavigationContext): Array<{ label: string; path: string; typeLabel?: string }> {
+    const breadcrumbs: Array<{ label: string; path: string; typeLabel?: string }> = [
+      { label: 'Home', path: '' }
     ];
 
+    let compositePath = '';
     context.pathSegments.forEach((segment, index) => {
+      compositePath += (index === 0 ? '' : ':') + segment.urlSegment;
+
+      const typeLabel = this.formatTypeLabel(segment.type);
       breadcrumbs.push({
-        label: segment.node.title,
-        path: context.pathSegments.slice(0, index + 1).map(s => s.urlSegment)
+        label: segment.node?.title || segment.id,
+        path: compositePath,
+        typeLabel
       });
     });
 
+    // Add collection view to breadcrumb if applicable
+    if (context.viewMode === ViewMode.COLLECTION && context.collectionType) {
+      const collectionLabel = this.formatTypeLabel(context.collectionType) + 's';
+      compositePath += ':' + context.collectionType;
+      breadcrumbs.push({
+        label: collectionLabel,
+        path: compositePath,
+        typeLabel: undefined
+      });
+    }
+
     return breadcrumbs;
+  }
+
+  /**
+   * Format type label for display
+   */
+  private formatTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      'epic': 'Epic',
+      'feature': 'Feature',
+      'scenario': 'Scenario'
+    };
+    return labels[type] || type;
   }
 
   /**
@@ -260,18 +441,29 @@ export class NavigationService {
   private updateContextFromCurrentRoute(): void {
     const url = this.router.url;
 
-    // Parse URL to extract path segments
+    // Parse URL to extract composite path
     const urlTree = this.router.parseUrl(url);
     const primarySegments = urlTree.root.children['primary']?.segments || [];
 
-    // Skip 'lamad' prefix and special routes
-    const pathSegments = primarySegments
+    // Skip 'lamad' prefix and special routes (map, search, content)
+    const pathParts = primarySegments
       .map(s => s.path)
-      .filter(s => s !== 'lamad' && s !== 'map' && s !== 'search' && s !== 'content');
+      .filter(s => s !== 'lamad');
+
+    // Check for special routes
+    if (pathParts.length > 0 && ['map', 'search', 'content'].includes(pathParts[0])) {
+      // Don't update navigation context for special routes
+      return;
+    }
+
+    // Extract composite path (everything after /lamad/)
+    // URL: /lamad/epic:social-medium:feature:affinity
+    // compositePath: "epic:social-medium:feature:affinity"
+    const compositePath = pathParts.join('/'); // Segments may be split by Angular router
 
     const queryParams = urlTree.queryParams;
 
-    const context = this.parsePathSegments(pathSegments, queryParams);
+    const context = this.parsePathSegments(compositePath, queryParams);
     this.contextSubject.next(context);
   }
 

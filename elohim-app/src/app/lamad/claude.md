@@ -330,14 +330,85 @@ The Meaning Map presents a **suggested path** toward the target subject, but all
 
 ### Routes
 
-Clean, focused routing structure:
+**Composite Identifier URL Strategy**
 
-```typescript
-/lamad                 → DocsHomeComponent    (landing, stats, overview)
-/lamad/map            → MeaningMapComponent  (hierarchical browse)
-/lamad/content/:id    → ContentViewerComponent (unified reader)
-/lamad/search         → SearchComponent      (search functionality)
+Lamad uses composite identifiers in URLs to create self-documenting, graph-friendly navigation:
+
+#### Pattern: `type:id:type:id:type:id...`
+
+**Node Views** (even number of segments):
 ```
+/lamad/epic:social-medium                                    → Epic content + collections
+/lamad/epic:social-medium:feature:affinity                   → Feature content + collections
+/lamad/epic:social-medium:feature:affinity:scenario:emma-bus → Scenario content (leaf)
+```
+
+**Collection Views** (odd number of segments):
+```
+/lamad/epic                                  → All epics
+/lamad/epic:social-medium:feature            → All features in this epic
+/lamad/epic:social-medium:feature:affinity:scenario → All scenarios in this feature
+```
+
+**Special Routes**:
+```
+/lamad                 → Home (landing, stats, epics list)
+/lamad/map            → Meaning Map (full graph visualization)
+/lamad/search         → Search interface
+/lamad/content/:id    → Direct content access (fallback, backwards compatible)
+```
+
+**Query Parameters** (context enrichment):
+```
+?target=elohim-protocol  → Target subject for orientation
+?attestation=civic-2     → Attestation journey tracking
+?step=3                  → Step in suggested path
+?from=node-id            → Source node (breadcrumb)
+?depth=2                 → Graph traversal depth
+```
+
+#### Why Composite Identifiers?
+
+1. **Self-Documenting**: URL explicitly shows types and relationships
+   - `epic:social-medium` is clearly an epic, not ambiguous
+   - Graph structure visible in URL
+
+2. **Graph Database Alignment**: Similar to Neo4j/graph DB notation
+   - Natural fit for DocumentGraph model
+   - Easy to parse into path segments
+
+3. **Domain-Agnostic**: Works for any content type
+   - Not tied to epic→feature→scenario hierarchy
+   - Extensible: `organization:acme:team:engineering:member:jane`
+
+4. **Collection Views Built-In**: Odd segments = list view
+   - `/lamad/epic:social-medium:feature` = "show me all features"
+   - No separate route patterns needed
+
+5. **Type Safety**: Parse validates type matches actual node
+   - `epic:123` must point to an actual epic node
+   - Prevents type confusion
+
+#### Navigation Flow
+
+1. **Home** (`/lamad`) → List of epics
+2. Click epic → **Node view** (`/lamad/epic:social-medium`)
+   - Shows epic content
+   - Displays features collection below
+3. Click feature → **Node view** (`/lamad/epic:social-medium:feature:affinity`)
+   - Shows feature content
+   - Displays scenarios collection below
+4. Click scenario → **Node view** (`/lamad/epic:social-medium:feature:affinity:scenario:emma-bus`)
+   - Shows scenario content (leaf node, no children)
+
+#### Breadcrumbs
+
+Automatically derived from composite path:
+```
+Home / Epic: Social Medium / Feature: Affinity Tracking / Scenario: Emma's Bus Advocacy
+```
+
+Type labels (`Epic:`, `Feature:`) extracted from path segments.
 
 ### Key Components
 
@@ -391,6 +462,24 @@ Clean, focused routing structure:
 - Parses Gherkin features (.feature)
 - Manages node relationships
 - Observable graph state
+
+#### NavigationService
+- Parses composite identifier URLs into navigation context
+- Manages hierarchical navigation state through the graph
+- Distinguishes between node views and collection views
+- Observable navigation context (BehaviorSubject)
+- Methods:
+  - `navigateTo(type, id, options)` - Navigate to a node using composite identifier
+  - `navigateToCollection(type, parentPath)` - Navigate to collection view
+  - `navigateToHome()` - Navigate to home (epics list)
+  - `navigateUp()` - Navigate up one level in hierarchy
+  - `parsePathSegments(compositePath)` - Parse composite URL into context
+  - `getBreadcrumbs(context)` - Build breadcrumb trail with type labels
+- Key Features:
+  - **View Mode Detection**: Odd segments = collection view, even = node view
+  - **Type Validation**: Ensures URL type matches actual node type
+  - **Children Resolution**: Gets children based on node type and relationships
+  - **Parent Path Tracking**: Maintains full composite path for nested navigation
 
 ### Models
 

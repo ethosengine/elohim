@@ -21,9 +21,13 @@
             *ngIf="!last"
             (click)="navigateToBreadcrumb(crumb.path)"
             class="breadcrumb-link">
+            <span *ngIf="crumb.typeLabel" class="breadcrumb-type">{{ crumb.typeLabel }}:</span>
             {{ crumb.label }}
           </a>
-          <span *ngIf="last" class="breadcrumb-current">{{ crumb.label }}</span>
+          <span *ngIf="last" class="breadcrumb-current">
+            <span *ngIf="crumb.typeLabel" class="breadcrumb-type">{{ crumb.typeLabel }}:</span>
+            {{ crumb.label }}
+          </span>
           <span *ngIf="!last" class="breadcrumb-separator">/</span>
         </li>
       </ol>

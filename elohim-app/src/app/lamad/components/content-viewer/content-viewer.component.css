@@ -51,6 +51,13 @@
   user-select: none;
 }
 
+.breadcrumb-type {
+  color: #667eea;
+  font-weight: 700;
+  margin-right: 0.25rem;
+  font-size: 0.9em;
+}
+
 /* Loading & Error states */
 .loading-state,
 .error-state {
