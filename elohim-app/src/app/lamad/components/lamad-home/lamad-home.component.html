@@ -1,131 +1,218 @@
-<div class="lamad-home">
-  <!-- Welcome Section -->
-  <section class="welcome-section">
-    <h1 class="main-title">Welcome to Lamad</h1>
-    <p class="main-description">
-      Learn the Elohim Protocol through a guided journey of discovery.
-      Track your affinity, earn attestations, and unlock deeper understanding as you explore.
-    </p>
+<div class="lamad-home-container">
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading learning path...</p>
+  </div>
 
-    <!-- Primary Action -->
-    <div class="primary-action">
-      <a routerLink="/lamad/map" class="cta-button">
-        <span class="cta-icon">🗺️</span>
-        <div class="cta-content">
-          <div class="cta-title">View Meaning Map</div>
-          <div class="cta-subtitle">Begin your journey toward understanding</div>
-        </div>
-      </a>
-    </div>
+  <!-- Main Three-Panel Layout -->
+  <div *ngIf="!isLoading" class="three-panel-layout">
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">📖</div>
-        <div class="stat-number">{{ stats.epicCount || 0 }}</div>
-        <div class="stat-label">Epics</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-number">{{ stats.featureCount || 0 }}</div>
-        <div class="stat-label">Features</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">✓</div>
-        <div class="stat-number">{{ stats.scenarioCount || 0 }}</div>
-        <div class="stat-label">Scenarios</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🔗</div>
-        <div class="stat-number">{{ stats.averageConnectionsPerNode | number:'1.1-1' }}</div>
-        <div class="stat-label">Avg Connections</div>
-      </div>
-    </div>
-
-    <!-- Affinity Stats -->
-    <div *ngIf="affinityStats" class="affinity-section">
-      <h2 class="section-subtitle">Your Progress</h2>
-      <div class="affinity-stats-grid">
-        <div class="affinity-stat-card">
-          <div class="affinity-stat-label">Explored Content</div>
-          <div class="affinity-stat-value">{{ affinityStats.engagedNodes }} / {{ affinityStats.totalNodes }}</div>
-          <div class="affinity-stat-bar">
-            <div
-              class="affinity-stat-bar-fill"
-              [style.width.%]="(affinityStats.engagedNodes / affinityStats.totalNodes) * 100">
-            </div>
+    <!-- LEFT SIDEBAR: Navigation Menu -->
+    <aside class="nav-sidebar">
+      <div class="sidebar-header">
+        <h2 class="sidebar-title">Learning Path</h2>
+        <div class="path-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="getPathProgress()"></div>
           </div>
-        </div>
-        <div class="affinity-stat-card">
-          <div class="affinity-stat-label">Average Affinity</div>
-          <div class="affinity-stat-value">{{ (affinityStats.averageAffinity * 100) | number:'1.0-0' }}%</div>
-          <div class="affinity-stat-bar">
-            <div
-              class="affinity-stat-bar-fill high"
-              [style.width.%]="affinityStats.averageAffinity * 100">
-            </div>
-          </div>
+          <span class="progress-text">{{ getPathProgress() | number:'1.0-0' }}% explored</span>
         </div>
       </div>
 
-      <!-- Distribution -->
-      <div class="distribution-section">
-        <h3 class="distribution-title">Affinity Distribution</h3>
-        <div class="distribution-bars">
-          <div class="distribution-bar">
-            <div class="distribution-label">Unseen</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill unseen"
-                [style.width.%]="(affinityStats.distribution.unseen / affinityStats.totalNodes) * 100">
-              </div>
+      <nav class="path-nav">
+        <button *ngFor="let pathNode of pathNodes; let i = index"
+                class="path-item"
+                [class.selected]="selectedNode?.id === pathNode.node.id"
+                [class.depth-1]="pathNode.depth === 1"
+                (click)="selectNode(pathNode.node)"
+                (keydown.enter)="selectNode(pathNode.node)"
+                type="button">
+          <span class="path-order">{{ i + 1 }}</span>
+          <span class="path-icon">{{ getContentTypeIcon(pathNode.node.contentType) }}</span>
+          <span class="path-title">{{ pathNode.node.title }}</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <a routerLink="/lamad/map" class="sidebar-link">
+          🗺️ View Full Map
+        </a>
+        <a routerLink="/lamad/search" class="sidebar-link">
+          🔍 Search Content
+        </a>
+      </div>
+    </aside>
+
+    <!-- RIGHT CONTENT AREA -->
+    <main class="content-area">
+
+      <!-- TOP: Graph Visualization -->
+      <section class="graph-section" [class.collapsed]="!isGraphExpanded">
+        <button class="graph-header"
+                (click)="toggleGraph()"
+                (keydown.enter)="toggleGraph()"
+                type="button">
+          <h3 class="graph-title">
+            <span class="graph-icon">📊</span>
+            At-a-Glance Overview
+          </h3>
+          <span class="toggle-btn" [class.rotated]="!isGraphExpanded">
+            ▼
+          </span>
+        </button>
+
+        <div class="graph-content" *ngIf="isGraphExpanded && affinityStats">
+          <!-- Stats Grid -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Total Content</div>
+              <div class="stat-value">{{ affinityStats.totalNodes }}</div>
             </div>
-            <div class="distribution-count">{{ affinityStats.distribution.unseen }}</div>
+            <div class="stat-card">
+              <div class="stat-label">Explored</div>
+              <div class="stat-value">{{ affinityStats.engagedNodes }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Avg Affinity</div>
+              <div class="stat-value">{{ (affinityStats.averageAffinity * 100) | number:'1.0-0' }}%</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Path Progress</div>
+              <div class="stat-value">{{ getPathProgress() | number:'1.0-0' }}%</div>
+            </div>
           </div>
-          <div class="distribution-bar">
-            <div class="distribution-label">Low</div>
+
+          <!-- Affinity Distribution -->
+          <div class="distribution-viz">
             <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill low"
-                [style.width.%]="(affinityStats.distribution.low / affinityStats.totalNodes) * 100">
+              <div class="distribution-segment unseen"
+                   [style.flex]="affinityStats.distribution.unseen"
+                   [title]="'Unseen: ' + affinityStats.distribution.unseen">
+              </div>
+              <div class="distribution-segment low"
+                   [style.flex]="affinityStats.distribution.low"
+                   [title]="'Low: ' + affinityStats.distribution.low">
+              </div>
+              <div class="distribution-segment medium"
+                   [style.flex]="affinityStats.distribution.medium"
+                   [title]="'Medium: ' + affinityStats.distribution.medium">
+              </div>
+              <div class="distribution-segment high"
+                   [style.flex]="affinityStats.distribution.high"
+                   [title]="'High: ' + affinityStats.distribution.high">
               </div>
             </div>
-            <div class="distribution-count">{{ affinityStats.distribution.low }}</div>
-          </div>
-          <div class="distribution-bar">
-            <div class="distribution-label">Medium</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill medium"
-                [style.width.%]="(affinityStats.distribution.medium / affinityStats.totalNodes) * 100">
-              </div>
+            <div class="distribution-legend">
+              <span class="legend-item">
+                <span class="legend-dot unseen"></span> Unseen
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot low"></span> Low
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot medium"></span> Medium
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot high"></span> High
+              </span>
             </div>
-            <div class="distribution-count">{{ affinityStats.distribution.medium }}</div>
-          </div>
-          <div class="distribution-bar">
-            <div class="distribution-label">High</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill high"
-                [style.width.%]="(affinityStats.distribution.high / affinityStats.totalNodes) * 100">
-              </div>
-            </div>
-            <div class="distribution-count">{{ affinityStats.distribution.high }}</div>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- Quick Actions -->
-  <section class="actions-section">
-    <h2 class="section-title">Explore</h2>
-    <div class="action-grid">
-      <a routerLink="/lamad/search" class="action-card">
-        <div class="action-icon">🔍</div>
-        <h3>Search</h3>
-        <p>Find content across all documentation</p>
-      </a>
-    </div>
-  </section>
+      <!-- CENTER: Content Viewer -->
+      <section class="content-viewer" *ngIf="selectedNode">
+
+        <!-- Content Header -->
+        <header class="content-header">
+          <div class="content-meta">
+            <span class="content-type-badge">
+              {{ getContentTypeIcon(selectedNode.contentType) }}
+              {{ selectedNode.contentType }}
+            </span>
+            <span class="content-category" *ngIf="selectedNode.metadata?.['category']">
+              {{ selectedNode.metadata['category'] }}
+            </span>
+          </div>
+
+          <h1 class="content-title">{{ selectedNode.title }}</h1>
+
+          <p class="content-description" *ngIf="selectedNode.description">
+            {{ selectedNode.description }}
+          </p>
+
+          <!-- Affinity Controls -->
+          <div class="affinity-controls">
+            <div class="affinity-display">
+              <span class="affinity-label">Your Affinity:</span>
+              <div class="affinity-circle"
+                   [class.affinity-unseen]="getAffinityLevel(selectedAffinity) === 'unseen'"
+                   [class.affinity-low]="getAffinityLevel(selectedAffinity) === 'low'"
+                   [class.affinity-medium]="getAffinityLevel(selectedAffinity) === 'medium'"
+                   [class.affinity-high]="getAffinityLevel(selectedAffinity) === 'high'">
+                {{ getAffinityPercentage(selectedAffinity) }}%
+              </div>
+            </div>
+            <div class="affinity-buttons">
+              <button (click)="adjustAffinity(-0.1)"
+                      [disabled]="selectedAffinity <= 0"
+                      class="affinity-btn decrease">
+                −
+              </button>
+              <button (click)="adjustAffinity(0.1)"
+                      [disabled]="selectedAffinity >= 1"
+                      class="affinity-btn increase">
+                +
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Content Body -->
+        <article class="content-body">
+          <!-- Markdown Content -->
+          <div *ngIf="selectedNode.contentFormat === 'markdown'"
+               class="markdown-content"
+               [innerHTML]="renderMarkdown(selectedNode.content)">
+          </div>
+
+          <!-- Gherkin Content -->
+          <div *ngIf="selectedNode.contentFormat === 'gherkin'"
+               class="gherkin-content"
+               [innerHTML]="renderGherkin(selectedNode.content)">
+          </div>
+
+          <!-- Plain Text Content -->
+          <div *ngIf="selectedNode.contentFormat === 'plaintext'"
+               class="plaintext-content">
+            {{ selectedNode.content }}
+          </div>
+        </article>
+
+        <!-- Content Footer: Navigation -->
+        <footer class="content-footer">
+          <button class="nav-btn prev"
+                  (click)="goToPrevious()"
+                  [disabled]="!hasPrevious()">
+            ← Previous
+          </button>
+
+          <div class="footer-info">
+            <span class="node-position">
+              {{ getCurrentPosition() }} of {{ pathNodes.length }}
+            </span>
+          </div>
+
+          <button class="nav-btn next"
+                  (click)="goToNext()"
+                  [disabled]="!hasNext()">
+            Next →
+          </button>
+        </footer>
+      </section>
+
+    </main>
+  </div>
 </div>

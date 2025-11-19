@@ -28,6 +28,29 @@
     --tech-bright: rgba(127, 203, 238, 0.8);
     --earthy-orange: rgb(217, 124, 43);
     --earthy-orange-light: rgba(217, 124, 43, 0.8);
+
+    /* Lamad Learning Platform - Clean Professional Theme (Dark Mode Default) */
+    --lamad-bg-primary: #0f172a;
+    --lamad-bg-secondary: #1e293b;
+    --lamad-bg-tertiary: #334155;
+    --lamad-surface: rgba(30, 41, 59, 0.8);
+    --lamad-surface-hover: rgba(51, 65, 85, 0.9);
+
+    --lamad-text-primary: #f1f5f9;
+    --lamad-text-secondary: #cbd5e1;
+    --lamad-text-tertiary: #94a3b8;
+    --lamad-text-muted: #64748b;
+
+    --lamad-border: rgba(148, 163, 184, 0.2);
+    --lamad-border-hover: rgba(148, 163, 184, 0.4);
+
+    --lamad-accent-primary: #6366f1;
+    --lamad-accent-secondary: #8b5cf6;
+    --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+    --lamad-success: #10b981;
+    --lamad-warning: #f59e0b;
+    --lamad-info: #3b82f6;
 }
 
 /* Light Theme - Activates based on device preference */
@@ -54,6 +77,29 @@
         --tech-bright: rgba(15, 85, 150, 0.95);
         --earthy-orange: rgb(175, 85, 30);
         --earthy-orange-light: rgba(175, 85, 30, 0.8);
+
+        /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
+        --lamad-bg-primary: #ffffff;
+        --lamad-bg-secondary: #f8fafc;
+        --lamad-bg-tertiary: #f1f5f9;
+        --lamad-surface: rgba(255, 255, 255, 0.95);
+        --lamad-surface-hover: rgba(248, 250, 252, 1);
+
+        --lamad-text-primary: #0f172a;
+        --lamad-text-secondary: #334155;
+        --lamad-text-tertiary: #475569;
+        --lamad-text-muted: #64748b;
+
+        --lamad-border: rgba(15, 23, 42, 0.15);
+        --lamad-border-hover: rgba(15, 23, 42, 0.3);
+
+        --lamad-accent-primary: #4f46e5;
+        --lamad-accent-secondary: #7c3aed;
+        --lamad-accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+        --lamad-success: #059669;
+        --lamad-warning: #d97706;
+        --lamad-info: #2563eb;
     }
 }
 
@@ -407,6 +453,29 @@ body[data-theme="light"] {
     --tech-bright: rgba(1, 87, 155, 0.9);
     --earthy-orange: rgb(230, 81, 0);
     --earthy-orange-light: rgba(230, 81, 0, 0.8);
+
+    /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
+    --lamad-bg-primary: #ffffff;
+    --lamad-bg-secondary: #f8fafc;
+    --lamad-bg-tertiary: #f1f5f9;
+    --lamad-surface: rgba(255, 255, 255, 0.95);
+    --lamad-surface-hover: rgba(248, 250, 252, 1);
+
+    --lamad-text-primary: #0f172a;
+    --lamad-text-secondary: #334155;
+    --lamad-text-tertiary: #475569;
+    --lamad-text-muted: #64748b;
+
+    --lamad-border: rgba(15, 23, 42, 0.15);
+    --lamad-border-hover: rgba(15, 23, 42, 0.3);
+
+    --lamad-accent-primary: #4f46e5;
+    --lamad-accent-secondary: #7c3aed;
+    --lamad-accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+    --lamad-success: #059669;
+    --lamad-warning: #d97706;
+    --lamad-info: #2563eb;
 }
 
 body[data-theme="light"]::before {
@@ -472,6 +541,29 @@ body[data-theme="dark"] {
     --tech-bright: rgba(127, 203, 238, 0.8);
     --earthy-orange: rgb(217, 124, 43);
     --earthy-orange-light: rgba(217, 124, 43, 0.8);
+
+    /* Lamad Learning Platform - Clean Professional Theme (Dark Mode) */
+    --lamad-bg-primary: #0f172a;
+    --lamad-bg-secondary: #1e293b;
+    --lamad-bg-tertiary: #334155;
+    --lamad-surface: rgba(30, 41, 59, 0.8);
+    --lamad-surface-hover: rgba(51, 65, 85, 0.9);
+
+    --lamad-text-primary: #f1f5f9;
+    --lamad-text-secondary: #cbd5e1;
+    --lamad-text-tertiary: #94a3b8;
+    --lamad-text-muted: #64748b;
+
+    --lamad-border: rgba(148, 163, 184, 0.2);
+    --lamad-border-hover: rgba(148, 163, 184, 0.4);
+
+    --lamad-accent-primary: #6366f1;
+    --lamad-accent-secondary: #8b5cf6;
+    --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+    --lamad-success: #10b981;
+    --lamad-warning: #f59e0b;
+    --lamad-info: #3b82f6;
 }
 
 body[data-theme="dark"]::before {

@@ -6,7 +6,6 @@
         <a routerLink="/lamad" class="logo-link">
           <h1>📚 Lamad</h1>
         </a>
-        <p class="subtitle">Learning Platform - Where Understanding is Earned</p>
       </div>
 
       <!-- Learning Path Progress Widget -->
@@ -20,20 +19,25 @@
         <a routerLink="/lamad/map" routerLinkActive="active">Meaning Map</a>
         <a routerLink="/" class="back-link">← Back to Site</a>
       </nav>
-    </div>
 
-    <!-- Search Bar -->
-    <div class="search-container">
-      <form (ngSubmit)="onSearch()" class="search-form">
-        <input
-          type="text"
-          [(ngModel)]="searchQuery"
-          name="search"
-          placeholder="Search content across Lamad..."
-          class="search-input"
-        />
-        <button type="submit" class="search-button">🔍</button>
-      </form>
+      <!-- Search Bar -->
+      <div class="search-container">
+        <form (ngSubmit)="onSearch()" class="search-form">
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            name="search"
+            placeholder="Search..."
+            class="search-input"
+          />
+          <button type="submit" class="search-button">🔍</button>
+        </form>
+      </div>
+
+      <!-- Theme Toggle -->
+      <div class="toolbar-theme-toggle">
+        <app-theme-toggle></app-theme-toggle>
+      </div>
     </div>
   </header>
 

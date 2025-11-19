@@ -1,4 +1,4 @@
-<!-- Theme toggle button -->
-<app-theme-toggle></app-theme-toggle>
+<!-- Theme toggle button (hidden on lamad routes which have their own in the toolbar) -->
+<app-theme-toggle *ngIf="!isLamadRoute"></app-theme-toggle>
 
 <router-outlet></router-outlet>
