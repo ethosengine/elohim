@@ -120,8 +120,8 @@ export class EpicContentPanesComponent implements OnInit, OnDestroy {
   private loadAffinity(nodeId: string): void {
     this.affinityTrackingService.affinity$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(affinityMap => {
-        this.affinity = affinityMap.get(nodeId) || 0;
+      .subscribe(affinityData => {
+        this.affinity = affinityData.affinity[nodeId] || 0;
       });
   }
 
@@ -156,7 +156,7 @@ export class EpicContentPanesComponent implements OnInit, OnDestroy {
 
   decreaseAffinity(): void {
     if (this.epic) {
-      this.affinityTrackingService.decrementAffinity(this.epic.id, 0.2);
+      this.affinityTrackingService.incrementAffinity(this.epic.id, -0.2);
     }
   }
 
