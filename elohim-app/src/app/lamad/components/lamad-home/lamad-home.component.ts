@@ -10,12 +10,11 @@ import { LearningPathService, PathNode } from '../../services/learning-path.serv
 import { ContentNode } from '../../models/content-node.model';
 import { AffinityStats } from '../../models/user-affinity.model';
 import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.component';
-import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
 @Component({
   selector: 'app-lamad-home',
   standalone: true,
-  imports: [CommonModule, RouterModule, AffinityCircleComponent, ThemeToggleComponent],
+  imports: [CommonModule, RouterModule, AffinityCircleComponent],
   templateUrl: './lamad-home.component.html',
   styleUrls: ['./lamad-home.component.css']
 })
@@ -67,7 +66,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
         if (graph && path.length > 0) {
           // Enrich path nodes with affinity data
           this.pathNodes = path.map(pn => this.enrichPathNode(pn));
-          
+
           // Sidebar should only show peer items (Epics)
           this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
 
@@ -84,6 +83,11 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
           // Calculate stats
           this.affinityStats = this.affinityService.getStats(allNodes);
+
+          // Select first node if none is selected
+          if (!this.selectedNode && this.pathNodes.length > 0) {
+            this.selectNode(this.pathNodes[0].node);
+          }
 
           this.isLoading = false;
         }
