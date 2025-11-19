@@ -42,8 +42,9 @@ describe('LamadHomeComponent', () => {
     relatedNodeIds: [],
     metadata: { category: 'social' },
     category: 'social',
-    epicId: 'epic-social-medium-v1',
-    scenarioIds: [],
+    epicIds: ['epic-social-medium-v1'],
+    scenarioIds: ['scenario-track-view'],
+    featureDescription: 'Track user engagement and affinity',
     gherkinContent: 'Feature: Affinity Tracking'
   };
 
@@ -58,20 +59,22 @@ describe('LamadHomeComponent', () => {
     relatedNodeIds: [],
     metadata: {},
     featureId: 'feature-affinity-tracking',
-    gherkinContent: 'Scenario: Track Content View'
+    epicIds: ['epic-social-medium-v1'],
+    scenarioType: 'scenario',
+    steps: []
   };
 
   const mockGraph: DocumentGraph = {
-    nodes: new Map([
-      ['epic-social-medium-v1', mockEpicNode],
-      ['feature-affinity-tracking', mockFeatureNode],
-      ['scenario-track-view', mockScenarioNode]
+    nodes: new Map<string, DocumentNode>([
+      ['epic-social-medium-v1', mockEpicNode as DocumentNode],
+      ['feature-affinity-tracking', mockFeatureNode as DocumentNode],
+      ['scenario-track-view', mockScenarioNode as DocumentNode]
     ]),
     relationships: new Map(),
     nodesByType: {
-      epics: new Map([['epic-social-medium-v1', mockEpicNode]]),
-      features: new Map([['feature-affinity-tracking', mockFeatureNode]]),
-      scenarios: new Map([['scenario-track-view', mockScenarioNode]])
+      epics: new Map<string, EpicNode>([['epic-social-medium-v1', mockEpicNode]]),
+      features: new Map<string, FeatureNode>([['feature-affinity-tracking', mockFeatureNode]]),
+      scenarios: new Map<string, ScenarioNode>([['scenario-track-view', mockScenarioNode]])
     },
     nodesByTag: new Map(),
     nodesByCategory: new Map(),
