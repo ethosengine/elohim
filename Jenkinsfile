@@ -310,6 +310,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 mkdir -p /tmp/build-context
                                 cp -r elohim-app /tmp/build-context/
                                 cp images/Dockerfile /tmp/build-context/
+                                cp images/nginx.conf /tmp/build-context/
                                 
                                 # Build image
                                 cd /tmp/build-context
