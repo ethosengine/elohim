@@ -28,19 +28,19 @@ export class LearningPathService {
    */
   private readonly DEFAULT_PATH_ORDER = [
     // Core vision and concepts (epics)
-    { id: 'manifesto.md', category: 'vision', depth: 0 },
-    { id: 'elohim-observer-protocol.md', category: 'core', depth: 0 },
-    { id: 'elohim-public-observer-epic.md', category: 'core', depth: 0 },
-    { id: 'elohim-value-scanner-protocol.md', category: 'core', depth: 0 },
-    { id: 'elohim-social-medium.md', category: 'core', depth: 0 },
-    { id: 'elohim-autonomous-entity-story.md', category: 'advanced', depth: 0 },
-    { id: 'elohim-global-orchestra.md', category: 'systemic', depth: 0 },
-    { id: 'elohim_hardware_spec.md', category: 'implementation', depth: 0 },
+    { id: 'manifesto', category: 'vision', depth: 0 },
+    { id: 'elohim-observer-protocol', category: 'core', depth: 0 },
+    { id: 'elohim-public-observer-epic', category: 'core', depth: 0 },
+    { id: 'elohim-value-scanner-protocol', category: 'core', depth: 0 },
+    { id: 'elohim-social-medium', category: 'core', depth: 0 },
+    { id: 'elohim-autonomous-entity-story', category: 'advanced', depth: 0 },
+    { id: 'elohim-global-orchestra', category: 'systemic', depth: 0 },
+    { id: 'elohim_hardware_spec', category: 'implementation', depth: 0 },
 
     // Technical features
-    { id: 'core/platform-architecture.feature', category: 'technical', depth: 1 },
-    { id: 'value-scanner/care-economy.feature', category: 'technical', depth: 1 },
-    { id: 'deployment/staging-validation.feature', category: 'technical', depth: 1 },
+    { id: 'feature_core_platform-architecture', category: 'technical', depth: 1 },
+    { id: 'feature_value-scanner_care-economy', category: 'technical', depth: 1 },
+    { id: 'feature_deployment_staging-validation', category: 'technical', depth: 1 },
   ];
 
   constructor(private readonly graphService: DocumentGraphService) {
