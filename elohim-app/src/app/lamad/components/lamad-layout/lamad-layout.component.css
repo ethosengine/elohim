@@ -200,6 +200,12 @@
   padding: 2rem;
 }
 
+/* Remove padding for full-width components like lamad-home */
+.lamad-main:has(app-lamad-home) {
+  padding: 0;
+  max-width: 100%;
+}
+
 /* Footer */
 .lamad-footer {
   background: var(--lamad-surface);
