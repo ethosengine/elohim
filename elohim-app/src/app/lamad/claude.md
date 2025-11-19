@@ -336,18 +336,31 @@ Lamad uses composite identifiers in URLs to create self-documenting, graph-frien
 
 #### Pattern: `type:id:type:id:type:id...`
 
+**IMPORTANT: Use IDs, Not Semantic Slugs**
+
+URLs use actual node IDs (UUIDs or stable identifiers), not human-readable slugs:
+- ✅ `/lamad/epic:epic-social-medium-v1:feature:feature-affinity-tracking`
+- ❌ `/lamad/epic:social-medium:feature:affinity`
+
+**Why IDs over slugs:**
+1. **Globally Unique**: No conflicts across the entire graph
+2. **Stable**: Never changes even if title/content changes
+3. **Programmatic**: Can construct URLs from anywhere with just the ID
+4. **Graph-Friendly**: Matches how graph databases reference nodes
+5. **No Collisions**: Multiple nodes can have similar titles without URL conflicts
+
 **Node Views** (even number of segments):
 ```
-/lamad/epic:social-medium                                    → Epic content + collections
-/lamad/epic:social-medium:feature:affinity                   → Feature content + collections
-/lamad/epic:social-medium:feature:affinity:scenario:emma-bus → Scenario content (leaf)
+/lamad/epic:epic-social-medium-v1                                           → Epic content + collections
+/lamad/epic:epic-social-medium-v1:feature:feature-affinity-tracking         → Feature content + collections
+/lamad/epic:epic-social-medium-v1:feature:feature-affinity-tracking:scenario:scenario-emma-bus → Scenario content (leaf)
 ```
 
 **Collection Views** (odd number of segments):
 ```
-/lamad/epic                                  → All epics
-/lamad/epic:social-medium:feature            → All features in this epic
-/lamad/epic:social-medium:feature:affinity:scenario → All scenarios in this feature
+/lamad/epic                                              → All epics
+/lamad/epic:epic-social-medium-v1:feature                → All features in this epic
+/lamad/epic:epic-social-medium-v1:feature:feature-affinity-tracking:scenario → All scenarios in this feature
 ```
 
 **Special Routes**:
@@ -392,23 +405,26 @@ Lamad uses composite identifiers in URLs to create self-documenting, graph-frien
 #### Navigation Flow
 
 1. **Home** (`/lamad`) → List of epics
-2. Click epic → **Node view** (`/lamad/epic:social-medium`)
+2. Click epic → **Node view** (`/lamad/epic:epic-social-medium-v1`)
    - Shows epic content
    - Displays features collection below
-3. Click feature → **Node view** (`/lamad/epic:social-medium:feature:affinity`)
+3. Click feature → **Node view** (`/lamad/epic:epic-social-medium-v1:feature:feature-affinity-tracking`)
    - Shows feature content
    - Displays scenarios collection below
-4. Click scenario → **Node view** (`/lamad/epic:social-medium:feature:affinity:scenario:emma-bus`)
+4. Click scenario → **Node view** (`/lamad/epic:epic-social-medium-v1:feature:feature-affinity-tracking:scenario:scenario-emma-bus`)
    - Shows scenario content (leaf node, no children)
 
 #### Breadcrumbs
 
-Automatically derived from composite path:
+Automatically derived from composite path, showing **titles** (not IDs) for readability:
 ```
 Home / Epic: Social Medium / Feature: Affinity Tracking / Scenario: Emma's Bus Advocacy
 ```
 
-Type labels (`Epic:`, `Feature:`) extracted from path segments.
+- **URL uses IDs** for stability: `epic:epic-social-medium-v1`
+- **Breadcrumb shows title** for readability: `Epic: Social Medium`
+- Type labels (`Epic:`, `Feature:`) extracted from path segments
+- Titles fetched from graph by ID lookup
 
 ### Key Components
 
