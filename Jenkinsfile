@@ -252,6 +252,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                         expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
                         expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                         expression { return env.BRANCH_NAME.contains('alpha') }
+                        // Also check CHANGE_BRANCH for PR builds
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
                     }
                 }
             }
