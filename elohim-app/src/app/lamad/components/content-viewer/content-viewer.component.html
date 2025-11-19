@@ -11,8 +11,11 @@
     <button class="btn-primary" (click)="backToMap()">Back to Mission Map</button>
   </div>
 
-  <!-- Content -->
-  <div *ngIf="node && !isLoading" class="content">
+  <!-- Epic Content (with panes) -->
+  <app-epic-content-panes *ngIf="node && !isLoading && node.contentType === 'epic'"></app-epic-content-panes>
+
+  <!-- Other Content Types (regular viewer) -->
+  <div *ngIf="node && !isLoading && node.contentType !== 'epic'" class="content">
     <!-- Header -->
     <div class="content-header">
       <button class="back-button" (click)="backToMap()">← Back to Map</button>

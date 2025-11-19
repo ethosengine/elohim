@@ -8,11 +8,12 @@ import { AffinityTrackingService } from '../../services/affinity-tracking.servic
 import { ContentNode } from '../../models/content-node.model';
 import { DocumentNode } from '../../models/document-node.model';
 import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
+import { EpicContentPanesComponent } from '../epic-content-panes/epic-content-panes.component';
 
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, EpicContentPanesComponent],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
