@@ -1,0 +1,244 @@
+/*
+ * Elohim Protocol BDD Specification Pipeline
+ *
+ * This pipeline validates the Elohim Protocol behavioral specifications
+ * defined in /docs using BDD tests. All tests use stub implementations
+ * that fail with "Not Implemented" to show what needs to be built.
+ *
+ * Purpose: Export .feature files as testable specifications. If you can
+ * make these tests pass, you can build that component of the protocol.
+ *
+ * This pipeline is COMPLETELY SEPARATE from the elohim-app pipeline.
+ */
+
+pipeline {
+    agent {
+        kubernetes {
+            label "elohim-protocol-${env.BUILD_NUMBER}"
+            yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    job: elohim-protocol
+spec:
+  nodeSelector:
+    node-type: edge
+  containers:
+  - name: node
+    image: node:20-alpine
+    command:
+    - cat
+    tty: true
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+"""
+        }
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '30', daysToKeepStr: '60'))
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+        timestamps()
+    }
+
+    triggers {
+        // Run on commits to docs or protocol-tests
+        pollSCM('H/15 * * * *')
+    }
+
+    environment {
+        PROTOCOL_VERSION = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+        TEST_REPORT_DIR = 'protocol-tests/reports'
+        FEATURE_EXPORT_DIR = 'protocol-tests/exports'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                container('node') {
+                    checkout scm
+                    sh '''
+                        echo "=== Elohim Protocol Specification Pipeline ==="
+                        echo "Branch: ${BRANCH_NAME}"
+                        echo "Build: ${BUILD_NUMBER}"
+                        echo "Protocol Version: ${PROTOCOL_VERSION}"
+                        echo ""
+                        echo "Counting .feature files in docs..."
+                        find docs -name "*.feature" | wc -l
+                    '''
+                }
+            }
+        }
+
+        stage('Install Protocol Test Dependencies') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Installing BDD test framework..."
+                            npm ci --prefer-offline --no-audit
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Validate Feature Files') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Validating Gherkin syntax in all .feature files..."
+                            npm run validate-features || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Protocol BDD Tests - Public Observer') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Running Public Observer protocol tests..."
+                            npm run test:public-observer || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Protocol BDD Tests - Governance') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Running Governance protocol tests..."
+                            npm run test:governance || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Protocol BDD Tests - Value Scanner') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Running Value Scanner protocol tests..."
+                            npm run test:value-scanner || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Protocol BDD Tests - Social Medium') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Running Social Medium protocol tests..."
+                            npm run test:social-medium || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Protocol BDD Tests - Autonomous Entity') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Running Autonomous Entity protocol tests..."
+                            npm run test:autonomous-entity || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Generate Unified Report') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Generating unified protocol specification report..."
+                            npm run report:generate || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Export Feature Files') {
+            steps {
+                container('node') {
+                    dir('protocol-tests') {
+                        sh '''
+                            echo "Exporting .feature files for external implementation..."
+                            npm run export:features || true
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Publish Reports') {
+            steps {
+                container('node') {
+                    script {
+                        // Publish Cucumber reports
+                        cucumber buildStatus: 'UNSTABLE',
+                            reportTitle: 'Elohim Protocol Specification Report',
+                            fileIncludePattern: '**/*.json',
+                            jsonReportDirectory: 'protocol-tests/reports/json',
+                            sortingMethod: 'ALPHABETICAL',
+                            trendsLimit: 100
+                    }
+
+                    // Archive all reports
+                    archiveArtifacts artifacts: 'protocol-tests/reports/**/*',
+                        allowEmptyArchive: true,
+                        fingerprint: true
+
+                    // Archive exported features
+                    archiveArtifacts artifacts: 'protocol-tests/exports/**/*.feature',
+                        allowEmptyArchive: true,
+                        fingerprint: true
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            container('node') {
+                sh '''
+                    echo ""
+                    echo "=== Protocol Specification Test Summary ==="
+                    if [ -d "protocol-tests/reports" ]; then
+                        echo "Reports available in Jenkins artifacts"
+                        echo "Exported features available for implementation"
+                    fi
+                '''
+            }
+        }
+        success {
+            echo "✓ Protocol specification tests completed (expected failures show what needs implementation)"
+        }
+        failure {
+            echo "✗ Protocol specification pipeline failed"
+        }
+    }
+}
