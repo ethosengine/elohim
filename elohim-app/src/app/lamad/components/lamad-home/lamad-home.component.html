@@ -117,10 +117,37 @@
     </div>
   </section>
 
+  <!-- Epics List (Path Items) -->
+  <section class="epics-section">
+    <h2 class="section-title">📚 Learning Paths</h2>
+    <p class="section-description">Choose an epic to begin your journey</p>
+    <div class="epics-grid">
+      <div
+        *ngFor="let epic of epics"
+        class="epic-card"
+        [routerLink]="['/lamad', epic.id]">
+        <div class="epic-header">
+          <span class="epic-icon">{{ getCategoryIcon(getEpicCategory(epic)) }}</span>
+          <span class="epic-category">{{ getEpicCategory(epic) }}</span>
+        </div>
+        <h3 class="epic-title">{{ epic.title }}</h3>
+        <p class="epic-description">{{ epic.description }}</p>
+        <div class="epic-meta">
+          <span class="epic-features-count">{{ epic.featureIds?.length || 0 }} features</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Quick Actions -->
   <section class="actions-section">
     <h2 class="section-title">Explore</h2>
     <div class="action-grid">
+      <a routerLink="/lamad/map" class="action-card">
+        <div class="action-icon">🗺️</div>
+        <h3>Meaning Map</h3>
+        <p>View the full content graph</p>
+      </a>
       <a routerLink="/lamad/search" class="action-card">
         <div class="action-icon">🔍</div>
         <h3>Search</h3>

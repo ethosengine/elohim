@@ -13,9 +13,36 @@
 
   <!-- Content -->
   <div *ngIf="node && !isLoading" class="content">
+    <!-- Breadcrumb Navigation -->
+    <nav *ngIf="isHierarchicalMode() && breadcrumbs.length > 0" class="breadcrumb-nav">
+      <ol class="breadcrumb">
+        <li *ngFor="let crumb of breadcrumbs; let last = last" class="breadcrumb-item">
+          <a
+            *ngIf="!last"
+            (click)="navigateToBreadcrumb(crumb.path)"
+            class="breadcrumb-link">
+            {{ crumb.label }}
+          </a>
+          <span *ngIf="last" class="breadcrumb-current">{{ crumb.label }}</span>
+          <span *ngIf="!last" class="breadcrumb-separator">/</span>
+        </li>
+      </ol>
+    </nav>
+
     <!-- Header -->
     <div class="content-header">
-      <button class="back-button" (click)="backToMap()">← Back to Map</button>
+      <button
+        *ngIf="isHierarchicalMode()"
+        class="back-button"
+        (click)="navigateUp()">
+        ← Back
+      </button>
+      <button
+        *ngIf="!isHierarchicalMode()"
+        class="back-button"
+        (click)="backToMap()">
+        ← Back to Map
+      </button>
 
       <div class="header-main">
         <div class="content-type-badge">
@@ -111,6 +138,29 @@
       </div>
     </div>
 
+    <!-- Children Panes (Hierarchical Navigation) -->
+    <div *ngIf="hasChildren()" class="children-section">
+      <h2>📂 Contents</h2>
+      <div class="children-grid">
+        <div
+          *ngFor="let child of children"
+          class="child-card"
+          (click)="navigateToChild(child)">
+          <div class="child-header">
+            <span class="child-icon">{{ getContentTypeIcon() }}</span>
+            <span class="child-type">{{ child.contentType }}</span>
+          </div>
+          <h3 class="child-title">{{ child.title }}</h3>
+          <p class="child-description">{{ child.description }}</p>
+          <div class="child-meta">
+            <span class="child-affinity">
+              Affinity: {{ getRelatedNodeAffinity(child.id) }}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Related content -->
     <div *ngIf="relatedNodes.length > 0" class="related-section">
       <h2>🔗 Related Content</h2>
@@ -132,5 +182,3 @@
     </div>
   </div>
 </div>
-
-<!-- Note: removed Math.round reference that was invalid in template -->
