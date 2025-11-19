@@ -8,6 +8,12 @@
         </a>
       </div>
 
+      <!-- Learning Path Progress Widget -->
+      <div class="learning-path-widget" *ngIf="!isGraphBuilding">
+        <div class="path-name">{{ learningPathName }}</div>
+        <div class="progress-text">{{ masteryPercentage }}% to mastery</div>
+      </div>
+
       <nav class="lamad-nav">
         <a routerLink="/lamad" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Home</a>
         <a routerLink="/lamad/map" routerLinkActive="active">Meaning Map</a>

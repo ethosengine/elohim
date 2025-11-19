@@ -76,6 +76,37 @@
   opacity: 0.7;
 }
 
+/* Learning Path Widget */
+.learning-path-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  backdrop-filter: blur(10px);
+  min-width: 180px;
+}
+
+.path-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lamad-text-secondary);
+  background: var(--lamad-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+
+.progress-text {
+  font-size: 0.7rem;
+  color: var(--lamad-text-muted);
+  font-weight: 500;
+  line-height: 1;
+}
+
 /* Theme Toggle in Toolbar */
 .toolbar-theme-toggle {
   flex: 0 0 auto;
@@ -266,5 +297,10 @@
 
   .lamad-main {
     padding: 1rem;
+  }
+
+  .learning-path-widget {
+    width: 100%;
+    min-width: unset;
   }
 }
