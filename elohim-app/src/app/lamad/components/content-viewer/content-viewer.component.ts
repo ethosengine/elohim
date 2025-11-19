@@ -26,7 +26,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
 
   // Hierarchical navigation context
   navigationContext: NavigationContext | null = null;
-  breadcrumbs: Array<{ label: string; path: string[] }> = [];
+  breadcrumbs: Array<{ label: string; path: string; typeLabel?: string }> = [];
   children: ContentNode[] = [];
 
   private destroy$ = new Subject<void>();
