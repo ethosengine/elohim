@@ -47,10 +47,10 @@
   <!-- Navigation Footer -->
   <div class="module-footer" *ngIf="epic || feature">
     <div class="footer-links">
-      <a *ngIf="epic" [routerLink]="['/docs/epic', epic.id]" class="footer-link">
+      <a *ngIf="epic" [routerLink]="['/lamad/content', epic.id]" class="footer-link">
         📖 View Full Epic
       </a>
-      <a *ngIf="feature" [routerLink]="['/docs/feature', feature.id]" class="footer-link">
+      <a *ngIf="feature" [routerLink]="['/lamad/content', feature.id]" class="footer-link">
         🧪 View All Scenarios
       </a>
     </div>

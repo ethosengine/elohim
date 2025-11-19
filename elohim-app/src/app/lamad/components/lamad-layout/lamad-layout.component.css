@@ -2,15 +2,15 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-  color: #e0e6ed;
+  background: linear-gradient(135deg, var(--lamad-bg-primary) 0%, var(--lamad-bg-secondary) 100%);
+  color: var(--lamad-text-secondary);
 }
 
 /* Header */
 .lamad-header {
-  background: rgba(26, 31, 58, 0.95);
-  border-bottom: 2px solid rgba(99, 102, 241, 0.3);
-  padding: 1.5rem 2rem;
+  background: var(--lamad-surface);
+  border-bottom: 2px solid var(--lamad-border);
+  padding: 0.25rem 1rem;
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -23,22 +23,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  gap: 1rem;
 }
 
 .lamad-logo h1 {
-  font-size: 1.75rem;
+  font-size: 0.9rem;
   margin: 0;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--lamad-accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  line-height: 1;
 }
 
 .subtitle {
-  font-size: 0.875rem;
-  color: #94a3b8;
-  margin: 0.25rem 0 0;
+  display: none;
 }
 
 .logo-link {
@@ -48,26 +47,28 @@
 /* Navigation */
 .lamad-nav {
   display: flex;
-  gap: 2rem;
+  gap: 0.5rem;
   align-items: center;
 }
 
 .lamad-nav a {
-  color: #cbd5e1;
+  color: var(--lamad-text-secondary);
   text-decoration: none;
   font-weight: 500;
   transition: all 0.2s;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1;
 }
 
 .lamad-nav a:hover {
-  color: #6366f1;
+  color: var(--lamad-accent-primary);
   background: rgba(99, 102, 241, 0.1);
 }
 
 .lamad-nav a.active {
-  color: #6366f1;
+  color: var(--lamad-accent-primary);
   background: rgba(99, 102, 241, 0.15);
 }
 
@@ -75,48 +76,90 @@
   opacity: 0.7;
 }
 
+/* Theme Toggle in Toolbar */
+.toolbar-theme-toggle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-theme-toggle ::ng-deep .theme-toggle {
+  position: static;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.25rem;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid var(--lamad-border);
+  box-shadow: none;
+}
+
+.toolbar-theme-toggle ::ng-deep .theme-toggle:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--lamad-border-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+.toolbar-theme-toggle ::ng-deep .theme-toggle:active {
+  transform: scale(0.95);
+}
+
+.toolbar-theme-toggle ::ng-deep .theme-icon {
+  font-size: 0.9rem;
+}
+
+.toolbar-theme-toggle ::ng-deep .auto-indicator {
+  font-size: 0.45rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  bottom: -0.15rem;
+  right: -0.15rem;
+}
+
 /* Search */
 .search-container {
-  max-width: 1400px;
-  margin: 0 auto;
+  flex: 0 0 auto;
 }
 
 .search-form {
   display: flex;
-  gap: 0.5rem;
-  max-width: 600px;
+  gap: 0.25rem;
+  max-width: 250px;
 }
 
 .search-input {
   flex: 1;
-  padding: 0.75rem 1rem;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: 0.5rem;
-  color: #e0e6ed;
-  font-size: 1rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.25rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.8rem;
   transition: all 0.2s;
+  line-height: 1;
+  min-width: 120px;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: var(--lamad-accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
 .search-input::placeholder {
-  color: #64748b;
+  color: var(--lamad-text-muted);
 }
 
 .search-button {
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  padding: 0.25rem 0.5rem;
+  background: var(--lamad-accent-gradient);
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   color: white;
-  font-size: 1rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s;
+  line-height: 1;
 }
 
 .search-button:hover {
@@ -139,7 +182,7 @@
   width: 50px;
   height: 50px;
   border: 4px solid rgba(99, 102, 241, 0.1);
-  border-top-color: #6366f1;
+  border-top-color: var(--lamad-accent-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -157,31 +200,68 @@
   padding: 2rem;
 }
 
+/* Remove padding for full-width components like lamad-home */
+.lamad-main:has(app-lamad-home) {
+  padding: 0;
+  max-width: 100%;
+}
+
 /* Footer */
 .lamad-footer {
-  background: rgba(15, 23, 42, 0.8);
-  border-top: 1px solid rgba(99, 102, 241, 0.2);
+  background: var(--lamad-surface);
+  border-top: 1px solid var(--lamad-border);
   padding: 1.5rem 2rem;
   text-align: center;
-  color: #64748b;
+  color: var(--lamad-text-muted);
   font-size: 0.875rem;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
+  .lamad-header {
+    padding: 0.5rem 1rem;
+  }
+
   .lamad-header-content {
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.5rem;
     align-items: flex-start;
   }
 
+  .lamad-logo h1 {
+    font-size: 1rem;
+  }
+
   .lamad-nav {
-    gap: 1rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .search-container {
+    width: 100%;
+    order: 3;
   }
 
   .search-form {
     max-width: 100%;
+  }
+
+  .search-input {
+    font-size: 0.875rem;
+  }
+
+  .toolbar-theme-toggle {
+    order: 2;
+  }
+
+  .toolbar-theme-toggle ::ng-deep .theme-toggle {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .toolbar-theme-toggle ::ng-deep .theme-icon {
+    font-size: 1rem;
   }
 
   .lamad-main {

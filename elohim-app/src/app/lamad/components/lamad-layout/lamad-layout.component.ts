@@ -3,11 +3,12 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/rou
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DocumentGraphService } from '../../services/document-graph.service';
+import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
 @Component({
   selector: 'app-lamad-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule, ThemeToggleComponent],
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css']
 })
