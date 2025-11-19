@@ -13,7 +13,7 @@ import { ScenarioNode, FeatureNode } from '../../models';
       <div class="scenario-header">
         <div class="breadcrumb">
           <a routerLink="/lamad">Home</a> /
-          <a [routerLink]="['/docs/feature', feature.id]" *ngIf="feature">{{feature.title}}</a> /
+          <a [routerLink]="['/lamad/content', feature.id]" *ngIf="feature">{{feature.title}}</a> /
           <span>Scenario</span>
         </div>
         <h1 class="scenario-title">{{scenario.title}}</h1>

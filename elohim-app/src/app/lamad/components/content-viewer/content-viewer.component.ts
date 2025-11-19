@@ -128,14 +128,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    * Navigate to related content
    */
   viewRelatedContent(node: ContentNode): void {
-    this.router.navigate(['/docs/content', node.id]);
+    this.router.navigate(['/lamad/content', node.id]);
   }
 
   /**
    * Navigate back to mission map
    */
   backToMap(): void {
-    this.router.navigate(['/docs/map']);
+    this.router.navigate(['/lamad/map']);
   }
 
   /**
