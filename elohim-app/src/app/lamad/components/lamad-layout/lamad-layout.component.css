@@ -2,14 +2,14 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-  color: #e0e6ed;
+  background: linear-gradient(135deg, var(--lamad-bg-primary) 0%, var(--lamad-bg-secondary) 100%);
+  color: var(--lamad-text-secondary);
 }
 
 /* Header */
 .lamad-header {
-  background: rgba(26, 31, 58, 0.95);
-  border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+  background: var(--lamad-surface);
+  border-bottom: 2px solid var(--lamad-border);
   padding: 0.25rem 1rem;
   backdrop-filter: blur(10px);
   position: sticky;
@@ -29,7 +29,7 @@
 .lamad-logo h1 {
   font-size: 0.9rem;
   margin: 0;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--lamad-accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -52,7 +52,7 @@
 }
 
 .lamad-nav a {
-  color: #cbd5e1;
+  color: var(--lamad-text-secondary);
   text-decoration: none;
   font-weight: 500;
   transition: all 0.2s;
@@ -63,12 +63,12 @@
 }
 
 .lamad-nav a:hover {
-  color: #6366f1;
+  color: var(--lamad-accent-primary);
   background: rgba(99, 102, 241, 0.1);
 }
 
 .lamad-nav a.active {
-  color: #6366f1;
+  color: var(--lamad-accent-primary);
   background: rgba(99, 102, 241, 0.15);
 }
 
@@ -89,13 +89,13 @@
   height: 1.75rem;
   border-radius: 0.25rem;
   background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  border: 1px solid var(--lamad-border);
   box-shadow: none;
 }
 
 .toolbar-theme-toggle ::ng-deep .theme-toggle:hover {
   background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.5);
+  border-color: var(--lamad-border-hover);
   transform: none;
   box-shadow: none;
 }
@@ -130,10 +130,10 @@
 .search-input {
   flex: 1;
   padding: 0.25rem 0.5rem;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: var(--lamad-bg-secondary);
+  border: 1px solid var(--lamad-border);
   border-radius: 0.25rem;
-  color: #e0e6ed;
+  color: var(--lamad-text-secondary);
   font-size: 0.8rem;
   transition: all 0.2s;
   line-height: 1;
@@ -142,17 +142,17 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: var(--lamad-accent-primary);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
 .search-input::placeholder {
-  color: #64748b;
+  color: var(--lamad-text-muted);
 }
 
 .search-button {
   padding: 0.25rem 0.5rem;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--lamad-accent-gradient);
   border: none;
   border-radius: 0.25rem;
   color: white;
@@ -182,7 +182,7 @@
   width: 50px;
   height: 50px;
   border: 4px solid rgba(99, 102, 241, 0.1);
-  border-top-color: #6366f1;
+  border-top-color: var(--lamad-accent-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -202,11 +202,11 @@
 
 /* Footer */
 .lamad-footer {
-  background: rgba(15, 23, 42, 0.8);
-  border-top: 1px solid rgba(99, 102, 241, 0.2);
+  background: var(--lamad-surface);
+  border-top: 1px solid var(--lamad-border);
   padding: 1.5rem 2rem;
   text-align: center;
-  color: #64748b;
+  color: var(--lamad-text-muted);
   font-size: 0.875rem;
 }
 
