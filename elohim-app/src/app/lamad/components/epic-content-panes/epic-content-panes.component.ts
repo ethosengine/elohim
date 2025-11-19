@@ -24,7 +24,7 @@ interface PaneTab {
   styleUrls: ['./epic-content-panes.component.scss']
 })
 export class EpicContentPanesComponent implements OnInit, OnDestroy {
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   epic: EpicNode | null = null;
   features: FeatureNode[] = [];
@@ -42,10 +42,10 @@ export class EpicContentPanesComponent implements OnInit, OnDestroy {
   ];
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private documentGraphService: DocumentGraphService,
-    private affinityTrackingService: AffinityTrackingService
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly documentGraphService: DocumentGraphService,
+    private readonly affinityTrackingService: AffinityTrackingService
   ) {}
 
   ngOnInit(): void {

@@ -9,9 +9,14 @@
   <div *ngIf="!isLoading" class="three-panel-layout">
 
     <!-- Mobile Sidebar Backdrop -->
-    <div class="sidebar-backdrop" 
-         *ngIf="isSidebarOpen" 
-         (click)="closeSidebar()">
+    <div class="sidebar-backdrop"
+         *ngIf="isSidebarOpen"
+         (click)="closeSidebar()"
+         (keydown.enter)="closeSidebar()"
+         (keydown.escape)="closeSidebar()"
+         tabindex="0"
+         role="button"
+         aria-label="Close sidebar">
     </div>
 
     <!-- LEFT SIDEBAR: Navigation Menu -->
@@ -100,7 +105,12 @@
                    class="hexagon-chip"
                    [class]="'affinity-' + node.affinityLevel"
                    [title]="node.title + ' (' + getAffinityPercentage(node.affinity) + '%)'"
-                   (click)="selectNode(node)">
+                   (click)="selectNode(node)"
+                   (keydown.enter)="selectNode(node)"
+                   (keydown.space)="selectNode(node)"
+                   tabindex="0"
+                   role="button"
+                   [attr.aria-label]="node.title">
               </div>
             </div>
           </div>
@@ -116,9 +126,14 @@
            <p class="home-subtitle">Explore the epics below to begin your journey.</p>
            
            <div class="epic-grid">
-             <div *ngFor="let item of sidebarNodes" 
+             <div *ngFor="let item of sidebarNodes"
                   class="epic-card"
-                  (click)="selectNode(item.node)">
+                  (click)="selectNode(item.node)"
+                  (keydown.enter)="selectNode(item.node)"
+                  (keydown.space)="selectNode(item.node)"
+                  tabindex="0"
+                  role="button"
+                  [attr.aria-label]="item.node.title">
                 <div class="epic-card-header">
                   <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
                   <h2 class="epic-title">{{ item.node.title }}</h2>

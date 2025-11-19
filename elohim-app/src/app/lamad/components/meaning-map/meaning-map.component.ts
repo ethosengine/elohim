@@ -71,7 +71,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes = Array.from(graph.nodes.values()) as DocumentNode[];
+    const allNodes: DocumentNode[] = Array.from(graph.nodes.values());
     const contentNodes = DocumentNodeAdapter.fromDocumentNodes(allNodes);
 
     // Get affinity stats
@@ -85,7 +85,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     // Group nodes by category
     const categoryMap = new Map<string, ContentNode[]>();
     contentNodes.forEach((node) => {
-      const category = (node.metadata?.['category'] ?? 'uncategorized') as string;
+      const category = node.metadata?.['category'] ?? 'uncategorized';
       if (!categoryMap.has(category)) {
         categoryMap.set(category, []);
       }

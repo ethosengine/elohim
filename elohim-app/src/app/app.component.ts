@@ -14,7 +14,7 @@ export class AppComponent implements OnInit {
   title = 'elohim-app';
   isLamadRoute = false;
 
-  constructor(private router: Router) {}
+  constructor(private readonly router: Router) {}
 
   ngOnInit(): void {
     // Track route changes to hide floating toggle on lamad routes
