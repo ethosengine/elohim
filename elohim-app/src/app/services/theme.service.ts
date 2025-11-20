@@ -68,6 +68,13 @@ export class ThemeService {
 
   /**
    * Save theme preference to localStorage
+   *
+   * SECURITY NOTE: localStorage usage is safe here.
+   * - Only stores non-sensitive user UI preference (theme selection)
+   * - No personal identifiable information (PII) is stored
+   * - No authentication tokens or credentials are stored
+   * - Data is client-side only and used for UI personalization
+   * - Limited to predefined theme values (light, dark, device)
    */
   private saveTheme(theme: Theme): void {
     try {
@@ -79,6 +86,12 @@ export class ThemeService {
 
   /**
    * Load theme preference from localStorage
+   *
+   * SECURITY NOTE: localStorage usage is safe here.
+   * - Only reads non-sensitive user UI preference (theme selection)
+   * - Validates input against allowed values before use
+   * - Falls back to safe default if validation fails
+   * - No risk of code injection as value is type-checked
    */
   private loadTheme(): void {
     try {
