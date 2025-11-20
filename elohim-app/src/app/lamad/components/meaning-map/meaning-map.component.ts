@@ -40,12 +40,12 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     engagedCount: 0,
   };
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private graphService: DocumentGraphService,
-    private affinityService: AffinityTrackingService,
-    private router: Router
+    private readonly graphService: DocumentGraphService,
+    private readonly affinityService: AffinityTrackingService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -71,7 +71,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes = Array.from(graph.nodes.values()) as DocumentNode[];
+    const allNodes: DocumentNode[] = Array.from(graph.nodes.values());
     const contentNodes = DocumentNodeAdapter.fromDocumentNodes(allNodes);
 
     // Get affinity stats
@@ -85,7 +85,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     // Group nodes by category
     const categoryMap = new Map<string, ContentNode[]>();
     contentNodes.forEach((node) => {
-      const category = (node.metadata?.['category'] as string) || 'uncategorized';
+      const category = node.metadata?.['category'] ?? 'uncategorized';
       if (!categoryMap.has(category)) {
         categoryMap.set(category, []);
       }
@@ -107,7 +107,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
           displayName: this.getCategoryDisplayName(categoryName),
           icon: this.getCategoryIcon(categoryName),
           nodes: nodesWithAffinity,
-          stats: stats.byCategory.get(categoryName) || null,
+          stats: stats.byCategory.get(categoryName) ?? null,
           expanded: true, // Default to expanded
         };
       }
@@ -115,8 +115,8 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
 
     // Sort categories by average affinity (lowest first)
     this.categories.sort((a, b) => {
-      const aAvg = a.stats?.averageAffinity || 0;
-      const bAvg = b.stats?.averageAffinity || 0;
+      const aAvg = a.stats?.averageAffinity ?? 0;
+      const bAvg = b.stats?.averageAffinity ?? 0;
       return aAvg - bAvg;
     });
   }

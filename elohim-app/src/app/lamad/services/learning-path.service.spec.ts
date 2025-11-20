@@ -1,0 +1,149 @@
+import { TestBed } from '@angular/core/testing';
+import { LearningPathService } from './learning-path.service';
+import { DocumentGraphService } from './document-graph.service';
+import { BehaviorSubject } from 'rxjs';
+import { DocumentGraph } from '../models/document-graph.model';
+import { DocumentNode, NodeType } from '../models/document-node.model';
+
+describe('LearningPathService', () => {
+  let service: LearningPathService;
+  let graphServiceMock: any;
+  let graphSubject: BehaviorSubject<DocumentGraph | null>;
+
+  const mockNodes: DocumentNode[] = [
+    {
+      id: 'manifesto',
+      title: 'Manifesto',
+      type: NodeType.EPIC,
+      description: '',
+      tags: [],
+      sourcePath: '',
+      relatedNodeIds: [],
+      metadata: {},
+      content: ''
+    },
+    {
+      id: 'elohim-observer-protocol',
+      title: 'Observer Protocol',
+      type: NodeType.EPIC,
+      description: '',
+      tags: [],
+      sourcePath: '',
+      relatedNodeIds: [],
+      metadata: {},
+      content: ''
+    },
+    {
+      id: 'unknown-node',
+      title: 'Unknown',
+      type: NodeType.FEATURE,
+      description: '',
+      tags: [],
+      sourcePath: '',
+      relatedNodeIds: [],
+      metadata: {},
+      content: ''
+    }
+  ];
+
+  const mockGraph: any = {
+    nodes: new Map(mockNodes.map(n => [n.id, n])),
+    relationships: new Map()
+  };
+
+  beforeEach(() => {
+    graphSubject = new BehaviorSubject<DocumentGraph | null>(null);
+    graphServiceMock = {
+      graph$: graphSubject.asObservable()
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        LearningPathService,
+        { provide: DocumentGraphService, useValue: graphServiceMock }
+      ]
+    });
+    service = TestBed.inject(LearningPathService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  it('should initialize path with matching nodes', () => {
+    graphSubject.next(mockGraph);
+    const path = service.getPath();
+    expect(path.length).toBeGreaterThan(0);
+    expect(path.some(p => p.node.id === 'manifesto')).toBeTrue();
+    expect(path.some(p => p.node.id === 'unknown-node')).toBeFalse();
+  });
+
+  it('should get next node', () => {
+    graphSubject.next(mockGraph);
+    const next = service.getNextNode('manifesto');
+    expect(next).toBeTruthy();
+    expect(next?.node.id).toBe('elohim-observer-protocol');
+  });
+
+  it('should return null if next node does not exist (end of path)', () => {
+    graphSubject.next(mockGraph);
+    // Find the last node in the path that actually exists in our mock graph
+    // The mock graph only has 'manifesto' and 'elohim-observer-protocol' from the DEFAULT_PATH_ORDER list.
+    // So 'elohim-observer-protocol' should be the last one.
+    const lastNode = service.getPath()[service.getPath().length - 1];
+    const next = service.getNextNode(lastNode.node.id);
+    expect(next).toBeNull();
+  });
+
+  it('should return null if next node does not exist (unknown node)', () => {
+    graphSubject.next(mockGraph);
+    const next = service.getNextNode('unknown-node');
+    expect(next).toBeNull();
+  });
+
+  it('should get previous node', () => {
+    graphSubject.next(mockGraph);
+    const prev = service.getPreviousNode('elohim-observer-protocol');
+    expect(prev).toBeTruthy();
+    expect(prev?.node.id).toBe('manifesto');
+  });
+
+  it('should return null if previous node does not exist (start of path)', () => {
+    graphSubject.next(mockGraph);
+    const prev = service.getPreviousNode('manifesto');
+    expect(prev).toBeNull();
+  });
+
+  it('should get node position', () => {
+    graphSubject.next(mockGraph);
+    expect(service.getNodePosition('manifesto')).toBe(0);
+    expect(service.getNodePosition('unknown-node')).toBe(-1);
+  });
+
+  it('should check if node is in path', () => {
+    graphSubject.next(mockGraph);
+    expect(service.isInPath('manifesto')).toBeTrue();
+    expect(service.isInPath('unknown-node')).toBeFalse();
+  });
+
+  it('should calculate path progress', () => {
+    graphSubject.next(mockGraph);
+    // Path should contain 2 nodes: manifesto and elohim-observer-protocol
+    const affinityMap = new Map<string, number>();
+    affinityMap.set('manifesto', 0.5); // Engaged
+    affinityMap.set('elohim-observer-protocol', 0); // Not engaged
+
+    const progress = service.getPathProgress(affinityMap);
+    expect(progress).toBe(50); // 1 out of 2 engaged
+  });
+
+  it('should handle empty graph', () => {
+    graphSubject.next(null);
+    expect(service.getPath().length).toBe(0);
+  });
+
+  it('should handle path progress with empty path', () => {
+    graphSubject.next(null);
+    expect(service.getPathProgress(new Map())).toBe(0);
+  });
+});

@@ -249,8 +249,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 not {
                     anyOf {
+                        branch 'dev'
                         expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                         expression { return env.BRANCH_NAME.contains('alpha') }
+                        // Also check CHANGE_BRANCH for PR builds
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
                     }
                 }
             }
@@ -310,6 +315,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 mkdir -p /tmp/build-context
                                 cp -r elohim-app /tmp/build-context/
                                 cp images/Dockerfile /tmp/build-context/
+                                cp images/nginx.conf /tmp/build-context/
                                 
                                 # Build image
                                 cd /tmp/build-context
@@ -479,7 +485,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 anyOf {
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     expression { return env.BRANCH_NAME.contains('alpha') }
+                    // Also check CHANGE_BRANCH for PR builds
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
                 }
             }
             steps {
@@ -533,8 +544,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 anyOf {
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
                     expression { return env.BRANCH_NAME.contains('alpha') }
+                    // Also check CHANGE_BRANCH for PR builds
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /alpha-.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
                 }
             }
             steps {

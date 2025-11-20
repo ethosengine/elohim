@@ -1,131 +1,217 @@
-<div class="lamad-home">
-  <!-- Welcome Section -->
-  <section class="welcome-section">
-    <h1 class="main-title">Welcome to Lamad</h1>
-    <p class="main-description">
-      Learn the Elohim Protocol through a guided journey of discovery.
-      Track your affinity, earn attestations, and unlock deeper understanding as you explore.
-    </p>
+<div class="lamad-home-container">
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading learning path...</p>
+  </div>
 
-    <!-- Primary Action -->
-    <div class="primary-action">
-      <a routerLink="/lamad/map" class="cta-button">
-        <span class="cta-icon">🗺️</span>
-        <div class="cta-content">
-          <div class="cta-title">View Meaning Map</div>
-          <div class="cta-subtitle">Begin your journey toward understanding</div>
-        </div>
-      </a>
-    </div>
+  <!-- Main Three-Panel Layout -->
+  <div *ngIf="!isLoading" class="three-panel-layout">
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">📖</div>
-        <div class="stat-number">{{ stats.epicCount || 0 }}</div>
-        <div class="stat-label">Epics</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-number">{{ stats.featureCount || 0 }}</div>
-        <div class="stat-label">Features</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">✓</div>
-        <div class="stat-number">{{ stats.scenarioCount || 0 }}</div>
-        <div class="stat-label">Scenarios</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🔗</div>
-        <div class="stat-number">{{ stats.averageConnectionsPerNode | number:'1.1-1' }}</div>
-        <div class="stat-label">Avg Connections</div>
-      </div>
-    </div>
+    <!-- Mobile Sidebar Backdrop -->
+    <button class="sidebar-backdrop"
+         *ngIf="isSidebarOpen"
+         (click)="closeSidebar()"
+         (keydown.escape)="closeSidebar()"
+         type="button"
+         aria-label="Close sidebar">
+    </button>
 
-    <!-- Affinity Stats -->
-    <div *ngIf="affinityStats" class="affinity-section">
-      <h2 class="section-subtitle">Your Progress</h2>
-      <div class="affinity-stats-grid">
-        <div class="affinity-stat-card">
-          <div class="affinity-stat-label">Explored Content</div>
-          <div class="affinity-stat-value">{{ affinityStats.engagedNodes }} / {{ affinityStats.totalNodes }}</div>
-          <div class="affinity-stat-bar">
-            <div
-              class="affinity-stat-bar-fill"
-              [style.width.%]="(affinityStats.engagedNodes / affinityStats.totalNodes) * 100">
-            </div>
-          </div>
-        </div>
-        <div class="affinity-stat-card">
-          <div class="affinity-stat-label">Average Affinity</div>
-          <div class="affinity-stat-value">{{ (affinityStats.averageAffinity * 100) | number:'1.0-0' }}%</div>
-          <div class="affinity-stat-bar">
-            <div
-              class="affinity-stat-bar-fill high"
-              [style.width.%]="affinityStats.averageAffinity * 100">
-            </div>
-          </div>
-        </div>
+    <!-- LEFT SIDEBAR: Navigation Menu -->
+    <aside class="nav-sidebar" [class.open]="isSidebarOpen">
+      <div class="sidebar-header">
+        <h2 class="sidebar-title">Elohim</h2>
+        <button class="close-sidebar-btn" (click)="toggleSidebar()">✕</button>
       </div>
 
-      <!-- Distribution -->
-      <div class="distribution-section">
-        <h3 class="distribution-title">Affinity Distribution</h3>
-        <div class="distribution-bars">
-          <div class="distribution-bar">
-            <div class="distribution-label">Unseen</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill unseen"
-                [style.width.%]="(affinityStats.distribution.unseen / affinityStats.totalNodes) * 100">
-              </div>
-            </div>
-            <div class="distribution-count">{{ affinityStats.distribution.unseen }}</div>
-          </div>
-          <div class="distribution-bar">
-            <div class="distribution-label">Low</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill low"
-                [style.width.%]="(affinityStats.distribution.low / affinityStats.totalNodes) * 100">
-              </div>
-            </div>
-            <div class="distribution-count">{{ affinityStats.distribution.low }}</div>
-          </div>
-          <div class="distribution-bar">
-            <div class="distribution-label">Medium</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill medium"
-                [style.width.%]="(affinityStats.distribution.medium / affinityStats.totalNodes) * 100">
-              </div>
-            </div>
-            <div class="distribution-count">{{ affinityStats.distribution.medium }}</div>
-          </div>
-          <div class="distribution-bar">
-            <div class="distribution-label">High</div>
-            <div class="distribution-bar-container">
-              <div
-                class="distribution-bar-fill high"
-                [style.width.%]="(affinityStats.distribution.high / affinityStats.totalNodes) * 100">
-              </div>
-            </div>
-            <div class="distribution-count">{{ affinityStats.distribution.high }}</div>
+      <nav class="path-nav">
+        <!-- Overview / Home Link -->
+        <button class="path-item overview-item"
+                [class.selected]="!selectedNode"
+                (click)="goHome()"
+                type="button">
+          <span class="path-icon">📊</span>
+          <span class="path-title">Overview</span>
+        </button>
+
+        <div class="nav-divider"></div>
+        <div class="nav-section-label">Epics</div>
+
+        <button *ngFor="let pathNode of sidebarNodes; let i = index"
+                class="path-item"
+                [class.selected]="selectedNode?.id === pathNode.node.id"
+                (click)="selectNode(pathNode.node)"
+                (keydown.enter)="selectNode(pathNode.node)"
+                type="button">
+          <span class="path-icon">{{ getContentTypeIcon(pathNode.node.contentType) }}</span>
+          <span class="path-title">{{ pathNode.node.title }}</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- RIGHT CONTENT AREA -->
+    <main class="content-area">
+
+      <!-- UNIFIED TOOLBAR -->
+      <header class="lamad-toolbar">
+        <!-- Left: Navigation Controls -->
+        <div class="toolbar-left">
+          <button class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Toggle Sidebar">
+            ☰
+          </button>
+          
+          <!-- Breadcrumbs -->
+          <div class="toolbar-breadcrumbs">
+             <button class="breadcrumb-link" (click)="goHome()">Home</button>
+             <ng-container *ngIf="selectedNode">
+               <span class="separator">/</span>
+               <span class="current-node">{{ selectedNode.title }}</span>
+             </ng-container>
           </div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- Quick Actions -->
-  <section class="actions-section">
-    <h2 class="section-title">Explore</h2>
-    <div class="action-grid">
-      <a routerLink="/lamad/search" class="action-card">
-        <div class="action-icon">🔍</div>
-        <h3>Search</h3>
-        <p>Find content across all documentation</p>
-      </a>
-    </div>
-  </section>
+        <!-- Right: Actions -->
+        <div class="toolbar-right">
+          <button class="icon-btn search-btn" (click)="toggleSearch()" [class.active]="isSearchOpen" aria-label="Search">
+            🔍
+          </button>
+        </div>
+      </header>
+
+      <!-- SEARCH OVERLAY -->
+      <div class="search-overlay" *ngIf="isSearchOpen">
+         <input type="text" placeholder="Search content..." class="search-input" autofocus>
+         <!-- Search results would go here -->
+      </div>
+
+      <!-- AT-A-GLANCE OVERVIEW (Collapsible Panel) -->
+      <section class="graph-section" [class.expanded]="isGraphExpanded">
+        <div class="graph-content" *ngIf="isGraphExpanded && affinityStats">
+          <div class="affinity-overview">
+            <!-- Learning Path Progress Circle -->
+            <div class="learning-progress-container">
+               <app-affinity-circle
+                 [affinity]="getPathProgress() / 100"
+                 [size]="100">
+               </app-affinity-circle>
+               <span class="progress-label">Mastery</span>
+            </div>
+
+            <!-- Hexagon Grid -->
+            <div class="hexagon-grid">
+              <button *ngFor="let node of allContentNodes"
+                   class="hexagon-chip"
+                   [class]="'affinity-' + node.affinityLevel"
+                   [title]="node.title + ' (' + getAffinityPercentage(node.affinity) + '%)'"
+                   (click)="selectNode(node)"
+                   type="button"
+                   [attr.aria-label]="node.title">
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CENTER: Content Viewer or Home Placeholder -->
+      <section class="content-viewer">
+
+        <!-- Home Placeholder (Epic Panes) -->
+        <div *ngIf="!selectedNode" class="home-placeholder">
+           <h1 class="home-title">The Elohim Protocol</h1>
+           <p class="home-subtitle">Explore the epics below to begin your journey.</p>
+           
+           <div class="epic-grid">
+             <button *ngFor="let item of sidebarNodes"
+                  class="epic-card"
+                  (click)="selectNode(item.node)"
+                  type="button"
+                  [attr.aria-label]="item.node.title">
+                <div class="epic-card-body">
+                  <div class="epic-card-header">
+                    <div class="epic-icon-container">
+                      <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
+                    </div>
+                    <h2 class="epic-title">{{ item.node.title }}</h2>
+                  </div>
+                  <p class="epic-desc">{{ item.node.description }}</p>
+                </div>
+                <div class="epic-footer">
+                   <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
+                   <div class="hex-badge" 
+                        [class]="'affinity-' + item.affinityLevel"
+                        [title]="'Affinity: ' + getAffinityPercentage(item.affinity) + '%'">
+                   </div>
+                </div>
+             </button>
+           </div>
+        </div>
+
+        <!-- Selected Content -->
+        <ng-container *ngIf="selectedNode">
+          <!-- Content Header -->
+          <header class="content-header">
+            <div class="content-meta">
+              <span class="content-type-badge">
+                {{ getContentTypeIcon(selectedNode.contentType) }}
+                {{ selectedNode.contentType }}
+              </span>
+              <span class="content-category" *ngIf="selectedNode.metadata?.['category']">
+                {{ selectedNode.metadata['category'] }}
+              </span>
+            </div>
+
+            <h1 class="content-title">{{ selectedNode.title }}</h1>
+
+            <p class="content-description" *ngIf="selectedNode.description">
+              {{ selectedNode.description }}
+            </p>
+          </header>
+
+          <!-- Content Body -->
+          <article class="content-body">
+            <!-- Markdown Content -->
+            <div *ngIf="selectedNode.contentFormat === 'markdown'"
+                 class="markdown-content"
+                 [innerHTML]="renderMarkdown(selectedNode.content)">
+            </div>
+
+            <!-- Gherkin Content -->
+            <div *ngIf="selectedNode.contentFormat === 'gherkin'"
+                 class="gherkin-content"
+                 [innerHTML]="renderGherkin(selectedNode.content)">
+            </div>
+
+            <!-- Plain Text Content -->
+            <div *ngIf="selectedNode.contentFormat === 'plaintext'"
+                 class="plaintext-content">
+              {{ selectedNode.content }}
+            </div>
+          </article>
+
+          <!-- Content Footer: Navigation -->
+          <footer class="content-footer">
+            <button class="nav-btn prev"
+                    (click)="goToPrevious()"
+                    [disabled]="!hasPrevious()">
+              ← Previous
+            </button>
+
+            <div class="footer-info">
+              <span class="node-position">
+                {{ getCurrentPosition() }} of {{ pathNodes.length }}
+              </span>
+            </div>
+
+            <button class="nav-btn next"
+                    (click)="goToNext()"
+                    [disabled]="!hasNext()">
+              Next →
+            </button>
+          </footer>
+        </ng-container>
+
+      </section>
+
+    </main>
+  </div>
 </div>

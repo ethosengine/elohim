@@ -43,19 +43,26 @@ This manifesto proposes technology that actively defends against corruption whil
 ## Repository Structure
 
 ```
-elohim-app/          # Angular application
-├── src/app/components/
-│   ├── hero/        # Protocol introduction
-│   ├── crisis/      # Analysis of current failures
-│   ├── elohim-host/ # Autonomous AI guardians
-│   ├── vision/      # Future possibilities
+elohim-app/             # Angular application (Main Platform)
+├── src/app/components/ # Feature components
+│   ├── hero/           # Protocol introduction
+│   ├── crisis/         # Analysis of current failures
+│   ├── elohim-host/    # Autonomous AI guardians
+│   ├── vision/         # Future possibilities
 │   ├── design-principles/ # Technical implementation
 │   ├── learning-success/  # Proven models
 │   ├── path-forward/      # Implementation steps
 │   ├── call-to-action/    # The choice ahead
-│   └── footer/      # Closing message
-├── src/styles.css   # Global design system
-└── devfile.yaml     # Development environment config
+│   └── footer/         # Closing message
+├── src/styles.css      # Global design system
+└── devfile.yaml        # Development environment config
+
+elohim-library/         # Angular Workspace for Shared Libraries
+└── projects/
+    └── lamad-ui/       # "Lamad" UI Pattern Library (Hexagon Grid, etc.)
+
+elohim-ui-playground/   # Component Showcase & Pattern Library App
+└── src/app/            # Demos for shared library components
 ```
 
 ## Development

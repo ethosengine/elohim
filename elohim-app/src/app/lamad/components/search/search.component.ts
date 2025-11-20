@@ -81,7 +81,7 @@ export class SearchComponent implements OnInit {
   }
 
   getNodeRoute(node: DocumentNode): string[] {
-    return ['/docs', node.type, node.id];
+    return ['/lamad/content', node.id];
   }
 
   getNodeTypeIcon(type: string): string {

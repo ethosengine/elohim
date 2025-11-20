@@ -1,10 +1,11 @@
-<button
-  class="theme-toggle"
-  (click)="toggleTheme()"
-  [attr.aria-label]="getTooltip()"
-  [title]="getTooltip()">
+<button 
+  class="theme-toggle" 
+  [class.inline-mode]="inline"
+  (click)="toggleTheme()" 
+  [title]="getTooltip()"
+  [attr.aria-label]="getTooltip()">
   <span class="theme-icon">
     {{ getIcon() }}
-    <span class="auto-indicator" *ngIf="isAutoMode()">A</span>
+    <span *ngIf="isAutoMode()" class="auto-indicator" title="Auto (System) Theme">A</span>
   </span>
 </button>

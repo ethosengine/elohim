@@ -29,7 +29,7 @@ import { FeatureNode, ScenarioNode, EpicNode } from '../../models';
         <h2>Scenarios</h2>
         <div class="scenario-list">
           <a *ngFor="let scenario of scenarios"
-             [routerLink]="['/docs/scenario', scenario.id]"
+             [routerLink]="['/lamad/content', scenario.id]"
              class="scenario-card">
             <h3>{{scenario.title}}</h3>
             <div class="step-count">{{scenario.steps.length}} steps</div>
@@ -41,7 +41,7 @@ import { FeatureNode, ScenarioNode, EpicNode } from '../../models';
         <h2>Related Epics</h2>
         <div class="epic-list">
           <a *ngFor="let epic of relatedEpics"
-             [routerLink]="['/docs/epic', epic.id]"
+             [routerLink]="['/lamad/content', epic.id]"
              class="epic-link">
             📖 {{epic.title}}
           </a>

@@ -12,15 +12,17 @@ When('the page loads', () => {
 
 Then('the site should be accessible', () => {
   const baseUrl = Cypress.config('baseUrl');
-  
+
   if (baseUrl.includes('staging.elohim.host')) {
     cy.url().should('include', 'staging.elohim.host');
+  } else if (baseUrl.includes('alpha.elohim.host')) {
+    cy.url().should('include', 'alpha.elohim.host');
   } else if (baseUrl.includes('.code.ethosengine.com')) {
     cy.url().should('include', '.code.ethosengine.com');
   } else if (baseUrl.includes('localhost')) {
     cy.url().should('include', 'localhost');
   }
-  
+
   cy.get('body').should('be.visible');
 });
 

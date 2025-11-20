@@ -37,6 +37,8 @@ components:
       env:
         - name: CLAUDE_CONFIG_DIR
           value: /projects/.claude-config
+        - name: XDG_CONFIG_HOME
+          value: /projects/.config
         - name: NPM_CONFIG_CACHE
           value: /tmp/npm-cache
         - name: CYPRESS_CACHE_FOLDER
@@ -50,6 +52,10 @@ components:
       endpoints:
         - name: angular-dev
           targetPort: 4200
+          exposure: public
+          protocol: http
+        - name: angular-playground
+          targetPort: 4201
           exposure: public
           protocol: http
 commands:

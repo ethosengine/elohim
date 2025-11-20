@@ -8,11 +8,12 @@ import { AffinityTrackingService } from '../../services/affinity-tracking.servic
 import { ContentNode } from '../../models/content-node.model';
 import { DocumentNode } from '../../models/document-node.model';
 import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
+import { EpicContentPanesComponent } from '../epic-content-panes/epic-content-panes.component';
 
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, EpicContentPanesComponent],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
@@ -23,14 +24,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private graphService: DocumentGraphService,
-    private affinityService: AffinityTrackingService
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly graphService: DocumentGraphService,
+    private readonly affinityService: AffinityTrackingService
   ) {}
 
   ngOnInit(): void {
@@ -128,14 +129,14 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    * Navigate to related content
    */
   viewRelatedContent(node: ContentNode): void {
-    this.router.navigate(['/docs/content', node.id]);
+    this.router.navigate(['/lamad/content', node.id]);
   }
 
   /**
    * Navigate back to mission map
    */
   backToMap(): void {
-    this.router.navigate(['/docs/map']);
+    this.router.navigate(['/lamad/map']);
   }
 
   /**
@@ -253,7 +254,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataCategory(): string | null {
     if (!this.node?.metadata?.['category']) return null;
-    return this.node.metadata['category'] as string;
+    return this.node.metadata['category'];
   }
 
   /**
@@ -273,7 +274,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataVersion(): string | null {
     if (!this.node?.metadata?.['version']) return null;
-    return this.node.metadata['version'] as string;
+    return this.node.metadata['version'];
   }
 
   /**
