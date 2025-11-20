@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MeaningMapComponent } from './meaning-map.component';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('MeaningMapComponent', () => {
   let component: MeaningMapComponent;
@@ -7,7 +8,10 @@ describe('MeaningMapComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MeaningMapComponent]
+      imports: [MeaningMapComponent],
+      providers: [
+        provideHttpClient()
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(MeaningMapComponent);
