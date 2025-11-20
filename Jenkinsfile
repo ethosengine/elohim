@@ -95,7 +95,9 @@ spec:
                     branch 'staging'
                     branch 'dev'
                     expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
                     expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
                     expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
                     changeRequest()
                 }
@@ -218,6 +220,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 sh """
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
+                                    sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.alpha.ts
                                 """
                                 
                                 sh 'npm run build'
@@ -243,6 +246,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('SonarQube Analysis') {
+            when {
+                not {
+                    anyOf {
+                        branch 'dev'
+                        expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                        expression { return env.BRANCH_NAME.contains('alpha') }
+                        // Also check CHANGE_BRANCH for PR builds
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                    }
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-app') {
@@ -299,6 +315,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 mkdir -p /tmp/build-context
                                 cp -r elohim-app /tmp/build-context/
                                 cp images/Dockerfile /tmp/build-context/
+                                cp images/nginx.conf /tmp/build-context/
                                 
                                 # Build image
                                 cd /tmp/build-context
@@ -410,6 +427,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Deploy to Staging') {
+            when {
+                anyOf {
+                    branch 'staging'
+                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                }
+            }
             steps {
                 container('builder'){
                     script {
@@ -456,32 +480,219 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('E2E Testing - Staging Validation') {
+        stage('Deploy to Alpha') {
+            when {
+                anyOf {
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    expression { return env.BRANCH_NAME.contains('alpha') }
+                    // Also check CHANGE_BRANCH for PR builds
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying to Alpha: ${IMAGE_TAG}"
+
+                            // Validate configmap
+                            sh '''
+                                kubectl get configmap elohim-config-alpha -n ethosengine || {
+                                    echo "❌ ERROR: elohim-config-alpha ConfigMap missing"
+                                    exit 1
+                                }
+                            '''
+
+                            // Update deployment manifest
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment.yaml > manifests/alpha-deployment-${IMAGE_TAG}.yaml"
+
+                            // Verify the image tag in the manifest
+                            sh """
+                                echo '==== Deployment manifest preview ===='
+                                grep 'image:' manifests/alpha-deployment-${IMAGE_TAG}.yaml
+                                echo '===================================='
+                            """
+
+                            // Deploy
+                            sh "kubectl apply -f manifests/alpha-deployment-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-site-alpha -n ethosengine"
+                            sh 'kubectl rollout status deployment/elohim-site-alpha -n ethosengine --timeout=300s'
+
+                            // Verify the deployment is using the correct image
+                            sh """
+                                echo '==== Verifying deployed image ===='
+                                kubectl get deployment elohim-site-alpha -n ethosengine -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                echo ''
+                                echo '=================================='
+                            """
+
+                            echo 'Alpha deployment completed!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('E2E Testing - Alpha Validation') {
+            when {
+                anyOf {
+                    branch 'dev'
+                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                    expression { return env.BRANCH_NAME ==~ /alpha-.+/ }
+                    expression { return env.BRANCH_NAME.contains('alpha') }
+                    // Also check CHANGE_BRANCH for PR builds
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /alpha-.+/ }
+                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-app') {
                         script {
                             def props = loadBuildVars()
-                            
+
                             withBuildVars(props) {
-                                echo 'Running E2E tests against staging'
+                                echo 'Running E2E tests against alpha'
                                 env.E2E_TESTS_RAN = 'true'
-                                
+
                                 // Install Cypress if needed
                                 sh '''
                                     if [ ! -d "node_modules/cypress" ]; then
                                         npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
                                     fi
                                 '''
-                                
+
+                                // Verify alpha is up
+                                sh '''
+                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://alpha.elohim.host | grep -q "200\\|302\\|301"; do
+                                        sleep 5
+                                    done'
+                                    echo "✅ Alpha site is responding"
+                                '''
+
+                                // Run tests
+                                sh """#!/bin/bash
+                                    export CYPRESS_baseUrl=https://alpha.elohim.host
+                                    export CYPRESS_ENV=alpha
+                                    export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
+                                    export NO_COLOR=1
+                                    export DISPLAY=:99
+
+                                    Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
+                                    XVFB_PID=\$!
+                                    sleep 2
+
+                                    npx cypress verify > /dev/null
+                                    mkdir -p cypress/reports
+
+                                    npx cypress run \\
+                                        --headless \\
+                                        --browser chromium \\
+                                        --spec "cypress/e2e/staging-validation.feature"
+
+                                    kill \$XVFB_PID 2>/dev/null || true
+                                """
+
+                                echo '✅ Alpha validation passed!'
+                            }
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    echo '✅ E2E tests passed - alpha validation successful!'
+                }
+                always {
+                    dir('elohim-app') {
+                        script {
+                            if (env.E2E_TESTS_RAN == 'true') {
+                                echo '📊 Publishing cucumber reports...'
+
+                                // Publish cucumber reports
+                                if (fileExists('cypress/reports/cucumber-report.json')) {
+                                    cucumber([
+                                        reportTitle: 'E2E Test Results (Alpha)',
+                                        fileIncludePattern: 'cucumber-report.json',
+                                        jsonReportDirectory: 'cypress/reports',
+                                        buildStatus: 'FAILURE',
+                                        failedFeaturesNumber: -1,
+                                        failedScenariosNumber: -1,
+                                        failedStepsNumber: -1,
+                                        skippedStepsNumber: -1,
+                                        pendingStepsNumber: -1,
+                                        undefinedStepsNumber: -1
+                                    ])
+                                    echo 'Cucumber reports published successfully'
+                                } else {
+                                    echo 'No cucumber reports found to publish'
+                                }
+                            }
+
+                            // Archive test artifacts
+                            if (env.E2E_TESTS_RAN == 'true') {
+                                if (fileExists('cypress/screenshots')) {
+                                    archiveArtifacts artifacts: 'cypress/screenshots/**/*.png', allowEmptyArchive: true
+                                }
+                                if (fileExists('cypress/videos')) {
+                                    archiveArtifacts artifacts: 'cypress/videos/**/*.mp4', allowEmptyArchive: true
+                                }
+                                if (fileExists('cypress/reports/cucumber-report.json')) {
+                                    archiveArtifacts artifacts: 'cypress/reports/cucumber-report.json', allowEmptyArchive: true
+                                }
+                            }
+                        }
+                    }
+                }
+                failure {
+                    echo '❌ E2E tests failed - alpha deployment validation unsuccessful'
+                    echo 'Check test artifacts and logs for details'
+                }
+            }
+        }
+
+        stage('E2E Testing - Staging Validation') {
+            when {
+                anyOf {
+                    branch 'staging'
+                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
+                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
+                }
+            }
+            steps {
+                container('builder'){
+                    dir('elohim-app') {
+                        script {
+                            def props = loadBuildVars()
+
+                            withBuildVars(props) {
+                                echo 'Running E2E tests against staging'
+                                env.E2E_TESTS_RAN = 'true'
+
+                                // Install Cypress if needed
+                                sh '''
+                                    if [ ! -d "node_modules/cypress" ]; then
+                                        npm install cypress @badeball/cypress-cucumber-preprocessor @cypress/browserify-preprocessor @bahmutov/cypress-esbuild-preprocessor
+                                    fi
+                                '''
+
                                 // Verify staging is up
                                 sh '''
-                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do 
+                                    timeout 60s bash -c 'until curl -s -o /dev/null -w "%{http_code}" https://staging.elohim.host | grep -q "200\\|302\\|301"; do
                                         sleep 5
                                     done'
                                     echo "✅ Staging site is responding"
                                 '''
-                                
+
                                 // Run tests
                                 sh """#!/bin/bash
                                     export CYPRESS_baseUrl=https://staging.elohim.host
@@ -489,22 +700,22 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     export CYPRESS_EXPECTED_GIT_HASH=${GIT_COMMIT_HASH}
                                     export NO_COLOR=1
                                     export DISPLAY=:99
-                                    
+
                                     Xvfb :99 -screen 0 1024x768x24 -ac > /dev/null 2>&1 &
                                     XVFB_PID=\$!
                                     sleep 2
-                                    
+
                                     npx cypress verify > /dev/null
                                     mkdir -p cypress/reports
-                                    
+
                                     npx cypress run \\
                                         --headless \\
                                         --browser chromium \\
                                         --spec "cypress/e2e/staging-validation.feature"
-                                    
+
                                     kill \$XVFB_PID 2>/dev/null || true
                                 """
-                                
+
                                 echo '✅ Staging validation passed!'
                             }
                         }

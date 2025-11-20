@@ -1,28 +1,4 @@
-<!-- Floating orbs -->
-<div class="orb orb-1"></div>
-<div class="orb orb-2"></div>
-<div class="orb orb-3"></div>
+<!-- Theme toggle button (hidden on lamad routes which have their own in the toolbar) -->
+<app-theme-toggle *ngIf="!isLamadRoute"></app-theme-toggle>
 
-<!-- Parallax background layers -->
-<div class="parallax-bg">
-    <div class="parallax-layer layer-1" data-speed="0.5"></div>
-    <div class="parallax-layer layer-2" data-speed="0.3"></div>
-    <div class="parallax-layer layer-3" data-speed="0.1"></div>
-</div>
-
-<!-- Theme toggle button -->
-<app-theme-toggle></app-theme-toggle>
-
-<!-- Debug bar (only shows in staging) -->
-<app-debug-bar></app-debug-bar>
-
-<!-- Components -->
-<app-hero></app-hero>
-<app-crisis></app-crisis>
-<app-elohim-host></app-elohim-host>
-<app-vision></app-vision>
-<app-design-principles></app-design-principles>
-<app-learning-success></app-learning-success>
-<app-path-forward></app-path-forward>
-<app-call-to-action></app-call-to-action>
-<app-footer></app-footer>
+<router-outlet></router-outlet>

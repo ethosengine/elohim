@@ -36,13 +36,17 @@ components:
       mountSources: true
       env:
         - name: CLAUDE_CONFIG_DIR
-          value: /tmp/claude-config
+          value: /projects/.claude-config
         - name: NPM_CONFIG_CACHE
           value: /tmp/npm-cache
         - name: CYPRESS_CACHE_FOLDER
           value: /tmp/cypress-cache
         - name: JENKINS_URL
           value: "https://jenkins.ethosengine.com"
+        - name: CHROME_BIN
+          value: /usr/local/bin/chrome
+        - name: CHROME_PATH
+          value: /opt/chrome-linux64/chrome  
       endpoints:
         - name: angular-dev
           targetPort: 4200

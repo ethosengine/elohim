@@ -1,0 +1,92 @@
+@epic:governance
+@user_type:community_leader
+@governance_layer:municipal
+@related_users:constitutional_council_member,policy_maker
+@related_layers:community,provincial_state
+@elohim_agents:municipal_elohim,community_elohim
+
+Feature: Municipal Governance for Community Leader
+  As a community_leader in the governance system
+  Operating at the municipal governance layer
+  I want to coordinate across Riverside neighborhoods for citywide flourishing
+  So that diverse neighborhood needs are balanced within shared infrastructure
+
+  Background:
+    Given the Elohim Protocol is operational
+    And Jamal Washington leads Riverside municipality
+    And the municipal governance context is active
+    And multiple neighborhoods have different needs and priorities
+
+  Scenario: Coordinate resource allocation across diverse neighborhoods
+    Given downtown needs economic development support
+    And residential areas prioritize environmental protection
+    And outskirts need infrastructure investment
+    When Municipal Elohim analyzes resource allocation
+    Then agent shows resource flows and gaps across neighborhoods
+    And agent identifies conflicts and synergies
+    And Jamal facilitates city council deliberation with agent data
+    And city council makes democratic allocation decisions
+    And protocol enables informed democratic choice
+
+  Scenario: Address climate refugee resettlement at municipal scale
+    Given climate refugees are arriving faster than housing can accommodate
+    And Municipal Elohim coordinates capacity mapping
+    When Jamal works with agent on integration strategy
+    Then agent matches refugee skills to job availability
+    And agent suggests phased integration by neighborhood
+    And agent monitors integration outcomes for adjustment
+    And Jamal ensures community voice in resettlement decisions
+    And integration succeeds better than without coordination
+    And Riverside demonstrates scalable humanitarian response
+
+  Scenario: Municipal policy integration with protocol decisions
+    Given city council passes new housing affordability ordinance
+    And Municipal Elohim flags potential conflict with property protocols
+    When conflict is identified
+    Then Constitutional Council reviews constitutional alignment
+    And council determines whether ordinance or protocol needs adjustment
+    And Jamal facilitates resolution through democratic deliberation
+    And city retains policy sovereignty within constitutional bounds
+    And agents and elected government work as partners
+
+  Scenario: Crisis coordination across municipal infrastructure
+    Given opioid overdose cluster occurs in downtown
+    When Municipal Elohim detects crisis pattern
+    Then agent coordinates emergency services, health services, and social support
+    And agent identifies who needs help across multiple systems
+    And agent enables rapid mutual aid mobilization
+    And Jamal maintains human judgment for crisis decisions
+    And agents inform while humans decide under uncertainty
+    And coordinated response saves lives
+
+  Scenario: Monitor municipal wellbeing indicators for policy improvement
+    Given Riverside has baseline data on wellbeing before protocol
+    When Jamal reviews municipal dashboard annually
+    Then dashboard shows life satisfaction trends across neighborhoods
+    And dashboard reveals loneliness patterns and interventions
+    And dashboard tracks economic resilience indicators
+    And dashboard identifies neighborhoods struggling despite protocol
+    And Jamal uses data to target policy interventions
+    And evidence-based governance improves outcomes
+
+  Scenario: Facilitate inter-neighborhood dialogue on shared challenges
+    Given neighborhoods have conflicting priorities
+    And downtown wants nightlife economy
+    And residential areas want noise reduction
+    When Municipal Elohim identifies the conflict
+    Then Jamal convenes inter-neighborhood deliberative assembly
+    And assembly uses Polis-style clustering to find common ground
+    And assembly develops solution: nightlife district with sound barriers
+    And neighborhoods collaborate rather than compete
+    And municipal scale enables solutions impossible at neighborhood level
+
+  Scenario: Coordinate with county and state on cross-boundary issues
+    Given Riverside is part of larger regional ecosystem
+    And watershed management crosses municipal boundaries
+    When Jamal works on water allocation issues
+    Then he coordinates with upstream and downstream municipalities
+    And Municipal Elohim shares data with regional agents
+    And multi-municipal deliberative assembly convenes
+    And solution serves multiple jurisdictions
+    And municipal leaders demonstrate lateral coordination
+    And subsidiarity enables appropriate-scale problem solving

@@ -1,0 +1,58 @@
+<div class="module-viewer">
+  <div class="module-header">
+    <div class="breadcrumb">
+      <a routerLink="/lamad">Docs Home</a> / <span>Learning Module</span>
+    </div>
+    <h1 class="module-title">{{ moduleName }}</h1>
+    <div class="module-meta" *ngIf="epic && feature">
+      <span class="meta-badge epic-badge">📖 Epic Story</span>
+      <span class="meta-badge feature-badge">🧪 {{ scenarios.length }} Scenarios</span>
+    </div>
+  </div>
+
+  <div class="module-content">
+    <div *ngFor="let section of interleavedSections"
+         [ngClass]="{'epic-section': section.type === 'epic', 'scenario-section': section.type === 'scenario'}">
+
+      <!-- Epic Section -->
+      <div *ngIf="section.type === 'epic'" class="epic-content">
+        <h2 *ngIf="section.level === 2" class="section-heading h2">{{ section.title }}</h2>
+        <h3 *ngIf="section.level === 3" class="section-heading h3">{{ section.title }}</h3>
+        <h4 *ngIf="section.level === 4" class="section-heading h4">{{ section.title }}</h4>
+        <div class="markdown-content" [innerHTML]="section.content"></div>
+      </div>
+
+      <!-- Scenario Section -->
+      <div *ngIf="section.type === 'scenario'" class="scenario-content">
+        <div class="scenario-header">
+          <div class="scenario-icon">🧪</div>
+          <h3 class="scenario-title">Scenario: {{ section.title }}</h3>
+        </div>
+        <div class="scenario-description" *ngIf="section.content">
+          {{ section.content }}
+        </div>
+        <div class="scenario-steps" *ngIf="section.scenarioSteps && section.scenarioSteps.length > 0">
+          <div *ngFor="let step of section.scenarioSteps"
+               class="scenario-step"
+               [ngClass]="getStepKeywordClass(step.keyword)">
+            <span class="step-keyword">{{ step.keyword }}</span>
+            <span class="step-text">{{ step.text }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Navigation Footer -->
+  <div class="module-footer" *ngIf="epic || feature">
+    <div class="footer-links">
+      <a *ngIf="epic" [routerLink]="['/lamad/content', epic.id]" class="footer-link">
+        📖 View Full Epic
+      </a>
+      <a *ngIf="feature" [routerLink]="['/lamad/content', feature.id]" class="footer-link">
+        🧪 View All Scenarios
+      </a>
+    </div>
+  </div>
+</div>

@@ -8,6 +8,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:headless": "ng test --watch=false --browsers=ChromeHeadlessCI",
+    "test:ci": "ng test --watch=false --browsers=ChromeHeadlessCI --code-coverage",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "e2e:dev-headless": "cypress run --headed --no-exit --browser chrome --env baseUrl=http://localhost:4200",
