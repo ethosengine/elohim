@@ -1,0 +1,42 @@
+.canvas-wrapper {
+  width: 100%;
+  min-height: 400px; /* Minimum height */
+  height: 100%;      /* Allow growing */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Align top so we can see the grid start */
+  overflow: hidden;
+  position: relative;
+}
+
+canvas {
+  cursor: pointer;
+  display: block; /* Remove inline gap */
+}
+
+.hex-tooltip {
+  position: absolute;
+  background: rgba(15, 23, 42, 0.95);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  pointer-events: none; /* Let mouse pass through */
+  z-index: 50;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transform: translate(10px, 10px); /* Offset from cursor */
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tooltip-title {
+  font-weight: 600;
+}
+
+.tooltip-affinity {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}

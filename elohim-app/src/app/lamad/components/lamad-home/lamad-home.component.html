@@ -126,19 +126,20 @@
                   (click)="selectNode(item.node)"
                   type="button"
                   [attr.aria-label]="item.node.title">
-                <div class="epic-card-header">
-                  <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
-                  <h2 class="epic-title">{{ item.node.title }}</h2>
+                <div class="epic-card-body">
+                  <div class="epic-card-header">
+                    <div class="epic-icon-container">
+                      <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
+                    </div>
+                    <h2 class="epic-title">{{ item.node.title }}</h2>
+                  </div>
+                  <p class="epic-desc">{{ item.node.description }}</p>
                 </div>
-                <p class="epic-desc">{{ item.node.description }}</p>
-                <div class="epic-meta">
+                <div class="epic-footer">
                    <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
-                   <div class="epic-affinity">
-                     <div class="mini-affinity-bar">
-                       <div class="mini-affinity-fill" 
-                            [style.width.%]="getAffinityPercentage(item.affinity)"
-                            [class]="'affinity-' + item.affinityLevel"></div>
-                     </div>
+                   <div class="hex-badge" 
+                        [class]="'affinity-' + item.affinityLevel"
+                        [title]="'Affinity: ' + getAffinityPercentage(item.affinity) + '%'">
                    </div>
                 </div>
              </button>
