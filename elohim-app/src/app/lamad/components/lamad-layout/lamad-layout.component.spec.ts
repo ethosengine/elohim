@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { LamadLayoutComponent } from './lamad-layout.component';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 
 describe('LamadLayoutComponent', () => {
   let component: LamadLayoutComponent;
@@ -10,7 +11,8 @@ describe('LamadLayoutComponent', () => {
     await TestBed.configureTestingModule({
       imports: [LamadLayoutComponent],
       providers: [
-        provideRouter([])
+        provideRouter([]),
+        provideHttpClient()
       ]
     }).compileComponents();
 

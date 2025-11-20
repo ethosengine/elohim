@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EpicViewerComponent } from './epic-viewer.component';
 import { ActivatedRoute } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 
 describe('EpicViewerComponent', () => {
@@ -11,6 +12,7 @@ describe('EpicViewerComponent', () => {
     await TestBed.configureTestingModule({
       imports: [EpicViewerComponent],
       providers: [
+        provideHttpClient(),
         {
           provide: ActivatedRoute,
           useValue: {

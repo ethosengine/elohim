@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ContentViewerComponent } from './content-viewer.component';
 import { ActivatedRoute } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 
 describe('ContentViewerComponent', () => {
@@ -11,6 +12,7 @@ describe('ContentViewerComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ContentViewerComponent],
       providers: [
+        provideHttpClient(),
         {
           provide: ActivatedRoute,
           useValue: {

@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FeatureViewerComponent } from './feature-viewer.component';
 import { ActivatedRoute } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 
 describe('FeatureViewerComponent', () => {
@@ -11,6 +12,7 @@ describe('FeatureViewerComponent', () => {
     await TestBed.configureTestingModule({
       imports: [FeatureViewerComponent],
       providers: [
+        provideHttpClient(),
         {
           provide: ActivatedRoute,
           useValue: {

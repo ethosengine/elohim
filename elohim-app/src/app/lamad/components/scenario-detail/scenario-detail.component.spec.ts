@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ScenarioDetailComponent } from './scenario-detail.component';
 import { ActivatedRoute } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 
 describe('ScenarioDetailComponent', () => {
@@ -11,6 +12,7 @@ describe('ScenarioDetailComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ScenarioDetailComponent],
       providers: [
+        provideHttpClient(),
         {
           provide: ActivatedRoute,
           useValue: {
