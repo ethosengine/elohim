@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FeatureViewerComponent } from './feature-viewer.component';
+import { ActivatedRoute } from '@angular/router';
+import { of } from 'rxjs';
 
 describe('FeatureViewerComponent', () => {
   let component: FeatureViewerComponent;
@@ -7,7 +9,15 @@ describe('FeatureViewerComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [FeatureViewerComponent]
+      imports: [FeatureViewerComponent],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            params: of({ id: 'test-feature-1' })
+          }
+        }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(FeatureViewerComponent);

@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { EpicViewerComponent } from './epic-viewer.component';
+import { ActivatedRoute } from '@angular/router';
+import { of } from 'rxjs';
 
 describe('EpicViewerComponent', () => {
   let component: EpicViewerComponent;
@@ -7,7 +9,15 @@ describe('EpicViewerComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EpicViewerComponent]
+      imports: [EpicViewerComponent],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            params: of({ id: 'test-epic-1' })
+          }
+        }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(EpicViewerComponent);
