@@ -144,7 +144,7 @@ describe('EpicNode Model', () => {
         embeddedReferences: [reference]
       };
 
-      expect(section.embeddedReferences).toHaveLength(1);
+      expect(section.embeddedReferences.length).toBe(1);
       expect(section.embeddedReferences[0].type).toBe('feature');
     });
   });
@@ -230,7 +230,7 @@ describe('EpicNode Model', () => {
         metadata: {}
       };
 
-      expect(epic.sections).toHaveLength(2);
+      expect(epic.sections.length).toBe(2);
       expect(epic.sections[0].title).toBe('Overview');
       expect(epic.sections[1].title).toBe('Details');
     });

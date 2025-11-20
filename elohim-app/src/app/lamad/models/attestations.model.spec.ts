@@ -62,7 +62,7 @@ describe('Attestations Model', () => {
 
       expect(attestation.expiresAt).toEqual(new Date('2030-01-01'));
       expect(attestation.issuedBy).toBe('FCC');
-      expect(attestation.metadata?.licenseNumber).toBe('KA1ABC');
+      expect(attestation.metadata?.['licenseNumber']).toBe('KA1ABC');
     });
   });
 
@@ -76,7 +76,7 @@ describe('Attestations Model', () => {
         endDate: new Date('2025-02-01')
       };
 
-      expect(journey.nodesVisited).toHaveLength(3);
+      expect(journey.nodesVisited.length).toBe(3);
       expect(journey.startingAffinity['node-1']).toBe(0.0);
       expect(journey.endingAffinity['node-1']).toBe(0.8);
     });
@@ -94,8 +94,8 @@ describe('Attestations Model', () => {
         endDate: new Date('2025-01-15')
       };
 
-      expect(journey.exercisesCompleted).toHaveLength(2);
-      expect(journey.applicationsCompleted).toHaveLength(1);
+      expect(journey.exercisesCompleted?.length).toBe(2);
+      expect(journey.applicationsCompleted?.length).toBe(1);
       expect(journey.timeInvested).toBe(3600000);
     });
   });
@@ -161,7 +161,7 @@ describe('Attestations Model', () => {
         revocable: false
       };
 
-      expect(access.requiredAttestations).toHaveLength(2);
+      expect(access.requiredAttestations?.length).toBe(2);
       expect(access.steward).toBe('steward-1');
     });
 
@@ -173,7 +173,7 @@ describe('Attestations Model', () => {
         revocable: false
       };
 
-      expect(access.requiredAllAttestations).toHaveLength(2);
+      expect(access.requiredAllAttestations?.length).toBe(2);
     });
 
     it('should support alternative endorsements', () => {
@@ -214,7 +214,7 @@ describe('Attestations Model', () => {
       };
 
       expect(userAttestations.userId).toBe('user-1');
-      expect(userAttestations.attestations).toHaveLength(0);
+      expect(userAttestations.attestations.length).toBe(0);
     });
 
     it('should hold multiple attestations', () => {
@@ -242,7 +242,7 @@ describe('Attestations Model', () => {
         lastUpdated: new Date()
       };
 
-      expect(userAttestations.attestations).toHaveLength(2);
+      expect(userAttestations.attestations.length).toBe(2);
     });
   });
 

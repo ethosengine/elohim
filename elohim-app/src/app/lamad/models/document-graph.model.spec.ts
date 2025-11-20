@@ -174,7 +174,7 @@ describe('DocumentGraph Model', () => {
         tags: ['authentication', 'security']
       };
 
-      expect(query.tags).toHaveLength(2);
+      expect(query.tags?.length).toBe(2);
     });
 
     it('should filter by categories', () => {
@@ -278,7 +278,7 @@ describe('DocumentGraph Model', () => {
       };
 
       expect(serializable.version).toBe('1.0.0');
-      expect(serializable.nodes).toHaveLength(0);
+      expect(serializable.nodes.length).toBe(0);
     });
   });
 
@@ -303,7 +303,7 @@ describe('DocumentGraph Model', () => {
       };
 
       expect(jsonLD['@context']['@vocab']).toBe('http://schema.org/');
-      expect(jsonLD['@graph']).toHaveLength(1);
+      expect(jsonLD['@graph'].length).toBe(1);
       expect(jsonLD['@graph'][0]['@id']).toBe('epic-1');
     });
 

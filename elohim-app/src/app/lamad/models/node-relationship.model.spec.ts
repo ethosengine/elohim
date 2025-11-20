@@ -26,7 +26,7 @@ describe('NodeRelationship Model', () => {
         'Epic describes feature'
       );
 
-      expect(relationships).toHaveLength(2);
+      expect(relationships.length).toBe(2);
       expect(relationships[0].sourceId).toBe('epic-1');
       expect(relationships[0].targetId).toBe('feature-1');
       expect(relationships[0].type).toBe(RelationshipType.DESCRIBES);

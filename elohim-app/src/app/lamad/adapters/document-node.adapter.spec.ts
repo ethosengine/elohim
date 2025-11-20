@@ -54,9 +54,9 @@ describe('DocumentNodeAdapter', () => {
       expect(contentNode.contentType).toBe('epic');
       expect(contentNode.contentFormat).toBe('markdown');
       expect(contentNode.content).toBe('# Test Epic');
-      expect(contentNode.metadata.authors).toContain('Author 1');
-      expect(contentNode.metadata.version).toBe('1.0');
-      expect(contentNode.metadata.category).toBe('Architecture');
+      expect(contentNode.metadata['authors']).toContain('Author 1');
+      expect(contentNode.metadata['version']).toBe('1.0');
+      expect(contentNode.metadata['category']).toBe('Architecture');
       expect(contentNode.relatedNodeIds).toContain('feature-1');
       expect(contentNode.relatedNodeIds).toContain('epic-2');
     });
@@ -84,8 +84,8 @@ describe('DocumentNodeAdapter', () => {
       expect(contentNode.contentType).toBe('feature');
       expect(contentNode.contentFormat).toBe('gherkin');
       expect(contentNode.content).toBe('Feature: Login');
-      expect(contentNode.metadata.category).toBe('authentication');
-      expect(contentNode.metadata.epicIds).toContain('epic-1');
+      expect(contentNode.metadata['category']).toBe('authentication');
+      expect(contentNode.metadata['epicIds']).toContain('epic-1');
       expect(contentNode.relatedNodeIds).toContain('epic-1');
       expect(contentNode.relatedNodeIds).toContain('scenario-1');
     });
@@ -111,8 +111,8 @@ describe('DocumentNodeAdapter', () => {
 
       expect(contentNode.contentType).toBe('scenario');
       expect(contentNode.contentFormat).toBe('gherkin');
-      expect(contentNode.metadata.featureId).toBe('feature-1');
-      expect(contentNode.metadata.scenarioType).toBe('scenario');
+      expect(contentNode.metadata['featureId']).toBe('feature-1');
+      expect(contentNode.metadata['scenarioType']).toBe('scenario');
       expect(contentNode.relatedNodeIds).toContain('feature-1');
       expect(contentNode.relatedNodeIds).toContain('epic-1');
     });
@@ -208,7 +208,7 @@ describe('DocumentNodeAdapter', () => {
 
       const contentNodes = DocumentNodeAdapter.fromDocumentNodes(docNodes);
 
-      expect(contentNodes).toHaveLength(2);
+      expect(contentNodes.length).toBe(2);
       expect(contentNodes[0].contentType).toBe('epic');
       expect(contentNodes[1].contentType).toBe('feature');
     });
@@ -243,7 +243,7 @@ describe('DocumentNodeAdapter', () => {
 
       const docNodes = DocumentNodeAdapter.toDocumentNodes(contentNodes);
 
-      expect(docNodes).toHaveLength(2);
+      expect(docNodes.length).toBe(2);
       expect(docNodes[0].type).toBe(NodeType.EPIC);
       expect(docNodes[1].type).toBe(NodeType.FEATURE);
     });

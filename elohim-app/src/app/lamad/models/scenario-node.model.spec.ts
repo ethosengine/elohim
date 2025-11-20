@@ -34,7 +34,7 @@ describe('ScenarioNode Model', () => {
       expect(scenario.type).toBe(NodeType.SCENARIO);
       expect(scenario.featureId).toBe('feature-1');
       expect(scenario.scenarioType).toBe('scenario');
-      expect(scenario.steps).toHaveLength(3);
+      expect(scenario.steps.length).toBe(3);
     });
 
     it('should support scenario outline type', () => {
@@ -103,9 +103,9 @@ describe('ScenarioNode Model', () => {
         metadata: {}
       };
 
-      expect(scenario.examples).toHaveLength(1);
+      expect(scenario.examples?.length).toBe(1);
       expect(scenario.examples?.[0].headers).toContain('username');
-      expect(scenario.examples?.[0].rows).toHaveLength(2);
+      expect(scenario.examples?.[0].rows.length).toBe(2);
     });
 
     it('should support test status', () => {
@@ -164,7 +164,7 @@ describe('ScenarioNode Model', () => {
         metadata: {}
       };
 
-      expect(scenario.stepResults).toHaveLength(2);
+      expect(scenario.stepResults?.length).toBe(2);
       expect(scenario.stepResults?.[0].status).toBe('passed');
     });
   });
@@ -179,8 +179,8 @@ describe('ScenarioNode Model', () => {
         ]
       };
 
-      expect(examples.headers).toHaveLength(2);
-      expect(examples.rows).toHaveLength(2);
+      expect(examples.headers.length).toBe(2);
+      expect(examples.rows.length).toBe(2);
       expect(examples.rows[0]).toEqual(['Alice', '30']);
     });
 
@@ -200,7 +200,7 @@ describe('ScenarioNode Model', () => {
         rows: []
       };
 
-      expect(examples.rows).toHaveLength(0);
+      expect(examples.rows.length).toBe(0);
     });
   });
 

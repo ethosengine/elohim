@@ -99,11 +99,11 @@ describe('ContentNode Model', () => {
         priority: 5
       };
 
-      expect(metadata.category).toBe('Architecture');
-      expect(metadata.authors).toContain('Author 1');
-      expect(metadata.version).toBe('1.0.0');
-      expect(metadata.status).toBe('published');
-      expect(metadata.priority).toBe(5);
+      expect(metadata['category']).toBe('Architecture');
+      expect(metadata['authors']).toContain('Author 1');
+      expect(metadata['version']).toBe('1.0.0');
+      expect(metadata['status']).toBe('published');
+      expect(metadata['priority']).toBe(5);
     });
 
     it('should support custom fields', () => {
@@ -114,10 +114,10 @@ describe('ContentNode Model', () => {
         nestedObject: { key: 'value' }
       };
 
-      expect(metadata.customField1).toBe('value1');
-      expect(metadata.customField2).toBe(123);
-      expect(metadata.customField3).toBe(true);
-      expect(metadata.nestedObject).toEqual({ key: 'value' });
+      expect(metadata['customField1']).toBe('value1');
+      expect(metadata['customField2']).toBe(123);
+      expect(metadata['customField3']).toBe(true);
+      expect(metadata['nestedObject']).toEqual({ key: 'value' });
     });
   });
 
@@ -145,8 +145,8 @@ describe('ContentNode Model', () => {
         metadata: { weight: 0.8, description: 'Strong validation' }
       };
 
-      expect(relationship.metadata?.weight).toBe(0.8);
-      expect(relationship.metadata?.description).toBe('Strong validation');
+      expect(relationship.metadata?.['weight']).toBe(0.8);
+      expect(relationship.metadata?.['description']).toBe('Strong validation');
     });
   });
 
@@ -195,7 +195,7 @@ describe('ContentNode Model', () => {
 
       expect(graph.nodes.size).toBe(0);
       expect(graph.relationships.size).toBe(0);
-      expect(graph.metadata.version).toBe('1.0');
+      expect(graph.metadata['version']).toBe('1.0');
     });
 
     it('should organize nodes by type', () => {
@@ -237,9 +237,9 @@ describe('ContentNode Model', () => {
         version: '2.0'
       };
 
-      expect(metadata.nodeCount).toBe(100);
-      expect(metadata.relationshipCount).toBe(250);
-      expect(metadata.version).toBe('2.0');
+      expect(metadata['nodeCount']).toBe(100);
+      expect(metadata['relationshipCount']).toBe(250);
+      expect(metadata['version']).toBe('2.0');
     });
   });
 });

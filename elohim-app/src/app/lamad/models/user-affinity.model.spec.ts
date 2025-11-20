@@ -31,7 +31,7 @@ describe('UserAffinity Model', () => {
         lastUpdated: new Date()
       };
 
-      expect(Object.keys(userAffinity.affinity)).toHaveLength(0);
+      expect(Object.keys(userAffinity.affinity).length).toBe(0);
     });
 
     it('should accept affinity values between 0 and 1', () => {

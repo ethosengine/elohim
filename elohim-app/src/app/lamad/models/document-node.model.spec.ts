@@ -27,7 +27,7 @@ describe('DocumentNode Model', () => {
       expect(node.type).toBe(NodeType.EPIC);
       expect(node.title).toBe('Test Epic');
       expect(node.tags).toContain('test');
-      expect(node.relatedNodeIds).toHaveLength(2);
+      expect(node.relatedNodeIds.length).toBe(2);
     });
 
     it('should support optional timestamps', () => {
@@ -69,9 +69,9 @@ describe('DocumentNode Model', () => {
         }
       };
 
-      expect(node.metadata.author).toBe('Test Author');
-      expect(node.metadata.version).toBe('1.0');
-      expect(node.metadata.customField).toBe('custom value');
+      expect(node.metadata['author']).toBe('Test Author');
+      expect(node.metadata['version']).toBe('1.0');
+      expect(node.metadata['customField']).toBe('custom value');
     });
 
     it('should handle empty tags and relatedNodeIds', () => {
@@ -87,8 +87,8 @@ describe('DocumentNode Model', () => {
         metadata: {}
       };
 
-      expect(node.tags).toHaveLength(0);
-      expect(node.relatedNodeIds).toHaveLength(0);
+      expect(node.tags.length).toBe(0);
+      expect(node.relatedNodeIds.length).toBe(0);
     });
   });
 
@@ -141,7 +141,7 @@ describe('DocumentNode Model', () => {
       };
 
       expect(result.matchedIn).toContain('title');
-      expect(result.matchedIn).toHaveLength(1);
+      expect(result.matchedIn.length).toBe(1);
     });
 
     it('should support matches in description', () => {
@@ -187,7 +187,7 @@ describe('DocumentNode Model', () => {
         matchedIn: ['title', 'description', 'content', 'tags']
       };
 
-      expect(result.matchedIn).toHaveLength(4);
+      expect(result.matchedIn.length).toBe(4);
       expect(result.matchedIn).toContain('title');
       expect(result.matchedIn).toContain('description');
       expect(result.matchedIn).toContain('content');

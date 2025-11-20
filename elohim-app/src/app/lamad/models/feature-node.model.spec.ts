@@ -29,7 +29,7 @@ describe('FeatureNode Model', () => {
       expect(feature.type).toBe(NodeType.FEATURE);
       expect(feature.category).toBe('authentication');
       expect(feature.epicIds).toContain('epic-1');
-      expect(feature.scenarioIds).toHaveLength(2);
+      expect(feature.scenarioIds.length).toBe(2);
     });
 
     it('should support optional background', () => {
@@ -61,7 +61,7 @@ describe('FeatureNode Model', () => {
       };
 
       expect(feature.background).toBeDefined();
-      expect(feature.background?.steps).toHaveLength(1);
+      expect(feature.background?.steps.length).toBe(1);
       expect(feature.background?.steps[0].keyword).toBe('Given');
     });
 
@@ -108,7 +108,7 @@ describe('FeatureNode Model', () => {
         ]
       };
 
-      expect(background.steps).toHaveLength(2);
+      expect(background.steps.length).toBe(2);
       expect(background.steps[0].keyword).toBe('Given');
       expect(background.steps[1].keyword).toBe('And');
     });
@@ -136,7 +136,7 @@ describe('FeatureNode Model', () => {
         ]
       };
 
-      expect(step.dataTable).toHaveLength(3);
+      expect(step.dataTable?.length).toBe(3);
       expect(step.dataTable?.[0]).toEqual(['username', 'password']);
       expect(step.dataTable?.[1]).toEqual(['user1', 'pass1']);
     });
