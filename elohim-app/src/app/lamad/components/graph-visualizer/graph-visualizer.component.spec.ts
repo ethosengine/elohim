@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { GraphVisualizerComponent } from './graph-visualizer.component';
+import { provideRouter } from '@angular/router';
 
 describe('GraphVisualizerComponent', () => {
   let component: GraphVisualizerComponent;
@@ -7,7 +8,10 @@ describe('GraphVisualizerComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GraphVisualizerComponent]
+      imports: [GraphVisualizerComponent],
+      providers: [
+        provideRouter([])
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(GraphVisualizerComponent);
