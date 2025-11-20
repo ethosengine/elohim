@@ -329,53 +329,54 @@
   font-weight: 600;
 }
 
-/* Hexagon Grid */
+/* Simple Hexagon Grid */
 .hexagon-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
+  justify-content: center;
   align-content: center;
+  gap: 6px; /* Distinct gap between items */
   flex: 1;
+  padding: 2rem 1rem;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .hexagon-chip {
-  width: 12px;
-  height: 14px;
-  background-color: #e0e0e0;
+  width: 32px;
+  height: 36px;
+  background-color: rgba(148, 163, 184, 0.3); /* Default fallback */
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   cursor: pointer;
-  transition: transform .1s;
+  transition: all 0.2s ease-out;
   border: none;
   padding: 0;
   font-family: inherit;
+  position: relative;
 }
 
 .hexagon-chip:hover {
-  transform: scale(1.5);
-  z-index: 10;
+  transform: scale(1.3);
+  z-index: 20;
+  filter: brightness(1.2);
 }
 
-/* Affinity Colors for Hexagons and Bars */
+/* Affinity Colors */
 .affinity-unseen {
-  background-color: #e0e0e0;
+  background-color: rgba(148, 163, 184, 0.8); /* Slate */
 }
 
-/* Grey */
 .affinity-low {
-  background-color: #fca5a5;
+  background-color: #fca5a5; /* Red/Orange tint */
 }
 
-/* Red/Orange tint (Impression) */
 .affinity-medium {
-  background-color: #fbbf24;
+  background-color: #fbbf24; /* Yellow/Gold */
 }
 
-/* Yellow/Gold (Intermediate) */
 .affinity-high {
-  background-color: #34d399;
+  background-color: #34d399; /* Green */
 }
-
-/* Green (Mastered) */
 
 /* Home Placeholder (Epic Grid) */
 .home-placeholder {
@@ -383,6 +384,7 @@
   flex: 1;
   overflow-y: auto;
   text-align: center;
+  background: radial-gradient(circle at top, rgba(99, 102, 241, 0.05), transparent 70%);
 }
 
 .home-title {
@@ -393,99 +395,140 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .home-subtitle {
   color: var(--lamad-text-secondary);
   font-size: 1.2rem;
   margin-bottom: 3rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .epic-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 2rem;
   text-align: left;
+  padding-bottom: 3rem;
 }
 
 .epic-card {
   background: var(--lamad-surface);
   border: 1px solid var(--lamad-border);
-  border-radius: 12px;
-  padding: 1.5rem;
+  border-radius: 16px; /* Softer corners */
+  padding: 0; /* Reset padding for internal layout */
   cursor: pointer;
-  transition: all .2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, .05);
+  transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, .02);
   text-align: left;
   width: 100%;
   font-family: inherit;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
 }
 
 .epic-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, .1);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(99, 102, 241, .15);
   border-color: var(--lamad-accent-primary);
+}
+
+.epic-card-body {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .epic-card-header {
   display: flex;
-  align-items: center;
-  gap: .75rem;
+  align-items: flex-start;
+  gap: 1rem;
   margin-bottom: 1rem;
 }
 
-.epic-icon {
+.epic-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 12px;
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 .epic-title {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
   color: var(--lamad-text-primary);
+  line-height: 1.3;
 }
 
 .epic-desc {
   color: var(--lamad-text-secondary);
-  font-size: .9rem;
-  line-height: 1.5;
+  font-size: .95rem;
+  line-height: 1.6;
   margin-bottom: 1.5rem;
-  height: 3em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  flex: 1;
 }
 
-.epic-meta {
+.epic-footer {
+  background: var(--lamad-bg-tertiary);
+  padding: 1rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-top: 1px solid var(--lamad-border);
-  padding-top: 1rem;
 }
 
 .epic-category {
   font-size: .75rem;
   text-transform: uppercase;
-  letter-spacing: .05em;
+  letter-spacing: .1em;
   color: var(--lamad-text-tertiary);
-  background: var(--lamad-bg-tertiary);
-  padding: .25rem .5rem;
-  border-radius: 4px;
+  font-weight: 600;
 }
 
-.mini-affinity-bar {
-  width: 60px;
-  height: 6px;
-  background: #e0e0e0;
-  border-radius: 3px;
-  overflow: hidden;
+/* Hex Badge for Epic Card */
+.hex-badge {
+  width: 24px;
+  height: 28px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: rgba(0,0,0,0.6);
 }
 
-.mini-affinity-fill {
-  height: 100%;
+/* Affinity Colors (Shared) */
+.affinity-unseen {
+  background-color: rgba(148, 163, 184, 0.8);
+}
+
+.affinity-low {
+  background-color: #fca5a5;
+  box-shadow: 0 0 4px #fca5a5;
+}
+
+.affinity-medium {
+  background-color: #fbbf24;
+  box-shadow: 0 0 8px #fbbf24;
+}
+
+.affinity-high {
+  background-color: #34d399;
+  box-shadow: 0 0 12px #34d399;
 }
 
 /* Content Viewer */
