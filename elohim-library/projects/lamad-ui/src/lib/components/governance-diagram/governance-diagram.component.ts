@@ -4,7 +4,6 @@
  */
 
 import { Component, ViewChild, ElementRef, AfterViewInit, OnDestroy, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 interface GovernanceLayer {
   x: number;
@@ -24,28 +23,39 @@ interface GovernanceLayer {
 @Component({
   selector: 'lamad-governance-diagram',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './governance-diagram.component.html',
   styleUrls: ['./governance-diagram.component.css']
 })
 export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('canvas') canvasRef?: ElementRef<HTMLCanvasElement>;
   @Input() autoPlay = true;
   @Input() width = 800;
   @Input() height = 600;
 
-  private ctx!: CanvasRenderingContext2D;
-  private animationFrame?: number;
-  private resizeObserver?: ResizeObserver;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private animationFrame: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   private layers: GovernanceLayer[] = [];
   private time = 0;
   private connectionProgress = 0;
 
-  ngAfterViewInit() {
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx = canvas.getContext('2d')!;
+  ngAfterViewInit(): void {
+    if (!this.canvasRef) {
+      console.warn('GovernanceDiagram: Canvas ref not available');
+      return;
+    }
 
+    const canvas = this.canvasRef.nativeElement;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      console.warn('GovernanceDiagram: Could not get 2D context');
+      return;
+    }
+
+    this.ctx = context;
     this.setupCanvas();
     this.initializeLayers();
 
@@ -54,20 +64,32 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     }
 
     // Handle window resize
-    this.resizeObserver = new ResizeObserver(() => this.setupCanvas());
-    this.resizeObserver.observe(canvas.parentElement!);
+    const parent = canvas.parentElement;
+    if (parent) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.setupCanvas();
+        if (!this.animationFrame) {
+          this.draw();
+        }
+      });
+      this.resizeObserver.observe(parent);
+    }
   }
 
-  ngOnDestroy() {
-    if (this.animationFrame) {
+  ngOnDestroy(): void {
+    if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
   }
 
-  private setupCanvas() {
+  private setupCanvas(): void {
+    if (!this.canvasRef || !this.ctx) return;
+
     const canvas = this.canvasRef.nativeElement;
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -84,8 +106,8 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     this.ctx.scale(dpr, dpr);
   }
 
-  private initializeLayers() {
-    const w = this.canvasRef.nativeElement.parentElement?.clientWidth || this.width;
+  private initializeLayers(): void {
+    const w = this.canvasRef?.nativeElement.parentElement?.clientWidth || this.width;
     const h = this.height;
 
     const padding = 40;
@@ -140,7 +162,7 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     ];
   }
 
-  private animate = () => {
+  private animate = (): void => {
     this.time += 0.016; // ~60fps
 
     this.update();
@@ -149,7 +171,7 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     this.animationFrame = requestAnimationFrame(this.animate);
   };
 
-  private update() {
+  private update(): void {
     // Update layer animations with staggered timing
     this.layers.forEach((layer, i) => {
       const delay = i * 0.3;
@@ -165,7 +187,9 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private draw() {
+  private draw(): void {
+    if (!this.ctx || !this.canvasRef) return;
+
     const canvas = this.canvasRef.nativeElement;
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
@@ -179,8 +203,8 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     this.layers.forEach(layer => this.drawLayer(layer));
   }
 
-  private drawConnections() {
-    if (this.connectionProgress <= 0 || this.layers.length < 2) return;
+  private drawConnections(): void {
+    if (!this.ctx || this.connectionProgress <= 0 || this.layers.length < 2) return;
 
     const ctx = this.ctx;
 
@@ -218,8 +242,8 @@ export class GovernanceDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawLayer(layer: GovernanceLayer) {
-    if (layer.scale <= 0) return;
+  private drawLayer(layer: GovernanceLayer): void {
+    if (!this.ctx || layer.scale <= 0) return;
 
     const ctx = this.ctx;
     const x = layer.x - (layer.width * layer.scale) / 2;

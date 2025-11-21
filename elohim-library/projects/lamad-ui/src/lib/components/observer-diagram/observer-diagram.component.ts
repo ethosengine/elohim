@@ -4,9 +4,8 @@
  */
 
 import { Component, ViewChild, ElementRef, AfterViewInit, OnDestroy, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
-interface Node {
+interface ObserverNode {
   x: number;
   y: number;
   radius: number;
@@ -30,30 +29,41 @@ interface DataParticle {
 @Component({
   selector: 'lamad-observer-diagram',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './observer-diagram.component.html',
   styleUrls: ['./observer-diagram.component.css']
 })
 export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('canvas') canvasRef?: ElementRef<HTMLCanvasElement>;
   @Input() autoPlay = true;
   @Input() width = 800;
   @Input() height = 400;
 
-  private ctx!: CanvasRenderingContext2D;
-  private animationFrame?: number;
-  private resizeObserver?: ResizeObserver;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private animationFrame: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
-  private nodes: Node[] = [];
+  private nodes: ObserverNode[] = [];
   private particles: DataParticle[] = [];
   private time = 0;
   private pathProgress = 0;
   private cycleTime = 0;
 
-  ngAfterViewInit() {
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx = canvas.getContext('2d')!;
+  ngAfterViewInit(): void {
+    if (!this.canvasRef) {
+      console.warn('ObserverDiagram: Canvas ref not available');
+      return;
+    }
 
+    const canvas = this.canvasRef.nativeElement;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      console.warn('ObserverDiagram: Could not get 2D context');
+      return;
+    }
+
+    this.ctx = context;
     this.setupCanvas();
     this.initializeNodes();
 
@@ -62,20 +72,32 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     }
 
     // Handle window resize
-    this.resizeObserver = new ResizeObserver(() => this.setupCanvas());
-    this.resizeObserver.observe(canvas.parentElement!);
+    const parent = canvas.parentElement;
+    if (parent) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.setupCanvas();
+        if (!this.animationFrame) {
+          this.draw();
+        }
+      });
+      this.resizeObserver.observe(parent);
+    }
   }
 
-  ngOnDestroy() {
-    if (this.animationFrame) {
+  ngOnDestroy(): void {
+    if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
   }
 
-  private setupCanvas() {
+  private setupCanvas(): void {
+    if (!this.canvasRef || !this.ctx) return;
+
     const canvas = this.canvasRef.nativeElement;
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -92,8 +114,8 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     this.ctx.scale(dpr, dpr);
   }
 
-  private initializeNodes() {
-    const w = this.canvasRef.nativeElement.parentElement?.clientWidth || this.width;
+  private initializeNodes(): void {
+    const w = this.canvasRef?.nativeElement.parentElement?.clientWidth || this.width;
     const h = this.height;
 
     this.nodes = [
@@ -130,7 +152,7 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     ];
   }
 
-  private animate = () => {
+  private animate = (): void => {
     this.time += 0.016; // ~60fps
     this.cycleTime += 0.016;
 
@@ -147,8 +169,8 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     this.animationFrame = requestAnimationFrame(this.animate);
   };
 
-  private update() {
-    const w = this.canvasRef.nativeElement.parentElement?.clientWidth || this.width;
+  private update(): void {
+    const w = this.canvasRef?.nativeElement.parentElement?.clientWidth || this.width;
 
     // Update node scales with smooth easing
     this.nodes.forEach((node, i) => {
@@ -197,7 +219,9 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private draw() {
+  private draw(): void {
+    if (!this.ctx || !this.canvasRef) return;
+
     const canvas = this.canvasRef.nativeElement;
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
@@ -217,8 +241,8 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     this.nodes.forEach(node => this.drawLabel(node));
   }
 
-  private drawPath() {
-    if (this.pathProgress <= 0) return;
+  private drawPath(): void {
+    if (!this.ctx || this.pathProgress <= 0) return;
 
     const ctx = this.ctx;
     ctx.save();
@@ -256,8 +280,8 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawNode(node: Node) {
-    if (node.scale <= 0) return;
+  private drawNode(node: ObserverNode): void {
+    if (!this.ctx || node.scale <= 0) return;
 
     const ctx = this.ctx;
     const r = node.radius * node.scale;
@@ -288,8 +312,8 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawLabel(node: Node) {
-    if (node.scale < 0.5) return;
+  private drawLabel(node: ObserverNode): void {
+    if (!this.ctx || node.scale < 0.5) return;
 
     const ctx = this.ctx;
 
@@ -303,7 +327,9 @@ export class ObserverDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawParticle(p: DataParticle) {
+  private drawParticle(p: DataParticle): void {
+    if (!this.ctx) return;
+
     const ctx = this.ctx;
 
     ctx.save();

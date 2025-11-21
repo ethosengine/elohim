@@ -4,7 +4,6 @@
  */
 
 import { Component, ViewChild, ElementRef, AfterViewInit, OnDestroy, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 interface ValueNode {
   x: number;
@@ -21,28 +20,39 @@ interface ValueNode {
 @Component({
   selector: 'lamad-value-scanner-diagram',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './value-scanner-diagram.component.html',
   styleUrls: ['./value-scanner-diagram.component.css']
 })
 export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('canvas') canvasRef?: ElementRef<HTMLCanvasElement>;
   @Input() autoPlay = true;
   @Input() width = 800;
   @Input() height = 600;
 
-  private ctx!: CanvasRenderingContext2D;
-  private animationFrame?: number;
-  private resizeObserver?: ResizeObserver;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private animationFrame: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   private nodes: ValueNode[] = [];
   private time = 0;
   private connectionProgress = 0;
 
-  ngAfterViewInit() {
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx = canvas.getContext('2d')!;
+  ngAfterViewInit(): void {
+    if (!this.canvasRef) {
+      console.warn('ValueScannerDiagram: Canvas ref not available');
+      return;
+    }
 
+    const canvas = this.canvasRef.nativeElement;
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+      console.warn('ValueScannerDiagram: Could not get 2D context');
+      return;
+    }
+
+    this.ctx = context;
     this.setupCanvas();
     this.initializeNodes();
 
@@ -51,20 +61,32 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     }
 
     // Handle window resize
-    this.resizeObserver = new ResizeObserver(() => this.setupCanvas());
-    this.resizeObserver.observe(canvas.parentElement!);
+    const parent = canvas.parentElement;
+    if (parent) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.setupCanvas();
+        if (!this.animationFrame) {
+          this.draw();
+        }
+      });
+      this.resizeObserver.observe(parent);
+    }
   }
 
-  ngOnDestroy() {
-    if (this.animationFrame) {
+  ngOnDestroy(): void {
+    if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
   }
 
-  private setupCanvas() {
+  private setupCanvas(): void {
+    if (!this.canvasRef || !this.ctx) return;
+
     const canvas = this.canvasRef.nativeElement;
     const parent = canvas.parentElement;
     if (!parent) return;
@@ -81,8 +103,8 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     this.ctx.scale(dpr, dpr);
   }
 
-  private initializeNodes() {
-    const w = this.canvasRef.nativeElement.parentElement?.clientWidth || this.width;
+  private initializeNodes(): void {
+    const w = this.canvasRef?.nativeElement.parentElement?.clientWidth || this.width;
     const h = this.height;
 
     const centerY = h / 2;
@@ -126,7 +148,7 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     ];
   }
 
-  private animate = () => {
+  private animate = (): void => {
     this.time += 0.016; // ~60fps
 
     this.update();
@@ -135,7 +157,7 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     this.animationFrame = requestAnimationFrame(this.animate);
   };
 
-  private update() {
+  private update(): void {
     // Update node scales with smooth easing
     this.nodes.forEach((node, i) => {
       const delay = i * 0.2;
@@ -151,7 +173,9 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private draw() {
+  private draw(): void {
+    if (!this.ctx || !this.canvasRef) return;
+
     const canvas = this.canvasRef.nativeElement;
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
@@ -171,8 +195,8 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     this.nodes.forEach(node => this.drawLabel(node));
   }
 
-  private drawConvergencePoint() {
-    if (this.connectionProgress < 0.8) return;
+  private drawConvergencePoint(): void {
+    if (!this.ctx || !this.canvasRef || this.connectionProgress < 0.8) return;
 
     const ctx = this.ctx;
     const w = this.canvasRef.nativeElement.parentElement?.clientWidth || this.width;
@@ -205,8 +229,8 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawConnections() {
-    if (this.connectionProgress <= 0 || this.nodes.length < 3) return;
+  private drawConnections(): void {
+    if (!this.ctx || !this.canvasRef || this.connectionProgress <= 0 || this.nodes.length < 3) return;
 
     const ctx = this.ctx;
     const progress = Math.min(this.connectionProgress, 1);
@@ -218,7 +242,7 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.globalAlpha = progress;
 
     // Draw triangle connecting all three nodes
-    const w = this.canvasRef.nativeElement.parentElement?.clientWidth || this.width;
+    const w = this.canvasRef?.nativeElement.parentElement?.clientWidth || this.width;
     const h = this.height;
     const centerX = w / 2;
     const centerY = h / 2;
@@ -246,8 +270,8 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawValueNode(node: ValueNode) {
-    if (node.scale <= 0) return;
+  private drawValueNode(node: ValueNode): void {
+    if (!this.ctx || node.scale <= 0) return;
 
     const ctx = this.ctx;
     const pulse = Math.sin(node.pulsePhase) * 0.1 + 1;
@@ -286,8 +310,8 @@ export class ValueScannerDiagramComponent implements AfterViewInit, OnDestroy {
     ctx.restore();
   }
 
-  private drawLabel(node: ValueNode) {
-    if (node.scale < 0.5) return;
+  private drawLabel(node: ValueNode): void {
+    if (!this.ctx || node.scale < 0.5) return;
 
     const ctx = this.ctx;
 
