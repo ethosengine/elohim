@@ -81,11 +81,11 @@ export interface ContentRelationship {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
-  relationshipType: RelationshipType;
+  relationshipType: ContentRelationshipType;
   metadata?: Record<string, any>;
 }
 
-export enum RelationshipType {
+export enum ContentRelationshipType {
   /** Parent-child hierarchical relationship */
   CONTAINS = 'CONTAINS',
 
@@ -143,10 +143,10 @@ export interface ContentGraph {
   reverseAdjacency: Map<string, Set<string>>;
 
   /** Graph metadata */
-  metadata: GraphMetadata;
+  metadata: ContentGraphMetadata;
 }
 
-export interface GraphMetadata {
+export interface ContentGraphMetadata {
   /** Total number of nodes */
   nodeCount: number;
 

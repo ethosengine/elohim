@@ -8,3 +8,7 @@ export * from './feature-node.model';
 export * from './scenario-node.model';
 export * from './node-relationship.model';
 export * from './document-graph.model';
+
+// New generic content models
+export * from './content-node.model';
+export * from './lamad-node-types';
