@@ -80,10 +80,6 @@ Progress is visualized through:
 
 Lamad represents more than a documentation browser. It's a proof-of-concept for sacred learning infrastructure that could transform education:
 
-### Assessment Without Extraction
-
-Integration with learning systems (Canvas, Blackboard, Google Classroom) to provide holistic views of growth—but with data sovereignty. Students and families control their educational data, not platforms.
-
 ### Measurement That Matters
 
 Moving beyond grades and test scores to track:
@@ -101,15 +97,6 @@ Using AI to illuminate, not surveil:
 - **Blind Spot Detection**: Revealing gaps in understanding
 - **Growth Guidance**: Personalized suggestions for development
 - **Impact Assessment**: How learning translates to real-world capability
-
-### Community-Connected Learning
-
-Lamad interfaces with the broader Elohim Protocol ecosystem:
-
-- **Identity Integration**: Learning profiles connected to personal identity (Imago Dei layer), but controlled by the individual
-- **Community Learning**: Shared resources, peer learning, collective growth within trust networks
-- **Institutional Boundaries**: Schools and organizations can participate without owning student data
-- **Lifelong Development**: Learning tracked across contexts and time, portable and sovereign
 
 ## How Lamad Differs from Extractive Platforms
 
@@ -156,14 +143,12 @@ Lamad is built on the same principles as the broader Elohim Protocol:
 
 **Now**: Lamad serves as the knowledge base for the Elohim Protocol itself, demonstrating how learning infrastructure can honor both rigor and agency.
 
-**Next**: Integration with existing educational systems to provide holistic assessment without extraction.
-
-**Vision**: A global learning infrastructure that:
-- Tracks growth from childhood through life
-- Enables skill-sharing and peer learning
-- Provides honest assessment without surveillance
-- Supports institutional accountability without data exploitation
-- Honors learning as sacred transformation
+**Vision**: A learning infrastructure that could:
+- Track authentic understanding, not compliance
+- Enable peer learning and skill-sharing
+- Provide assessment without surveillance
+- Support growth across contexts and time
+- Honor learning as sacred transformation
 
 ## Start Exploring
 
