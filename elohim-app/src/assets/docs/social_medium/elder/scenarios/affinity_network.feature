@@ -1,0 +1,60 @@
+@epic:social_medium
+@user_type:elder
+@governance_layer:affinity_network
+@related_users:elder,content_creator,child
+@related_layers:neighborhood,community,cultural_linguistic
+@elohim_agents:guardian_agent,matching_agent,wisdom_preservation_agent
+
+Feature: Interest Communities and Peer Connection for Elder
+  As an elder in the social_medium system
+  Operating at the affinity_network governance layer
+  I want to connect with others who share my interests and experiences
+  So that I can pursue passions, build friendships, and combat isolation
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the elder user is registered in the system
+    And the affinity_network governance context is active
+    And Rose, age 73, seeks connection around her interests
+
+  Scenario: Elder joins quilting affinity network
+    Given Rose is a quilter interested in connecting with other quilters
+    When she discovers a regional quilting network on Elohim
+    And the network includes elders and younger crafters
+    Then she can join and share her quilting patterns
+    And she connects with others who appreciate traditional techniques
+    And she mentors younger quilters learning the craft
+    And her patterns are valued and spread through the network
+    And she finds meaningful community around her lifelong passion
+
+  Scenario: Elder protected from health fraud in wellness network
+    Given Rose participates in a seniors wellness affinity network
+    When a scammer tries to promote miracle cure products
+    And they attempt to contact network members with fraudulent claims
+    Then the guardian agent detects the scam pattern
+    And the fraudulent messages are blocked before reaching Rose
+    And legitimate health information continues to flow
+    And wellness discussions remain safe and evidence-based
+    And Rose and peers are protected while maintaining autonomy
+
+  Scenario: Elder shares cultural knowledge across generations
+    Given Rose is second-generation Italian American
+    And she knows traditional recipes and cultural practices
+    When she joins a cultural preservation affinity network
+    And she documents her grandmother's recipes with stories
+    Then her contributions reach others interested in Italian American heritage
+    And younger generations learn traditional knowledge
+    And her cultural memory is preserved for future generations
+    And Rose experiences pride in cultural contribution
+    And intergenerational cultural transmission succeeds
+
+  Scenario: Elder finds peer support during life transition
+    Given Rose is adjusting to widowhood after 50 years of marriage
+    When she joins a grief support affinity network for widows/widowers
+    And she shares her experience and struggles
+    Then she connects with others navigating similar loss
+    And peer support helps her process grief
+    And she eventually mentors newly widowed community members
+    And the network provides genuine emotional support
+    And isolation during difficult transition is prevented
+    And Rose finds path forward through community support

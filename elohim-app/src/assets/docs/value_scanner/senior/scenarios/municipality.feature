@@ -1,0 +1,152 @@
+@epic:value_scanner
+@user_type:senior
+@governance_layer:municipality
+@related_users:middle_aged,elderly,retired,civic_participant,senior_advocate
+@related_layers:individual,household,family,neighborhood,community
+@elohim_agents:personal_agent,community_elohim,municipality_elohim
+
+Feature: Municipality Layer Value Recognition for Senior
+  As a senior in early retirement in the value scanner system
+  Operating at the municipality governance layer
+  I want to access appropriate services and influence municipal policy
+  So that municipal systems support senior flourishing and recognize senior contributions
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the senior user "Margaret" is registered in the system
+    And Margaret participates in municipal civic life
+    And the municipality governance context is active
+    And the municipality_elohim coordinates municipal care economy
+    And Margaret lives within the municipal jurisdiction
+
+  Scenario: Access to senior nutrition programs without stigma
+    Given Margaret manages nutrition on $32k/year fixed income
+    And municipal senior nutrition programs exist
+    When the municipality_elohim connects Margaret to food resources
+    Then she should be informed about senior meal programs
+    And Meals on Wheels or congregate dining should be accessible
+    And the framing should be senior service, not poverty relief
+    And Margaret should access programs with dignity
+    And her care contributions should be visible to counterbalance receiving
+    And municipal food resources should support senior health
+
+  Scenario: Municipal senior center programs that recognize continued productivity
+    Given Margaret is active and engaged, not waiting to die
+    And senior centers sometimes reinforce obsolescence narratives
+    When the municipality_elohim connects Margaret to senior programs
+    Then programs should treat seniors as productive contributors
+    And opportunities should include volunteering, teaching, organizing
+    And the focus should be engagement and contribution, not entertainment
+    And Margaret should find programs that honor her capability
+    And senior centers should be care economy hubs
+    And municipal programs should support active aging
+
+  Scenario: Public transportation access supports senior independence
+    Given Margaret can no longer afford car ownership
+    And she needs transportation for medical appointments, shopping, and social life
+    When the municipality_elohim provides transportation information
+    Then accessible public transit should be available
+    And senior fare programs should be communicated clearly
+    And transportation should enable Margaret's continued independence
+    And mobility should be supported as key to aging in community
+    And municipal transit should be optimized for senior access
+    And affordable transportation should preserve autonomy
+
+  Scenario: Municipal food assistance programs accessed with dignity
+    Given Margaret's budget is tight at $150/week
+    And municipal SNAP or food assistance may be available
+    When the municipality_elohim identifies assistance eligibility
+    Then Margaret should be informed without stigma
+    And enrollment should be simple and dignified
+    And her care contributions should be visible alongside receiving benefits
+    And the framing should be community resource access
+    And participation should feel like claiming entitlement, not begging
+    And municipal assistance should support fixed-income seniors
+
+  Scenario: Influencing municipal policy on senior services and care economy
+    Given Margaret has lived experience of retirement and care economy
+    And municipal policy affects senior quality of life
+    When the municipality_elohim facilitates policy engagement
+    Then Margaret should be connected to policy-making processes
+    And her voice should inform municipal senior services
+    And care economy principles should be brought to municipal governance
+    And seniors should organize to shape policy
+    And Margaret's contributions should give her authority in policy discussions
+    And municipal planning should reflect senior input
+
+  Scenario: Municipal health care access and coordination
+    Given Margaret has changing health needs with aging
+    And she navigates complex health care systems
+    When the municipality_elohim coordinates health access
+    Then municipal health programs should be accessible
+    And senior health clinics should be available and affordable
+    And navigation support should help Margaret access care
+    And preventive health should be prioritized for seniors
+    And municipal health policy should support senior wellness
+    And Margaret should be able to age healthily in community
+
+  Scenario: Property tax relief and housing support for fixed-income seniors
+    Given Margaret lives on fixed income
+    And property taxes or rent can threaten housing stability
+    When the municipality_elohim identifies housing assistance
+    Then senior property tax relief programs should be communicated
+    And rental assistance should be accessible if applicable
+    And Margaret should be able to age in place affordably
+    And housing stability should be protected for seniors
+    And municipal housing policy should recognize fixed-income constraints
+    And aging in community should be economically feasible
+
+  Scenario: Senior employment and income supplementation programs
+    Given Margaret's fixed income is limited
+    And some seniors want/need supplemental income
+    When the municipality_elohim provides employment information
+    Then senior-appropriate employment opportunities should be available
+    And part-time work that doesn't jeopardize benefits should be possible
+    And income supplementation programs should be accessible
+    And Margaret should have options to increase resources if she chooses
+    And employment should be optional, not mandatory for survival
+    And municipal programs should support senior economic security
+
+  Scenario: Municipal recognition of senior volunteer contributions
+    Given Margaret volunteers extensively in municipal programs
+    And her labor subsidizes municipal service provision
+    When the municipality_elohim tracks volunteer contributions
+    Then municipal government should see aggregate senior volunteer value
+    And policy should reflect dependence on senior volunteer labor
+    And seniors should be recognized as essential to municipal function
+    And Margaret's contributions should give her standing in municipal affairs
+    And volunteer labor should inform resource allocation
+    And senior productivity should be visible to government
+
+  Scenario: Emergency preparedness includes senior needs and capabilities
+    Given Margaret has nursing background and crisis response experience
+    And seniors have specific vulnerabilities in emergencies
+    When the municipality_elohim coordinates emergency planning
+    Then Margaret should be part of emergency response networks
+    And her skills should be known to emergency management
+    And senior vulnerabilities should be planned for
+    And senior capabilities should be mobilized in crisis
+    And municipal preparedness should include and empower seniors
+    And Margaret should contribute to community resilience
+
+  Scenario: Municipal parks and recreation optimized for senior use
+    Given Margaret needs physical activity for health
+    And public spaces should serve all ages
+    When the municipality_elohim provides recreation information
+    Then parks should have senior-appropriate amenities
+    And walking paths, benches, and accessibility should be prioritized
+    And recreation programs should include senior activities
+    And public space should support active aging
+    And municipal planning should consider senior needs
+    And Margaret should have access to health-supporting public resources
+
+  Scenario: Protecting seniors from municipal surveillance while enabling services
+    Given Margaret participates in municipal programs
+    And municipal systems collect data
+    When the municipality_elohim manages Margaret's municipal data
+    Then her privacy must be protected from surveillance
+    And service access should not require surrendering privacy
+    And data collection should be minimal and purposeful
+    And Margaret should control what municipal government knows
+    And elder surveillance should be prevented
+    And dignity should be preserved in all municipal interactions

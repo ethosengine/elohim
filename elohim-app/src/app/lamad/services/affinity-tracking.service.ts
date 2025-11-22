@@ -7,7 +7,7 @@ import {
   CategoryAffinityStats,
   TypeAffinityStats,
 } from '../models/user-affinity.model';
-import { DocumentNode } from '../models/document-node.model';
+import { ContentNode } from '../models/content-node.model';
 
 /**
  * Service for tracking user affinity (relationship strength) to content nodes.
@@ -107,7 +107,7 @@ export class AffinityTrackingService {
    * Get aggregate statistics across all nodes
    * @param nodes All content nodes in the system
    */
-  getStats(nodes: DocumentNode[]): AffinityStats {
+  getStats(nodes: ContentNode[]): AffinityStats {
     const affinity = this.affinitySubject.value.affinity;
     const totalNodes = nodes.length;
     let engagedNodes = 0;
@@ -151,7 +151,7 @@ export class AffinityTrackingService {
       categoryMap.get(category)!.push(nodeAffinity);
 
       // By type
-      const type = node.type;
+      const type = node.contentType;
       if (!typeMap.has(type)) {
         typeMap.set(type, []);
       }

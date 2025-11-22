@@ -1,0 +1,13 @@
+.value-scanner-diagram-wrapper {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+}
+
+canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: transparent;
+}

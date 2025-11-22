@@ -514,6 +514,109 @@
   box-shadow: 0 0 12px #34d399;
 }
 
+/* Drill Down Styles */
+.epic-drilldown {
+  padding: 1rem 1.5rem;
+  background: var(--lamad-bg-primary); /* Slightly lighter/different than footer */
+  border-top: 1px solid var(--lamad-border);
+}
+
+.drilldown-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lamad-text-tertiary);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.drilldown-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.drilldown-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--lamad-border);
+  border-radius: 20px;
+  background: var(--lamad-surface);
+  color: var(--lamad-text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drilldown-chip:hover {
+  border-color: var(--lamad-accent-primary);
+  color: var(--lamad-accent-primary);
+  background: rgba(99, 102, 241, 0.05);
+  transform: translateY(-1px);
+}
+
+.drilldown-icon {
+  font-size: 1rem;
+}
+
+.drilldown-count {
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--lamad-text-primary);
+}
+
+.drilldown-type {
+  font-weight: 500;
+}
+
+/* Drill Down View Header */
+.drilldown-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.back-btn {
+  background: transparent;
+  border: none;
+  color: var(--lamad-accent-primary);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: background 0.2s;
+  margin-bottom: 1rem;
+}
+
+.back-btn:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.separator {
+  color: var(--lamad-text-tertiary);
+  margin: 0 0.5rem;
+  font-weight: 300;
+}
+
+/* Sidebar Back Item */
+.path-item.back-item {
+  border-bottom: 1px solid var(--lamad-border);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.75rem;
+  color: var(--lamad-accent-primary);
+}
+
+.path-item.back-item:hover {
+  background: rgba(99, 102, 241, 0.05);
+}
+
 /* Content Viewer */
 .content-viewer {
   flex: 1;

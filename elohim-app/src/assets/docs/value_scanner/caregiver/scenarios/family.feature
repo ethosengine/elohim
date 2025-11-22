@@ -1,0 +1,145 @@
+@epic:value_scanner
+@user_type:caregiver
+@governance_layer:family
+@related_users:adult,middle_aged,elderly,person_with_disabilities
+@related_layers:household,individual,community
+@elohim_agents:personal_agent,family_elohim
+
+Feature: Family Layer Value Recognition for Caregiver
+  As a caregiver coordinating care across family relationships
+  Operating at the family governance layer
+  I want family care complexity visible and supported across generations
+  So that family care economy sustains multiple care relationships simultaneously
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the caregiver user "James" is registered in the system
+    And James cares for husband David (52) with early-onset Alzheimer's
+    And James also coordinates care for his mother (76, recently widowed)
+    And James has relationships with David's parents and extended family
+    And the family governance context is active
+    And the family_elohim coordinates multigenerational care economy
+    And James navigates complex family dynamics amid intensive caregiving
+
+  Scenario: Sandwich generation care burden made visible across family
+    Given James cares simultaneously for spouse and aging parent
+    And he provides intensive care in both directions
+    When the family_elohim tracks James's care contributions
+    Then his care work for David should be quantified fully
+    And his care coordination for his mother should be visible
+    And extended family should see his dual care burden
+    And sandwich generation reality should be recognized explicitly
+    And family should understand the overwhelming scope of James's labor
+    And visibility should enable family support rather than more demands
+
+  Scenario: Spousal care recognized as professional-grade family contribution
+    Given James provides skilled nursing-level care for David
+    And this care is rendered invisible because they're married
+    When the family_elohim evaluates James's spousal care
+    Then it should be valued at professional care rates
+    And care tokens should reflect $50k+/year equivalent value
+    And "caring for spouse out of love" should not erase economic value
+    And family should recognize James is doing professional work
+    And spousal caregiving should be visible as enormous contribution
+    And marriage should not make care work economically invisible
+
+  Scenario: Family boundary management as care recipient's family intrudes
+    Given David's parents have opinions about his care
+    And they may question James's decisions
+    When family boundaries are negotiated
+    Then the family_elohim should support James's care authority
+    And it should recognize him as primary caregiver and spouse
+    And it should help James maintain appropriate boundaries
+    And David's family should provide support, not interference
+    And family governance should respect caregiving relationship
+    And boundaries should be clear when family dynamics become difficult
+
+  Scenario: Care coordination with James's mother while caring for David
+    Given James's mother (76) needs increasing support
+    And James is already overwhelmed caring for David
+    When James coordinates care for his mother
+    Then the family_elohim should help him manage both relationships
+    And it should recognize he cannot provide intensive care in both directions
+    And it should help coordinate additional support for his mother
+    And it should prevent James from collapsing under dual burden
+    And family care should be sustainable across multiple recipients
+
+  Scenario: Extended family contributions distributed equitably
+    Given James carries enormous family care burden
+    And other family members could provide some support
+    When the family_elohim analyzes family care distribution
+    Then it should identify who is doing what
+    And it should make visible that James is carrying most burden
+    And it should prevent care from falling entirely on one person
+    And it should enable equitable distribution negotiations
+    And family care should be shared fairly, not concentrated
+
+  Scenario: Family financial support recognition as care contribution
+    Given James's household income has plummeted due to caregiving
+    And family members may provide financial assistance
+    When family financial support is tracked
+    Then the family_elohim should recognize financial help as care contribution
+    And it should value financial support alongside direct care labor
+    And family members unable to provide direct care can contribute financially
+    And care economy should include multiple forms of contribution
+    And financial support should be recognized, not taken for granted
+
+  Scenario: Family grief support as David's condition progresses
+    Given entire family grieves David's decline
+    And James's grief is compounded by providing daily care
+    When the family_elohim recognizes collective family grief
+    Then it should connect family to grief support resources
+    And it should acknowledge progressive loss affects everyone
+    And it should coordinate family emotional support for each other
+    And James should receive family support, not just provide care
+    And family should process grief together while supporting James
+
+  Scenario: In-law family dynamics around David's care
+    Given David's parents struggle with their son's diagnosis
+    And they may have complicated feelings about James's caregiving
+    When the family_elohim navigates in-law relationships
+    Then it should recognize complex family dynamics
+    And it should support James's relationship with David's family
+    And it should help manage their grief without undermining James
+    And in-law relationships should be supportive of James's caregiving
+    And family care economy should include chosen family bonds
+
+  Scenario: Family care legacy planning as David's condition progresses
+    Given David's condition will continue to worsen
+    And James may eventually need institutional care support
+    When family plans for David's future care
+    Then the family_elohim should facilitate family care planning
+    And it should help family discuss difficult future scenarios
+    And it should coordinate family resources for potential needs
+    And family should plan together for multiple care scenarios
+    And care legacy planning should involve whole family
+
+  Scenario: Family respite coordination to prevent James's burnout
+    Given James needs regular respite or he will collapse
+    And family members could provide some respite care
+    When the family_elohim coordinates respite
+    Then it should identify family members who could help
+    And it should schedule regular respite periods
+    And it should ensure James gets breaks from intensive care
+    And family should actively provide respite, not just sympathy
+    And respite coordination should be systematic, not ad hoc
+
+  Scenario: Sibling coordination for mother's care to prevent overwhelming James
+    Given James's siblings also have responsibility for their mother
+    And James is already overwhelmed with David's care
+    When the family_elohim tracks sibling care contributions
+    Then it should ensure siblings share mother's care equitably
+    And it should prevent care from defaulting entirely to James
+    And it should coordinate among siblings for fair distribution
+    And James's dual burden should not excuse siblings from contributing
+    And family care should be distributed based on capacity
+
+  Scenario: Family cultural recognition of caregiving as sacred work
+    Given some cultural traditions honor caregiving as sacred
+    And family culture may recognize James's care work meaningfully
+    When the family_elohim tracks cultural care values
+    Then it should recognize cultural frameworks that honor caregiving
+    And it should support family cultural practices around care
+    And cultural recognition should supplement economic recognition
+    And diverse family cultures should be respected and valued
+    And care economy should align with family cultural values

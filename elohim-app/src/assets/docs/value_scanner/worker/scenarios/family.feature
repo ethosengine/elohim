@@ -1,0 +1,111 @@
+Feature: Family Care Participation for Workers
+  As a worker maintaining family connections
+  I need to participate in family care despite employment constraints
+  So that I can honor family relationships while managing work demands
+
+  Background:
+    Given I am a worker with family care responsibilities
+    And my work schedule limits my availability for family
+    And family members are distributed geographically
+    And the family_elohim coordinates care across distance
+
+  Scenario: Maintaining family connection despite limited time
+    Given my work schedule leaves minimal time for family
+    When I want to stay connected to parents and siblings
+    Then the family_elohim should help me maintain meaningful connection
+    And suggest efficient ways to participate in family care
+    And recognize that my work constraints don't diminish my care commitment
+    And coordinate around my limited availability
+
+  Scenario: Contributing to aging parent care from distance
+    Given my parents are aging and need increasing support
+    And I work full-time with unpredictable schedule
+    And I cannot provide hands-on daily care
+    When the family coordinates parent care
+    Then the protocol should help me contribute within my capacity
+    And identify non-time-intensive ways I can support
+    And coordinate with siblings who may have different availability
+    And recognize my contributions even when limited by employment
+
+  Scenario: Supporting family members during crisis
+    Given a family member experiences health crisis or emergency
+    When I want to help but have employment obligations
+    Then the protocol should help me assess my options
+    And coordinate with other family members for coverage
+    And help me communicate with my employer about family needs
+    And support me in balancing work demands with family care
+
+  Scenario: Coordinating financial support for family
+    Given my income is limited but family may need support
+    When family members need financial help
+    Then the protocol should help me assess what I can contribute
+    And coordinate financial support across family network
+    And recognize that my economic constraints are real
+    And facilitate fair distribution of financial responsibility
+
+  Scenario: Sharing care work across sibling network
+    Given siblings may have different capacities for family care
+    And my work schedule limits my hands-on participation
+    When the family needs ongoing care coordination
+    Then the protocol should help distribute care work fairly
+    And recognize that my employment constraints affect availability
+    And identify where I can contribute given my limitations
+    And support negotiation toward equitable family care distribution
+
+  Scenario: Participating in family celebrations despite work
+    Given family gatherings and celebrations matter for connection
+    And my work schedule may conflict with family events
+    When family plans celebrations or important gatherings
+    Then the protocol should help me advocate for work schedule changes
+    And coordinate around my employment constraints when necessary
+    And help me participate meaningfully even if time is limited
+    And recognize that family care includes celebration and joy
+
+  Scenario: Recognizing invisible family care labor
+    Given I provide emotional support, communication, and coordination
+    Even when I cannot provide hands-on care
+    When family members track care contributions
+    Then the protocol should recognize all forms of care work
+    And make visible my emotional labor and communication work
+    And validate that staying connected is valuable care contribution
+    And ensure I am not invisibilized due to employment constraints
+
+  Scenario: Navigating family expectations about availability
+    Given family members may not understand my work constraints
+    When family expects more availability than I can provide
+    Then the protocol should help me communicate my limitations
+    And provide evidence of my actual time and energy constraints
+    And support me in setting realistic boundaries
+    And help family understand that my constraints reflect employment structure not lack of care
+
+  Scenario: Accessing family support during work crisis
+    Given my work demands sometimes become overwhelming
+    When I need family support during difficult work periods
+    Then the protocol should help me ask for help
+    And coordinate family support when I am struggling
+    And enable reciprocity when my situation improves
+    And recognize that care flows both ways in family systems
+
+  Scenario: Coordinating care for family members I support
+    Given I may have dependents or family I support financially
+    When my care responsibilities extend beyond myself
+    Then the protocol should help me coordinate care for dependents
+    And optimize limited resources across family needs
+    And connect me to support systems for working families
+    And recognize that work-family balance requires systemic support
+
+  Scenario: Building family care resilience across generations
+    Given family care needs span generations
+    When family members support each other across life stages
+    Then the protocol should coordinate intergenerational care
+    And recognize contributions from all generations
+    And facilitate sustainable care distribution
+    And support family care economy across time
+
+  Scenario: Documenting family care for workplace advocacy
+    Given family care responsibilities are real and ongoing
+    When I need to advocate for family-friendly workplace policies
+    Then the protocol should help me document family care demands
+    And provide evidence of work-family conflict
+    And support me in requesting accommodations or policy changes
+    And empower me to advocate for care-economy-aligned employment

@@ -48,6 +48,14 @@ export interface GherkinStep {
   docString?: string;
 }
 
+export interface ScenarioExamples {
+  /** Header row */
+  headers: string[];
+
+  /** Data rows */
+  rows: string[][];
+}
+
 export interface TestStatus {
   /** Overall status */
   status: 'passing' | 'failing' | 'pending' | 'skipped' | 'unknown';

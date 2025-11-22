@@ -18,6 +18,9 @@ export interface ContentNode {
   /** Content type - domain-specific (e.g., 'epic', 'feature', 'scenario', 'tutorial') */
   contentType: string;
 
+  /** Type property for compatibility with DocumentNode (optional, same as contentType) */
+  type?: string;
+
   /** Display title */
   title: string;
 
@@ -81,11 +84,11 @@ export interface ContentRelationship {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
-  relationshipType: RelationshipType;
+  relationshipType: ContentRelationshipType;
   metadata?: Record<string, any>;
 }
 
-export enum RelationshipType {
+export enum ContentRelationshipType {
   /** Parent-child hierarchical relationship */
   CONTAINS = 'CONTAINS',
 
@@ -117,6 +120,8 @@ export enum RelationshipType {
   FOLLOWS = 'FOLLOWS',
 }
 
+export { ContentRelationshipType as RelationshipType };
+
 /**
  * Graph structure for content nodes
  */
@@ -143,10 +148,10 @@ export interface ContentGraph {
   reverseAdjacency: Map<string, Set<string>>;
 
   /** Graph metadata */
-  metadata: GraphMetadata;
+  metadata: ContentGraphMetadata;
 }
 
-export interface GraphMetadata {
+export interface ContentGraphMetadata {
   /** Total number of nodes */
   nodeCount: number;
 
@@ -167,3 +172,6 @@ export interface DocumentNodeAdapter {
   fromDocumentNode(documentNode: any): ContentNode;
   toDocumentNode(contentNode: ContentNode): any;
 }
+
+// Alias for backward compatibility
+export type { ContentGraphMetadata as GraphMetadata };
