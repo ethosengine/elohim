@@ -14,13 +14,6 @@ spec:
       paths:
       - backend:
           service:
-            name: elohim-ui-playground-service
-            port:
-              number: 80
-        path: /ui-playground
-        pathType: Prefix
-      - backend:
-          service:
             name: elohim-site-service
             port:
               number: 80
@@ -29,13 +22,6 @@ spec:
   - host: staging.elohim.host
     http:
       paths:
-      - backend:
-          service:
-            name: elohim-ui-playground-staging-service
-            port:
-              number: 80
-        path: /ui-playground
-        pathType: Prefix
       - backend:
           service:
             name: elohim-site-staging-service

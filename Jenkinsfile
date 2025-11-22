@@ -584,37 +584,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
-        stage('Deploy UI Playground to Staging') {
-            when {
-                anyOf {
-                    branch 'staging'
-                    expression { return env.BRANCH_NAME ==~ /staging-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /review-.+/ }
-                }
-            }
-            steps {
-                container('builder'){
-                    script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            echo "Deploying UI Playground to Staging: ${IMAGE_TAG}"
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment-ui-playground.yaml > manifests/staging-deployment-ui-playground-${IMAGE_TAG}.yaml"
-
-                            // Deploy
-                            sh "kubectl apply -f manifests/staging-deployment-ui-playground-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-ui-playground-staging -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-ui-playground-staging -n ethosengine --timeout=300s'
-
-                            echo 'UI Playground Staging deployment completed!'
-                        }
-                    }
-                }
-            }
-        }
-
         stage('Deploy to Alpha') {
             when {
                 anyOf {
@@ -989,31 +958,6 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
 
                             echo 'Production deployment completed!'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Deploy UI Playground to Prod') {
-            when {
-                branch 'main'
-            }
-            steps {
-                container('builder'){
-                    script {
-                        def props = loadBuildVars()
-
-                        withBuildVars(props) {
-                            echo "Deploying UI Playground to Production: ${IMAGE_TAG}"
-
-                            // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment-ui-playground.yaml > manifests/prod-deployment-ui-playground-${IMAGE_TAG}.yaml"
-                            sh "kubectl apply -f manifests/prod-deployment-ui-playground-${IMAGE_TAG}.yaml"
-                            sh "kubectl rollout restart deployment/elohim-ui-playground -n ethosengine"
-                            sh 'kubectl rollout status deployment/elohim-ui-playground -n ethosengine --timeout=300s'
-
-                            echo 'UI Playground Production deployment completed!'
                         }
                     }
                 }
