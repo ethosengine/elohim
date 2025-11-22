@@ -361,23 +361,6 @@
   filter: brightness(1.2);
 }
 
-/* Affinity Colors */
-.affinity-unseen {
-  background-color: rgba(148, 163, 184, 0.8); /* Slate */
-}
-
-.affinity-low {
-  background-color: #fca5a5; /* Red/Orange tint */
-}
-
-.affinity-medium {
-  background-color: #fbbf24; /* Yellow/Gold */
-}
-
-.affinity-high {
-  background-color: #34d399; /* Green */
-}
-
 /* Home Placeholder (Epic Grid) */
 .home-placeholder {
   padding: 3rem;
