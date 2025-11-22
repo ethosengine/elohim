@@ -429,9 +429,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Install UI Playground Dependencies') {
             steps {
                 container('builder'){
-                    dir('elohim-ui-playground') {
+                    dir('elohim-library') {
                         script {
-                            echo 'Installing npm dependencies for UI Playground'
+                            echo 'Installing npm dependencies for UI Playground workspace'
                             sh 'npm ci'
                         }
                     }
@@ -442,10 +442,13 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build UI Playground') {
             steps {
                 container('builder'){
-                    dir('elohim-ui-playground') {
+                    dir('elohim-library') {
                         script {
+                            echo 'Building lamad-ui library'
+                            sh 'npm run build lamad-ui'
+
                             echo 'Building UI Playground Angular application'
-                            sh 'npm run build -- --base-href=/ui-playground/'
+                            sh 'npm run build elohim-ui-playground -- --base-href=/ui-playground/'
                             sh 'ls -la dist/'
                         }
                     }
@@ -471,7 +474,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 # Create build context
                                 mkdir -p /tmp/build-context-playground
-                                cp -r elohim-ui-playground /tmp/build-context-playground/
+                                cp -r elohim-library /tmp/build-context-playground/
                                 cp images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
                                 cp images/nginx-ui-playground.conf /tmp/build-context-playground/
 

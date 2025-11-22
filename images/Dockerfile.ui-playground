@@ -5,17 +5,20 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY elohim-ui-playground/package*.json ./
+# Copy package files from elohim-library workspace
+COPY elohim-library/package*.json ./
 
 # Install dependencies
 RUN npm ci --only=production
 
-# Copy source code
-COPY elohim-ui-playground/ ./
+# Copy source code from elohim-library workspace
+COPY elohim-library/ ./
+
+# Build the lamad-ui library first
+RUN npm run build lamad-ui
 
 # Build the application for production with base-href for /ui-playground
-RUN npm run build -- --base-href=/ui-playground/
+RUN npm run build elohim-ui-playground -- --base-href=/ui-playground/
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
