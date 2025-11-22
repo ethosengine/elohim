@@ -18,6 +18,9 @@ export interface ContentNode {
   /** Content type - domain-specific (e.g., 'epic', 'feature', 'scenario', 'tutorial') */
   contentType: string;
 
+  /** Type property for compatibility with DocumentNode (optional, same as contentType) */
+  type?: string;
+
   /** Display title */
   title: string;
 
@@ -169,3 +172,6 @@ export interface DocumentNodeAdapter {
   fromDocumentNode(documentNode: any): ContentNode;
   toDocumentNode(contentNode: ContentNode): any;
 }
+
+// Alias for backward compatibility
+export { ContentGraphMetadata as GraphMetadata };
