@@ -11,7 +11,7 @@ export * from './lamad-node-types';
 export * from './node-relationship.model';
 
 // Export from feature-node.model (excluding ScenarioExamples to avoid conflict)
-export type { FeatureNode, FeatureCategory } from './feature-node.model';
+export type { FeatureNode } from './feature-node.model';
 
 // Export from scenario-node.model (includes ScenarioExamples)
 export * from './scenario-node.model';
@@ -21,6 +21,8 @@ export type {
   ContentNode,
   ContentMetadata,
   ContentFormat,
-  ContentRelationship
+  ContentRelationship,
+  ContentGraph,
+  ContentGraphMetadata as GraphMetadata
 } from './content-node.model';
-export { ContentRelationshipType, ContentFormatType } from './content-node.model';
+export { ContentRelationshipType } from './content-node.model';

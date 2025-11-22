@@ -85,7 +85,7 @@ export class FeatureViewerComponent implements OnInit {
     this.route.params.subscribe(params => {
       const node = this.documentGraphService.getNode(params['id']);
       if (node && node.type === 'feature') {
-        this.feature = node as FeatureNode;
+        this.feature = node as any as FeatureNode;
         this.loadRelated();
       }
     });
@@ -95,9 +95,11 @@ export class FeatureViewerComponent implements OnInit {
     if (!this.feature) return;
     this.scenarios = this.feature.scenarioIds
       .map(id => this.documentGraphService.getNode(id))
-      .filter((n): n is ScenarioNode => n?.type === 'scenario');
+      .filter(n => n?.type === 'scenario')
+      .map(n => n as any as ScenarioNode);
     this.relatedEpics = this.feature.epicIds
       .map(id => this.documentGraphService.getNode(id))
-      .filter((n): n is EpicNode => n?.type === 'epic');
+      .filter(n => n?.type === 'epic')
+      .map(n => n as any as EpicNode);
   }
 }

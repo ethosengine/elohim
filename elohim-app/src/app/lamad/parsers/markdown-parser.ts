@@ -22,6 +22,13 @@ interface EmbeddedReference {
  */
 export class MarkdownParser {
   /**
+   * Parse an epic markdown file into a ContentNode
+   */
+  static parseEpic(content: string, sourcePath: string): ContentNode {
+    return this.parseContent(content, sourcePath);
+  }
+
+  /**
    * Parse a markdown file into a ContentNode
    */
   static parseContent(content: string, sourcePath: string): ContentNode {

@@ -36,6 +36,18 @@ export class LearningPathService {
      this.pathSubject.next(pathNodes);
   }
 
+  getPath(): PathNode[] {
+    return this._path;
+  }
+
+  getNodePosition(nodeId: string): number {
+    return this._path.findIndex(n => n.node.id === nodeId);
+  }
+
+  isInPath(nodeId: string): boolean {
+    return this._path.some(n => n.node.id === nodeId);
+  }
+
   getNextNode(currentId: string): PathNode | null {
     const index = this._path.findIndex(n => n.node.id === currentId);
     if (index >= 0 && index < this._path.length - 1) {
