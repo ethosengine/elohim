@@ -7,6 +7,7 @@ import { BehaviorSubject, of } from 'rxjs';
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.component';
+import { ContentNode } from '../../models/content-node.model';
 
 // Mock AffinityCircleComponent
 @Component({
@@ -29,49 +30,91 @@ describe('EpicContentPanesComponent', () => {
   let graphSubject: BehaviorSubject<any>;
   let affinitySubject: BehaviorSubject<any>;
 
-  const mockEpic = {
+  const mockEpic: ContentNode = {
     id: 'epic-1',
     title: 'Test Epic',
+    contentType: 'epic',
     description: 'Description',
-    featureIds: ['feat-1'],
-    relatedEpicIds: ['epic-2'],
-    markdownContent: '# Title',
-    authors: [],
-    version: '1.0',
-    category: 'core'
+    content: '# Title',
+    contentFormat: 'markdown',
+    tags: [],
+    sourcePath: 'epic-1.md',
+    relatedNodeIds: ['feat-1', 'epic-2'],
+    metadata: {
+      featureIds: ['feat-1'],
+      relatedEpicIds: ['epic-2'],
+      markdownContent: '# Title',
+      authors: [],
+      version: '1.0',
+      category: 'core'
+    }
   };
 
-  const mockFeature = {
+  const mockFeature: ContentNode = {
     id: 'feat-1',
     title: 'Test Feature',
-    scenarioIds: ['scen-1'],
-    testStatus: { status: 'passed' },
-    featureDescription: 'Desc',
-    category: 'tech'
+    contentType: 'feature',
+    description: 'Desc',
+    content: 'Feature content',
+    contentFormat: 'gherkin',
+    tags: [],
+    sourcePath: 'feat-1.feature',
+    relatedNodeIds: ['epic-1', 'scen-1'],
+    metadata: {
+      scenarioIds: ['scen-1'],
+      testStatus: { status: 'passed' },
+      featureDescription: 'Desc',
+      category: 'tech'
+    }
   };
 
-  const mockScenario = {
+  const mockScenario: ContentNode = {
     id: 'scen-1',
     title: 'Test Scenario',
-    steps: [],
-    testStatus: { status: 'passed' },
-    scenarioType: 'e2e'
+    contentType: 'scenario',
+    description: 'Scenario desc',
+    content: 'Scenario content',
+    contentFormat: 'gherkin',
+    tags: [],
+    sourcePath: 'feat-1.feature',
+    relatedNodeIds: ['feat-1'],
+    metadata: {
+      steps: [],
+      testStatus: { status: 'passed' },
+      scenarioType: 'e2e'
+    }
   };
 
-  const mockRelatedEpic = {
+  const mockRelatedEpic: ContentNode = {
     id: 'epic-2',
     title: 'Related Epic',
-    featureIds: [],
+    contentType: 'epic',
     description: 'Desc',
-    category: 'core'
+    content: '# Related',
+    contentFormat: 'markdown',
+    tags: [],
+    sourcePath: 'epic-2.md',
+    relatedNodeIds: ['epic-1'],
+    metadata: {
+      featureIds: [],
+      category: 'core'
+    }
   };
 
   const mockGraph = {
-    nodesByType: {
-      epics: new Map<string, any>([['epic-1', mockEpic], ['epic-2', mockRelatedEpic]]),
-      features: new Map<string, any>([['feat-1', mockFeature]]),
-      scenarios: new Map<string, any>([['scen-1', mockScenario]])
-    }
+    nodes: new Map<string, ContentNode>([
+      ['epic-1', mockEpic],
+      ['epic-2', mockRelatedEpic],
+      ['feat-1', mockFeature],
+      ['scen-1', mockScenario]
+    ]),
+    relationships: new Map(),
+    adjacency: new Map([
+      ['epic-1', new Set(['feat-1', 'epic-2'])],
+      ['feat-1', new Set(['epic-1', 'scen-1'])],
+      ['scen-1', new Set(['feat-1'])],
+      ['epic-2', new Set(['epic-1'])]
+    ])
   };
 
   beforeEach(async () => {
@@ -81,7 +124,12 @@ describe('EpicContentPanesComponent', () => {
     affinitySubject = new BehaviorSubject({ affinity: { 'epic-1': 0.5 } });
 
     graphServiceMock = {
-      graph$: graphSubject.asObservable()
+      graph$: graphSubject.asObservable(),
+      getRelatedNodes: jasmine.createSpy('getRelatedNodes').and.callFake((nodeId: string) => {
+        const relatedIds = mockGraph.adjacency.get(nodeId);
+        if (!relatedIds) return [];
+        return Array.from(relatedIds).map(id => mockGraph.nodes.get(id)).filter((n): n is ContentNode => n !== undefined);
+      })
     };
 
     affinityServiceMock = {
@@ -116,7 +164,7 @@ describe('EpicContentPanesComponent', () => {
   });
 
   it('should load epic and related content', () => {
-    expect(component.epic).toEqual(mockEpic as any);
+    expect(component.epic).toEqual(mockEpic);
     expect(component.features.length).toBe(1);
     expect(component.scenarios.length).toBe(1);
     expect(component.relatedEpics.length).toBe(1);
@@ -137,17 +185,17 @@ describe('EpicContentPanesComponent', () => {
   });
 
   it('should navigate to feature', () => {
-    component.viewFeature(mockFeature as any);
+    component.viewFeature(mockFeature);
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/content', 'feat-1']);
   });
 
   it('should navigate to scenario', () => {
-    component.viewScenario(mockScenario as any);
+    component.viewScenario(mockScenario);
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/content', 'scen-1']);
   });
 
   it('should navigate to related epic', () => {
-    component.viewRelatedEpic(mockRelatedEpic as any);
+    component.viewRelatedEpic(mockRelatedEpic);
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/lamad/content', 'epic-2']);
   });
 
@@ -168,10 +216,11 @@ describe('EpicContentPanesComponent', () => {
   });
 
   it('should get feature status class', () => {
-    const cls = component.getFeatureStatusClass(mockFeature as any);
+    const cls = component.getFeatureStatusClass(mockFeature);
     expect(cls).toBe('status-passed');
-    
-    const unknown = component.getFeatureStatusClass({} as any);
+
+    const unknownFeature: ContentNode = { ...mockFeature, metadata: {} };
+    const unknown = component.getFeatureStatusClass(unknownFeature);
     expect(unknown).toBe('status-unknown');
   });
 });
