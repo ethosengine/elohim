@@ -174,4 +174,4 @@ export interface DocumentNodeAdapter {
 }
 
 // Alias for backward compatibility
-export { ContentGraphMetadata as GraphMetadata };
+export type { ContentGraphMetadata as GraphMetadata };
