@@ -120,7 +120,7 @@ This references [Feature: user authentication] and [Scenario: login flow].`;
       expect(embeddedRefs.some((ref: any) => ref.type === 'scenario')).toBe(true);
     });
 
-    it.skip('should infer category from title', () => {
+    xit('should infer category from title', () => {
       // Category inference is not currently used in ContentNode
       const observerEpic = MarkdownParser.parseEpic('# Observer System', 'epic.md');
       expect(observerEpic.metadata?.['category']).toBe('observer');
