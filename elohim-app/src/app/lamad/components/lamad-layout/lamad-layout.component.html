@@ -1,6 +1,6 @@
 <div class="lamad-container">
-  <!-- Header -->
-  <header class="lamad-header">
+  <!-- Header (Hidden on Home Page) -->
+  <header class="lamad-header" *ngIf="!isHomePage">
     <div class="lamad-header-content">
       <div class="lamad-logo">
         <a routerLink="/lamad" class="logo-link">
@@ -46,8 +46,8 @@
     <router-outlet></router-outlet>
   </main>
 
-  <!-- Footer -->
-  <footer class="lamad-footer">
+  <!-- Footer (Hidden on Home Page) -->
+  <footer class="lamad-footer" *ngIf="!isHomePage">
     <p>Lamad Learning Platform | Where Understanding is Earned | Powered by Elohim Protocol</p>
   </footer>
 </div>

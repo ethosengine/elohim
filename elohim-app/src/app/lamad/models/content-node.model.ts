@@ -117,6 +117,8 @@ export enum ContentRelationshipType {
   FOLLOWS = 'FOLLOWS',
 }
 
+export { ContentRelationshipType as RelationshipType };
+
 /**
  * Graph structure for content nodes
  */

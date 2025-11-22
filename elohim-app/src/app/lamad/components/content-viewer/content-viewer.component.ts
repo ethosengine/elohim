@@ -6,8 +6,6 @@ import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
-import { DocumentNode } from '../../models/document-node.model';
-import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
 import { EpicContentPanesComponent } from '../epic-content-panes/epic-content-panes.component';
 
 @Component({
@@ -68,15 +66,15 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
       next: (graph) => {
         if (!graph) return;
 
-        const documentNode = graph.nodes.get(nodeId) as DocumentNode;
-        if (!documentNode) {
+        const contentNode = graph.nodes.get(nodeId);
+        if (!contentNode) {
           this.error = 'Content not found';
           this.isLoading = false;
           return;
         }
 
-        // Convert to ContentNode
-        this.node = DocumentNodeAdapter.fromDocumentNode(documentNode);
+        // Set ContentNode
+        this.node = contentNode;
 
         // Get current affinity
         this.affinity = this.affinityService.getAffinity(nodeId);
@@ -102,11 +100,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   private loadRelatedNodes(graph: any, relatedIds: string[]): void {
     this.relatedNodes = relatedIds
-      .map((id) => {
-        const docNode = graph.nodes.get(id) as DocumentNode;
-        return docNode ? DocumentNodeAdapter.fromDocumentNode(docNode) : null;
-      })
-      .filter((node): node is ContentNode => node !== null);
+      .map((id) => graph.nodes.get(id))
+      .filter((node): node is ContentNode => node !== undefined);
   }
 
   /**

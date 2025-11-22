@@ -5,11 +5,11 @@
       <div class="title-section">
         <h1 class="epic-title">{{ epic.title }}</h1>
         <div class="epic-meta">
-          <span class="category-badge" *ngIf="epic.category">
-            {{ epic.category }}
+          <span class="category-badge" *ngIf="epic.metadata.category">
+            {{ epic.metadata.category }}
           </span>
-          <span class="version-badge" *ngIf="epic.version">
-            v{{ epic.version }}
+          <span class="version-badge" *ngIf="epic.metadata.version">
+            v{{ epic.metadata.version }}
           </span>
         </div>
       </div>
@@ -57,14 +57,14 @@
         <p class="epic-description" *ngIf="epic.description">{{ epic.description }}</p>
       </div>
 
-      <div class="epic-metadata" *ngIf="epic.authors && epic.authors.length > 0">
+      <div class="epic-metadata" *ngIf="epic.metadata.authors && epic.metadata.authors.length > 0">
         <div class="metadata-item">
           <strong>Authors:</strong>
-          <span>{{ epic.authors.join(', ') }}</span>
+          <span>{{ epic.metadata.authors.join(', ') }}</span>
         </div>
       </div>
 
-      <div class="markdown-content" [innerHTML]="renderMarkdown(epic.markdownContent)">
+      <div class="markdown-content" [innerHTML]="renderMarkdown(epic.content)">
       </div>
     </div>
 
@@ -90,17 +90,17 @@
           type="button">
           <div class="card-header">
             <h3 class="feature-title">{{ feature.title }}</h3>
-            <span class="status-indicator" *ngIf="feature.testStatus">
-              {{ feature.testStatus.status }}
+            <span class="status-indicator" *ngIf="feature.metadata['testStatus']">
+              {{ feature.metadata['testStatus'].status }}
             </span>
           </div>
-          <p class="feature-description">{{ feature.featureDescription }}</p>
+          <p class="feature-description">{{ feature.metadata['featureDescription'] }}</p>
           <div class="card-footer">
-            <span class="scenario-count">
-              {{ feature.scenarioIds.length }} scenario{{ feature.scenarioIds.length !== 1 ? 's' : '' }}
+            <span class="scenario-count" *ngIf="feature.metadata['scenarioIds']">
+              {{ feature.metadata['scenarioIds'].length }} scenario{{ feature.metadata['scenarioIds'].length !== 1 ? 's' : '' }}
             </span>
-            <span class="category-tag" *ngIf="feature.category">
-              {{ feature.category }}
+            <span class="category-tag" *ngIf="feature.metadata.category">
+              {{ feature.metadata.category }}
             </span>
           </div>
         </button>
@@ -128,23 +128,23 @@
           (click)="viewScenario(scenario)"
           type="button">
           <div class="card-header">
-            <div class="scenario-type-badge">{{ scenario.scenarioType }}</div>
+            <div class="scenario-type-badge">{{ scenario.metadata['scenarioType'] }}</div>
             <h3 class="scenario-title">{{ scenario.title }}</h3>
           </div>
-          <div class="scenario-steps">
+          <div class="scenario-steps" *ngIf="scenario.metadata['steps']">
             <div class="step-summary">
-              {{ scenario.steps.length }} step{{ scenario.steps.length !== 1 ? 's' : '' }}
+              {{ scenario.metadata['steps'].length }} step{{ scenario.metadata['steps'].length !== 1 ? 's' : '' }}
             </div>
-            <div class="step-preview" *ngIf="scenario.steps.length > 0">
-              <code>{{ scenario.steps[0].keyword }} {{ scenario.steps[0].text }}</code>
+            <div class="step-preview" *ngIf="scenario.metadata['steps'].length > 0">
+              <code>{{ scenario.metadata['steps'][0].keyword }} {{ scenario.metadata['steps'][0].text }}</code>
             </div>
           </div>
-          <div class="card-footer" *ngIf="scenario.testStatus">
+          <div class="card-footer" *ngIf="scenario.metadata['testStatus']">
             <span class="test-status">
-              Status: {{ scenario.testStatus.status }}
+              Status: {{ scenario.metadata['testStatus'].status }}
             </span>
-            <span class="last-run" *ngIf="scenario.testStatus.lastRun">
-              Last run: {{ scenario.testStatus.lastRun | date: 'short' }}
+            <span class="last-run" *ngIf="scenario.metadata['testStatus'].lastRun">
+              Last run: {{ scenario.metadata['testStatus'].lastRun | date: 'short' }}
             </span>
           </div>
         </button>
@@ -172,14 +172,15 @@
           type="button">
           <div class="card-header">
             <h3 class="epic-title">{{ relatedEpic.title }}</h3>
-            <span class="category-badge" *ngIf="relatedEpic.category">
-              {{ relatedEpic.category }}
+            <span class="category-badge" *ngIf="relatedEpic.metadata.category">
+              {{ relatedEpic.metadata.category }}
             </span>
           </div>
           <p class="epic-description">{{ relatedEpic.description }}</p>
           <div class="card-footer">
-            <span class="feature-count">
-              {{ relatedEpic.featureIds.length }} feature{{ relatedEpic.featureIds.length !== 1 ? 's' : '' }}
+             <!-- Feature count might be unavailable or needing computation -->
+            <span class="feature-count" *ngIf="relatedEpic.metadata['featureIds']">
+              {{ relatedEpic.metadata['featureIds'].length }} feature{{ relatedEpic.metadata['featureIds'].length !== 1 ? 's' : '' }}
             </span>
           </div>
         </button>

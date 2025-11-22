@@ -1,0 +1,143 @@
+Feature: Individual Autonomy and Self-Direction for IDD Community Members
+  As an IDD community member
+  I want to exercise maximum autonomy within my capabilities
+  So that I can direct my own life with dignity and appropriate support
+
+  Background:
+    Given Jordan is an IDD community member with Down syndrome
+    And Jordan uses the Value Scanner with cognitive accessibility features
+    And Jordan's personal_agent is configured for simple language and visual guidance
+    And Jordan deserves dignity, respect, and genuine autonomy
+
+  Scenario: Making personal choices with accessible interface
+    Given Jordan wants to choose their outfit for a community event
+    When Jordan opens the Value Scanner wardrobe feature
+    Then the interface displays clothing options with large pictures
+    And each option uses simple labels ("Blue shirt", "Red sweater")
+    And the interface uses step-by-step guidance ("First pick a shirt")
+    And Jordan can make their own choice without support worker intervention
+    And the system celebrates Jordan's choice with positive feedback
+    And Jordan's preference is recorded for future suggestions
+
+  Scenario: Expressing food preferences with visual support
+    Given Jordan has specific food likes and dislikes
+    And the group home is planning weekly meals
+    When Jordan uses the meal preference feature
+    Then the interface shows pictures of food options
+    And Jordan can indicate preferences using simple icons (thumbs up/down)
+    And the system uses simple language ("Do you like chicken?")
+    And Jordan's choices are communicated to household meal planning
+    And Jordan experiences their preferences being honored
+    And the personal_agent provides encouragement throughout
+
+  Scenario: Scheduling personal time with cognitive support
+    Given Jordan wants to plan their weekend activities
+    When Jordan opens the schedule planner
+    Then the interface shows time visually (morning/afternoon/evening pictures)
+    And activity options appear as large icons with simple labels
+    And the system guides Jordan step-by-step ("What do you want Saturday morning?")
+    And Jordan can select activities they enjoy (park, movies, friends)
+    And the personal_agent helps coordinate support if needed
+    And Jordan's schedule reflects their genuine choices
+    And Jordan maintains decision-making authority
+
+  Scenario: Managing personal care routine with autonomy
+    Given Jordan has a morning self-care routine
+    And Jordan can complete most tasks independently with reminders
+    When Jordan uses the morning routine feature
+    Then the interface shows each task as a picture checklist
+    And Jordan can mark tasks complete as they finish them
+    And the system provides gentle audio reminders if Jordan forgets
+    And the personal_agent celebrates Jordan's independence
+    And support workers only assist when Jordan requests help
+    And Jordan's autonomy is maximized within their capabilities
+
+  Scenario: Setting personal goals with supported decision-making
+    Given Jordan wants to learn a new skill
+    And Jordan's support worker is available to help
+    When Jordan explores the goal-setting feature
+    Then the interface shows potential goals as visual options
+    And the support worker helps Jordan understand each option
+    But Jordan makes the final choice of which goal to pursue
+    And the system breaks the goal into simple, achievable steps
+    And Jordan's personal_agent provides encouragement and progress tracking
+    And Jordan experiences ownership of their own growth
+
+  Scenario: Expressing preferences for support style
+    Given Jordan works with multiple support workers
+    And different workers have different support styles
+    When Jordan uses the support preference feature
+    Then the interface asks simple questions about what helps Jordan
+    And Jordan can indicate preferences using pictures and simple choices
+    And the system communicates Jordan's preferences to support team
+    And support workers honor Jordan's expressed preferences
+    And Jordan's voice shapes how they receive support
+    And Jordan's dignity is preserved through preference respect
+
+  Scenario: Making purchasing decisions within budget
+    Given Jordan receives a weekly personal allowance
+    And Jordan wants to buy something they enjoy
+    When Jordan uses the shopping feature at the store
+    Then the personal_agent shows Jordan's available money visually
+    And the interface helps Jordan compare item prices to their budget
+    And Jordan can choose what to buy within their means
+    And the system celebrates Jordan's smart money choices
+    And Jordan experiences genuine financial autonomy
+    And Jordan learns from their purchasing decisions
+
+  Scenario: Choosing how to spend free time
+    Given Jordan has free time after work
+    And Jordan has multiple activity options available
+    When Jordan considers what to do
+    Then the personal_agent shows activity options with pictures
+    And each option includes simple information (location, time, who)
+    And Jordan selects their preferred activity
+    And the system helps coordinate any needed support
+    But Jordan's choice drives what happens
+    And Jordan's preferences are learned and remembered
+    And Jordan experiences agency over their own time
+
+  Scenario: Expressing feelings and emotions accessibly
+    Given Jordan wants to communicate how they're feeling
+    And verbal expression might be challenging sometimes
+    When Jordan uses the feelings check-in feature
+    Then the interface shows emotion faces (happy, sad, angry, scared, etc.)
+    And Jordan can select the face that matches their feeling
+    And the system asks simple follow-up questions with visual aids
+    And Jordan's feelings are communicated to their support network
+    And Jordan's emotional expression is honored and validated
+    And support is offered if Jordan is struggling
+
+  Scenario: Participating in personal health decisions
+    Given Jordan has a doctor's appointment coming up
+    And the doctor wants to discuss treatment options
+    When Jordan's support worker helps prepare for the appointment
+    Then the personal_agent provides simple health information with pictures
+    And Jordan learns about their options in accessible language
+    And Jordan can express preferences and concerns
+    And the doctor speaks directly to Jordan, not just support worker
+    And Jordan participates in health decisions at their capability level
+    And supported decision-making principles guide the process
+    And Jordan's personhood is fully respected
+
+  Scenario: Building personal identity and self-expression
+    Given Jordan is developing their sense of self
+    And Jordan has interests, values, and preferences
+    When Jordan uses the personal profile feature
+    Then the interface helps Jordan express who they are
+    And Jordan can select interests from visual options (music, sports, art)
+    And Jordan can share what matters to them using simple language support
+    And the system celebrates Jordan's unique identity
+    And Jordan's self-expression is honored, not corrected to fit norms
+    And Jordan experiences being seen as a full person
+
+  Scenario: Exercising privacy rights with dignity
+    Given Jordan deserves privacy like any adult
+    And Jordan has personal information and private moments
+    When Jordan uses privacy controls in the Value Scanner
+    Then the interface explains privacy with simple concepts and pictures
+    And Jordan can choose what information is private vs. shared
+    And the system respects Jordan's privacy choices
+    And support workers only access information when truly needed
+    And Jordan's dignity is preserved through privacy respect
+    And Jordan learns about privacy boundaries in accessible way

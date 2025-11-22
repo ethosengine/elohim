@@ -5,9 +5,7 @@ import { Subject, combineLatest } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { DocumentNode } from '../../models/document-node.model';
 import { ContentNode } from '../../models/content-node.model';
-import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
 import { CategoryAffinityStats } from '../../models/user-affinity.model';
 
 interface CategorySection {
@@ -71,11 +69,10 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes: DocumentNode[] = Array.from(graph.nodes.values());
-    const contentNodes = DocumentNodeAdapter.fromDocumentNodes(allNodes);
+    const contentNodes: ContentNode[] = Array.from(graph.nodes.values());
 
     // Get affinity stats
-    const stats = this.affinityService.getStats(allNodes);
+    const stats = this.affinityService.getStats(contentNodes);
     this.overallStats = {
       totalNodes: stats.totalNodes,
       averageAffinity: stats.averageAffinity,

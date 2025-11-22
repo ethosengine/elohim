@@ -1,0 +1,132 @@
+---
+epic: governance
+user_type: appellant
+archetype_name: "Appellant"
+epic_domain: "AI Governance - Constitutional oversight and appeals"
+governance_scope: [individual, family, community, provincial, national]
+related_users: [constitutional_council_member, technical_expert, community_leader]
+---
+
+# Appellant - Governance
+
+## Archetype
+
+Marcus is 42 years old, and he's furious. His Family Elohim just alerted his partner about concerning behavioral changes—increasing isolation, disturbing online content consumption, hints of suicidal ideation. Marcus knows the agent probably saved his life. His brother died by suicide with similar warning signs. But right now, he doesn't feel grateful—he feels violated. This is an invasion of privacy. He wasn't in immediate danger. The agent had no right to break confidentiality and worry his family.
+
+So Marcus does what the Elohim Protocol promises he can do: he appeals. Not to another AI, not to some distant bureaucracy, but to real humans—a Constitutional Council of randomly-selected citizens who will review whether the agent's decision aligned with constitutional principles. Marcus doesn't expect to win. He's not even sure he wants to win. But he needs to be heard. He needs someone to acknowledge that what felt like care also felt like surveillance, that intervention—even life-saving intervention—comes at a cost to autonomy and dignity.
+
+The appeal process reveals something Marcus didn't expect: transparency. The Family Elohim shows its full reasoning—the pattern detection, the constitutional analysis, the graduated intervention protocol (family alert before emergency services), the historical context (his brother's death). The Constitutional Council deliberates for two hours, not asking "was Marcus right to be angry?" but "did the agent operate within constitutional bounds?" They rule yes—but they also recommend protocol enhancements, including the ability for individuals to pre-specify alert preferences. Marcus is initially still angry, but after seeing the reasoning and recommendations, he understands. He updates his preferences (family yes, but only after three-day pattern, not immediate). He gets support. Six months later, he's alive and recovering. And he knows that his appeal—his moment of feeling heard—made the protocol better for everyone.
+
+## Core Needs
+
+- **Fair Hearing and Meaningful Recourse**: Marcus needs to know that his appeal will be genuinely considered by humans, not just rubber-stamped or dismissed by another algorithm. The Constitutional Council must actually deliberate, engage with his complaint, and provide reasoned judgment. Even if they affirm the agent's decision, Marcus needs to see that his concern mattered, that his appeal had the potential to change the outcome if constitutional principles supported him.
+
+- **Explainable Reasoning from Agents**: Marcus can't challenge a decision he doesn't understand. He needs the Family Elohim to explain in plain language: What pattern did you detect? What constitutional principle guided you? What alternatives did you consider? Why did you choose family alert over other interventions? The explanation must be honest and accessible, not jargon-filled or evasive. Current AI governance failures include black-box decisions with no explanation—Elohim Protocol addresses this through mandatory agent explainability.
+
+- **Dignity Throughout the Process**: Even when Marcus is wrong (and part of him knows the agent probably saved his life), he needs the appeal process to respect his autonomy, privacy, and human worth. The system must not treat him as irrational, ungrateful, or obstructive simply because he's challenging agent authority. His anger is legitimate, his concern about surveillance is real, and his right to appeal must be honored without judgment or punishment.
+
+- **Actual Impact on Protocol Evolution**: Marcus's appeal isn't just about his individual case—it's about improving the system. When the Constitutional Council identifies that the Family Elohim should have offered pre-specified alert preferences, that recommendation becomes protocol enhancement. Marcus's lived experience of feeling violated, even by life-saving intervention, makes the system better for everyone. He needs to see that impact, to know his suffering wasn't wasted.
+
+- **Escalation Path When Lower Layers Fail**: If the first-layer appeal (Community Elohim review) doesn't satisfy Marcus, he needs the ability to escalate to peer agent review, then Constitutional Council, then higher layers if needed. The cascade must be accessible (not requiring lawyers or technical expertise), timely (not years of waiting), and genuinely independent (each layer brings fresh perspective, not rubber-stamping the previous decision).
+
+## Key Relationships
+
+**To Elohim Agents**: Marcus has a complex relationship with the agent he's appealing. He's angry at the Family Elohim for violating his privacy, but he also knows it was trying to help. The agent must engage his appeal respectfully—providing full reasoning, acknowledging the dignity violation he experienced, accepting legitimate critique. The agent doesn't apologize for saving Marcus's life, but it does explain how it balanced competing constitutional principles (care vs. privacy) and why it weighted care more heavily given the suicide risk pattern.
+
+**To Constitutional Council Members**: Marcus needs these randomly-selected citizens to truly hear him. They're not judges in robes or distant bureaucrats—they're people like Sarah Martinez, the nurse-mother serving her 3-month term. Marcus tells his story, explains why he felt violated, challenges the agent's interpretation. The council members listen, ask questions, deliberate. They don't automatically side with Marcus or the agent—they evaluate constitutional alignment. Their judgment feels legitimate because they're peers, not elites.
+
+**To Technical Experts**: If Marcus's case involves complex AI reasoning that the Constitutional Council needs help understanding, technical experts explain how the pattern detection worked, what confidence levels the agent had, whether the cryptographic constitutional proof held. The experts serve Marcus too—they help him understand what the agent actually did, whether there were technical errors (like in the Wisconsin case where an agent confused addresses), and whether the system worked as designed.
+
+**To Other Appellants**: Marcus isn't alone. The Transparency Dashboard shows that 3% of agent decisions are appealed, and 40% of appeals result in decisions being overturned or modified. Marcus can see aggregate patterns—what kinds of decisions generate most appeals (adolescent autonomy conflicts), what success rates different appeal types have, what precedents exist. This community of appellants means Marcus isn't isolated in his challenge to agent authority.
+
+**To Community Leaders**: At the community layer, local leaders see appeal patterns and can advocate for protocol adjustments. If many appellants like Marcus are challenging mental health intervention thresholds, community leaders might propose localized calibration or community dialogue about where to set boundaries. Marcus's appeal contributes to community governance.
+
+**To Policy Makers**: Marcus's appeal and the constitutional precedent it sets might influence policy makers crafting legislation about AI governance, privacy rights, mental health intervention, or digital dignity. His specific case becomes data in democratic deliberation about how we want to be governed by and with AI.
+
+**To Family and Community**: Marcus's appeal affects his relationships. His partner, who received the alert, is part of this story. The agent's intervention strained trust ("you're being monitored"), but the appeal process and constitutional review helped them negotiate new boundaries. The community sees that appeals work, that recourse is real, which builds trust in the overall system.
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+**Individual/Family Layer**
+Marcus's appeal originates here—a Family Elohim decision that affected him personally. This is where most appeals begin: individual autonomy vs. family care, personal privacy vs. collective wellbeing, resource allocation within households. The appeals at this layer are intimate, emotionally charged, and often involve balancing love (as care) with respect (as autonomy).
+
+**Community Layer**
+Marcus's first-layer appeal goes to Community Elohim review, happening within minutes to hours. The Community Elohim examines whether the Family Elohim's decision was appropriate given local context, cultural norms, and community resources. If Marcus lived in a community with strong mental health services, would the intervention have been different? This layer provides quick recourse for clear errors or misalignments.
+
+**Provincial/State Layer**
+If Marcus's appeal escalates (Community Elohim affirms, he requests peer review), it reaches the Regional Constitutional Council where Sarah Martinez serves. This layer handles appeals that couldn't be resolved locally, establish precedent affecting multiple communities, or involve novel constitutional questions. Marcus's mental health intervention case might set regional precedent about privacy thresholds.
+
+**National Layer**
+If Marcus's case revealed fundamental constitutional tension (not just implementation error), it might escalate to national Constitutional Council. This is rare—most appeals resolve at community or regional layer. But if the question is "does mental health intervention ever justify privacy breach at the constitutional level?" rather than "did this particular intervention follow proper protocol?", national interpretation matters.
+
+**Global Layer**
+Marcus's case likely wouldn't reach global layer unless it raised existential questions about human dignity, privacy rights, or the fundamental relationship between autonomous AI and human autonomy. But his appeal contributes to global data—patterns of mental health interventions, privacy concerns, and constitutional interpretation that inform the 7-year constitutional conventions.
+
+### Temporal
+
+**Immediate Review (Level 1 - Minutes to Hours)**
+Marcus triggers appeal through his interface. Community Elohim reviews immediately, showing reasoning transparently. Most appeals resolve here—the agent explains more clearly, shows counterfactuals ("if X were different, decision would have been Y"), or acknowledges error and corrects. Speed matters: Marcus is angry now, needs recourse now.
+
+**Peer Review (Level 2 - Days)**
+If immediate review doesn't satisfy Marcus, he escalates to horizontal peer review—three randomly-selected Family Elohim agents from other families examine the case with Constitutional Council observer. They investigate deeper (in Tommy's robotics case, they discovered racist bullying the original agent missed). Peer agents can override, modify, or affirm the original decision.
+
+**Constitutional Council (Level 3 - Weeks)**
+If peer review still doesn't resolve the appeal, or if the case raises novel constitutional questions, it goes to the Constitutional Council that Sarah Martinez serves on. They deliberate thoroughly, create precedent, and issue judgment that becomes part of the public constitutional record. Marcus might wait 2-3 weeks, but he gets human judgment on his appeal.
+
+**Higher Layer Escalation (Level 4 - Months)**
+For appeals that reveal constitutional conflicts across communities or novel situations without precedent, escalation to provincial/national councils happens. Marcus probably wouldn't need this for his mental health case, but systemic issues (like the watershed decision between agricultural and ecological agents) require this level.
+
+**Constitutional Convention (Level 5 - Years)**
+The ultimate recourse: if Marcus's appeal reveals a fundamental gap in the constitutional framework (like "developing autonomy is itself a constitutional value" from the adolescent autonomy cases), it can inform proposals at the 7-year convention. Marcus's individual appeal contributes to humanity's ongoing negotiation of how to govern with AI.
+
+## Implementation Notes
+
+### Technical Infrastructure
+
+**Appeal Interface Design**: Marcus needs dead-simple appeal triggering—button on his phone labeled "I disagree with this decision, I want it reviewed." The interface must collect: his complaint (in his own words), what outcome he wants, what constitutional principle he thinks was violated. No legal jargon required, no forms to fill out, no technical expertise needed. Accessible design for everyone, including low literacy, disabilities, or high emotional distress.
+
+**Reasoning Transparency**: When Marcus appeals, the agent must surface its full decision pathway in layered detail: plain language summary, constitutional principle analysis, pattern detection explanation (what data, what confidence level), counterfactual exploration (what would have changed the outcome), and technical audit trail for experts. Marcus chooses how deep to go based on his needs.
+
+**Appeal Tracking**: Marcus can see his appeal's status at any time—submitted, under review, assigned to peer agents or Constitutional Council, decision pending, decision issued. He gets notifications at key milestones. He can see how his case compares to similar appeals (anonymized). The tracking must be transparent without being overwhelming.
+
+**Precedent Search**: Marcus can search past appeals to understand how similar cases were decided. "Mental health intervention + privacy" returns cases with constitutional reasoning, outcomes, and protocol changes that resulted. This helps Marcus calibrate expectations, understand the constitutional framework, and build his appeal argument.
+
+**Outcome Implementation**: If Marcus's appeal succeeds (decision overturned or modified), the implementation must be automatic and immediate. If the Constitutional Council rules that the Family Elohim overstepped, Marcus's preferences get updated, the alert is documented as error, and similar interventions require higher threshold going forward. No delay, no bureaucracy, no need for Marcus to enforce the judgment himself.
+
+### Democratic Process
+
+**Accessible Participation**: Marcus can present his appeal orally, in writing, via video, or through representative. Language translation available, accessibility accommodations provided, cultural mediation offered if needed. The process cannot privilege the articulate, educated, or tech-savvy. Marcus's nurse working-class voice must be heard as clearly as a lawyer's.
+
+**Protection from Retaliation**: Marcus must be able to appeal without fear that agents will punish him with future decisions, that his community will ostracize him, that authorities will target him. The protocol includes protections: appeals are right, not privilege; filing appeal cannot be used against appellant; frivolous appeal filters exist but are calibrated to allow genuine dissent.
+
+**Representation When Needed**: For complex appeals or vulnerable appellants (children, cognitively disabled, severely distressed), representatives can assist. But the representative serves Marcus, not their own agenda. The system includes checks against lawyers capturing the process, turning appeals into profit opportunities or gatekeeping mechanisms.
+
+**Public vs. Private**: Marcus chooses whether his appeal is public (contributes to transparent precedent) or private (protects sensitive information). Mental health cases like his might default to private with anonymized precedent publication. But Marcus can choose full transparency if he wants his story to help others.
+
+### Procedural Fairness
+
+**Burden of Proof**: The agent must justify its decision with constitutional reasoning and cryptographic proof of alignment. Marcus doesn't have to prove the agent was wrong—the agent has to prove it was right. This is critical: otherwise, appellants face impossible burden of challenging complex AI systems they can't fully understand.
+
+**Independent Review**: Each layer of appeal must be genuinely independent—Community Elohim reviewing Family Elohim isn't conflicted (different agents), peer review uses random selection (can't be gamed), Constitutional Council is sortition-selected (can't be captured). Marcus knows the review isn't rigged in favor of agents.
+
+**Timely Resolution**: Appeals have mandatory timelines—Level 1 within 24 hours, Level 2 within one week, Level 3 within one month. Delays deny justice. The system must be resourced adequately (enough Constitutional Council members, enough peer agents available, enough technical support) to meet these timelines even under high appeal volume.
+
+**Clear Standards**: Marcus needs to understand what "constitutional alignment" means in practice. The standards aren't secret or arbitrary—they're publicly documented, evolved through precedent, and explained in accessible language. Marcus might not agree with the standard (he thinks privacy should trump intervention more than the protocol does), but he understands what standard was applied and why.
+
+**Amendment as Ultimate Recourse**: If Marcus's appeal reveals that the constitutional framework itself is wrong (not just misapplied), he can propose amendment for the next 7-year convention. His lived experience—privacy violation even by life-saving intervention—becomes constitutional input. The system must make this path visible and accessible.
+
+### Philosophical Dignity
+
+**Honoring Dissent**: Marcus's right to appeal isn't just procedural—it's recognition that he might be right when the agent is wrong, or that even when the agent is technically correct, the human experience of its decision matters. Dissent is valued, not merely tolerated. The system improves through challenge, not obedience.
+
+**Legitimacy Through Participation**: Marcus's appeal, even if unsuccessful, gives him voice in his own governance. This is dignity—not being done to, but participating in the decisions that affect you. The Elohim Protocol fails if it optimizes outcomes but denies people the experience of shaping their lives.
+
+**Learning from Anger**: Marcus's fury at the privacy breach contains wisdom. His anger says "even life-saving intervention feels like control when it's unilateral." The Constitutional Council doesn't dismiss this as irrational—they honor it by recommending pre-specified preferences. Negative emotions are data about dignity violations, not obstacles to overcome.
+
+**Reconciliation with Care**: Ultimately, Marcus reconciles with the Family Elohim through the appeal process. Not because the agent was perfect (it wasn't—the protocol improves based on his feedback), but because the system demonstrated that his autonomy mattered even when his life was at risk. The balance between care and control was negotiated, not imposed. This is partnership.
+
+---
+
+*Marcus updates his alert preferences after his appeal. Family: yes. But three-day pattern required, not immediate intervention. He feels heard. Six months later, when another concerning pattern emerges, the agent follows his preferences—alerts after three days, not immediately. Marcus appreciates the respect. He also appreciates that he's still alive. The appeal gave him ownership of his own protection. That's the difference between care and control. That's why recourse matters.*
