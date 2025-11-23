@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-ui-playground-alpha
+  namespace: ethosengine
+  labels:
+    app: elohim-ui-playground-alpha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elohim-ui-playground-alpha
+  template:
+    metadata:
+      labels:
+        app: elohim-ui-playground-alpha
+    spec:
+      containers:
+      - name: elohim-ui-playground-alpha
+        image: harbor.ethosengine.com/ethosengine/elohim-ui-playground:BUILD_NUMBER_PLACEHOLDER
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"

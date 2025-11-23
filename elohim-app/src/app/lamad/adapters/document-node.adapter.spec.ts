@@ -151,6 +151,7 @@ describe('DocumentNodeAdapter', () => {
         content: 'Content',
         contentFormat: 'gherkin',
         tags: [],
+        sourcePath: '/test.feature',
         relatedNodeIds: [],
         metadata: {}
       };
@@ -169,6 +170,7 @@ describe('DocumentNodeAdapter', () => {
         content: 'Content',
         contentFormat: 'gherkin',
         tags: [],
+        sourcePath: '/test.feature',
         relatedNodeIds: [],
         metadata: {}
       };
@@ -225,6 +227,7 @@ describe('DocumentNodeAdapter', () => {
           content: 'Content',
           contentFormat: 'markdown',
           tags: [],
+          sourcePath: '/epic.md',
           relatedNodeIds: [],
           metadata: {}
         },
@@ -236,6 +239,7 @@ describe('DocumentNodeAdapter', () => {
           content: 'Content',
           contentFormat: 'gherkin',
           tags: [],
+          sourcePath: '/feature.feature',
           relatedNodeIds: [],
           metadata: {}
         }

@@ -1,8 +1,11 @@
-import { Component, OnInit } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { filter, takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
+import { LearningPathService } from '../../services/learning-path.service';
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
 
 @Component({
@@ -12,12 +15,16 @@ import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-tog
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css']
 })
-export class LamadLayoutComponent implements OnInit {
+export class LamadLayoutComponent implements OnInit, OnDestroy {
   searchQuery = '';
   isGraphBuilding = true;
+  isHomePage = false;
+  
+  private destroy$ = new Subject<void>();
 
   constructor(
     private readonly documentGraphService: DocumentGraphService,
+    private readonly learningPathService: LearningPathService,
     private readonly router: Router
   ) {}
 
@@ -26,6 +33,11 @@ export class LamadLayoutComponent implements OnInit {
     this.documentGraphService.buildGraph().subscribe({
       next: graph => {
         console.log('Lamad content graph built successfully', graph.metadata);
+        
+        // Initialize learning path with epics
+        const epics = this.documentGraphService.getNodesByType('epic');
+        this.learningPathService.setPath(epics);
+        
         this.isGraphBuilding = false;
       },
       error: err => {
@@ -33,6 +45,21 @@ export class LamadLayoutComponent implements OnInit {
         this.isGraphBuilding = false;
       }
     });
+    
+    // Track route for UI state
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd),
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.checkIfHomePage();
+    });
+    
+    this.checkIfHomePage();
+  }
+  
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   onSearch(): void {
@@ -41,5 +68,9 @@ export class LamadLayoutComponent implements OnInit {
         queryParams: { q: this.searchQuery }
       });
     }
+  }
+  
+  private checkIfHomePage(): void {
+    this.isHomePage = this.router.url === '/lamad' || this.router.url === '/lamad/';
   }
 }

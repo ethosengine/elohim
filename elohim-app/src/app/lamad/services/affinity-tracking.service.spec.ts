@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { AffinityTrackingService } from './affinity-tracking.service';
 import { DocumentNode, NodeType } from '../models/document-node.model';
+import { ContentNode } from '../models/content-node.model';
 
 describe('AffinityTrackingService', () => {
   let service: AffinityTrackingService;
@@ -135,11 +136,13 @@ describe('AffinityTrackingService', () => {
 
   describe('getStats', () => {
     it('should calculate statistics correctly', () => {
-      const nodes: DocumentNode[] = [
+      const nodes: ContentNode[] = [
         {
           id: 'n1',
           title: 'Node 1',
           type: NodeType.EPIC,
+          contentType: 'epic',
+          contentFormat: 'markdown',
           description: '',
           tags: [],
           sourcePath: '',
@@ -151,6 +154,8 @@ describe('AffinityTrackingService', () => {
           id: 'n2',
           title: 'Node 2',
           type: NodeType.EPIC,
+          contentType: 'epic',
+          contentFormat: 'markdown',
           description: '',
           tags: [],
           sourcePath: '',
@@ -162,6 +167,8 @@ describe('AffinityTrackingService', () => {
           id: 'n3',
           title: 'Node 3',
           type: NodeType.FEATURE,
+          contentType: 'feature',
+          contentFormat: 'gherkin',
           description: '',
           tags: [],
           sourcePath: '',

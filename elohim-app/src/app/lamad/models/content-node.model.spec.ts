@@ -19,6 +19,7 @@ describe('ContentNode Model', () => {
         content: '# Test Epic\n\nContent here',
         contentFormat: 'markdown',
         tags: ['test', 'documentation'],
+        sourcePath: '/docs/node-1.md',
         relatedNodeIds: ['node-2'],
         metadata: {}
       };
@@ -41,6 +42,7 @@ describe('ContentNode Model', () => {
           content: 'Test content',
           contentFormat: format,
           tags: [],
+          sourcePath: `/test/${format}.md`,
           relatedNodeIds: [],
           metadata: {}
         };
@@ -78,6 +80,7 @@ describe('ContentNode Model', () => {
         content: 'Content',
         contentFormat: 'html',
         tags: [],
+        sourcePath: '/articles/article-1.html',
         relatedNodeIds: [],
         createdAt,
         updatedAt,

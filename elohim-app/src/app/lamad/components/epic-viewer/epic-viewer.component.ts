@@ -34,7 +34,7 @@ export class EpicViewerComponent implements OnInit {
     const node = this.documentGraphService.getNode(epicId);
 
     if (node && node.type === 'epic') {
-      this.epic = node as EpicNode;
+      this.epic = node as any as EpicNode;
       this.loadRelatedFeatures();
       this.renderMarkdown();
     }
@@ -45,7 +45,8 @@ export class EpicViewerComponent implements OnInit {
 
     this.relatedFeatures = this.epic.featureIds
       .map(id => this.documentGraphService.getNode(id))
-      .filter((node): node is FeatureNode => node !== undefined && node.type === 'feature');
+      .filter(node => node !== undefined && node.type === 'feature')
+      .map(node => node as any as FeatureNode);
   }
 
   private renderMarkdown(): void {

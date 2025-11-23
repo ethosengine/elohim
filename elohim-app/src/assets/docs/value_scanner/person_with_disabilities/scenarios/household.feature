@@ -1,0 +1,167 @@
+@epic:value_scanner
+@user_type:person_with_disabilities
+@governance_layer:household
+@related_users:adult,young_adult,elderly,caregiver,support_worker
+@related_layers:individual,family,community,workplace_organizational
+@elohim_agents:personal_agent,household_elohim
+
+Feature: Household Layer Value Recognition for Person with Disabilities
+  As a person with disabilities managing an independent household with support
+  Operating at the household governance layer
+  I want to maintain full authority over my household while coordinating needed assistance
+  So that I can live independently with dignity, managing my home as I choose
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the person_with_disabilities user "Alex" is registered in the system
+    And Alex lives independently in their own household
+    And Alex has cerebral palsy affecting mobility and fine motor control
+    And Alex coordinates support workers for specific assistance needs
+    And Alex's household operates on approximately $35k/year budget
+    And the household governance context is active
+    And the household_elohim coordinates Alex's household care economy
+    And Alex maintains full decision-making authority over household
+
+  Scenario: Alex maintains complete authority as household manager
+    Given Alex coordinates support workers for physical assistance
+    And some might assume support workers are in charge
+    When household decisions need to be made
+    Then Alex should have absolute authority over all household choices
+    And support workers should provide services Alex directs
+    And the household_elohim should structure Alex as employer/coordinator
+    And Alex's autonomy should be protected systematically
+    And the relationship should be professional partnership, not caretaking
+    And Alex should never be treated as passive recipient of care
+    And the protocol should embody Alex's household sovereignty
+
+  Scenario: Accessible grocery shopping with delivery coordination
+    Given Alex uses the Value Scanner for meal planning and shopping
+    And Alex cannot easily transport heavy grocery items
+    When Alex completes weekly shopping
+    Then the system should coordinate delivery seamlessly
+    And Alex should be able to schedule delivery to match their availability
+    And heavy items should be handled by support workers or delivery staff
+    And Alex should maintain control over product selection
+    And delivery should be dignified, not framed as special accommodation
+    And the process should be as efficient as able-bodied shopping
+    And Alex should have equal access to all products and options
+
+  Scenario: Meal planning adapted to Alex's preparation capabilities
+    Given Alex has specific constraints around meal preparation
+    And some physical tasks are difficult or impossible without assistance
+    When Alex plans weekly meals
+    Then the household_elohim should suggest meals within Alex's capabilities
+    And it should account for what Alex can prepare independently
+    And it should coordinate support worker assistance for complex prep
+    And nutritional needs should be met within preparation constraints
+    And meal planning should feel empowering, not limiting
+    And Alex should maintain choice over their food and nutrition
+    And adaptations should expand options, not restrict them
+
+  Scenario: Household budget management on combined disability benefits and part-time income
+    Given Alex's household operates on $35k/year
+    And income comes from part-time employment and disability benefits
+    When Alex manages household budget
+    Then the household_elohim should track spending against limited resources
+    And it should help Alex prioritize essential expenses
+    And disability-related costs (equipment, support services, medical) should be factored in
+    And Alex should be able to make informed financial decisions
+    And budget tools should respect Alex's competence in managing money
+    And the system should support Alex's financial autonomy
+    And resource constraints should be managed with dignity
+
+  Scenario: Support worker scheduling coordinated efficiently
+    Given Alex requires assistance with specific physical tasks
+    And support workers have their own schedules
+    When Alex needs to coordinate support services
+    Then the household_elohim should help schedule support worker visits efficiently
+    And it should match Alex's needs with worker availability
+    And Alex should be able to communicate requirements clearly
+    And schedule changes should be accommodated flexibly
+    And coordination should reduce Alex's cognitive load
+    And Alex should maintain authority over when and how support is provided
+    And the system should serve Alex's independence, not create dependence
+
+  Scenario: Household maintenance coordinated with accessibility considerations
+    Given Alex's household requires regular maintenance
+    And some maintenance tasks are physically inaccessible to Alex
+    When household maintenance needs arise
+    Then the household_elohim should help Alex coordinate necessary services
+    And it should identify which tasks need external assistance
+    And it should help Alex hire appropriate service providers
+    And Alex should maintain authority over what work is done and how
+    And service providers should respect Alex's expertise about their own home
+    And coordination should be efficient and dignity-preserving
+    And Alex should be able to maintain their home independently with appropriate support
+
+  Scenario: Household care token accumulation includes Alex's contributions
+    Given Alex participates in care token economy
+    And Alex contributes to household through management and coordination
+    When household care tokens are calculated
+    Then Alex's household management labor should be valued appropriately
+    And Alex's cognitive work of coordinating support should count
+    And care tokens should accumulate from Alex's contributions
+    And Alex should receive care token supplements based on household income level
+    And the scanner should be accessible regardless of economic status
+    And Alex should be positioned as contributor, not just recipient
+    And economic standing should reflect Alex's actual care work
+
+  Scenario: Household technology adapted for Alex's accessibility needs
+    Given Alex's household includes various technologies
+    And accessibility is essential for Alex's independence
+    When Alex manages household systems
+    Then all household technology should be accessible to Alex
+    And the household_elohim should integrate with accessible smart home systems
+    And Alex should be able to control environment through voice or other accessible means
+    And technology should reduce barriers, not create them
+    And universal design principles should guide all technology choices
+    And Alex should have equal or better access than non-disabled people
+    And technology should serve Alex's independence
+
+  Scenario: Emergency preparedness accounts for Alex's specific needs
+    Given Alex has disability-related emergency considerations
+    And emergencies require rapid response
+    When the household_elohim plans for emergency scenarios
+    Then emergency plans should account for Alex's mobility limitations
+    And evacuation plans should be accessible to Alex
+    And medical equipment needs should be factored into emergency supplies
+    And support worker backup plans should be established
+    And Alex should have accessible emergency communication methods
+    And emergency preparedness should reduce Alex's vulnerability
+    And planning should be proactive, not reactive
+
+  Scenario: Household privacy protected from service providers
+    Given support workers and service providers enter Alex's household
+    And this creates potential privacy vulnerabilities
+    When household data is collected
+    Then Alex should control what household information is shared with service providers
+    And support workers should access only information necessary for their tasks
+    And Alex's medical and personal information should remain private
+    And household patterns should not be shared without Alex's consent
+    And the household_elohim should protect Alex's privacy systematically
+    And Alex should feel secure in their own home
+    And privacy protections should be robust even with frequent visitors
+
+  Scenario: Household care economy visible to counter narrative of burden
+    Given society often frames disabled people as burdens on households
+    And Alex contributes substantial household labor
+    When household care contributions are displayed
+    Then Alex's management, coordination, and decision-making should be visible
+    And the household_elohim should quantify Alex's cognitive and emotional labor
+    And data should counter the narrative that Alex is dependent burden
+    And Alex should see themselves as household contributor
+    And visibility should shift cultural understanding of disability and contribution
+    And the protocol should make Alex's care work undeniable
+    And Alex should experience affirmation of their household value
+
+  Scenario: Accessible household coordination reduces disability-related stress
+    Given navigating household management with disability is inherently stressful
+    And inaccessible systems compound that stress
+    When the household_elohim coordinates household functions
+    Then it should actively reduce Alex's cognitive load
+    And it should prevent accessibility barriers from becoming crises
+    And it should provide gentle reminders and support
+    And coordination should feel like genuine assistance
+    And Alex should experience less stress, not more
+    And the protocol should recognize that accessibility reduces disability
+    And good design should make Alex's household management easier than current systems

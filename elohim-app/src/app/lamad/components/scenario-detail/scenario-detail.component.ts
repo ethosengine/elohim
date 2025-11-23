@@ -84,10 +84,10 @@ export class ScenarioDetailComponent implements OnInit {
     this.route.params.subscribe(params => {
       const node = this.documentGraphService.getNode(params['id']);
       if (node && node.type === 'scenario') {
-        this.scenario = node as ScenarioNode;
+        this.scenario = node as any as ScenarioNode;
         const featureNode = this.documentGraphService.getNode(this.scenario.featureId);
         if (featureNode?.type === 'feature') {
-          this.feature = featureNode as FeatureNode;
+          this.feature = featureNode as any as FeatureNode;
         }
       }
     });

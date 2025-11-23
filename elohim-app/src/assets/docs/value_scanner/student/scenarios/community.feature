@@ -1,0 +1,165 @@
+@epic:value_scanner
+@user_type:student
+@governance_layer:community
+@related_users:student,young_adult,adult,community_member
+@related_layers:neighborhood,educational,individual
+@elohim_agents:personal_agent,community_elohim
+
+Feature: Community Layer Value Recognition for Student
+  As a student building care networks in temporary community
+  Operating at the community governance layer
+  I want to participate in student mutual aid and broader community care economy
+  So that I develop reciprocal relationships that provide support and teach community building
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the student user "Kenji" is registered in the system
+    And Kenji participates in student community at his college
+    And Kenji is geographically separated from family care networks
+    And Kenji needs to build community support in temporary college setting
+    And the community governance context is active
+    And the community_elohim could coordinate care economy networks
+    And student community includes formal organizations and informal mutual aid
+
+  Scenario: Student mutual aid networks as care economy foundation
+    Given Kenji participates in student mutual aid group
+    And students share resources, knowledge, and support
+    When the community_elohim tracks mutual aid participation
+    Then it should recognize meal sharing as care contribution
+    And it should value textbook lending, note sharing, and skill exchange
+    And it should accumulate care tokens for helping other students
+    And mutual aid should be understood as care economy practice
+    And the system should make reciprocal support visible
+    And student mutual aid should be recognized as community building
+
+  Scenario: Emergency support through student community networks
+    Given Kenji faces unexpected crisis (medical emergency, financial shortfall, housing instability)
+    And formal institutions often respond too slowly
+    When student community provides emergency support
+    Then the community_elohim should coordinate rapid mutual aid
+    And it should help students pool resources for peer emergency
+    And it should recognize emergency care as high-value contribution
+    And it should track "Maya loaned Kenji $100 for urgent medical cost"
+    And community should function as immediate safety net
+    And student mutual aid should provide crisis intervention
+
+  Scenario: Knowledge and skill sharing in student community
+    Given Kenji has environmental science knowledge
+    And other students have different expertise
+    When students share knowledge freely
+    Then the community_elohim should recognize teaching as care work
+    And it should value Kenji explaining organic chemistry to struggling peer
+    And it should track peer tutoring as community contribution
+    And knowledge sharing should accumulate care tokens
+    And the system should foster culture of generous knowledge exchange
+    And intellectual support should be recognized as care labor
+
+  Scenario: Food sharing and collective cooking in student community
+    Given many students face food insecurity
+    And collective meals reduce individual costs
+    When Kenji participates in community meal sharing
+    Then the community_elohim should recognize communal feeding as care work
+    And it should value both cooking for others and hosting shared meals
+    And it should track "Kenji cooked dinner for 8 people in study group"
+    And food sharing should be core care economy practice
+    And the system should make nutrition care visible and valued
+    And collective eating should build community bonds
+
+  Scenario: Mental health and emotional support in student community
+    Given students face high stress, anxiety, and mental health challenges
+    And formal mental health services are often inadequate
+    When students provide emotional support to peers
+    Then the community_elohim should recognize emotional labor as care work
+    And it should value listening, validating, and supporting peers in crisis
+    And it should accumulate care tokens for emotional care work
+    And mental health support should be understood as community care
+    And the system should validate peer emotional support as real work
+    And student community should be recognized as mental health resource
+
+  Scenario: Collective advocacy for student needs and rights
+    Given students face systemic challenges (inadequate financial aid, housing costs, food insecurity)
+    And collective action can create change
+    When Kenji participates in student organizing
+    Then the community_elohim should recognize advocacy as care contribution
+    And it should value organizing work, protest participation, and policy advocacy
+    And it should accumulate care tokens for working toward collective flourishing
+    And advocacy labor should be recognized as community care work
+    And the system should support student collective action
+    And organizing for justice should be valued as care economy participation
+
+  Scenario: Building community across identity and affinity groups
+    Given student community includes diverse identity groups
+    And Kenji might participate in environmental student org, cultural groups, academic communities
+    When Kenji bridges across different student communities
+    Then the community_elohim should recognize bridge-building as care work
+    And it should value work connecting different student networks
+    And it should show how diverse relationships strengthen overall community
+    And coalition building should accumulate care tokens
+    And the system should foster inclusive, interconnected community
+    And students should learn to build community across difference
+
+  Scenario: Temporary community building as lifelong skill
+    Given Kenji's college community is temporary
+    And he will leave after graduation
+    When the personal_agent reflects on community participation
+    Then it should help Kenji see community building as transferable skill
+    And it should validate that temporary communities are still real
+    And it should teach him that community is built through care relationships
+    And the agent should help him understand he'll build community wherever he goes
+    And the system should frame student community as practice for lifelong participation
+    And Kenji should learn that community is created, not just inherited
+
+  Scenario: Access to community resources during extreme scarcity
+    Given Kenji lives on $180/week and might face emergencies
+    And community food banks, clothing closets, and support services exist
+    When Kenji needs community resources
+    Then the community_elohim should connect him to available support
+    And it should reduce shame and barriers to access
+    And it should frame receiving support as participating in care economy
+    And it should recognize that receiving care is part of reciprocity
+    And the system should normalize community resource sharing
+    And students should access community support with dignity
+
+  Scenario: Community care during academic pressure peaks
+    Given exam periods create intense stress across student community
+    And everyone is struggling simultaneously
+    When student community provides collective support during finals
+    Then the community_elohim should coordinate mutual care
+    And it should recognize study space hosting, meal provision, emotional support
+    And it should value care work that helps community through crisis period
+    And collective survival should be recognized as care economy
+    And the system should support community resilience
+    And students should learn that community carries each other through hard times
+
+  Scenario: Student community as political and cultural force
+    Given students are networked, idealistic, and trend-setting
+    And student movements have historically created cultural change
+    When student community adopts care economy practices
+    Then the community_elohim should recognize students as change agents
+    And it should support spread of care economy culture among students
+    And it should help students see themselves as building alternative economy
+    And student community should be recognized as site for cultural transformation
+    And the system should empower students as care economy pioneers
+    And student adoption could spread care economy to broader generation
+
+  Scenario: Documenting community care contributions for future recognition
+    Given Kenji's community care work is currently invisible to traditional economy
+    And his care tokens accumulate throughout college
+    When Kenji graduates and enters workforce
+    Then his care token history should document community leadership and care skills
+    And it should translate community organizing to "proven leadership capability"
+    And it should show mutual aid coordination as "project management expertise"
+    And community care work should be valuable on employment terms
+    And the system should help Kenji articulate care economy participation professionally
+    And student community work should be recognized as career-relevant experience
+
+  Scenario: Privacy and consent in community data sharing
+    Given community coordination requires some information sharing
+    And Kenji has full privacy rights
+    When the community_elohim manages community information
+    Then Kenji must control what community data is shared
+    And his participation should be visible only with his consent
+    And community care should not require surveillance
+    And privacy should be protected while enabling coordination
+    And the system should balance community connection with individual privacy
+    And Kenji should participate in community on his own terms
