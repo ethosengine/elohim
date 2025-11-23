@@ -426,6 +426,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     not { branch 'main' }
+                    not { branch 'staging' }
+                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
+                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
@@ -450,6 +453,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     not { branch 'main' }
+                    not { branch 'staging' }
+                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
+                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
@@ -478,6 +484,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     not { branch 'main' }
+                    not { branch 'staging' }
+                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
+                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
@@ -531,6 +540,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     not { branch 'main' }
+                    not { branch 'staging' }
+                    not { expression { return env.BRANCH_NAME ==~ /staging-.+/ } }
+                    not { expression { return env.BRANCH_NAME ==~ /review-.+/ } }
                     anyOf {
                         changeset "elohim-library/**"
                         changeset "elohim-ui-playground/**"
