@@ -6,7 +6,6 @@ import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
-import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
 import { CategoryAffinityStats } from '../../models/user-affinity.model';
 
 interface CategorySection {
@@ -70,10 +69,10 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes = Array.from(graph.nodes.values()) as ContentNode[];
+    const allNodes = Array.from(graph.nodes.values());
     // Note: ContentNodeAdapter.fromDocumentNodes is not needed if we are already using ContentNode
     // But if we need normalization, we can use it. Assuming graph has ContentNodes now.
-    
+
     const contentNodes = allNodes; 
 
     // Get affinity stats
@@ -87,7 +86,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
     // Group nodes by category
     const categoryMap = new Map<string, ContentNode[]>();
     contentNodes.forEach((node) => {
-      const category = (node.metadata?.['category'] ?? 'uncategorized') as string;
+      const category = node.metadata?.['category'] ?? 'uncategorized';
       if (!categoryMap.has(category)) {
         categoryMap.set(category, []);
       }

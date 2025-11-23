@@ -362,7 +362,7 @@ export class NavigationService {
 
       const typeLabel = this.formatTypeLabel(segment.type);
       breadcrumbs.push({
-        label: segment.node?.title || segment.id,
+        label: segment.node?.title ?? segment.id,
         path: compositePath,
         typeLabel
       });

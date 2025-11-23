@@ -1,4 +1,4 @@
-import { DocumentNode, NodeType } from './document-node.model';
+import { DocumentNode } from './document-node.model';
 
 /**
  * Generic content node model inspired by WordPress's post concept.
