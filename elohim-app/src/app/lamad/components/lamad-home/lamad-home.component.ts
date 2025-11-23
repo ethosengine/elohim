@@ -7,6 +7,7 @@ import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { LearningPathService, PathNode } from '../../services/learning-path.service';
+import { NavigationService } from '../../services/navigation.service';
 import { ContentNode } from '../../models/content-node.model';
 import { AffinityStats } from '../../models/user-affinity.model';
 import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.component';
@@ -21,10 +22,10 @@ import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.comp
 export class LamadHomeComponent implements OnInit, OnDestroy {
   // Learning path
   pathNodes: PathNodeWithAffinity[] = [];
-  
+
   // Sidebar nodes (Epics only)
   sidebarNodes: PathNodeWithAffinity[] = [];
-  
+
   // All nodes for "At a Glance"
   allContentNodes: ContentNodeWithAffinity[] = [];
 
@@ -41,12 +42,21 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   isSidebarOpen = true;
   isSearchOpen = false;
 
+  // Drill-down state
+  viewState: 'root' | 'drilldown' = 'root';
+  activeDrillDown: {
+    parent: ContentNode,
+    nodes: ContentNodeWithAffinity[],
+    type: string
+  } | null = null;
+
   private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly graphService: DocumentGraphService,
     private readonly affinityService: AffinityTrackingService,
     private readonly pathService: LearningPathService,
+    private readonly navigationService: NavigationService,
     private readonly router: Router,
     private readonly sanitizer: DomSanitizer
   ) {}
@@ -67,27 +77,17 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
           // Enrich path nodes with affinity data
           this.pathNodes = path.map(pn => this.enrichPathNode(pn));
 
-          // Sidebar should only show peer items (Epics)
-          this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
-
-          // Enrich all nodes for the hexagon view
+          // Enrich all nodes for the hexagon view and drill-down lookups
           const allNodes = Array.from(graph.nodes.values());
-          // @ts-ignore - adapting DocumentNode to ContentNode shape roughly for now or using what we have
-          this.allContentNodes = allNodes.map(node => this.enrichContentNode({
-             ...node,
-             contentType: node.type,
-             contentFormat: 'markdown', // default fallback
-             relatedNodeIds: node.relatedNodeIds || [],
-             metadata: node.metadata || {}
-          } as unknown as ContentNode));
+          this.allContentNodes = allNodes.map(node => this.enrichContentNode(node));
+
+          // Initial sidebar state (Epics) if at root
+          if (this.viewState === 'root') {
+             this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
+          }
 
           // Calculate stats
           this.affinityStats = this.affinityService.getStats(allNodes);
-
-          // Select first node if none is selected
-          if (!this.selectedNode && this.pathNodes.length > 0) {
-            this.selectNode(this.pathNodes[0].node);
-          }
 
           this.isLoading = false;
         }
@@ -107,13 +107,40 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
           depth: pn.depth,
           category: pn.category
         }));
-        
-        // Refresh sidebar nodes
-        this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
-        
+
+        // Refresh sidebar nodes based on current view
+        if (this.viewState === 'root') {
+          this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
+        } else if (this.viewState === 'drilldown' && this.activeDrillDown) {
+           // Re-enrich drilled down nodes to update affinity colors
+           this.activeDrillDown.nodes = this.activeDrillDown.nodes.map(node =>
+             this.enrichContentNode(node)
+           );
+           this.updateSidebarForDrillDown();
+        }
+
         // Refresh all content nodes
         if (this.allContentNodes.length > 0) {
            this.allContentNodes = this.allContentNodes.map(node => this.enrichContentNode(node));
+        }
+      });
+
+    // Listen for navigation changes (URL updates)
+    this.navigationService.context$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(context => {
+        if (context && context.currentNode) {
+          // URL has a node selected
+          // Update local state without navigating again
+          this.selectedNode = context.currentNode;
+          this.selectedAffinity = this.affinityService.getAffinity(this.selectedNode.id);
+          this.affinityService.trackView(this.selectedNode.id);
+          
+          window.scrollTo(0, 0);
+          this.closeSidebar();
+        } else if (context && context.viewMode === 'home') {
+          // At root /lamad
+          this.goHome(false); // false = don't navigate router
         }
       });
   }
@@ -132,12 +159,111 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
   /**
    * Navigate to Home / Overview
+   * @param navigate Whether to update the URL (default true)
    */
-  goHome(): void {
+  goHome(navigate = true): void {
     this.selectedNode = null;
-    this.isGraphExpanded = true;
-    this.closeSidebar();
+    // Don't force expand on mobile to avoid jarring layout shifts
+    if (window.innerWidth >= 768) {
+        this.isGraphExpanded = true;
+    }
+    
+    this.viewState = 'root';
+    this.activeDrillDown = null;
+
+    // Reset sidebar to epics
+    this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
+
+    if (navigate) {
+      this.navigationService.navigateToHome();
+    }
+    
     window.scrollTo(0, 0);
+  }
+  
+  /**
+   * Handle click on Overview sidebar item
+   */
+  onOverviewClick(): void {
+    // If we are already at home (no selected node, root view), clicking overview should toggle graph
+    if (!this.selectedNode && this.viewState === 'root') {
+        this.toggleGraph();
+    } else {
+        // Otherwise navigate home
+        this.goHome();
+    }
+  }
+
+  /**
+   * Go up one level from drilldown
+   */
+  goUp(): void {
+    if (this.viewState === 'drilldown') {
+      this.goHome();
+    } else if (this.selectedNode) {
+      // Navigate up in the URL hierarchy
+      this.navigationService.navigateUp();
+    }
+  }
+
+  /**
+   * Drill down into a specific content type for a parent node
+   */
+  drillDown(parent: ContentNode, type: string): void {
+    const relatedIds = parent.relatedNodeIds || [];
+    const relatedNodes = this.allContentNodes.filter(n =>
+      relatedIds.includes(n.id) && n.contentType === type
+    );
+
+    this.activeDrillDown = {
+      parent,
+      nodes: relatedNodes,
+      type
+    };
+    this.viewState = 'drilldown';
+    this.selectedNode = null; // Ensure we show the list view
+
+    this.updateSidebarForDrillDown();
+    window.scrollTo(0, 0);
+  }
+
+  private updateSidebarForDrillDown(): void {
+    if (!this.activeDrillDown) return;
+
+    // Map content nodes to PathNodes for sidebar compatibility
+    this.sidebarNodes = this.activeDrillDown.nodes.map((node, index) => ({
+      node,
+      order: index,
+      depth: 1,
+      category: node.metadata?.['category'] || 'general',
+      affinity: node.affinity,
+      affinityLevel: node.affinityLevel
+    }));
+  }
+
+  /**
+   * Get related nodes grouped by type for card display
+   */
+  getRelatedGrouping(node: ContentNode): { type: string, count: number }[] {
+    if (!node.relatedNodeIds || node.relatedNodeIds.length === 0) return [];
+
+    const counts = new Map<string, number>();
+
+    node.relatedNodeIds.forEach(id => {
+      const related = this.allContentNodes.find(n => n.id === id);
+      if (related) {
+        const type = related.contentType;
+        counts.set(type, (counts.get(type) || 0) + 1);
+      }
+    });
+
+    const groups: { type: string, count: number }[] = [];
+    counts.forEach((count, type) => {
+      groups.push({ type, count });
+    });
+
+    // Sort for consistency
+    return groups.sort((a, b) => a.type.localeCompare(b.type));
   }
 
   /**
@@ -189,19 +315,25 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
   /**
    * Select a node to display in the content viewer
+   * This now uses NavigationService to update URL
    */
   selectNode(node: ContentNode): void {
-    this.selectedNode = node;
-    this.selectedAffinity = this.affinityService.getAffinity(node.id);
-
-    // Auto-track view
-    this.affinityService.trackView(node.id);
+    // Use navigation service to update URL
+    // The local state update will happen via subscription to context$
     
-    // Scroll to top
-    window.scrollTo(0, 0);
-
-    // Close sidebar on mobile
-    this.closeSidebar();
+    const currentContext = this.navigationService.getCurrentContext();
+    let parentPath: string | undefined;
+    
+    // Check if it's a child of active drilldown parent
+    if (this.activeDrillDown && this.activeDrillDown.parent) {
+        // Construct parent path from parent node
+        // parentType:parentId
+        parentPath = `${this.activeDrillDown.parent.contentType}:${this.activeDrillDown.parent.id}`;
+    }
+    
+    this.navigationService.navigateTo(node.contentType, node.id, {
+        parentPath
+    });
   }
 
   /**
@@ -294,6 +426,14 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       epic: '📖',
       feature: '⚙️',
       scenario: '✓',
+      organization: '🏢',
+      user_type: '👤',
+      book: '📚',
+      video: '🎥',
+      article: '📰',
+      audio: '🎧',
+      document: '📄',
+      page: '🌐'
     };
     return icons[contentType] || '📄';
   }
@@ -309,6 +449,12 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       systemic: 'Systemic View',
       implementation: 'Implementation',
       technical: 'Technical',
+      // Epic categories
+      governance: 'Governance',
+      autonomous_entity: 'Autonomous Entity',
+      public_observer: 'Public Observer',
+      social_medium: 'Social Medium',
+      value_scanner: 'Value Scanner'
     };
     return displays[category] || category;
   }
@@ -341,7 +487,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
     // Links
-    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+    html = html.replace(/\\\[(.*?)\\\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
 
     // Code blocks
     html = html.replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>');
@@ -397,7 +543,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       '"': '&quot;',
       "'": '&#039;'
     };
-    return text.replace(/[&<>'"]/g, (m) => map[m]);
+    return text.replace(/[&<>'"']/g, (m) => map[m]);
   }
 }
 

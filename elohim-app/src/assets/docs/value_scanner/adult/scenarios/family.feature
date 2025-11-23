@@ -1,0 +1,144 @@
+@epic:value_scanner
+@user_type:adult
+@governance_layer:family
+@related_users:young_child,child,parent,grandparent,partner
+@related_layers:household,individual,community
+@elohim_agents:personal_agent,family_elohim
+
+Feature: Family Layer Value Recognition for Adult
+  As an adult in the sandwich generation
+  Operating at the family governance layer
+  I want to coordinate care across multiple generations
+  So that care flows effectively upward, downward, inward, and outward
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the adult user "Sarah" is registered in the system
+    And Sarah is mother to Tommy (5) and Emma (8)
+    And Sarah has a partner
+    And Sarah's parents are in their 60s and beginning to need support
+    And the family governance context is active
+    And the family_elohim coordinates multi-generational care economy
+
+  Scenario: Coordinating care across multiple generations simultaneously
+    Given Sarah provides care to her children, her partner, and increasingly to her parents
+    And she is in the sandwich generation
+    When the family_elohim tracks care flows
+    Then it should map care moving upward to parents
+    And it should track care downward to children
+    And it should recognize care inward for Sarah's own well-being
+    And it should value care outward to community
+    And Sarah should see the full complexity of her care work
+    And multi-generational care patterns should be visible
+
+  Scenario: Differentiating children's developmental stages in family care
+    Given Tommy (5) needs wonder-preservation and tight boundaries
+    And Emma (8) needs guided autonomy and increasing responsibility
+    When Sarah coordinates family care activities
+    Then the family_elohim should maintain different permission levels
+    And Tommy's interactions should preserve developmental appropriateness
+    And Emma's interactions should support growing independence
+    And Sarah should manage each child's needs specifically
+    And developmental stages should be respected within family context
+
+  Scenario: Making Sarah's care contributions visible to extended family
+    Given Sarah performs enormous care labor across family contexts
+    And extended family may not see the full scope
+    When family care contributions are tracked
+    Then Sarah's care for children should be quantified
+    And her care for aging parents should be visible
+    And her household coordination should be recognized
+    And extended family should see Sarah's contributions specifically
+    And visibility should enable fair family labor distribution
+
+  Scenario: Coordinating care for aging parents across distance
+    Given Sarah's parents are in their 60s
+    And they live in a different location
+    And they're beginning to need support
+    When Sarah provides care to her parents
+    Then the family_elohim should track care contributions across distance
+    And it should coordinate with siblings if present
+    And it should help Sarah balance care for parents with care for children
+    And elder care should be recognized as substantial care work
+    And Sarah should not be overwhelmed by competing family demands
+
+  Scenario: Teaching children value literacy through family care participation
+    Given Sarah is raising Tommy and Emma in care economy
+    And she wants them to learn value literacy
+    When children participate in family care activities
+    Then the family_elohim should recognize their age-appropriate contributions
+    And Sarah should model care economy principles
+    And children should learn by doing within family context
+    And family should be primary site of care economy education
+    And next generation should assume care economy is normal
+
+  Scenario: Family care tokens accumulate across all members' contributions
+    Given family participates in care token economy
+    And Sarah, partner, Tommy, and Emma all contribute
+    When family care tokens are calculated
+    Then Sarah's extensive contributions should be valued highly
+    And children's age-appropriate work should count
+    And partner's contributions should be recognized
+    And extended family care should be tracked
+    And family care tokens should reflect collective contributions
+    And tokens should be available for family resource access
+
+  Scenario: Preventing Sarah's burnout through family care coordination
+    Given Sarah is at high risk for caregiver burnout
+    And she tends to sacrifice herself for family needs
+    When the family_elohim monitors care patterns
+    Then it should detect when Sarah is giving unsustainably
+    And it should surface imbalances before crisis
+    And it should prompt other family members to contribute more
+    And it should connect Sarah to family support resources
+    And the protocol should protect Sarah's capacity to care
+
+  Scenario: Family culture of visible, valued, reciprocal care
+    Given Sarah is building family culture around care economy
+    And she wants care to be visible and valued by all members
+    When family care patterns develop over time
+    Then the family_elohim should make all contributions visible
+    And recognition should flow in all directions
+    And family culture should value care labor explicitly
+    And reciprocity should be practiced, not just preached
+    And family should become care economy demonstration site
+
+  Scenario: Coordinating family care with partner in equitable partnership
+    Given Sarah and partner share parenting responsibilities
+    And they're raising children together
+    When family care labor is distributed
+    Then the family_elohim should track both partners' contributions
+    And labor should be distributed equitably
+    And neither partner should bear unfair burden
+    And children should see modeled equitable partnership
+    And family governance should be genuinely shared
+
+  Scenario: Extended family care reciprocity across generations
+    Given Sarah's parents provided care for her as a child
+    And she's now providing care to them as they age
+    When multi-generational care patterns are tracked
+    Then the family_elohim should recognize reciprocal care flows
+    And care should be seen as flowing both ways across time
+    And Sarah's care for parents should be valued
+    And parents' previous care for Sarah should be acknowledged
+    And multi-generational reciprocity should be visible
+
+  Scenario: Family resource allocation reflects all members' contributions
+    Given family makes decisions about major resource allocation
+    And multiple members contribute in different ways
+    When family decisions are made
+    Then all members' care contributions should be considered
+    And Sarah's care work should give her legitimate standing
+    And children's contributions should be recognized appropriately
+    And resource decisions should reflect visible care patterns
+    And family economics should honor care creates value
+
+  Scenario: Family privacy protected while coordinating across contexts
+    Given family care economy involves multiple family members
+    And privacy needs differ across individuals
+    When family data is managed
+    Then Sarah should control what's shared with extended family
+    And children's privacy should be protected by parental oversight
+    And partner's privacy should be respected
+    And extended family should only see what Sarah chooses to share
+    And family privacy should be complex, nuanced, and protected

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DocumentGraphService } from '../../services/document-graph.service';
-import { DocumentNode } from '../../models';
+import { ContentNode } from '../../models/content-node.model';
 
 @Component({
   selector: 'app-search',
@@ -23,7 +23,7 @@ import { DocumentNode } from '../../models';
           <a *ngFor="let node of results"
              [routerLink]="getNodeRoute(node)"
              class="result-card">
-            <div class="result-type">{{getNodeTypeIcon(node.type)}} {{node.type}}</div>
+            <div class="result-type">{{getNodeTypeIcon(node.contentType)}} {{node.contentType}}</div>
             <h3>{{node.title}}</h3>
             <p>{{node.description}}</p>
             <div class="result-tags">
@@ -57,7 +57,7 @@ import { DocumentNode } from '../../models';
 })
 export class SearchComponent implements OnInit {
   query = '';
-  results: DocumentNode[] = [];
+  results: ContentNode[] = [];
   hasSearched = false;
 
   constructor(
@@ -80,7 +80,7 @@ export class SearchComponent implements OnInit {
     this.results = this.documentGraphService.searchNodes(this.query);
   }
 
-  getNodeRoute(node: DocumentNode): string[] {
+  getNodeRoute(node: ContentNode): string[] {
     return ['/lamad/content', node.id];
   }
 

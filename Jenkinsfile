@@ -379,14 +379,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
+
                         withBuildVars(props) {
                             withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
                                 echo "Triggering Harbor scan for: ${IMAGE_TAG}"
-                                
+
                                 sh """
                                     AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
-                                    
+
                                     wget --post-data="" \\
                                       --header="accept: application/json" \\
                                       --header="Content-Type: application/json" \\
@@ -395,30 +395,169 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                       "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/scan" || \\
                                     echo "Scan request failed"
                                 """
-                                
+
                                 echo 'Scan initiated, polling for completion...'
-                                
+
                                 sh """#!/bin/bash
                                     AUTH_HEADER="Authorization: Basic \$(echo -n "\$HARBOR_USERNAME:\$HARBOR_PASSWORD" | base64)"
                                     MAX_ATTEMPTS=24
                                     ATTEMPT=1
-                                    
+
                                     while [ \$ATTEMPT -le \$MAX_ATTEMPTS ]; do
                                         VULN_DATA=\$(wget -q -O- \\
                                           --header="accept: application/json" \\
                                           --header="\$AUTH_HEADER" \\
                                           "https://harbor.ethosengine.com/api/v2.0/projects/ethosengine/repositories/elohim-site/artifacts/${IMAGE_TAG}/additions/vulnerabilities" 2>/dev/null || echo "")
-                                        
+
                                         if [ ! -z "\$VULN_DATA" ] && echo "\$VULN_DATA" | grep -q '"scanner"'; then
                                             echo "✅ Scan completed"
                                             break
                                         fi
-                                        
+
                                         [ \$((ATTEMPT % 5)) -eq 0 ] && echo "Waiting for scan (attempt \$ATTEMPT/\$MAX_ATTEMPTS)..."
                                         sleep 10
                                         ATTEMPT=\$((ATTEMPT + 1))
                                     done
                                 """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Install UI Playground Dependencies') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
+            steps {
+                container('builder'){
+                    dir('elohim-library') {
+                        script {
+                            echo 'Installing npm dependencies for UI Playground workspace'
+                            sh 'npm ci'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build UI Playground') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
+            steps {
+                container('builder'){
+                    dir('elohim-library') {
+                        script {
+                            echo 'Building lamad-ui library'
+                            sh 'npm run build lamad-ui'
+
+                            echo 'Building UI Playground Angular application'
+                            sh 'npm run build elohim-ui-playground -- --base-href=/ui-playground/'
+                            sh 'ls -la dist/'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build UI Playground Image') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo 'Building UI Playground container image'
+                            echo "Image tag: ${IMAGE_TAG}"
+
+                            sh """#!/bin/bash
+                                set -euo pipefail
+
+                                # Verify BuildKit
+                                buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
+
+                                # Create build context
+                                mkdir -p /tmp/build-context-playground
+                                cp -r elohim-library /tmp/build-context-playground/
+                                cp images/Dockerfile.ui-playground /tmp/build-context-playground/Dockerfile
+                                cp images/nginx-ui-playground.conf /tmp/build-context-playground/
+
+                                # Build image
+                                cd /tmp/build-context-playground
+                                BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                                  nerdctl -n k8s.io build -t elohim-ui-playground:${IMAGE_TAG} -f Dockerfile .
+
+                                # Additional tags
+                                nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} elohim-ui-playground:${GIT_COMMIT_HASH}
+
+                                if [ "${BRANCH_NAME}" = "main" ]; then
+                                    nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} elohim-ui-playground:latest
+                                fi
+                            """
+
+                            echo 'UI Playground container image built successfully'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Push UI Playground to Harbor Registry') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                                echo 'Logging into Harbor registry'
+                                sh 'echo $HARBOR_PASSWORD | nerdctl -n k8s.io login harbor.ethosengine.com -u $HARBOR_USERNAME --password-stdin'
+
+                                echo "Tagging and pushing UI Playground image: ${IMAGE_TAG}"
+                                sh """
+                                    nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-ui-playground:${IMAGE_TAG}
+                                    nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-ui-playground:${GIT_COMMIT_HASH}
+
+                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-ui-playground:${IMAGE_TAG}
+                                    nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-ui-playground:${GIT_COMMIT_HASH}
+                                """
+
+                                if (env.BRANCH_NAME == 'main') {
+                                    sh """
+                                        nerdctl -n k8s.io tag elohim-ui-playground:${IMAGE_TAG} harbor.ethosengine.com/ethosengine/elohim-ui-playground:latest
+                                        nerdctl -n k8s.io push harbor.ethosengine.com/ethosengine/elohim-ui-playground:latest
+                                    """
+                                }
+
+                                echo 'Successfully pushed UI Playground to Harbor registry'
                             }
                         }
                     }
@@ -438,10 +577,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
+
                         withBuildVars(props) {
                             echo "Deploying to Staging: ${IMAGE_TAG}"
-                            
+
                             // Validate configmap
                             sh '''
                                 kubectl get configmap elohim-config-staging -n ethosengine || {
@@ -449,7 +588,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     exit 1
                                 }
                             '''
-                            
+
                             // Update deployment manifest
                             sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/staging-deployment.yaml > manifests/staging-deployment-${IMAGE_TAG}.yaml"
 
@@ -533,6 +672,51 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             """
 
                             echo 'Alpha deployment completed!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy UI Playground to Alpha') {
+            when {
+                allOf {
+                    anyOf {
+                        branch 'dev'
+                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                        expression { return env.BRANCH_NAME.contains('alpha') }
+                        // Also check CHANGE_BRANCH for PR builds
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                    }
+                    anyOf {
+                        changeset "elohim-library/**"
+                        changeset "elohim-ui-playground/**"
+                        changeset "images/Dockerfile.ui-playground"
+                        changeset "images/nginx-ui-playground.conf"
+                        changeset "manifests/alpha-deployment-ui-playground.yaml"
+                    }
+                }
+            }
+            steps {
+                container('builder'){
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Deploying UI Playground to Alpha: ${IMAGE_TAG}"
+
+                            // Update deployment manifest
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/alpha-deployment-ui-playground.yaml > manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
+
+                            // Deploy
+                            sh "kubectl apply -f manifests/alpha-deployment-ui-playground-${IMAGE_TAG}.yaml"
+                            sh "kubectl rollout restart deployment/elohim-ui-playground-alpha -n ethosengine"
+                            sh 'kubectl rollout status deployment/elohim-ui-playground-alpha -n ethosengine --timeout=300s'
+
+                            echo 'UI Playground Alpha deployment completed!'
                         }
                     }
                 }
@@ -797,10 +981,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 container('builder'){
                     script {
                         def props = loadBuildVars()
-                        
+
                         withBuildVars(props) {
                             echo "Deploying to Production: ${IMAGE_TAG}"
-                            
+
                             // Validate configmap
                             sh '''
                                 kubectl get configmap elohim-config-prod -n ethosengine || {
@@ -808,15 +992,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     exit 1
                                 }
                             '''
-                            
+
                             // Deploy
-                     
+
                             // Update deployment manifest
-                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml" 
+                            sh "sed 's/BUILD_NUMBER_PLACEHOLDER/${IMAGE_TAG}/g' manifests/prod-deployment.yaml > manifests/prod-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl apply -f manifests/prod-deployment-${IMAGE_TAG}.yaml"
                             sh "kubectl rollout restart deployment/elohim-site -n ethosengine"
                             sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
-                            
+
                             echo 'Production deployment completed!'
                         }
                     }
@@ -871,11 +1055,17 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     nerdctl -n k8s.io rmi elohim-app:${GIT_COMMIT_HASH} || true
                                     nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${IMAGE_TAG} || true
                                     nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:${GIT_COMMIT_HASH} || true
+                                    nerdctl -n k8s.io rmi elohim-ui-playground:${IMAGE_TAG} || true
+                                    nerdctl -n k8s.io rmi elohim-ui-playground:${GIT_COMMIT_HASH} || true
+                                    nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-ui-playground:${IMAGE_TAG} || true
+                                    nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-ui-playground:${GIT_COMMIT_HASH} || true
                                 """
                                 if (env.BRANCH_NAME == 'main') {
                                     sh """
                                         nerdctl -n k8s.io rmi elohim-app:latest || true
                                         nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-site:latest || true
+                                        nerdctl -n k8s.io rmi elohim-ui-playground:latest || true
+                                        nerdctl -n k8s.io rmi harbor.ethosengine.com/ethosengine/elohim-ui-playground:latest || true
                                     """
                                 }
                                 sh "nerdctl -n k8s.io system prune -af --volumes || true"

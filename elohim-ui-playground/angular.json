@@ -90,10 +90,8 @@
             "host": "0.0.0.0",
             "port": 4201,
             "allowedHosts": [
-              "mbd06b-gmail-com-elohim-devspace-code-redirect-3.code.ethosengine.com",
-              "mbd06b-gmail-com-elohim-devspace-angular-dev.code.ethosengine.com",
-              "*.code.ethosengine.com",
-              "all"
+              "mbd06b-gmail-com-elohim-devspace-ui-playground.code.ethosengine.com",
+              "*.code.ethosengine.com"
             ]
           },
           "configurations": {

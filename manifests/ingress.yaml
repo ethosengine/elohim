@@ -34,6 +34,13 @@ spec:
       paths:
       - backend:
           service:
+            name: elohim-ui-playground-alpha-service
+            port:
+              number: 80
+        path: /ui-playground
+        pathType: Prefix
+      - backend:
+          service:
             name: elohim-site-alpha-service
             port:
               number: 80

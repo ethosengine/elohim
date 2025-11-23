@@ -232,9 +232,14 @@
 }
 
 /* Affinity indicator */
+.affinity-indicator {
+  display: flex;
+  align-items: center;
+}
+
 .affinity-circle {
-  width: 45px;
-  height: 45px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -249,18 +254,17 @@
 }
 
 .affinity-circle.affinity-low {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
 }
 
 .affinity-circle.affinity-medium {
-  background: #f59e0b;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
 }
 
 .affinity-circle.affinity-high {
-  background: #10b981;
+  background: linear-gradient(135deg, #10b981, #34d399);
 }
 
-/* Node content */
 .node-title {
   font-size: 1.1rem;
   margin: 0.5rem 0;
@@ -269,62 +273,39 @@
 }
 
 .node-description {
-  font-size: 0.9rem;
   color: #666;
-  margin: 0.5rem 0 1rem;
+  font-size: 0.9rem;
   line-height: 1.5;
+  margin: 0.5rem 0;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .node-meta {
+  margin-top: 1rem;
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-bottom: 0.75rem;
 }
 
 .tag {
-  background: #e5e7eb;
-  color: #4b5563;
-  padding: 0.25rem 0.5rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 0.2rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
 }
 
-/* Mini affinity bar */
 .affinity-bar-mini {
+  margin-top: 1rem;
   height: 4px;
-  background: #e5e7eb;
+  background: #f3f4f6;
   border-radius: 2px;
   overflow: hidden;
-  margin-top: 0.75rem;
 }
 
-.affinity-bar-mini .affinity-bar-fill {
-  height: 100%;
-}
-
-/* Affinity colors for bars */
-.affinity-bar-fill.affinity-unseen {
-  background: #9ca3af;
-}
-
-.affinity-bar-fill.affinity-low {
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-}
-
-.affinity-bar-fill.affinity-medium {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-}
-
-.affinity-bar-fill.affinity-high {
-  background: linear-gradient(90deg, #10b981, #34d399);
-}
-
-/* Empty state */
 .empty-state {
   text-align: center;
   padding: 3rem;
