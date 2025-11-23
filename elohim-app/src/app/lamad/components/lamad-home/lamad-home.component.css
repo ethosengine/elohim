@@ -460,6 +460,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
 }
 
 .epic-card-header {

@@ -5,7 +5,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
-import { EpicNode, FeatureNode, ScenarioNode, DocumentNode } from '../../models';
+import { EpicNode, FeatureNode, ScenarioNode } from '../../models';
 
 interface ModuleSection {
   type: 'epic' | 'scenario';

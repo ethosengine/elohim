@@ -153,7 +153,7 @@
 
            <div class="epic-grid">
              <div *ngFor="let item of sidebarNodes" class="epic-card">
-                <div class="epic-card-body" (click)="selectNode(item.node)" tabindex="0" (keydown.enter)="selectNode(item.node)">
+                <button class="epic-card-body" (click)="selectNode(item.node)" type="button">
                   <div class="epic-card-header">
                     <div class="epic-icon-container">
                       <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
@@ -161,7 +161,7 @@
                     <h2 class="epic-title">{{ item.node.title }}</h2>
                   </div>
                   <p class="epic-desc">{{ item.node.description }}</p>
-                </div>
+                </button>
 
                 <div class="epic-footer">
                    <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
