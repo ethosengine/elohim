@@ -1,14 +1,15 @@
-import { EpicNode, EpicSection, EmbeddedReference, NodeType } from '../models';
+import { ContentNode, ContentMetadata } from '../models/content-node.model';
+import { EpicSection, EmbeddedReference } from '../models/epic-node.model';
 
 /**
- * Parser for Markdown epic documents
- * Extracts structure, sections, and embedded references
+ * Parser for Markdown documents
+ * Extracts structure, sections, and embedded references into generic ContentNode
  */
 export class MarkdownParser {
   /**
-   * Parse a markdown file into an EpicNode
+   * Parse a markdown file into a ContentNode
    */
-  static parseEpic(content: string, sourcePath: string): EpicNode {
+  static parseContent(content: string, sourcePath: string): ContentNode {
     const lines = content.split('\n');
 
     // Extract frontmatter if present
@@ -24,37 +25,48 @@ export class MarkdownParser {
     // Extract tags from frontmatter or content
     const tags = this.extractTags(frontmatter, content);
 
-    // Extract epic ID from filename
-    const epicId = this.generateEpicId(sourcePath);
+    // Extract ID from frontmatter or filename
+    const id = this.generateNodeId(sourcePath, frontmatter);
 
     // Extract feature and scenario references
     const { featureIds, relatedEpicIds } = this.extractReferences(content, tags);
 
+    // Determine content type
+    const contentType = frontmatter?.['type'] ?? 'epic'; 
+
     // Extract metadata
-    const metadata = {
+    const metadata: ContentMetadata = {
       ...frontmatter,
+      category: frontmatter?.['category'] ?? this.inferCategory(title, tags),
+      authors: frontmatter?.['authors'] ?? [],
+      version: frontmatter?.['version'] ?? '1.0',
       wordCount: this.countWords(content),
-      headingCount: sections.length
+      headingCount: sections.length,
+      sections // Keep sections in metadata for viewers that might want them
     };
 
     return {
-      id: epicId,
-      type: NodeType.EPIC,
+      id,
+      contentType,
+      type: contentType, // Legacy compatibility
       title,
       description: this.generateDescription(sections),
       tags,
       sourcePath,
-      content,
+      content, // Keep full content
+      contentFormat: 'markdown',
       relatedNodeIds: [...featureIds, ...relatedEpicIds],
       metadata,
-      authors: frontmatter?.['authors'] ?? [],
-      version: frontmatter?.['version'] ?? '1.0',
-      category: frontmatter?.['category'] ?? this.inferCategory(title, tags),
-      featureIds,
-      relatedEpicIds,
-      markdownContent: content,
-      sections
+      createdAt: new Date(), // Placeholder
+      updatedAt: new Date()  // Placeholder
     };
+  }
+
+  /**
+   * Alias for backward compatibility if needed, but prefer parseContent
+   */
+  static parseEpic(content: string, sourcePath: string): ContentNode {
+      return this.parseContent(content, sourcePath);
   }
 
   /**
@@ -262,9 +274,13 @@ export class MarkdownParser {
   }
 
   /**
-   * Generate epic ID from file path
+   * Generate Node ID from file path
    */
-  private static generateEpicId(sourcePath: string): string {
+  private static generateNodeId(sourcePath: string, frontmatter: Record<string, any> | null): string {
+    // Prefer ID from frontmatter
+    if (frontmatter?.['id']) return frontmatter['id'];
+    
+    // Fallback to path-based ID
     return sourcePath
       .split('/')
       .pop()!

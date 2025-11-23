@@ -49,6 +49,24 @@ This isn't just documentation - it's the first implementation of **Elohim Social
 - The hero's journey to difficult truths
 - Guardians of human flourishing
 
+### Terminology Distinction: Elohim vs. Lamad
+
+To avoid architectural confusion, we maintain a strict distinction between the *actors* and the *medium*:
+
+**Elohim**: The **Active Agents**.
+- The real-time, intelligent entities operating within the system.
+- Examples: `community_elohim`, `family_elohim`, `personal_agent`.
+- They negotiate access, track patterns, and facilitate coordination.
+- They are the "ghost in the machine."
+
+**Lamad**: The **Static Structure**.
+- The graph-based learning platform and content repository.
+- The definition of Node Types (`LamadNodeType`) and metadata.
+- The map, the territory, and the footprints (affinity).
+- It is the "machine" that the ghosts inhabit and curate.
+
+*Note: We explicitly renamed internal types from `ElohimNodeType` to `LamadNodeType` to enforce this separation of concerns.*
+
 ## Core Vision
 
 ### Reading Experience First

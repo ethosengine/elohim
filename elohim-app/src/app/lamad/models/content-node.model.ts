@@ -1,3 +1,5 @@
+import { DocumentNode } from './document-node.model';
+
 /**
  * Generic content node model inspired by WordPress's post concept.
  *
@@ -11,12 +13,15 @@
  * each domain to extend the base model without rigid type hierarchies.
  */
 
-export interface ContentNode {
+export interface ContentNode extends Omit<DocumentNode, 'type'> {
   /** Unique identifier */
   id: string;
 
   /** Content type - domain-specific (e.g., 'epic', 'feature', 'scenario', 'tutorial') */
   contentType: string;
+
+  /** Type property for compatibility with DocumentNode (same as contentType, but string) */
+  type?: string;
 
   /** Display title */
   title: string;
@@ -33,8 +38,8 @@ export interface ContentNode {
   /** Tags for categorization and search */
   tags: string[];
 
-  /** Source file path (if applicable) */
-  sourcePath?: string;
+  /** Source file path */
+  sourcePath: string;
 
   /** Related node IDs (bidirectional relationships) */
   relatedNodeIds: string[];
@@ -81,11 +86,11 @@ export interface ContentRelationship {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
-  relationshipType: RelationshipType;
+  relationshipType: ContentRelationshipType;
   metadata?: Record<string, any>;
 }
 
-export enum RelationshipType {
+export enum ContentRelationshipType {
   /** Parent-child hierarchical relationship */
   CONTAINS = 'CONTAINS',
 
@@ -117,6 +122,8 @@ export enum RelationshipType {
   FOLLOWS = 'FOLLOWS',
 }
 
+export { ContentRelationshipType as RelationshipType };
+
 /**
  * Graph structure for content nodes
  */
@@ -143,10 +150,10 @@ export interface ContentGraph {
   reverseAdjacency: Map<string, Set<string>>;
 
   /** Graph metadata */
-  metadata: GraphMetadata;
+  metadata: ContentGraphMetadata;
 }
 
-export interface GraphMetadata {
+export interface ContentGraphMetadata {
   /** Total number of nodes */
   nodeCount: number;
 
@@ -167,3 +174,6 @@ export interface DocumentNodeAdapter {
   fromDocumentNode(documentNode: any): ContentNode;
   toDocumentNode(contentNode: ContentNode): any;
 }
+
+// Alias for backward compatibility
+export type { ContentGraphMetadata as GraphMetadata };

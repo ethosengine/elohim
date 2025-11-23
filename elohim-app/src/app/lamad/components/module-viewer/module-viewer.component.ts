@@ -5,7 +5,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
-import { EpicNode, FeatureNode, ScenarioNode, DocumentNode } from '../../models';
+import { EpicNode, FeatureNode, ScenarioNode } from '../../models';
 
 interface ModuleSection {
   type: 'epic' | 'scenario';
@@ -58,22 +58,22 @@ export class ModuleViewerComponent implements OnInit, OnDestroy {
 
       // Find the epic node
       const epics = this.documentGraphService.getNodesByType('epic');
-      const epicNode = epics.find((node: DocumentNode) =>
+      const epicNode = epics.find(node =>
         node.type === 'epic' && node.id.includes('value-scanner')
       );
 
       if (epicNode) {
-        this.epic = epicNode as EpicNode;
+        this.epic = epicNode as any as EpicNode;
       }
 
       // Find the feature node
       const features = this.documentGraphService.getNodesByType('feature');
-      const featureNode = features.find((node: DocumentNode) =>
+      const featureNode = features.find(node =>
         node.type === 'feature' && node.id.includes('care-economy')
       );
 
       if (featureNode) {
-        this.feature = featureNode as FeatureNode;
+        this.feature = featureNode as any as FeatureNode;
         this.loadScenarios();
       }
 
@@ -86,7 +86,8 @@ export class ModuleViewerComponent implements OnInit, OnDestroy {
 
     this.scenarios = this.feature.scenarioIds
       .map(id => this.documentGraphService.getNode(id))
-      .filter((node): node is ScenarioNode => node !== undefined && node.type === 'scenario');
+      .filter(node => node !== undefined && node.type === 'scenario')
+      .map(node => node as any as ScenarioNode);
   }
 
   private buildInterleavedView(): void {

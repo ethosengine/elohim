@@ -1,17 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, forkJoin, of } from 'rxjs';
-import { map, catchError, tap, switchMap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, from, of } from 'rxjs';
+import { map, catchError, tap, switchMap, mergeMap, toArray } from 'rxjs/operators';
 import {
-  DocumentGraph,
-  DocumentNode,
-  EpicNode,
-  FeatureNode,
-  ScenarioNode,
-  NodeRelationship,
-  RelationshipType,
-  createBidirectionalRelationship
-} from '../models';
+  ContentGraph,
+  ContentNode,
+  ContentRelationship,
+  RelationshipType
+} from '../models/content-node.model';
 import { GherkinParser, MarkdownParser } from '../parsers';
 
 /**
@@ -22,40 +18,25 @@ import { GherkinParser, MarkdownParser } from '../parsers';
   providedIn: 'root'
 })
 export class DocumentGraphService {
-  private readonly graphSubject = new BehaviorSubject<DocumentGraph | null>(null);
+  private readonly graphSubject = new BehaviorSubject<ContentGraph | null>(null);
   public readonly graph$ = this.graphSubject.asObservable();
 
-  private readonly EPIC_PATH = 'assets/docs';
-  private readonly FEATURE_PATH = 'assets/features';
-
-  // Manifest files listing available documents
-  private readonly EPIC_MANIFEST = 'assets/docs/manifest.json';
-  private readonly FEATURE_MANIFEST = 'assets/features/manifest.json';
+  private readonly DOCS_PATH = 'assets/docs';
+  private readonly MANIFEST_PATH = 'assets/docs/manifest.json';
 
   constructor(private readonly http: HttpClient) {}
 
   /**
    * Initialize and build the documentation graph
    */
-  buildGraph(): Observable<DocumentGraph> {
-    return forkJoin({
-      epics: this.loadEpicFiles(),
-      features: this.loadFeatureFiles()
-    }).pipe(
-      map(({ epics, features }) => {
+  buildGraph(): Observable<ContentGraph> {
+    return this.loadContentFiles().pipe(
+      map(nodes => {
         const graph = this.createEmptyGraph();
 
-        // Add epics to graph
-        epics.forEach(epic => {
-          this.addNodeToGraph(graph, epic);
-        });
-
-        // Add features and scenarios to graph
-        features.forEach(({ feature, scenarios }) => {
-          this.addNodeToGraph(graph, feature);
-          scenarios.forEach(scenario => {
-            this.addNodeToGraph(graph, scenario);
-          });
+        // Add all nodes to graph
+        nodes.forEach(node => {
+          this.addNodeToGraph(graph, node);
         });
 
         // Build relationships
@@ -70,12 +51,10 @@ export class DocumentGraphService {
         return graph;
       }),
       tap(graph => {
-        console.log('Documentation graph built:', {
+        console.log('Content graph built:', {
           nodes: graph.nodes.size,
           relationships: graph.relationships.size,
-          epics: graph.nodesByType.epics.size,
-          features: graph.nodesByType.features.size,
-          scenarios: graph.nodesByType.scenarios.size
+          types: Array.from(graph.nodesByType.keys())
         });
       })
     );
@@ -84,37 +63,34 @@ export class DocumentGraphService {
   /**
    * Get the current graph
    */
-  getGraph(): DocumentGraph | null {
+  getGraph(): ContentGraph | null {
     return this.graphSubject.value;
   }
 
   /**
    * Get a node by ID
    */
-  getNode(id: string): DocumentNode | undefined {
+  getNode(id: string): ContentNode | undefined {
     return this.graphSubject.value?.nodes.get(id);
   }
 
   /**
    * Get all nodes of a specific type
    */
-  getNodesByType(type: 'epic' | 'feature' | 'scenario'): DocumentNode[] {
+  getNodesByType(type: string): ContentNode[] {
     const graph = this.graphSubject.value;
-    if (!graph) return [];
+    if (!graph?.nodesByType?.has(type)) return [];
 
-    if (type === 'epic') {
-      return Array.from(graph.nodesByType.epics.values());
-    } else if (type === 'feature') {
-      return Array.from(graph.nodesByType.features.values());
-    } else {
-      return Array.from(graph.nodesByType.scenarios.values());
-    }
+    const ids = graph.nodesByType.get(type)!;
+    return Array.from(ids)
+      .map(id => graph.nodes.get(id))
+      .filter((node): node is ContentNode => node !== undefined);
   }
 
   /**
    * Get related nodes for a given node ID
    */
-  getRelatedNodes(nodeId: string): DocumentNode[] {
+  getRelatedNodes(nodeId: string): ContentNode[] {
     const graph = this.graphSubject.value;
     if (!graph) return [];
 
@@ -123,18 +99,18 @@ export class DocumentGraphService {
 
     return Array.from(relatedIds)
       .map(id => graph.nodes.get(id))
-      .filter((node): node is DocumentNode => node !== undefined);
+      .filter((node): node is ContentNode => node !== undefined);
   }
 
   /**
    * Search nodes by text
    */
-  searchNodes(query: string): DocumentNode[] {
+  searchNodes(query: string): ContentNode[] {
     const graph = this.graphSubject.value;
     if (!graph) return [];
 
     const lowerQuery = query.toLowerCase();
-    const results: DocumentNode[] = [];
+    const results: ContentNode[] = [];
 
     graph.nodes.forEach(node => {
       const matchScore = this.calculateMatchScore(node, lowerQuery);
@@ -151,63 +127,80 @@ export class DocumentGraphService {
   }
 
   /**
-   * Load epic markdown files
+   * Load all content files from manifest
    */
-  private loadEpicFiles(): Observable<EpicNode[]> {
-    return this.http.get<{ files: string[] }>(this.EPIC_MANIFEST).pipe(
+  private loadContentFiles(): Observable<ContentNode[]> {
+    return this.http.get<{ files: { path: string; type: string }[] }>(this.MANIFEST_PATH).pipe(
       switchMap(manifest => {
-        const fileObservables = manifest.files.map(file =>
-          this.http.get(`${this.EPIC_PATH}/${file}`, { responseType: 'text' }).pipe(
-            map(content => MarkdownParser.parseEpic(content, `docs/${file}`)),
-            catchError(err => {
-              console.error(`Failed to load epic: ${file}`, err);
-              return of(null);
-            })
-          )
+        if (!manifest?.files) {
+            console.warn('Manifest empty or invalid');
+            return of([]);
+        }
+
+        return from(manifest.files).pipe(
+          mergeMap(file =>
+            this.http.get(`${this.DOCS_PATH}/${file.path}`, { responseType: 'text' }).pipe(
+              map(content => {
+                const fullPath = file.path;
+                // Infer type if not provided
+                const type = file.type || 'article'; 
+                const category = this.inferCategoryFromPath(fullPath);
+
+                if (type === 'feature' || fullPath.endsWith('.feature')) {
+                  const result = GherkinParser.parseFeature(content, fullPath, category);
+                  // Convert FeatureNode and ScenarioNodes to ContentNode
+                  const featureNode = result.feature as unknown as ContentNode;
+                  featureNode.contentType = 'feature';
+                  featureNode.contentFormat = 'gherkin';
+                  featureNode.type = 'feature';
+
+                  const scenarioNodes = this.convertScenariosToContentNodes(result.scenarios);
+
+                  return [featureNode, ...scenarioNodes];
+                } else {
+                  // Default to markdown parser
+                  // Fix: parseContent is now the entry point in MarkdownParser
+                  const node = MarkdownParser.parseContent(content, fullPath);
+                  // Ensure type from manifest overrides or complements parser inference if needed
+                  if (file.type && file.type !== 'epic' && node.contentType === 'epic') {
+                      node.contentType = file.type;
+                  }
+                  // Ensure legacy type field is set for compatibility
+                  node.type = node.contentType;
+                  return [node];
+                }
+              }),
+              catchError(err => {
+                console.error(`Failed to load file: ${file.path}`, err);
+                return of([] as ContentNode[]);
+              })
+            ),
+            5 // Concurrency limit
+          ),
+          toArray(),
+          map(results => results.flat())
         );
-        return forkJoin(fileObservables);
-      }),
-      map(results => results.filter((epic): epic is EpicNode => epic !== null))
+      })
     );
   }
 
-  /**
-   * Load feature files
-   */
-  private loadFeatureFiles(): Observable<Array<{ feature: FeatureNode; scenarios: ScenarioNode[] }>> {
-    return this.http.get<{ files: { path: string; category: string }[] }>(this.FEATURE_MANIFEST).pipe(
-      switchMap(manifest => {
-        const fileObservables = manifest.files.map(({ path, category }) =>
-          this.http.get(`${this.FEATURE_PATH}/${path}`, { responseType: 'text' }).pipe(
-            map(content => GherkinParser.parseFeature(content, path, category)),
-            catchError(err => {
-              console.error(`Failed to load feature: ${path}`, err);
-              return of(null);
-            })
-          )
-        );
-        return forkJoin(fileObservables);
-      }),
-      map(results =>
-        results.filter(
-          (result): result is { feature: FeatureNode; scenarios: ScenarioNode[] } => result !== null
-        )
-      )
-    );
+  private inferCategoryFromPath(path: string): string {
+    const parts = path.split('/');
+    if (parts.length > 1) {
+        return parts[0].replace(/_/g, '-');
+    }
+    return 'general';
   }
+
 
   /**
    * Create an empty graph structure
    */
-  private createEmptyGraph(): DocumentGraph {
+  private createEmptyGraph(): ContentGraph {
     return {
       nodes: new Map(),
       relationships: new Map(),
-      nodesByType: {
-        epics: new Map(),
-        features: new Map(),
-        scenarios: new Map()
-      },
+      nodesByType: new Map(),
       nodesByTag: new Map(),
       nodesByCategory: new Map(),
       adjacency: new Map(),
@@ -215,17 +208,8 @@ export class DocumentGraphService {
       metadata: {
         nodeCount: 0,
         relationshipCount: 0,
-        lastBuilt: new Date(),
-        sources: {
-          epicPath: this.EPIC_PATH,
-          featurePath: this.FEATURE_PATH
-        },
-        stats: {
-          epicCount: 0,
-          featureCount: 0,
-          scenarioCount: 0,
-          averageConnectionsPerNode: 0
-        }
+        lastUpdated: new Date(),
+        version: '1.0'
       }
     };
   }
@@ -233,22 +217,15 @@ export class DocumentGraphService {
   /**
    * Add a node to the graph with all indices
    */
-  private addNodeToGraph(graph: DocumentGraph, node: DocumentNode): void {
+  private addNodeToGraph(graph: ContentGraph, node: ContentNode): void {
     // Add to main nodes map
     graph.nodes.set(node.id, node);
 
     // Add to type index
-    switch (node.type) {
-      case 'epic':
-        graph.nodesByType.epics.set(node.id, node as EpicNode);
-        break;
-      case 'feature':
-        graph.nodesByType.features.set(node.id, node as FeatureNode);
-        break;
-      case 'scenario':
-        graph.nodesByType.scenarios.set(node.id, node as ScenarioNode);
-        break;
+    if (!graph.nodesByType.has(node.contentType)) {
+      graph.nodesByType.set(node.contentType, new Set());
     }
+    graph.nodesByType.get(node.contentType)!.add(node.id);
 
     // Add to tag index
     node.tags.forEach(tag => {
@@ -259,7 +236,7 @@ export class DocumentGraphService {
     });
 
     // Add to category index
-    const category = (node as any).category;
+    const category = node.metadata?.['category'];
     if (category) {
       if (!graph.nodesByCategory.has(category)) {
         graph.nodesByCategory.set(category, new Set());
@@ -279,120 +256,118 @@ export class DocumentGraphService {
   /**
    * Build relationships between nodes
    */
-  private buildRelationships(graph: DocumentGraph): void {
-    // Epic -> Feature relationships
-    graph.nodesByType.epics.forEach(epic => {
-      epic.featureIds.forEach(featureId => {
-        if (graph.nodes.has(featureId)) {
-          this.addRelationships(
-            graph,
-            createBidirectionalRelationship(
-              RelationshipType.DESCRIBES,
-              epic.id,
-              featureId,
-              `Epic describes feature implementation`
-            )
-          );
+  private buildRelationships(graph: ContentGraph): void {
+    graph.nodes.forEach(node => {
+        // 1. Explicit relatedNodeIds
+        if (node.relatedNodeIds && node.relatedNodeIds.length > 0) {
+            node.relatedNodeIds.forEach(targetId => this.linkNodes(graph, node.id, targetId, RelationshipType.RELATES_TO));
         }
-      });
-    });
-
-    // Feature -> Scenario relationships
-    graph.nodesByType.features.forEach(feature => {
-      feature.scenarioIds.forEach(scenarioId => {
-        if (graph.nodes.has(scenarioId)) {
-          this.addRelationship(graph, {
-            id: `${feature.id}_${scenarioId}_contains`,
-            type: RelationshipType.BELONGS_TO,
-            sourceId: scenarioId,
-            targetId: feature.id,
-            bidirectional: false,
-            description: 'Scenario belongs to feature'
-          });
+        
+        // 2. Metadata-based relationships
+        if (node.metadata) {
+            const meta = node.metadata;
+            
+            // related_users -> User Types
+            if (Array.isArray(meta['related_users'])) {
+                meta['related_users'].forEach((userType: string) => this.linkNodes(graph, node.id, userType, RelationshipType.RELATES_TO));
+            }
+            
+            // related_epics -> Epics
+            if (Array.isArray(meta['related_epics'])) {
+                meta['related_epics'].forEach((epicId: string) => this.linkNodes(graph, node.id, epicId, RelationshipType.RELATES_TO));
+            }
+            
+            // primary_epic -> Epic
+            if (meta['primary_epic']) {
+                this.linkNodes(graph, node.id, meta['primary_epic'], RelationshipType.BELONGS_TO);
+            }
+            
+             // epic -> Epic
+            if (meta['epic']) {
+                this.linkNodes(graph, node.id, meta['epic'], RelationshipType.BELONGS_TO);
+            }
         }
-      });
-    });
-
-    // Scenario -> Epic relationships (via tags)
-    graph.nodesByType.scenarios.forEach(scenario => {
-      scenario.epicIds.forEach(epicId => {
-        if (graph.nodes.has(epicId)) {
-          this.addRelationship(graph, {
-            id: `${scenario.id}_${epicId}_validates`,
-            type: RelationshipType.VALIDATES,
-            sourceId: scenario.id,
-            targetId: epicId,
-            bidirectional: false,
-            description: 'Scenario validates epic'
-          });
-        }
-      });
-    });
-
-    // Epic -> Epic relationships
-    graph.nodesByType.epics.forEach(epic => {
-      epic.relatedEpicIds.forEach(relatedEpicId => {
-        if (graph.nodes.has(relatedEpicId)) {
-          this.addRelationship(graph, {
-            id: `${epic.id}_${relatedEpicId}_references`,
-            type: RelationshipType.REFERENCES,
-            sourceId: epic.id,
-            targetId: relatedEpicId,
-            bidirectional: false,
-            description: 'Epic references related epic'
-          });
-        }
-      });
     });
   }
 
   /**
-   * Add multiple relationships to graph
+   * Helper to safely link nodes if target exists
    */
-  private addRelationships(graph: DocumentGraph, relationships: NodeRelationship[]): void {
-    relationships.forEach(rel => this.addRelationship(graph, rel));
+  private linkNodes(graph: ContentGraph, sourceId: string, targetIdRaw: string, type: RelationshipType): void {
+     if (!targetIdRaw) return;
+     const targetId = targetIdRaw.trim();
+     
+     // Try exact match
+     if (graph.nodes.has(targetId)) {
+         this.createRelationship(graph, sourceId, targetId, type);
+         return;
+     }
+     
+     // Try finding by title (case-insensitive) if ID match fails
+     for (const [id, node] of graph.nodes.entries()) {
+         if (node.title.toLowerCase() === targetId.toLowerCase()) {
+             this.createRelationship(graph, sourceId, id, type);
+             return;
+         }
+     }
+  }
+  
+  private createRelationship(graph: ContentGraph, sourceId: string, targetId: string, type: RelationshipType): void {
+      const id = `${sourceId}_${type}_${targetId}`;
+      if (!graph.relationships.has(id)) {
+          this.addRelationship(graph, {
+            id,
+            sourceNodeId: sourceId,
+            targetNodeId: targetId,
+            relationshipType: type
+          });
+          
+          // Add reverse relationship for bi-directional nav
+          if (type === RelationshipType.RELATES_TO) {
+              const reverseId = `${targetId}_${type}_${sourceId}`;
+              if (!graph.relationships.has(reverseId)) {
+                  this.addRelationship(graph, {
+                    id: reverseId,
+                    sourceNodeId: targetId,
+                    targetNodeId: sourceId,
+                    relationshipType: type
+                  });
+              }
+          }
+      }
   }
 
   /**
    * Add a single relationship to graph
    */
-  private addRelationship(graph: DocumentGraph, relationship: NodeRelationship): void {
+  private addRelationship(graph: ContentGraph, relationship: ContentRelationship): void {
     graph.relationships.set(relationship.id, relationship);
 
     // Update adjacency lists
-    if (!graph.adjacency.has(relationship.sourceId)) {
-      graph.adjacency.set(relationship.sourceId, new Set());
+    if (!graph.adjacency.has(relationship.sourceNodeId)) {
+      graph.adjacency.set(relationship.sourceNodeId, new Set());
     }
-    graph.adjacency.get(relationship.sourceId)!.add(relationship.targetId);
+    graph.adjacency.get(relationship.sourceNodeId)!.add(relationship.targetNodeId);
 
-    if (!graph.reverseAdjacency.has(relationship.targetId)) {
-      graph.reverseAdjacency.set(relationship.targetId, new Set());
+    if (!graph.reverseAdjacency.has(relationship.targetNodeId)) {
+      graph.reverseAdjacency.set(relationship.targetNodeId, new Set());
     }
-    graph.reverseAdjacency.get(relationship.targetId)!.add(relationship.sourceId);
+    graph.reverseAdjacency.get(relationship.targetNodeId)!.add(relationship.sourceNodeId);
   }
 
   /**
    * Update graph metadata
    */
-  private updateGraphMetadata(graph: DocumentGraph): void {
+  private updateGraphMetadata(graph: ContentGraph): void {
     graph.metadata.nodeCount = graph.nodes.size;
     graph.metadata.relationshipCount = graph.relationships.size;
-    graph.metadata.lastBuilt = new Date();
-    graph.metadata.stats = {
-      epicCount: graph.nodesByType.epics.size,
-      featureCount: graph.nodesByType.features.size,
-      scenarioCount: graph.nodesByType.scenarios.size,
-      averageConnectionsPerNode:
-        graph.nodes.size > 0
-          ? Array.from(graph.adjacency.values()).reduce((sum, set) => sum + set.size, 0) / graph.nodes.size
-          : 0
-    };
+    graph.metadata.lastUpdated = new Date();
   }
 
   /**
    * Calculate match score for search
    */
-  private calculateMatchScore(node: DocumentNode, query: string): number {
+  private calculateMatchScore(node: ContentNode, query: string): number {
     let score = 0;
 
     if (node.title.toLowerCase().includes(query)) score += 100;
@@ -401,5 +376,15 @@ export class DocumentGraphService {
     if (node.tags.some(tag => tag.toLowerCase().includes(query))) score += 75;
 
     return score;
+  }
+
+  private convertScenariosToContentNodes(scenarios: any[]): ContentNode[] {
+    return scenarios.map(s => {
+      const node = s as unknown as ContentNode;
+      node.contentType = 'scenario';
+      node.contentFormat = 'gherkin';
+      node.type = 'scenario';
+      return node;
+    });
   }
 }

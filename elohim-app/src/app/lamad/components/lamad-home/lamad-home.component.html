@@ -27,7 +27,7 @@
       <nav class="path-nav">
         <!-- Overview / Home Link -->
         <button class="path-item overview-item"
-                [class.selected]="!selectedNode"
+                [class.selected]="!selectedNode && viewState === 'root'"
                 (click)="goHome()"
                 type="button">
           <span class="path-icon">📊</span>
@@ -35,7 +35,23 @@
         </button>
 
         <div class="nav-divider"></div>
-        <div class="nav-section-label">Epics</div>
+
+        <!-- Dynamic Section Label -->
+        <div class="nav-section-label">
+          <ng-container *ngIf="viewState === 'root'">Epics</ng-container>
+          <ng-container *ngIf="viewState === 'drilldown' && activeDrillDown">
+            {{ activeDrillDown.parent.title }} / {{ activeDrillDown.type }}
+          </ng-container>
+        </div>
+
+        <!-- Back Button for Drilldown -->
+        <button *ngIf="viewState === 'drilldown'"
+                class="path-item back-item"
+                (click)="goUp()"
+                type="button">
+          <span class="path-icon">←</span>
+          <span class="path-title">Back to Epics</span>
+        </button>
 
         <button *ngFor="let pathNode of sidebarNodes; let i = index"
                 class="path-item"
@@ -59,10 +75,18 @@
           <button class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Toggle Sidebar">
             ☰
           </button>
-          
+
           <!-- Breadcrumbs -->
           <div class="toolbar-breadcrumbs">
              <button class="breadcrumb-link" (click)="goHome()">Home</button>
+
+             <ng-container *ngIf="viewState === 'drilldown' && activeDrillDown">
+               <span class="separator">/</span>
+               <button class="breadcrumb-link" (click)="selectNode(activeDrillDown.parent)">{{ activeDrillDown.parent.title }}</button>
+               <span class="separator">/</span>
+               <span class="current-node">{{ activeDrillDown.type }}</span>
+             </ng-container>
+
              <ng-container *ngIf="selectedNode">
                <span class="separator">/</span>
                <span class="current-node">{{ selectedNode.title }}</span>
@@ -109,24 +133,27 @@
               </button>
             </div>
           </div>
+          
+          <!-- Collapse Button -->
+          <div class="graph-footer">
+            <button class="collapse-btn" (click)="toggleGraph()" aria-label="Close Overview">
+              <span>▲</span> Close Overview
+            </button>
+          </div>
         </div>
       </section>
 
       <!-- CENTER: Content Viewer or Home Placeholder -->
       <section class="content-viewer">
 
-        <!-- Home Placeholder (Epic Panes) -->
-        <div *ngIf="!selectedNode" class="home-placeholder">
+        <!-- Home Placeholder (Root View: Epic Panes) -->
+        <div *ngIf="!selectedNode && viewState === 'root'" class="home-placeholder">
            <h1 class="home-title">The Elohim Protocol</h1>
            <p class="home-subtitle">Explore the epics below to begin your journey.</p>
-           
+
            <div class="epic-grid">
-             <button *ngFor="let item of sidebarNodes"
-                  class="epic-card"
-                  (click)="selectNode(item.node)"
-                  type="button"
-                  [attr.aria-label]="item.node.title">
-                <div class="epic-card-body">
+             <div *ngFor="let item of sidebarNodes" class="epic-card">
+                <button class="epic-card-body" (click)="selectNode(item.node)" type="button">
                   <div class="epic-card-header">
                     <div class="epic-icon-container">
                       <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
@@ -134,12 +161,62 @@
                     <h2 class="epic-title">{{ item.node.title }}</h2>
                   </div>
                   <p class="epic-desc">{{ item.node.description }}</p>
-                </div>
+                </button>
+
                 <div class="epic-footer">
                    <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
-                   <div class="hex-badge" 
+                   <div class="hex-badge"
                         [class]="'affinity-' + item.affinityLevel"
                         [title]="'Affinity: ' + getAffinityPercentage(item.affinity) + '%'">
+                   </div>
+                </div>
+
+                <!-- Drill Down Links -->
+                <div class="epic-drilldown" *ngIf="getRelatedGrouping(item.node).length > 0">
+                   <div class="drilldown-label">Explore:</div>
+                   <div class="drilldown-chips">
+                     <button *ngFor="let group of getRelatedGrouping(item.node)"
+                             class="drilldown-chip"
+                             (click)="drillDown(item.node, group.type)"
+                             type="button">
+                       <span class="drilldown-icon">{{ getContentTypeIcon(group.type) }}</span>
+                       <span class="drilldown-count">{{ group.count }}</span>
+                       <span class="drilldown-type">{{ group.type | titlecase }}</span>
+                     </button>
+                   </div>
+                </div>
+             </div>
+           </div>
+        </div>
+
+        <!-- Drill-Down View (Filtered List) -->
+        <div *ngIf="!selectedNode && viewState === 'drilldown' && activeDrillDown" class="home-placeholder drilldown-view">
+           <div class="drilldown-header">
+             <button class="back-btn" (click)="goUp()">← Back to Epics</button>
+             <h1 class="home-title">{{ activeDrillDown.parent.title }} <span class="separator">/</span> {{ activeDrillDown.type | titlecase }}</h1>
+             <p class="home-subtitle">Exploring {{ activeDrillDown.nodes.length }} items in {{ activeDrillDown.parent.title }}</p>
+           </div>
+
+           <div class="epic-grid">
+             <button *ngFor="let node of activeDrillDown.nodes"
+                  class="epic-card"
+                  (click)="selectNode(node)"
+                  type="button"
+                  [attr.aria-label]="node.title">
+                <div class="epic-card-body">
+                  <div class="epic-card-header">
+                    <div class="epic-icon-container">
+                      <span class="epic-icon">{{ getContentTypeIcon(node.contentType) }}</span>
+                    </div>
+                    <h2 class="epic-title">{{ node.title }}</h2>
+                  </div>
+                  <p class="epic-desc">{{ node.description }}</p>
+                </div>
+                <div class="epic-footer">
+                   <span class="epic-category">{{ getCategoryDisplay(node.metadata['category'] || 'General') }}</span>
+                   <div class="hex-badge"
+                        [class]="'affinity-' + node.affinityLevel"
+                        [title]="'Affinity: ' + getAffinityPercentage(node.affinity) + '%'">
                    </div>
                 </div>
              </button>

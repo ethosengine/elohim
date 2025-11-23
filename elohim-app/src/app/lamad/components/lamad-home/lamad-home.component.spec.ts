@@ -6,6 +6,7 @@ import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { LearningPathService } from '../../services/learning-path.service';
+import { NavigationService } from '../../services/navigation.service';
 import { DocumentGraph } from '../../models';
 import { ContentNode } from '../../models/content-node.model';
 
@@ -15,10 +16,13 @@ describe('LamadHomeComponent', () => {
   let mockDocumentGraphService: any;
   let mockAffinityService: any;
   let mockLearningPathService: any;
+  let mockNavigationService: any;
   let graphSubject: BehaviorSubject<DocumentGraph | null>;
   let pathSubject: BehaviorSubject<any[]>;
   let affinitySubject: BehaviorSubject<any>;
   let changesSubject: BehaviorSubject<any>;
+  let contextSubject: BehaviorSubject<any>;
+  let nodeRegistry: Map<string, ContentNode>;
 
   const mockContentNode: ContentNode = {
     id: 'manifesto.md',
@@ -28,6 +32,7 @@ describe('LamadHomeComponent', () => {
     content: '# Test Content',
     contentFormat: 'markdown',
     tags: [],
+    sourcePath: 'manifesto.md',
     relatedNodeIds: [],
     metadata: {
       category: 'vision'
@@ -90,10 +95,15 @@ describe('LamadHomeComponent', () => {
   } as DocumentGraph;
 
   beforeEach(async () => {
+    // Create a registry of ContentNodes for navigation mock
+    nodeRegistry = new Map<string, ContentNode>();
+    nodeRegistry.set(mockContentNode.id, mockContentNode);
+
     graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph as DocumentGraph);
     pathSubject = new BehaviorSubject<any[]>(mockPathNodes);
     affinitySubject = new BehaviorSubject<any>({});
     changesSubject = new BehaviorSubject<any>(null);
+    contextSubject = new BehaviorSubject<any>({ nodeId: null, nodeType: null });
 
     mockDocumentGraphService = {
       getGraph: jasmine.createSpy('getGraph').and.returnValue(mockGraph as DocumentGraph),
@@ -132,6 +142,20 @@ describe('LamadHomeComponent', () => {
       getPathProgress: jasmine.createSpy('getPathProgress').and.returnValue(50)
     };
 
+    mockNavigationService = {
+      context$: contextSubject.asObservable(),
+      navigateToHome: jasmine.createSpy('navigateToHome'),
+      navigateUp: jasmine.createSpy('navigateUp'),
+      getCurrentContext: jasmine.createSpy('getCurrentContext').and.returnValue({ nodeId: null, nodeType: null }),
+      navigateTo: jasmine.createSpy('navigateTo').and.callFake((nodeType: string, nodeId: string, options?: any) => {
+        // Simulate navigation by emitting on context$ with the node
+        const node = nodeRegistry.get(nodeId);
+        if (node) {
+          contextSubject.next({ currentNode: node, nodeType, nodeId, viewMode: 'node' });
+        }
+      })
+    };
+
     const mockSanitizer = {
       sanitize: jasmine.createSpy('sanitize').and.callFake((context: any, value: string) => value)
     };
@@ -142,6 +166,7 @@ describe('LamadHomeComponent', () => {
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
         { provide: AffinityTrackingService, useValue: mockAffinityService },
         { provide: LearningPathService, useValue: mockLearningPathService },
+        { provide: NavigationService, useValue: mockNavigationService },
         { provide: DomSanitizer, useValue: mockSanitizer },
         provideRouter([])
       ]
@@ -162,7 +187,8 @@ describe('LamadHomeComponent', () => {
     expect(component.pathNodes[0].node.title).toBe('Elohim Manifesto');
   });
 
-  it('should select first node on init', () => {
+  xit('should select first node on init', () => {
+    // Auto-select is currently disabled to show landing page
     fixture.detectChanges();
 
     expect(component.selectedNode).toBeTruthy();
@@ -245,22 +271,26 @@ describe('LamadHomeComponent', () => {
     fixture.detectChanges();
     component.selectedNode = mockContentNode;
     const nextNode = { ...mockContentNode, id: 'next-node' };
+    nodeRegistry.set(nextNode.id, nextNode);
     mockLearningPathService.getNextNode.and.returnValue({ node: nextNode, order: 1, depth: 0, category: 'core' });
 
     component.goToNext();
 
     expect(mockLearningPathService.getNextNode).toHaveBeenCalledWith(mockContentNode.id);
+    expect(mockNavigationService.navigateTo).toHaveBeenCalledWith(nextNode.contentType, nextNode.id, jasmine.any(Object));
   });
 
   it('should navigate to previous node', () => {
     fixture.detectChanges();
     component.selectedNode = mockContentNode;
     const prevNode = { ...mockContentNode, id: 'prev-node' };
+    nodeRegistry.set(prevNode.id, prevNode);
     mockLearningPathService.getPreviousNode.and.returnValue({ node: prevNode, order: 0, depth: 0, category: 'vision' });
 
     component.goToPrevious();
 
     expect(mockLearningPathService.getPreviousNode).toHaveBeenCalledWith(mockContentNode.id);
+    expect(mockNavigationService.navigateTo).toHaveBeenCalledWith(prevNode.contentType, prevNode.id, jasmine.any(Object));
   });
 
   it('should check if has next node', () => {

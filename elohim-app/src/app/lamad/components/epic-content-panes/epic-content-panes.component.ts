@@ -4,9 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { EpicNode } from '../../models/epic-node.model';
-import { FeatureNode } from '../../models/feature-node.model';
-import { ScenarioNode } from '../../models/scenario-node.model';
+import { ContentNode } from '../../models/content-node.model';
 import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.component';
 
 interface PaneTab {
@@ -26,10 +24,10 @@ interface PaneTab {
 export class EpicContentPanesComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
-  epic: EpicNode | null = null;
-  features: FeatureNode[] = [];
-  scenarios: ScenarioNode[] = [];
-  relatedEpics: EpicNode[] = [];
+  epic: ContentNode | null = null;
+  features: ContentNode[] = [];
+  scenarios: ContentNode[] = [];
+  relatedEpics: ContentNode[] = [];
 
   activeTab: string = 'overview';
   affinity: number = 0;
@@ -71,32 +69,41 @@ export class EpicContentPanesComponent implements OnInit, OnDestroy {
         if (!graph) return;
 
         // Load the epic
-        this.epic = graph.nodesByType.epics.get(epicId) || null;
+        this.epic = graph.nodes.get(epicId) || null;
 
         if (!this.epic) {
           console.error('Epic not found:', epicId);
           return;
         }
 
-        // Load features that implement this epic
-        this.features = this.epic.featureIds
-          .map(id => graph.nodesByType.features.get(id))
-          .filter((f): f is FeatureNode => f !== undefined);
+        // Get all directly related nodes
+        const directRelations = this.documentGraphService.getRelatedNodes(epicId);
 
-        // Load scenarios from those features
-        const scenarioIds = new Set<string>();
+        // Filter for features
+        this.features = directRelations.filter(node => node.contentType === 'feature');
+
+        // Filter for related epics
+        this.relatedEpics = directRelations.filter(node => 
+            node.contentType === 'epic' && node.id !== epicId
+        );
+
+        // Load scenarios from features (indirect relation from epic perspective, usually)
+        // Or direct if the graph links them directly.
+        // Let's gather scenarios from the features we found.
+        const scenarioSet = new Set<string>();
+        const scenarios: ContentNode[] = [];
+
         this.features.forEach(feature => {
-          feature.scenarioIds.forEach(id => scenarioIds.add(id));
+             const featureRelations = this.documentGraphService.getRelatedNodes(feature.id);
+             featureRelations.forEach(rel => {
+                 if ((rel.contentType === 'scenario' || rel.contentType === 'scenario_outline') && !scenarioSet.has(rel.id)) {
+                     scenarioSet.add(rel.id);
+                     scenarios.push(rel);
+                 }
+             });
         });
 
-        this.scenarios = Array.from(scenarioIds)
-          .map(id => graph.nodesByType.scenarios.get(id))
-          .filter((s): s is ScenarioNode => s !== undefined);
-
-        // Load related epics
-        this.relatedEpics = this.epic.relatedEpicIds
-          .map(id => graph.nodesByType.epics.get(id))
-          .filter((e): e is EpicNode => e !== undefined);
+        this.scenarios = scenarios;
 
         // Update tab counts
         this.updateTabCounts();
@@ -166,26 +173,28 @@ export class EpicContentPanesComponent implements OnInit, OnDestroy {
     }
   }
 
-  viewFeature(feature: FeatureNode): void {
+  viewFeature(feature: ContentNode): void {
     this.router.navigate(['/lamad/content', feature.id]);
   }
 
-  viewScenario(scenario: ScenarioNode): void {
+  viewScenario(scenario: ContentNode): void {
     this.router.navigate(['/lamad/content', scenario.id]);
   }
 
-  viewRelatedEpic(epic: EpicNode): void {
+  viewRelatedEpic(epic: ContentNode): void {
     this.router.navigate(['/lamad/content', epic.id]);
   }
 
-  getFeatureStatusClass(feature: FeatureNode): string {
-    if (!feature.testStatus) return 'status-unknown';
-    return `status-${feature.testStatus.status}`;
+  getFeatureStatusClass(feature: ContentNode): string {
+    const status = feature.metadata?.['testStatus']?.status;
+    if (!status) return 'status-unknown';
+    return `status-${status}`;
   }
 
-  getScenarioStatusClass(scenario: ScenarioNode): string {
-    if (!scenario.testStatus) return 'status-unknown';
-    return `status-${scenario.testStatus.status}`;
+  getScenarioStatusClass(scenario: ContentNode): string {
+    const status = scenario.metadata?.['testStatus']?.status;
+    if (!status) return 'status-unknown';
+    return `status-${status}`;
   }
 
   /**

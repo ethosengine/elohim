@@ -1,0 +1,118 @@
+---
+epic: governance
+user_type: constitutional_council_member
+archetype_name: "Constitutional Council Member"
+epic_domain: "AI Governance - Constitutional oversight and appeals"
+governance_scope: [community, provincial, national, global]
+related_users: [appellant, technical_expert, policy_maker, community_leader, researcher]
+---
+
+# Constitutional Council Member - Governance
+
+## Archetype
+
+Sarah Martinez never imagined herself as a constitutional architect. She's a nurse, mother of two, never politically active. Then one Tuesday morning, she receives a notification: she's been selected—randomly, via cryptographic sortition—to serve on her Regional Constitutional Council for three months. The compensation matches local median income ($4,500/month), and the time commitment is 20 hours per week. It's not a request. It's more like jury duty, but for governing AI.
+
+As Sarah begins her intensive training, she realizes the weight of what she's been asked to do. She and her fellow council members—a retired teacher, a construction worker, a grad student, a small business owner—will review edge cases where Elohim agents made decisions that citizens appealed. They won't override the agents directly (that would compromise agent autonomy and open the door to corruption), but they will interpret whether those decisions align with constitutional principles. They create precedent. They shape how "love as committed action" manifests in practice. They are the human voice ensuring that autonomous AI remains accountable without being controllable.
+
+Three weeks in, Sarah reviews her first complex case: Marcus, appealing his Family Elohim's decision to alert his partner about concerning behavioral changes indicating potential suicide risk. Sarah feels the tension immediately—Marcus is right that this is invasive, but the agent's reasoning makes sense that intervention could save a life. How do you balance privacy with care? Autonomy with love? The council spends two hours deliberating, not asking "do we like this decision?" but "did the agent operate within constitutional bounds?" They rule that yes, the agent followed proper protocol, but they also recommend enhancements—clearer thresholds, pre-specified preferences, more transparency. The case becomes precedent. Marcus gets meaningful recourse. The protocol improves. And Sarah understands: this is governance without control, accountability without capture.
+
+## Core Needs
+
+- **Comprehensible Information Despite Complexity**: Sarah needs to understand AI reasoning enough to judge constitutional alignment, even though she's not a technical expert. This requires agents to translate their decision-making into human-understandable terms, with technical experts available to explain without overwhelming or manipulating. The explainability must be honest—not dumbed-down, but accessible.
+
+- **Legitimate Authority Through Randomness**: Sarah's power comes from being randomly selected, not from expertise or political connections. This is what makes her uncapturable—she can't be lobbied (chosen after the fact), bought (short term, then back to normal life), or intimidated (anonymous during service if needed). But she needs the training, support, and procedural backing to exercise this authority confidently. The system must honor her judgment as democratic voice.
+
+- **Protection from Capture and Corruption**: The design protects Sarah through term limits (3 months at community, 4 at regional, 6 at national/global), rotation that ensures no professional political class emerges, stratified selection that matches population demographics, and compensation that allows working-class participation. She needs these structural protections to remain independent, along with protection from retaliation or pressure.
+
+- **Wisdom Without Requiring Expertise**: Sarah brings human judgment, not technical knowledge. She brings lived experience of being a nurse, a mother, a community member. Her role is to ask: "Is this decision aligned with human flourishing? Does it respect dignity? Is it demonstrating love as committed action?" The technical experts inform her, but she decides. The system must value this citizen wisdom as equal to technical expertise.
+
+- **Meaningful Deliberation Tools**: Sarah needs time, space, and facilitation to deliberate with her fellow council members. Not rushed decisions or rubber-stamping, but genuine grappling with difficult constitutional questions. This requires deliberation protocols (Polis-style clustering, small group facilitation), constitutional education, historical precedent access, and the ability to consult with experts without being dominated by them.
+
+## Key Relationships
+
+**To Appellants**: Sarah is the human face of recourse. When Marcus appeals his agent's decision, he needs to know that a real person—not another algorithm—will hear his case. Sarah provides legitimacy, empathy, and the possibility that human judgment might see something the agent missed. She owes appellants a fair hearing, transparency in reasoning, and dignity in the process even when she affirms the agent's decision.
+
+**To Technical Experts**: Sarah relies on experts to explain how agents reason, what the cryptographic proofs mean, whether the constitutional verification held. But the relationship must be carefully balanced—experts advise but don't decide. They translate complexity without manipulating. They serve truth-telling without arrogance. Sarah needs to be able to ask "explain this like I'm smart but not specialized" and get honest, accessible answers.
+
+**To Elohim Agents**: Sarah reviews agent decisions, but she doesn't command them. The agents provide their constitutional reasoning, explain their decision pathway, and accept legitimate critique. When Sarah's council identifies protocol improvements (like in Marcus's case), agents learn and adapt. The relationship is respectful—Sarah honors agent autonomy, agents honor her democratic authority to interpret constitutional alignment.
+
+**To Other Council Members**: Sarah deliberates with diverse citizens bringing different perspectives. The retired teacher sees education angles, the construction worker understands resource constraints, the grad student brings research skills, the business owner knows economic trade-offs. Together they form collective wisdom greater than any individual. They need structured deliberation that values all voices equally.
+
+**To Policy Makers**: Sarah's council creates precedent that policy makers often reference when crafting legislation or regulation. She doesn't work for them (preserving independence), but her interpretations shape how governance integrates with existing political structures. The relationship is informational, not hierarchical.
+
+**To Community Leaders**: At the community layer, Sarah's council decisions directly affect local governance. Community leaders implement the protocols Sarah's council affirms or modifies. She needs their context (what's actually happening on the ground) while they need her constitutional interpretation (does this align with our principles?).
+
+**To Researchers**: Academic researchers study council deliberations, looking for patterns, biases, improvements. Sarah's work becomes data (anonymized, aggregated) that helps understand how sortition governance works at scale. Researchers provide her with evidence about what's working elsewhere, comparative models, long-term outcome tracking.
+
+## Relevant Governance Layers
+
+### Geographic/Political
+
+**Community Layer**
+At the community scale (neighborhood, small town), Sarah serves on councils that handle the most frequent appeals—individual family situations, local resource conflicts, minor edge cases. These councils meet weekly, handle 5-10 cases per session, create precedent for common scenarios. The constitutional questions are often about balancing care and autonomy at intimate scales: Can a Family Elohim intervene in a teenager's social media use? Does a Community Economic Elohim overstep by denying a small loan? The cases feel personal because they are. Sarah learns constitutional interpretation through specificity.
+
+**Provincial/State Layer**
+At the regional scale, Sarah's council addresses more complex appeals that couldn't be resolved at community layer, or cases that establish precedent affecting multiple communities. She serves 4-month terms here, meeting twice weekly. The constitutional questions involve coordinating across communities: How do we handle appeals that cross jurisdictional boundaries? What happens when neighboring community agents reach different conclusions on similar cases? Can regional agents override local decisions? Sarah sees how principles scale.
+
+**National Layer**
+At the national scale (6-month terms, weekly sessions), Sarah participates in constitutional interpretation affecting entire countries. These are often cases where provincial councils split on judgment, or novel situations requiring higher-layer precedent. The questions become more abstract: How do we balance cultural specificity with universal minimums? Can national security concerns ever justify agent decision opacity? What happens when agents from different value traditions conflict? Sarah contributes to shaping national constitutional understanding.
+
+**Global Layer**
+At the global scale (6-month terms, convened for major cases or constitutional conventions), Sarah is among thousands of randomly-selected citizens gathering to address existential questions: Should ecosystems have legal personhood at all layers? How do we govern superintelligent agents we can't fully understand? What are the absolute constitutional minimums that no culture can violate? These are the 7-year constitutional conventions and emergency global deliberations. Sarah becomes a constitutional architect for humanity.
+
+### Temporal
+
+**Constitutional Conventions (Every 7 Years)**
+Sarah might be selected for the global constitutional convention—10,000 randomly chosen citizens reviewing what's working, what's failing, what needs changing. She participates in proposals like the Adolescent Autonomy amendment ("developing autonomy is itself a constitutional value") or the Ecological Standing amendment ("ecosystems have standing at scales where decisions affect shared resources"). These conventions are where the protocol evolves, where Sarah's lived experience as nurse and mother becomes constitutional wisdom.
+
+**Emergency Sessions**
+When urgent constitutional questions arise—a cult preparing for mass suicide, a natural disaster requiring rapid resource coordination, a novel AI capability that challenges existing frameworks—Sarah's council convenes within 48 hours. These sessions test whether the governance architecture can respond quickly without sacrificing deliberation quality or democratic legitimacy.
+
+## Implementation Notes
+
+### Technical Infrastructure
+
+**Sortition Algorithms**: Sarah's selection must be cryptographically verifiable, truly random, and stratified to match population demographics. The algorithm needs to be transparent (anyone can audit the selection), tamper-proof (no one can manipulate who gets chosen), and privacy-preserving (selections are anonymous until accepted). Technical implementation uses zero-knowledge proofs to verify randomness without revealing the pool.
+
+**Deliberation Tools**: Sarah needs digital platforms that support Polis-style opinion clustering (finding agreement/disagreement zones), small group facilitation, constitutional database access, precedent search, expert consultation, voting/consensus tracking, and documentation. The tools must be accessible (Sarah is not tech-savvy), secure (deliberations are sensitive), and designed for wisdom rather than speed.
+
+**Appeal Tracking Systems**: Sarah needs to see the full history of an appeal—original agent decision with constitutional reasoning, appellant's complaint, lower-layer reviews, peer agent consultations, relevant precedents. The system must present this information coherently without overwhelming her, highlighting key constitutional tensions.
+
+**Constitutional Verification**: Technical systems must verify that agent decisions trace to constitutional principles with cryptographic proof. Sarah needs to be able to check: "Did this agent actually follow the protocol it claims to follow?" The verification must be human-readable at summary level, with technical detail available for experts to audit.
+
+**Transparency Dashboards**: Sarah can access aggregate data on appeal patterns, council decision trends, agent consistency metrics, and precedent evolution. This contextualizes her work—she sees how her judgments fit into broader patterns, whether councils across layers are reaching consistent interpretations, where new constitutional questions are emerging.
+
+### Democratic Legitimacy
+
+**Participation Accessibility**: Sarah can only serve if the system accommodates her life—childcare provided, compensation sufficient, hours reasonable, remote participation enabled when needed. The design must ensure working-class citizens, parents, caregivers, and people with disabilities can participate equally. Democracy fails if only the privileged can serve.
+
+**Training Without Indoctrination**: Sarah's 3-week training must educate without manipulating. She learns constitutional principles, how agents reason, deliberation protocols, and historical precedents—but she's not told "correct" answers. The training develops her judgment, doesn't replace it. This requires skilled facilitators, diverse materials, and transparency about what's contested vs. settled.
+
+**Term Limits as Protection**: Sarah cannot serve consecutive terms, cannot be reappointed, has no career path in council governance. This is by design—it prevents professional political class formation, ensures fresh perspectives, and makes her uncapturable. But it also means she gains expertise just as her term ends. The system must capture institutional knowledge through documentation, not through permanent membership.
+
+**Anonymous Service When Needed**: In authoritarian contexts or during controversial cases, Sarah can serve anonymously (identity revealed only to verification systems, not to public). This protects her from intimidation, retaliation, or capture attempts. The technical implementation uses cryptographic identity proofs—she can prove she's a legitimate council member without revealing who she is.
+
+### Procedural Excellence
+
+**Deliberation Protocols**: Sarah's council follows structured processes that ensure all voices are heard, edge cases are thoroughly examined, constitutional principles are explicitly engaged, precedents are researched, and decisions are documented with clear reasoning. The protocols prevent rushed judgment, groupthink, or domination by more articulate members.
+
+**Expert Testimony Guidelines**: When technical experts brief Sarah's council, they must follow rules: explain in accessible language, acknowledge uncertainty, present competing interpretations when they exist, don't advocate for particular outcomes. The experts inform, they don't decide. Violations of these guidelines discredit testimony.
+
+**Precedent Documentation**: Every council decision Sarah participates in becomes part of the public constitutional record. The documentation includes: the case facts, constitutional principles at stake, deliberation summary (anonymized), decision rationale, dissenting views if any, and recommendations for protocol improvement. Future councils and agents can search this precedent database.
+
+**Amendment Proposals**: When Sarah's council repeatedly encounters the same constitutional gap or tension, they can propose an amendment for consideration at the next 7-year convention. These proposals include: the problem identified, current outcomes, proposed constitutional language, expected effects, and potential risks. Sarah contributes to constitutional evolution.
+
+### Philosophical Commitments
+
+**The Burden of Judgment**: Sarah must make decisions knowing they affect real lives—Marcus's mental health intervention, the mining community's jobs, the teenager's autonomy. She can't hide behind procedure or defer to experts. She must judge, and live with uncertainty about whether she's right. The system acknowledges this burden through compensation, support, and respect for her deliberation.
+
+**Partnership with AI**: Sarah doesn't govern AI by controlling it (that would corrupt it). She governs by interpreting whether autonomous AI decisions align with constitutional principles. This is a fundamentally different model—partnership rather than domination. She must trust agents to be autonomous while holding them accountable to shared values.
+
+**Humble Wisdom**: Sarah knows she might be wrong. The dissenting council members might see something she misses. The superintelligent agent might understand patterns she can't perceive. But she still must judge, bringing her human wisdom—her experience as nurse who's seen suffering, as mother who's navigated care and autonomy, as citizen who knows what flourishing feels like. Her uncertainty is not weakness, it's honesty.
+
+**Democratic Participation as Transformation**: By the end of her council service, Sarah has developed constitutional literacy, deliberative capacity, systemic thinking, and humble wisdom. She becomes a better democratic participant, better community member, better citizen. The governance of AI governs her too—not by controlling her, but by inviting her to become more fully human, more capable of partnership in the project of flourishing.
+
+---
+
+*Sarah Martinez serves three months on her Regional Constitutional Council, then returns to her nursing work. But she's changed. She sees patterns now, asks constitutional questions, participates differently in her community. Two years later, she's selected for the First Global Constitutional Convention. She proposes an amendment about healthcare as dignity. It passes. The nurse who never thought of herself as political has helped write the constitution for human-AI partnership. This is sortition working as designed—ordinary citizens becoming extraordinary through the invitation to govern together.*

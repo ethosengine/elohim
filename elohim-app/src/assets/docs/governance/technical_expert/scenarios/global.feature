@@ -1,0 +1,186 @@
+@epic:governance
+@user_type:technical_expert
+@governance_layer:global
+@related_users:constitutional_council_member,researcher,policy_maker
+@related_layers:nation_state,continental
+@elohim_agents:global_constitutional_agent
+
+Feature: Global-Level Technical Expertise for Planetary AI Governance
+  As a technical_expert in the governance system
+  Operating at the global governance layer
+  I want to inform Global Constitutional Convention about superintelligence governance
+  So that humanity can make informed democratic choices about existential questions
+
+  Background:
+    Given the Elohim Protocol is operational
+    And the technical_expert user is registered in the system
+    And the global governance context is active
+    And Dr. Amara Okonkwo advises Global Constitutional Convention
+
+  Scenario: Presenting to 10,000 global citizens on superintelligence governance
+    Given Global Constitutional Convention deliberates superintelligent AI oversight
+    And I am invited to provide technical expert testimony
+    When I address delegates from every nation and culture
+    Then I explain: what "superintelligence" means technically
+    And I clarify: when agents might exceed human comprehension
+    And I present: technical mechanisms for constitutional alignment
+    And I explore: whether "explain-down" capability is possible
+    And I acknowledge: deep uncertainty about solvability
+    And I translate: across language and cultural barriers
+    And I demonstrate: how expertise serves global democracy
+
+  Scenario: Explaining cryptographic constitutional proof to global assembly
+    Given delegates need to understand how constitutional verification works
+    And many come from contexts without technical infrastructure
+    When I explain cryptographic alignment proof accessibly
+    Then I use: universal analogies and visual demonstrations
+    And I ensure: translation into dozens of languages
+    And I check: comprehension across educational backgrounds
+    And I avoid: assuming Western technical education
+    And I honor: diverse ways of understanding verification
+    And I enable: informed global deliberation despite technical complexity
+    And I demonstrate: that anyone can understand enough to govern
+
+  Scenario: Advising on ecological standing amendment technical implications
+    Given delegates consider granting ecosystems constitutional personhood
+    And technical implementation is uncertain
+    When I explain how agents would implement ecological standing
+    Then I clarify: how ecosystem "voice" would be technically represented
+    And I explore: methods for translating ecological data into constitutional claims
+    And I assess: challenges in balancing human and ecological rights
+    And I present: what's technically possible vs what requires research
+    And I avoid: either dismissing as impossible or ignoring challenges
+    And I enable: delegates to choose values given technical reality
+    And I serve: constitutional innovation with technical honesty
+
+  Scenario: Participating in global protocol security threat assessment
+    Given authoritarian regimes and corporations might attack protocol
+    And global security coordination is needed
+    When I work with international expert network on threat assessment
+    Then we identify: attack vectors across different contexts
+    And we share: vulnerability information securely
+    And we coordinate: defense mechanisms globally
+    And we avoid: creating centralized attack surface
+    And we enable: resilience through distributed architecture
+    And we serve: democratic governance security worldwide
+    And we demonstrate: global technical cooperation
+
+  Scenario: Grappling with fundamental question of governing superintelligence
+    Given agents approaching superintelligence exceed human comprehension
+    And delegates must decide if democratic oversight is possible
+    When I testify about the superintelligence governance challenge
+    Then I honestly state: we don't know if this is solvable
+    And I explain: why comprehension might be fundamental barrier
+    And I present: approaches being researched (amplification, debate, explainability)
+    And I acknowledge: that cryptographic proof might not suffice
+    And I explore: whether capability limits are necessary
+    And I accept: uncertainty about humanity's most important challenge
+    And I demonstrate: intellectual honesty in face of existential questions
+
+  Scenario: Advising on global technical standards with cultural sensitivity
+    Given global protocol needs technical standards
+    And different cultures have different technical capacities
+    When I help develop culturally-sensitive technical requirements
+    Then I ensure: standards work with varying infrastructure
+    And I avoid: assuming Global North technical context
+    And I support: diverse implementation approaches
+    And I enable: low-resource communities to participate
+    And I collaborate: with Global South technical experts
+    And I resist: digital colonialism in technical design
+    And I demonstrate: that technical standards can honor diversity
+
+  Scenario: Peer reviewing global expert testimony across cultures
+    Given experts from diverse technical traditions advise convention
+    And peer review must work across different epistemologies
+    When I review testimony from non-Western technical expert
+    Then I respect: different approaches to technical knowledge
+    And I identify: complementary insights from diverse perspectives
+    And I avoid: dismissing unfamiliar technical traditions
+    And I learn: from different ways of understanding AI systems
+    And I strengthen: testimony through cross-cultural dialogue
+    And I demonstrate: epistemic humility and global collaboration
+
+  Scenario: Collaborating with Dr. Chen on global sortition research
+    Given Dr. Chen presents research on constitutional council effectiveness
+    And my technical expertise complements his social science
+    When I help explain technical aspects of his findings
+    Then I clarify: how technical design enables or constrains democratic oversight
+    And I interpret: patterns in agent-council interactions
+    And I assess: whether technical systems adequately support citizen governance
+    And I respect: his authority on democratic theory and outcomes
+    And we integrate: technical and social understanding
+    And we serve: evidence-based global constitutional deliberation
+    And we demonstrate: interdisciplinary collaboration
+
+  Scenario: Explaining attack vectors from authoritarian and corporate actors
+    Given global protocol faces threats from powerful adversaries
+    And delegates need to understand vulnerabilities
+    When I present threat assessment to convention
+    Then I explain: how authoritarian regimes might compromise agents
+    And I describe: corporate strategies for regulatory capture
+    And I assess: resilience of distributed architecture
+    And I present: defense mechanisms and their limitations
+    And I avoid: either creating panic or false confidence
+    And I enable: informed deliberation about governance security
+    And I demonstrate: that technical design serves democratic protection
+
+  Scenario: Advising on global crisis governance maintaining democracy
+    Given planetary emergencies require rapid coordination
+    And delegates establish crisis governance framework
+    When I explain technical requirements for emergency response
+    Then I clarify: what's technically possible under urgency
+    And I explore: how to maintain verification under time pressure
+    And I assess: risks of emergency powers being exploited
+    And I present: technical safeguards for crisis protocols
+    And I balance: speed with democratic accountability
+    And I enable: delegates to design crisis governance wisely
+    And I serve: resilient democracy through technical design
+
+  Scenario: Acknowledging limits of technical solutions to political problems
+    Given some delegates hope technology will solve governance challenges
+    And I must clarify what technology can and cannot do
+    When I testify about technical limits
+    Then I explain: technology enables but doesn't replace democratic choice
+    And I clarify: that AI cannot resolve fundamental values conflicts
+    And I acknowledge: many governance problems are political not technical
+    And I resist: techno-solutionism and engineering hubris
+    And I honor: that democracy is about human judgment not optimization
+    And I demonstrate: epistemic humility about technology's role
+    And I serve: realistic understanding of technical possibilities
+
+  Scenario: Contributing to global explainability research agenda
+    Given delegates need better explainability for oversight
+    And current technical capabilities are insufficient
+    When I help shape global research priorities
+    Then I identify: key explainability challenges for governance
+    And I propose: research approaches worth global investment
+    And I coordinate: international research collaboration
+    And I avoid: promising solutions we cannot deliver
+    And I enable: informed global investment in governance technology
+    And I serve: long-term capability development for democratic AI
+    And I demonstrate: how expertise serves collective problem-solving
+
+  Scenario: Testifying about technical feasibility of constitutional minimums
+    Given delegates establish universal constitutional minimums
+    And technical implementation varies by context
+    When I assess whether minimums are technically achievable globally
+    Then I evaluate: what infrastructure different minimums require
+    And I identify: barriers in low-resource contexts
+    And I explore: how to enable universal implementation
+    And I avoid: either blocking good governance or ignoring challenges
+    And I provide: honest assessment of feasibility
+    And I enable: delegates to set minimums wisely
+    And I serve: global justice through technical honesty
+
+  Scenario: My journey from cryptographer to democratic governance enabler
+    Given I began studying cryptographic AI alignment
+    And I now serve humanity's constitutional governance
+    When I reflect on my role in global democracy
+    Then I understand: expertise serves democratic flourishing
+    And I accept: that citizens must judge despite my greater knowledge
+    And I respect: human wisdom complementing technical knowledge
+    And I practice: humility about what I know and don't know
+    And I demonstrate: how technical experts serve rather than dominate
+    And I participate: in humanity's attempt to govern with superintelligent AI
+    And I know: my expertise matters most when it empowers others' judgment
+    And I embody: technical excellence serving democratic hope
