@@ -198,6 +198,9 @@
   width: 100%;
   margin: 0 auto;
   padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Remove padding for full-width components like lamad-home */
