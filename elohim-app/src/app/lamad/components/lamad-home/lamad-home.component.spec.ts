@@ -28,6 +28,7 @@ describe('LamadHomeComponent', () => {
     content: '# Test Content',
     contentFormat: 'markdown',
     tags: [],
+    sourcePath: 'manifesto.md',
     relatedNodeIds: [],
     metadata: {
       category: 'vision'

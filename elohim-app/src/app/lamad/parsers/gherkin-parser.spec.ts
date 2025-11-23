@@ -16,7 +16,7 @@ Scenario: Successful login
 
       const result = GherkinParser.parseFeature(content, 'auth/login.feature', 'authentication');
 
-      expect(result.feature.contentType).toBe('feature');
+      expect(result.feature.type).toBe(NodeType.FEATURE);
       expect(result.feature.title).toBe('User Authentication');
       expect(result.feature.metadata?.['category']).toBe('authentication');
       expect(result.scenarios.length).toBe(1);
