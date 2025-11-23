@@ -786,7 +786,7 @@
     height: auto;
     overflow: visible; /* Allow scrolling on body/container */
   }
-  
+
   .lamad-home-container {
     height: auto;
     min-height: 100vh;
@@ -823,7 +823,7 @@
   .sidebar-backdrop {
     display: block;
   }
-  
+
   /* ... rest of mobile styles ... */
   .content-area {
     height: auto;
@@ -840,7 +840,7 @@
     align-items: center;
     gap: 1rem;
   }
-  
+
   .learning-progress-container {
      margin-bottom: 1rem;
   }
@@ -849,23 +849,23 @@
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .home-placeholder {
     padding: 1.5rem;
   }
-  
+
   .home-title {
     font-size: 1.8rem;
   }
-  
+
   .content-header {
     padding: 1.5rem;
   }
-  
+
   .content-title {
     font-size: 1.6rem;
   }
-  
+
   .content-body {
     padding: 1.5rem;
   }
@@ -882,7 +882,7 @@
   .current-node {
     max-width: 150px;
   }
-  
+
   .graph-section.expanded {
     max-height: 800px; /* More height for stacked mobile layout */
   }

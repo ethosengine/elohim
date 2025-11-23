@@ -12,6 +12,7 @@ export * from './node-relationship.model';
 
 // Export from feature-node.model (excluding ScenarioExamples to avoid conflict)
 export type { FeatureNode } from './feature-node.model';
+export type { GherkinStep, GherkinBackground, TestStatus } from './feature-node.model';
 
 // Export from scenario-node.model (includes ScenarioExamples)
 export * from './scenario-node.model';

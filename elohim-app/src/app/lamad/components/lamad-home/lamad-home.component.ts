@@ -21,10 +21,10 @@ import { AffinityCircleComponent } from '../affinity-circle/affinity-circle.comp
 export class LamadHomeComponent implements OnInit, OnDestroy {
   // Learning path
   pathNodes: PathNodeWithAffinity[] = [];
-  
+
   // Sidebar nodes (Epics only)
   sidebarNodes: PathNodeWithAffinity[] = [];
-  
+
   // All nodes for "At a Glance"
   allContentNodes: ContentNodeWithAffinity[] = [];
 
@@ -40,13 +40,13 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   isLoading = true;
   isSidebarOpen = true;
   isSearchOpen = false;
-  
+
   // Drill-down state
   viewState: 'root' | 'drilldown' = 'root';
-  activeDrillDown: { 
-    parent: ContentNode, 
-    nodes: ContentNodeWithAffinity[], 
-    type: string 
+  activeDrillDown: {
+    parent: ContentNode,
+    nodes: ContentNodeWithAffinity[],
+    type: string
   } | null = null;
 
   private readonly destroy$ = new Subject<void>();
@@ -65,11 +65,10 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
     // Load graph and build path
     combineLatest([
-      this.graphService.graph$,
-      this.pathService.path$,
-      this.affinityService.affinity$
+      this.graphService.graph$.pipe(takeUntil(this.destroy$)),
+      this.pathService.path$.pipe(takeUntil(this.destroy$)),
+      this.affinityService.affinity$.pipe(takeUntil(this.destroy$))
     ])
-      .pipe(takeUntil(this.destroy$))
       .subscribe(([graph, path, affinity]) => {
         if (graph && path.length > 0) {
           // Enrich path nodes with affinity data
@@ -81,6 +80,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
           // Initial sidebar state (Epics) if at root
           if (this.viewState === 'root') {
+             // Filter using ContentNode property 'contentType'
              this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
           }
 
@@ -111,21 +111,21 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
           depth: pn.depth,
           category: pn.category
         }));
-        
+
         // Refresh sidebar nodes based on current view
         if (this.viewState === 'root') {
           this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
         } else if (this.viewState === 'drilldown' && this.activeDrillDown) {
            // Re-enrich drilled down nodes to update affinity colors
-           this.activeDrillDown.nodes = this.activeDrillDown.nodes.map(node => 
+           this.activeDrillDown.nodes = this.activeDrillDown.nodes.map(node =>
              this.enrichContentNode(node)
            );
            // We might want to update sidebarNodes here too if we want sidebar to reflect drilldown
-           // For now, let's keep sidebar as Epics or update it. 
+           // For now, let's keep sidebar as Epics or update it.
            // Let's update sidebar to show the current drilldown list for easier navigation
            this.updateSidebarForDrillDown();
         }
-        
+
         // Refresh all content nodes
         if (this.allContentNodes.length > 0) {
            this.allContentNodes = this.allContentNodes.map(node => this.enrichContentNode(node));
@@ -153,10 +153,10 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     this.isGraphExpanded = true;
     this.viewState = 'root';
     this.activeDrillDown = null;
-    
+
     // Reset sidebar to epics
     this.sidebarNodes = this.pathNodes.filter(pn => pn.node.contentType === 'epic');
-    
+
     this.closeSidebar();
     window.scrollTo(0, 0);
   }
@@ -175,7 +175,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   drillDown(parent: ContentNode, type: string): void {
     const relatedIds = parent.relatedNodeIds || [];
-    const relatedNodes = this.allContentNodes.filter(n => 
+    const relatedNodes = this.allContentNodes.filter(n =>
       relatedIds.includes(n.id) && n.contentType === type
     );
 
@@ -186,14 +186,14 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     };
     this.viewState = 'drilldown';
     this.selectedNode = null; // Ensure we show the list view
-    
+
     this.updateSidebarForDrillDown();
     window.scrollTo(0, 0);
   }
 
   private updateSidebarForDrillDown(): void {
     if (!this.activeDrillDown) return;
-    
+
     // Map content nodes to PathNodes for sidebar compatibility
     this.sidebarNodes = this.activeDrillDown.nodes.map((node, index) => ({
       node,
@@ -212,7 +212,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     if (!node.relatedNodeIds || node.relatedNodeIds.length === 0) return [];
 
     const counts = new Map<string, number>();
-    
+
     node.relatedNodeIds.forEach(id => {
       const related = this.allContentNodes.find(n => n.id === id);
       if (related) {
@@ -286,7 +286,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
     // Auto-track view
     this.affinityService.trackView(node.id);
-    
+
     // Scroll to top
     window.scrollTo(0, 0);
 
@@ -445,7 +445,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
     // Links
-    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+    html = html.replace(/\\\[(.*?)\\\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
 
     // Code blocks
     html = html.replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>');
@@ -501,7 +501,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       '"': '&quot;',
       "'": '&#039;'
     };
-    return text.replace(/[&<>'"]/g, (m) => map[m]);
+    return text.replace(/[&<>'"']/g, (m) => map[m]);
   }
 }
 

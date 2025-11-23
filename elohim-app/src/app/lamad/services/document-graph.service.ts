@@ -142,19 +142,37 @@ export class DocumentGraphService {
             this.http.get(`${this.DOCS_PATH}/${file.path}`, { responseType: 'text' }).pipe(
               map(content => {
                 const fullPath = file.path;
+                // Infer type if not provided
+                const type = file.type || 'article'; 
                 const category = this.inferCategoryFromPath(fullPath);
 
-                if (file.type === 'feature' || fullPath.endsWith('.feature')) {
+                if (type === 'feature' || fullPath.endsWith('.feature')) {
                   const result = GherkinParser.parseFeature(content, fullPath, category);
-                  // Return array of [FeatureNode, ...ScenarioNodes]
-                  return [result.feature, ...result.scenarios];
+                  // Convert FeatureNode and ScenarioNodes to ContentNode
+                  const featureNode = result.feature as unknown as ContentNode;
+                  featureNode.contentType = 'feature';
+                  featureNode.contentFormat = 'gherkin';
+                  featureNode.type = 'feature';
+                  
+                  const scenarioNodes = result.scenarios.map(s => {
+                      const node = s as unknown as ContentNode;
+                      node.contentType = 'scenario';
+                      node.contentFormat = 'gherkin';
+                      node.type = 'scenario';
+                      return node;
+                  });
+                  
+                  return [featureNode, ...scenarioNodes];
                 } else {
                   // Default to markdown parser
+                  // Fix: parseContent is now the entry point in MarkdownParser
                   const node = MarkdownParser.parseContent(content, fullPath);
                   // Ensure type from manifest overrides or complements parser inference if needed
                   if (file.type && file.type !== 'epic' && node.contentType === 'epic') {
                       node.contentType = file.type;
                   }
+                  // Ensure legacy type field is set for compatibility
+                  node.type = node.contentType;
                   return [node];
                 }
               }),
@@ -175,7 +193,6 @@ export class DocumentGraphService {
   private inferCategoryFromPath(path: string): string {
     const parts = path.split('/');
     if (parts.length > 1) {
-        // e.g. "autonomous_entity/community_investor/..." -> "autonomous-entity"
         return parts[0].replace(/_/g, '-');
     }
     return 'general';
@@ -256,7 +273,7 @@ export class DocumentGraphService {
         if (node.metadata) {
             const meta = node.metadata;
             
-            // related_users (e.g. ['worker', 'customer']) -> User Types
+            // related_users -> User Types
             if (Array.isArray(meta['related_users'])) {
                 meta['related_users'].forEach((userType: string) => this.linkNodes(graph, node.id, userType, RelationshipType.RELATES_TO));
             }
@@ -266,22 +283,12 @@ export class DocumentGraphService {
                 meta['related_epics'].forEach((epicId: string) => this.linkNodes(graph, node.id, epicId, RelationshipType.RELATES_TO));
             }
             
-            // related_layers -> Epics/Layers
-            if (Array.isArray(meta['related_layers'])) {
-                meta['related_layers'].forEach((layerId: string) => this.linkNodes(graph, node.id, layerId, RelationshipType.RELATES_TO));
-            }
-            
-            // primary_epic -> Epic (Belongs To)
+            // primary_epic -> Epic
             if (meta['primary_epic']) {
                 this.linkNodes(graph, node.id, meta['primary_epic'], RelationshipType.BELONGS_TO);
             }
             
-            // governance_scope -> Layers
-            if (Array.isArray(meta['governance_scope'])) {
-                 meta['governance_scope'].forEach((scopeId: string) => this.linkNodes(graph, node.id, scopeId, RelationshipType.RELATES_TO));
-            }
-            
-             // epic -> Epic (Belongs To) - specific for user types
+             // epic -> Epic
             if (meta['epic']) {
                 this.linkNodes(graph, node.id, meta['epic'], RelationshipType.BELONGS_TO);
             }
@@ -302,15 +309,7 @@ export class DocumentGraphService {
          return;
      }
      
-     // Try "epic_" prefix if target looks like an epic name but wasn't found
-     // (Since we normalize epic IDs to just the name now via generateNodeId, this might not be needed if names match)
-     // But let's try a fallback search just in case
-     // e.g. 'governance' -> 'governance' (exact)
-     // e.g. 'community' -> 'community' (exact)
-     
      // Try finding by title (case-insensitive) if ID match fails
-     // This is expensive (O(N)), but graph is small (<1000 nodes)
-     // Optimized: Iterate once? No, just do it.
      for (const [id, node] of graph.nodes.entries()) {
          if (node.title.toLowerCase() === targetId.toLowerCase()) {
              this.createRelationship(graph, sourceId, id, type);
@@ -329,8 +328,7 @@ export class DocumentGraphService {
             relationshipType: type
           });
           
-          // Add reverse relationship for navigation? 
-          // RELATES_TO is usually bidirectional in UI navigation
+          // Add reverse relationship for bi-directional nav
           if (type === RelationshipType.RELATES_TO) {
               const reverseId = `${targetId}_${type}_${sourceId}`;
               if (!graph.relationships.has(reverseId)) {
@@ -379,7 +377,7 @@ export class DocumentGraphService {
     let score = 0;
 
     if (node.title.toLowerCase().includes(query)) score += 100;
-    if (node.description && node.description.toLowerCase().includes(query)) score += 50;
+    if (node.description.toLowerCase().includes(query)) score += 50;
     if (node.content.toLowerCase().includes(query)) score += 10;
     if (node.tags.some(tag => tag.toLowerCase().includes(query))) score += 75;
 

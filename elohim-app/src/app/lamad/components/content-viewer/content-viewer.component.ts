@@ -5,13 +5,15 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
+import { NavigationService, NavigationContext } from '../../services/navigation.service';
 import { ContentNode } from '../../models/content-node.model';
-import { EpicContentPanesComponent } from '../epic-content-panes/epic-content-panes.component';
+import { DocumentNode } from '../../models/document-node.model';
+import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
 
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule, EpicContentPanesComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
@@ -22,23 +24,50 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   isLoading = true;
   error: string | null = null;
 
-  private readonly destroy$ = new Subject<void>();
+  // Hierarchical navigation context
+  navigationContext: NavigationContext | null = null;
+  breadcrumbs: Array<{ label: string; path: string; typeLabel?: string }> = [];
+  children: ContentNode[] = [];
+
+  private destroy$ = new Subject<void>();
   private nodeId: string | null = null;
 
   constructor(
-    private readonly route: ActivatedRoute,
-    private readonly router: Router,
-    private readonly graphService: DocumentGraphService,
-    private readonly affinityService: AffinityTrackingService
+    private route: ActivatedRoute,
+    private router: Router,
+    private graphService: DocumentGraphService,
+    private affinityService: AffinityTrackingService,
+    private navigationService: NavigationService
   ) {}
 
   ngOnInit(): void {
+    // Handle old-style direct content access: /content/:id
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe((params) => {
-      this.nodeId = params['id'];
-      if (this.nodeId) {
-        this.loadContent(this.nodeId);
+      const directId = params['id'];
+      if (directId) {
+        this.nodeId = directId;
+        this.loadContent(directId);
+        // Don't use hierarchical context for direct access
+        return;
       }
     });
+
+    // Handle new hierarchical navigation context
+    this.navigationService.context$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((context) => {
+        if (context && context.currentNode) {
+          this.navigationContext = context;
+          this.breadcrumbs = this.navigationService.getBreadcrumbs(context);
+
+          // Convert children to ContentNodes
+          this.children = context.children; // Already ContentNodes
+
+          // Load the current node
+          this.nodeId = context.currentNode.id;
+          this.loadContent(context.currentNode.id);
+        }
+      });
 
     // Listen for affinity changes
     this.affinityService.changes$
@@ -100,8 +129,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   private loadRelatedNodes(graph: any, relatedIds: string[]): void {
     this.relatedNodes = relatedIds
-      .map((id) => graph.nodes.get(id))
-      .filter((node): node is ContentNode => node !== undefined);
+      .map((id: string) => graph.nodes.get(id))
+      .filter((node: ContentNode | undefined): node is ContentNode => node !== undefined);
   }
 
   /**
@@ -128,10 +157,69 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Navigate to a child node in the hierarchy using composite identifiers
+   */
+  navigateToChild(child: ContentNode): void {
+    if (this.navigationContext) {
+      // Build composite parent path: "epic:id:feature:id"
+      const parentPath = this.navigationContext.pathSegments
+        .map(s => s.urlSegment)
+        .join(':');
+
+      // Navigate to child with composite identifier
+      this.navigationService.navigateTo(
+        child.contentType,
+        child.id,
+        {
+          parentPath: parentPath || undefined,
+          queryParams: this.navigationContext.queryParams
+        }
+      );
+    } else {
+      // Fallback to direct navigation with composite identifier
+      this.router.navigate(['/lamad', `${child.contentType}:${child.id}`]);
+    }
+  }
+
+  /**
+   * Navigate up one level in the hierarchy
+   */
+  navigateUp(): void {
+    this.navigationService.navigateUp();
+  }
+
+  /**
+   * Navigate to a breadcrumb using composite path
+   */
+  navigateToBreadcrumb(compositePath: string): void {
+    if (!compositePath || compositePath.length === 0) {
+      this.navigationService.navigateToHome();
+    } else {
+      this.router.navigate([`/lamad/${compositePath}`], {
+        queryParams: this.navigationContext?.queryParams || {}
+      });
+    }
+  }
+
+  /**
    * Navigate back to mission map
    */
   backToMap(): void {
     this.router.navigate(['/lamad/map']);
+  }
+
+  /**
+   * Check if we're in hierarchical navigation mode
+   */
+  isHierarchicalMode(): boolean {
+    return this.navigationContext !== null;
+  }
+
+  /**
+   * Check if there are children to display
+   */
+  hasChildren(): boolean {
+    return this.children.length > 0;
   }
 
   /**
@@ -196,7 +284,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
     // Links
-    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+    html = html.replace(/\\\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
 
     // Code blocks
     html = html.replace(/```(.*?)```/gs, '<pre><code>$1</code></pre>');
@@ -249,7 +337,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataCategory(): string | null {
     if (!this.node?.metadata?.['category']) return null;
-    return this.node.metadata['category'];
+    return this.node.metadata['category'] as string;
   }
 
   /**
@@ -269,7 +357,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataVersion(): string | null {
     if (!this.node?.metadata?.['version']) return null;
-    return this.node.metadata['version'];
+    return this.node.metadata['version'] as string;
   }
 
   /**
@@ -283,6 +371,6 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
       '"': '&quot;',
       "'": '&#039;',
     };
-    return text.replace(/[&<>"']/g, (m) => map[m]);
+    return text.replace(/[&<>"']|[']/g, (m) => map[m]);
   }
 }
