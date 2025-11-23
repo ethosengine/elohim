@@ -6,6 +6,7 @@ import { LamadHomeComponent } from './lamad-home.component';
 import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { LearningPathService } from '../../services/learning-path.service';
+import { NavigationService } from '../../services/navigation.service';
 import { DocumentGraph } from '../../models';
 import { ContentNode } from '../../models/content-node.model';
 
@@ -15,10 +16,12 @@ describe('LamadHomeComponent', () => {
   let mockDocumentGraphService: any;
   let mockAffinityService: any;
   let mockLearningPathService: any;
+  let mockNavigationService: any;
   let graphSubject: BehaviorSubject<DocumentGraph | null>;
   let pathSubject: BehaviorSubject<any[]>;
   let affinitySubject: BehaviorSubject<any>;
   let changesSubject: BehaviorSubject<any>;
+  let contextSubject: BehaviorSubject<any>;
 
   const mockContentNode: ContentNode = {
     id: 'manifesto.md',
@@ -95,6 +98,7 @@ describe('LamadHomeComponent', () => {
     pathSubject = new BehaviorSubject<any[]>(mockPathNodes);
     affinitySubject = new BehaviorSubject<any>({});
     changesSubject = new BehaviorSubject<any>(null);
+    contextSubject = new BehaviorSubject<any>({ nodeId: null, nodeType: null });
 
     mockDocumentGraphService = {
       getGraph: jasmine.createSpy('getGraph').and.returnValue(mockGraph as DocumentGraph),
@@ -133,6 +137,14 @@ describe('LamadHomeComponent', () => {
       getPathProgress: jasmine.createSpy('getPathProgress').and.returnValue(50)
     };
 
+    mockNavigationService = {
+      context$: contextSubject.asObservable(),
+      navigateToHome: jasmine.createSpy('navigateToHome'),
+      navigateUp: jasmine.createSpy('navigateUp'),
+      getCurrentContext: jasmine.createSpy('getCurrentContext').and.returnValue({ nodeId: null, nodeType: null }),
+      navigateTo: jasmine.createSpy('navigateTo')
+    };
+
     const mockSanitizer = {
       sanitize: jasmine.createSpy('sanitize').and.callFake((context: any, value: string) => value)
     };
@@ -143,6 +155,7 @@ describe('LamadHomeComponent', () => {
         { provide: DocumentGraphService, useValue: mockDocumentGraphService },
         { provide: AffinityTrackingService, useValue: mockAffinityService },
         { provide: LearningPathService, useValue: mockLearningPathService },
+        { provide: NavigationService, useValue: mockNavigationService },
         { provide: DomSanitizer, useValue: mockSanitizer },
         provideRouter([])
       ]
