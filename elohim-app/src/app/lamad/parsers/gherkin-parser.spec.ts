@@ -16,9 +16,9 @@ Scenario: Successful login
 
       const result = GherkinParser.parseFeature(content, 'auth/login.feature', 'authentication');
 
-      expect(result.feature.contentType).toBe('feature');
+      expect(result.feature.type).toBe(NodeType.FEATURE);
       expect(result.feature.title).toBe('User Authentication');
-      expect(result.feature.metadata?.['category']).toBe('authentication');
+      expect(result.feature.category).toBe('authentication');
       expect(result.scenarios.length).toBe(1);
       expect(result.scenarios[0].title).toBe('Successful login');
     });
@@ -51,7 +51,7 @@ Scenario: Test Scenario
       const result = GherkinParser.parseFeature(content, 'test.feature', 'test');
 
       const scenario = result.scenarios[0];
-      const steps = scenario.metadata?.['steps'] as any[];
+      const steps = scenario.steps;
       expect(steps.length).toBe(3);
       expect(steps[0].keyword).toBe('Given');
       expect(steps[0].text).toBe('I have a precondition');
@@ -71,7 +71,7 @@ Scenario: Test
 
       const result = GherkinParser.parseFeature(content, 'test.feature', 'test');
 
-      const steps = result.scenarios[0].metadata?.['steps'] as any[];
+      const steps = result.scenarios[0].steps;
       expect(steps.find((s: any) => s.keyword === 'And')).toBeTruthy();
       expect(steps.find((s: any) => s.keyword === 'But')).toBeTruthy();
     });
@@ -92,8 +92,8 @@ Examples:
       const result = GherkinParser.parseFeature(content, 'login.feature', 'auth');
 
       const scenario = result.scenarios[0];
-      expect(scenario.metadata?.['scenarioType']).toBe('scenario_outline');
-      const examples = scenario.metadata?.['examples'] as any[];
+      expect(scenario.scenarioType).toBe('scenario_outline');
+      const examples = scenario.examples;
       expect(examples).toBeDefined();
       expect(examples![0].headers).toEqual(['username', 'password', 'result']);
       expect(examples![0].rows.length).toBe(2);
@@ -113,7 +113,7 @@ Scenario: Checkout
 
       const result = GherkinParser.parseFeature(content, 'shop.feature', 'shopping');
 
-      const background = result.feature.metadata?.['background'] as any;
+      const background = result.feature.background;
       expect(background).toBeDefined();
       expect(background!.steps.length).toBe(2);
       expect(background!.steps[0].keyword).toBe('Given');
@@ -131,8 +131,8 @@ Scenario: View profile
       const result = GherkinParser.parseFeature(content, 'profile.feature', 'user');
 
       // Verify epicIds are arrays (parser extracts tags correctly)
-      expect(Array.isArray(result.feature.metadata?.['epicIds'])).toBe(true);
-      expect(Array.isArray(result.scenarios[0].metadata?.['epicIds'])).toBe(true);
+      expect(Array.isArray(result.feature.epicIds)).toBe(true);
+      expect(Array.isArray(result.scenarios[0].epicIds)).toBe(true);
     });
 
     it('should parse multiple scenarios', () => {
@@ -205,9 +205,9 @@ Scenario: Test Scenario
 
       const result = GherkinParser.parseFeature(content, 'test.feature', 'test');
 
-      expect(result.scenarios[0].metadata?.['featureId']).toBe(result.feature.id);
+      expect(result.scenarios[0].featureId).toBe(result.feature.id);
       expect(result.scenarios[0].relatedNodeIds).toContain(result.feature.id);
-      const scenarioIds = result.feature.metadata?.['scenarioIds'] as string[];
+      const scenarioIds = result.feature.scenarioIds;
       expect(scenarioIds).toContain(result.scenarios[0].id);
     });
 
@@ -256,7 +256,7 @@ Scenario: Test
       const result = GherkinParser.parseFeature(content, 'test.feature', 'test');
 
       expect(result.feature.content).toBe(content);
-      expect(result.feature.metadata?.['gherkinContent']).toBe(content);
+      expect(result.feature.gherkinContent).toBe(content);
     });
 
     it('should handle multiple tags on same line', () => {
@@ -284,7 +284,7 @@ Scenario: Test
       const result = GherkinParser.parseFeature(content, 'test.feature', 'test');
 
       expect(result.scenarios.length).toBe(1);
-      const steps = result.scenarios[0].metadata?.['steps'] as any[];
+      const steps = result.scenarios[0].steps;
       expect(steps.length).toBe(3);
     });
 
@@ -299,8 +299,8 @@ Scenario: Multi-epic Scenario
       const result = GherkinParser.parseFeature(content, 'test.feature', 'test');
 
       // Just verify epicIds exist and are arrays
-      expect(Array.isArray(result.feature.metadata?.['epicIds'])).toBe(true);
-      expect(Array.isArray(result.scenarios[0].metadata?.['epicIds'])).toBe(true);
+      expect(Array.isArray(result.feature.epicIds)).toBe(true);
+      expect(Array.isArray(result.scenarios[0].epicIds)).toBe(true);
     });
   });
 });
