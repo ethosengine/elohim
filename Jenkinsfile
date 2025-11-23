@@ -427,6 +427,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Install UI Playground Dependencies') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-library') {
@@ -440,6 +448,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build UI Playground') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
             steps {
                 container('builder'){
                     dir('elohim-library') {
@@ -457,6 +473,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build UI Playground Image') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
             steps {
                 container('builder'){
                     script {
@@ -499,6 +523,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push UI Playground to Harbor Registry') {
+            when {
+                anyOf {
+                    changeset "elohim-library/**"
+                    changeset "elohim-ui-playground/**"
+                    changeset "images/Dockerfile.ui-playground"
+                    changeset "images/nginx-ui-playground.conf"
+                }
+            }
             steps {
                 container('builder'){
                     script {
@@ -648,15 +680,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Deploy UI Playground to Alpha') {
             when {
-                anyOf {
-                    branch 'dev'
-                    expression { return env.BRANCH_NAME ==~ /feat-.+/ }
-                    expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
-                    expression { return env.BRANCH_NAME.contains('alpha') }
-                    // Also check CHANGE_BRANCH for PR builds
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
-                    expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                allOf {
+                    anyOf {
+                        branch 'dev'
+                        expression { return env.BRANCH_NAME ==~ /feat-.+/ }
+                        expression { return env.BRANCH_NAME ==~ /claude\/.+/ }
+                        expression { return env.BRANCH_NAME.contains('alpha') }
+                        // Also check CHANGE_BRANCH for PR builds
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /claude\/.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH ==~ /feat-.+/ }
+                        expression { return env.CHANGE_BRANCH && env.CHANGE_BRANCH.contains('alpha') }
+                    }
+                    anyOf {
+                        changeset "elohim-library/**"
+                        changeset "elohim-ui-playground/**"
+                        changeset "images/Dockerfile.ui-playground"
+                        changeset "images/nginx-ui-playground.conf"
+                        changeset "manifests/alpha-deployment-ui-playground.yaml"
+                    }
                 }
             }
             steps {
