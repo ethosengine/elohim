@@ -22,6 +22,7 @@ describe('LamadHomeComponent', () => {
   let affinitySubject: BehaviorSubject<any>;
   let changesSubject: BehaviorSubject<any>;
   let contextSubject: BehaviorSubject<any>;
+  let nodeRegistry: Map<string, ContentNode>;
 
   const mockContentNode: ContentNode = {
     id: 'manifesto.md',
@@ -94,6 +95,10 @@ describe('LamadHomeComponent', () => {
   } as DocumentGraph;
 
   beforeEach(async () => {
+    // Create a registry of ContentNodes for navigation mock
+    nodeRegistry = new Map<string, ContentNode>();
+    nodeRegistry.set(mockContentNode.id, mockContentNode);
+
     graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph as DocumentGraph);
     pathSubject = new BehaviorSubject<any[]>(mockPathNodes);
     affinitySubject = new BehaviorSubject<any>({});
@@ -142,7 +147,13 @@ describe('LamadHomeComponent', () => {
       navigateToHome: jasmine.createSpy('navigateToHome'),
       navigateUp: jasmine.createSpy('navigateUp'),
       getCurrentContext: jasmine.createSpy('getCurrentContext').and.returnValue({ nodeId: null, nodeType: null }),
-      navigateTo: jasmine.createSpy('navigateTo')
+      navigateTo: jasmine.createSpy('navigateTo').and.callFake((nodeType: string, nodeId: string, options?: any) => {
+        // Simulate navigation by emitting on context$ with the node
+        const node = nodeRegistry.get(nodeId);
+        if (node) {
+          contextSubject.next({ currentNode: node, nodeType, nodeId, viewMode: 'node' });
+        }
+      })
     };
 
     const mockSanitizer = {
@@ -260,22 +271,26 @@ describe('LamadHomeComponent', () => {
     fixture.detectChanges();
     component.selectedNode = mockContentNode;
     const nextNode = { ...mockContentNode, id: 'next-node' };
+    nodeRegistry.set(nextNode.id, nextNode);
     mockLearningPathService.getNextNode.and.returnValue({ node: nextNode, order: 1, depth: 0, category: 'core' });
 
     component.goToNext();
 
     expect(mockLearningPathService.getNextNode).toHaveBeenCalledWith(mockContentNode.id);
+    expect(mockNavigationService.navigateTo).toHaveBeenCalledWith(nextNode.contentType, nextNode.id, jasmine.any(Object));
   });
 
   it('should navigate to previous node', () => {
     fixture.detectChanges();
     component.selectedNode = mockContentNode;
     const prevNode = { ...mockContentNode, id: 'prev-node' };
+    nodeRegistry.set(prevNode.id, prevNode);
     mockLearningPathService.getPreviousNode.and.returnValue({ node: prevNode, order: 0, depth: 0, category: 'vision' });
 
     component.goToPrevious();
 
     expect(mockLearningPathService.getPreviousNode).toHaveBeenCalledWith(mockContentNode.id);
+    expect(mockNavigationService.navigateTo).toHaveBeenCalledWith(prevNode.contentType, prevNode.id, jasmine.any(Object));
   });
 
   it('should check if has next node', () => {
