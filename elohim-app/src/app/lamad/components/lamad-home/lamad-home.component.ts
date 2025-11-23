@@ -532,7 +532,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Escape HTML
+   * Escapes HTML special characters to prevent XSS attacks
    */
   private escapeHtml(text: string): string {
     const map: Record<string, string> = {
