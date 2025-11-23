@@ -69,7 +69,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
    * Build the hierarchical Meaning Map from the content graph
    */
   private buildMeaningMap(graph: any): void {
-    const allNodes = Array.from(graph.nodes.values());
+    const allNodes = Array.from(graph.nodes.values()) as ContentNode[];
     // Note: ContentNodeAdapter.fromDocumentNodes is not needed if we are already using ContentNode
     // But if we need normalization, we can use it. Assuming graph has ContentNodes now.
 
