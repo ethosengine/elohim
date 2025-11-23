@@ -19,8 +19,8 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   searchQuery = '';
   isGraphBuilding = true;
   isHomePage = false;
-  
-  private destroy$ = new Subject<void>();
+
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly documentGraphService: DocumentGraphService,
