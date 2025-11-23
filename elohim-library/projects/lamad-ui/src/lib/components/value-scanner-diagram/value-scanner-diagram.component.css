@@ -1,13 +1,210 @@
-.value-scanner-diagram-wrapper {
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  position: relative;
+.scanner-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+    background-color: #F5F4F0;
+    border-radius: 0.75rem;
+    border: 1px solid #e7e5e4;
+    width: 100%;
+    max-width: 48rem;
+    margin: 2rem auto;
+    font-family: 'Inter', sans-serif;
 }
 
-canvas {
-  width: 100%;
-  height: auto;
-  display: block;
-  background: transparent;
+.title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    color: #1c1917;
+}
+
+.description {
+    font-size: 0.875rem;
+    color: #57534e;
+    margin-bottom: 2rem;
+    text-align: center;
+    max-width: 32rem;
+    line-height: 1.5;
+}
+
+.timeline-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 2rem;
+}
+
+.line-background {
+    position: absolute;
+    top: 2rem;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: #e7e5e4;
+    z-index: 0;
+}
+
+.line-progress {
+    position: absolute;
+    top: 2rem;
+    left: 0;
+    height: 4px;
+    background-color: #C5A059;
+    z-index: 0;
+    transition: width 0.5s ease-out;
+}
+
+.steps-wrapper {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    z-index: 10;
+}
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 25%;
+}
+
+.step-icon-wrapper {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 9999px;
+    border: 2px solid #e7e5e4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    transition: all 0.3s;
+    font-size: 1.5rem;
+    color: #d6d3d1;
+}
+
+.step-icon-wrapper.active {
+    border-color: #C5A059;
+    color: #1c1917;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: scale(1.1);
+}
+
+.emoji-icon {
+    line-height: 1;
+}
+
+.negotiate-dots {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.dot-blue { background-color: #3b82f6; }
+.dot-green { background-color: #22c55e; animation-delay: 75ms; }
+.dot-gold { background-color: #C5A059; animation-delay: 150ms; }
+
+.step-content {
+    text-align: center;
+}
+
+.step-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+    color: #a8a29e;
+}
+
+.step-title.active-text {
+    color: #1c1917;
+}
+
+.step-desc {
+    font-size: 0.625rem;
+    line-height: 1.25;
+    color: #a8a29e;
+    padding: 0 0.5rem;
+}
+
+.step-desc.active-desc {
+    color: #C5A059;
+    font-weight: 500;
+}
+
+/* Bundle Card */
+.bundle-card {
+    margin-top: 2rem;
+    padding: 1rem;
+    background-color: white;
+    border: 1px solid #e7e5e4;
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 20rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.bundle-header {
+    font-size: 0.625rem;
+    font-family: monospace;
+    color: #a8a29e;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #f5f5f4;
+    padding-bottom: 0.25rem;
+}
+
+.bundle-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.bundle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.row-label {
+    color: #57534e;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.label-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+.row-value {
+    font-family: monospace;
+    font-weight: 700;
+}
+
+.value-care { color: #ef4444; }
+.value-community { color: #3b82f6; }
+
+.transition-row {
+    transition: opacity 0.5s;
+    opacity: 0.2;
+}
+
+.transition-row.visible {
+    opacity: 1;
+}
+
+@keyframes ping {
+    75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+    }
 }
