@@ -163,11 +163,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
    */
   goHome(navigate = true): void {
     this.selectedNode = null;
-    // Don't force expand on mobile to avoid jarring layout shifts
-    if (window.innerWidth >= 768) {
-        this.isGraphExpanded = true;
-    }
-    
+    this.isGraphExpanded = true;
+
     this.viewState = 'root';
     this.activeDrillDown = null;
 
@@ -177,7 +174,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     if (navigate) {
       this.navigationService.navigateToHome();
     }
-    
+
     window.scrollTo(0, 0);
   }
   

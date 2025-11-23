@@ -254,11 +254,6 @@
     overflow-x: auto;
   }
 
-  /* Hide the "Back to Site" link on mobile to save space */
-  .lamad-nav .back-link {
-    display: none;
-  }
-
   /* Hide search on mobile to save space */
   .search-container {
     display: none;
