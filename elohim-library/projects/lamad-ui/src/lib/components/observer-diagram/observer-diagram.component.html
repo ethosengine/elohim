@@ -1,3 +1,54 @@
-<div class="observer-diagram-wrapper">
-  <canvas #canvas></canvas>
+<div class="observer-container">
+  <h3 class="title">The Elohim Observer</h3>
+  <p class="description">
+    Physical privacy switches ensure sovereignty. When active, the Observer witnesses to protect and value, then forgets.
+  </p>
+
+  <div class="grid-layout">
+    <!-- Switch Control -->
+    <div class="control-column">
+      <div class="switch-container" (click)="toggleMode()">
+        <div class="switch-plate">
+          <div class="switch-toggle" [class.switch-up]="mode === 'witness'" [class.switch-down]="mode === 'private'"></div>
+          <div class="label label-top">Witness</div>
+          <div class="label label-bottom">Private</div>
+        </div>
+      </div>
+      <span class="column-label">Physical Switch</span>
+    </div>
+
+    <!-- Camera Visual -->
+    <div class="camera-column">
+      <div class="camera-lens" [class.active]="mode === 'witness'">
+        <!-- Eye Icon (SVG) -->
+        <svg *ngIf="mode === 'witness'" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-eye active-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        
+        <!-- Eye Off Icon (SVG) -->
+        <svg *ngIf="mode === 'private'" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-eye-off"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+      </div>
+      <div *ngIf="mode === 'witness'" class="processing-text">Processing...</div>
+    </div>
+
+    <!-- Data Flow -->
+    <div class="data-column">
+      <div class="data-stream-area">
+        <div *ngIf="mode === 'private'" class="no-data">NO DATA FLOW</div>
+        
+        <div *ngFor="let id of dataStream" class="data-packet">
+          <div class="packet-content">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span>Witnessed Event</span>
+          </div>
+          <div class="packet-status">Video Deleted</div>
+        </div>
+
+        <div *ngIf="mode === 'witness'" class="story-preserved">
+            <div class="badge">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+                STORY PRESERVED
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
