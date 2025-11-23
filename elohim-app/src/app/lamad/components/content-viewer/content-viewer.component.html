@@ -146,10 +146,11 @@
     <div *ngIf="hasChildren()" class="children-section">
       <h2>📂 Contents</h2>
       <div class="children-grid">
-        <div
+        <button
           *ngFor="let child of children"
           class="child-card"
-          (click)="navigateToChild(child)">
+          (click)="navigateToChild(child)"
+          type="button">
           <div class="child-header">
             <span class="child-icon">{{ getContentTypeIcon() }}</span>
             <span class="child-type">{{ child.contentType }}</span>
@@ -161,7 +162,7 @@
               Affinity: {{ getRelatedNodeAffinity(child.id) }}%
             </span>
           </div>
-        </div>
+        </button>
       </div>
     </div>
 

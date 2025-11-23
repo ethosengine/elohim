@@ -7,8 +7,6 @@ import { DocumentGraphService } from '../../services/document-graph.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { NavigationService, NavigationContext } from '../../services/navigation.service';
 import { ContentNode } from '../../models/content-node.model';
-import { DocumentNode } from '../../models/document-node.model';
-import { DocumentNodeAdapter } from '../../adapters/document-node.adapter';
 
 @Component({
   selector: 'app-content-viewer',
@@ -29,15 +27,15 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   breadcrumbs: Array<{ label: string; path: string; typeLabel?: string }> = [];
   children: ContentNode[] = [];
 
-  private destroy$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private graphService: DocumentGraphService,
-    private affinityService: AffinityTrackingService,
-    private navigationService: NavigationService
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly graphService: DocumentGraphService,
+    private readonly affinityService: AffinityTrackingService,
+    private readonly navigationService: NavigationService
   ) {}
 
   ngOnInit(): void {
@@ -48,7 +46,6 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         this.nodeId = directId;
         this.loadContent(directId);
         // Don't use hierarchical context for direct access
-        return;
       }
     });
 
@@ -56,7 +53,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     this.navigationService.context$
       .pipe(takeUntil(this.destroy$))
       .subscribe((context) => {
-        if (context && context.currentNode) {
+        if (context?.currentNode) {
           this.navigationContext = context;
           this.breadcrumbs = this.navigationService.getBreadcrumbs(context);
 
@@ -337,7 +334,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataCategory(): string | null {
     if (!this.node?.metadata?.['category']) return null;
-    return this.node.metadata['category'] as string;
+    return this.node.metadata['category'];
   }
 
   /**
@@ -357,7 +354,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
    */
   getMetadataVersion(): string | null {
     if (!this.node?.metadata?.['version']) return null;
-    return this.node.metadata['version'] as string;
+    return this.node.metadata['version'];
   }
 
   /**
@@ -371,6 +368,6 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
       '"': '&quot;',
       "'": '&#039;',
     };
-    return text.replace(/[&<>"']|[']/g, (m) => map[m]);
+    return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 }

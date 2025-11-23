@@ -19,8 +19,8 @@ export class LearningPathService {
   // based on affinity and graph structure.
   
   private _path: PathNode[] = [];
-  private pathSubject = new BehaviorSubject<PathNode[]>([]);
-  
+  private readonly pathSubject = new BehaviorSubject<PathNode[]>([]);
+
   public readonly path$ = this.pathSubject.asObservable();
 
   constructor() {}
@@ -30,7 +30,7 @@ export class LearningPathService {
          node,
          order: index,
          depth: 0, // Flattened for now
-         category: node.metadata?.['category'] || 'general'
+         category: node.metadata?.['category'] ?? 'general'
      }));
      this._path = pathNodes;
      this.pathSubject.next(pathNodes);
@@ -69,7 +69,7 @@ export class LearningPathService {
       
       let totalAffinity = 0;
       this._path.forEach(pn => {
-          totalAffinity += affinityMap.get(pn.node.id) || 0;
+          totalAffinity += affinityMap.get(pn.node.id) ?? 0;
       });
       
       return (totalAffinity / this._path.length) * 100;
