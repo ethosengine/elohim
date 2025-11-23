@@ -1,33 +1,11 @@
-import { ContentNode, ContentFormat } from '../models/content-node.model';
-import { LamadNodeType } from '../models/lamad-node-types';
-
-interface EpicSection {
-    title: string;
-    level: number;
-    anchor: string;
-    content: string;
-    embeddedReferences: EmbeddedReference[];
-}
-
-interface EmbeddedReference {
-    type: string;
-    nodeId: string;
-    position: number;
-    displayText: string;
-}
+import { ContentNode, ContentFormat, ContentMetadata } from '../models/content-node.model';
+import { EpicSection, EmbeddedReference } from '../models/epic-node.model';
 
 /**
  * Parser for Markdown documents
  * Extracts structure, sections, and embedded references into generic ContentNode
  */
 export class MarkdownParser {
-  /**
-   * Parse an epic markdown file into a ContentNode
-   */
-  static parseEpic(content: string, sourcePath: string): ContentNode {
-    return this.parseContent(content, sourcePath);
-  }
-
   /**
    * Parse a markdown file into a ContentNode
    */
@@ -37,18 +15,6 @@ export class MarkdownParser {
     // Extract frontmatter if present
     const frontmatter = this.extractFrontmatter(lines);
     const contentStart = frontmatter ? this.findContentStart(lines) : 0;
-
-    // Determine content type
-    let contentType = 'epic'; // Default
-    if (frontmatter) {
-        if (frontmatter['node_type']) {
-            contentType = frontmatter['node_type'];
-        } else if (frontmatter['user_type']) {
-            contentType = 'user_type';
-        } else if (frontmatter['type']) {
-             contentType = frontmatter['type'];
-        }
-    }
 
     // Extract title from first heading or filename
     const title = this.extractTitle(lines, contentStart) ?? this.getTitleFromPath(sourcePath);
@@ -60,14 +26,20 @@ export class MarkdownParser {
     const tags = this.extractTags(frontmatter, content);
 
     // Extract ID from frontmatter or filename
-    const id = frontmatter?.['id'] || frontmatter?.['org_id'] || frontmatter?.['user_type'] || this.generateNodeId(sourcePath);
+    const id = this.generateNodeId(sourcePath, frontmatter);
 
     // Extract feature and scenario references
     const { featureIds, relatedEpicIds } = this.extractReferences(content, tags);
 
+    // Determine content type
+    const contentType = frontmatter?.['type'] || 'epic'; 
+
     // Extract metadata
-    const metadata = {
+    const metadata: ContentMetadata = {
       ...frontmatter,
+      category: frontmatter?.['category'] ?? this.inferCategory(title, tags),
+      authors: frontmatter?.['authors'] ?? [],
+      version: frontmatter?.['version'] ?? '1.0',
       wordCount: this.countWords(content),
       headingCount: sections.length,
       sections // Keep sections in metadata for viewers that might want them
@@ -76,6 +48,7 @@ export class MarkdownParser {
     return {
       id,
       contentType,
+      type: contentType, // Legacy compatibility
       title,
       description: this.generateDescription(sections),
       tags,
@@ -87,6 +60,13 @@ export class MarkdownParser {
       createdAt: new Date(), // Placeholder
       updatedAt: new Date()  // Placeholder
     };
+  }
+
+  /**
+   * Alias for backward compatibility if needed, but prefer parseContent
+   */
+  static parseEpic(content: string, sourcePath: string): ContentNode {
+      return this.parseContent(content, sourcePath);
   }
 
   /**
@@ -197,8 +177,8 @@ export class MarkdownParser {
    */
   private static findEmbeddedReferences(line: string, position: number): EmbeddedReference[] {
     const references: EmbeddedReference[] = [];
-    const featurePattern = /\[Feature:\s*([^\]]+)\]/g;
-    const scenarioPattern = /\[Scenario:\s*([^\]]+)\]/g;
+    const featurePattern = /\ \[Feature:\s*([^\\]+)\]/g;
+    const scenarioPattern = /\ \[Scenario:\s*([^\\]+)\]/g;
 
     let match;
 
@@ -296,17 +276,17 @@ export class MarkdownParser {
   /**
    * Generate Node ID from file path
    */
-  private static generateNodeId(sourcePath: string): string {
-    const parts = sourcePath.split('/');
-    const filename = parts.pop()!.replace(/\.md$/, '').toLowerCase();
+  private static generateNodeId(sourcePath: string, frontmatter: Record<string, any> | null): string {
+    // Prefer ID from frontmatter
+    if (frontmatter?.['id']) return frontmatter['id'];
     
-    if (filename === 'readme' || filename === 'index' || filename === 'epic') {
-        // Use parent directory name
-        const parent = parts.pop();
-        return parent ? parent.toLowerCase().replace(/[^a-z0-9-]/g, '_') : filename;
-    }
-    
-    return filename.replace(/[^a-z0-9-]/g, '_');
+    // Fallback to path-based ID
+    return sourcePath
+      .split('/')
+      .pop()!
+      .replace(/\.md$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '_');
   }
 
   /**

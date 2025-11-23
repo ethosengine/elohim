@@ -211,13 +211,6 @@ export class AffinityTrackingService {
 
   /**
    * Load affinity data from localStorage
-   *
-   * SECURITY NOTE: localStorage usage is safe here.
-   * - Only stores non-sensitive user preference data (content affinity scores)
-   * - No personal identifiable information (PII) is stored
-   * - No authentication tokens or credentials are stored
-   * - Data is client-side only and used for UI personalization
-   * - Uses demo user ID for prototyping phase
    */
   private loadFromStorage(): UserAffinity {
     try {
@@ -242,12 +235,6 @@ export class AffinityTrackingService {
 
   /**
    * Save affinity data to localStorage
-   *
-   * SECURITY NOTE: localStorage usage is safe here.
-   * - Only stores non-sensitive user preference data (content affinity scores)
-   * - No personal identifiable information (PII) is stored
-   * - No authentication tokens or credentials are stored
-   * - Data is client-side only and used for UI personalization
    */
   private saveToStorage(affinity: UserAffinity): void {
     try {

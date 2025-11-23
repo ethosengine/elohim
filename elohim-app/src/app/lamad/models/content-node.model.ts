@@ -1,3 +1,5 @@
+import { DocumentNode, NodeType } from './document-node.model';
+
 /**
  * Generic content node model inspired by WordPress's post concept.
  *
@@ -11,14 +13,14 @@
  * each domain to extend the base model without rigid type hierarchies.
  */
 
-export interface ContentNode {
+export interface ContentNode extends Omit<DocumentNode, 'type'> {
   /** Unique identifier */
   id: string;
 
   /** Content type - domain-specific (e.g., 'epic', 'feature', 'scenario', 'tutorial') */
   contentType: string;
 
-  /** Type property for compatibility with DocumentNode (optional, same as contentType) */
+  /** Type property for compatibility with DocumentNode (same as contentType, but string) */
   type?: string;
 
   /** Display title */
@@ -36,8 +38,8 @@ export interface ContentNode {
   /** Tags for categorization and search */
   tags: string[];
 
-  /** Source file path (if applicable) */
-  sourcePath?: string;
+  /** Source file path */
+  sourcePath: string;
 
   /** Related node IDs (bidirectional relationships) */
   relatedNodeIds: string[];

@@ -35,7 +35,7 @@
         </button>
 
         <div class="nav-divider"></div>
-        
+
         <!-- Dynamic Section Label -->
         <div class="nav-section-label">
           <ng-container *ngIf="viewState === 'root'">Epics</ng-container>
@@ -43,7 +43,7 @@
             {{ activeDrillDown.parent.title }} / {{ activeDrillDown.type }}
           </ng-container>
         </div>
-        
+
         <!-- Back Button for Drilldown -->
         <button *ngIf="viewState === 'drilldown'"
                 class="path-item back-item"
@@ -75,11 +75,11 @@
           <button class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Toggle Sidebar">
             ☰
           </button>
-          
+
           <!-- Breadcrumbs -->
           <div class="toolbar-breadcrumbs">
              <button class="breadcrumb-link" (click)="goHome()">Home</button>
-             
+
              <ng-container *ngIf="viewState === 'drilldown' && activeDrillDown">
                <span class="separator">/</span>
                <button class="breadcrumb-link" (click)="selectNode(activeDrillDown.parent)">{{ activeDrillDown.parent.title }}</button>
@@ -133,6 +133,13 @@
               </button>
             </div>
           </div>
+          
+          <!-- Collapse Button -->
+          <div class="graph-footer">
+            <button class="collapse-btn" (click)="toggleGraph()" aria-label="Close Overview">
+              <span>▲</span> Close Overview
+            </button>
+          </div>
         </div>
       </section>
 
@@ -143,7 +150,7 @@
         <div *ngIf="!selectedNode && viewState === 'root'" class="home-placeholder">
            <h1 class="home-title">The Elohim Protocol</h1>
            <p class="home-subtitle">Explore the epics below to begin your journey.</p>
-           
+
            <div class="epic-grid">
              <div *ngFor="let item of sidebarNodes" class="epic-card">
                 <div class="epic-card-body" (click)="selectNode(item.node)" tabindex="0" (keydown.enter)="selectNode(item.node)">
@@ -155,15 +162,15 @@
                   </div>
                   <p class="epic-desc">{{ item.node.description }}</p>
                 </div>
-                
+
                 <div class="epic-footer">
                    <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
-                   <div class="hex-badge" 
+                   <div class="hex-badge"
                         [class]="'affinity-' + item.affinityLevel"
                         [title]="'Affinity: ' + getAffinityPercentage(item.affinity) + '%'">
                    </div>
                 </div>
-                
+
                 <!-- Drill Down Links -->
                 <div class="epic-drilldown" *ngIf="getRelatedGrouping(item.node).length > 0">
                    <div class="drilldown-label">Explore:</div>
@@ -181,7 +188,7 @@
              </div>
            </div>
         </div>
-        
+
         <!-- Drill-Down View (Filtered List) -->
         <div *ngIf="!selectedNode && viewState === 'drilldown' && activeDrillDown" class="home-placeholder drilldown-view">
            <div class="drilldown-header">
@@ -189,7 +196,7 @@
              <h1 class="home-title">{{ activeDrillDown.parent.title }} <span class="separator">/</span> {{ activeDrillDown.type | titlecase }}</h1>
              <p class="home-subtitle">Exploring {{ activeDrillDown.nodes.length }} items in {{ activeDrillDown.parent.title }}</p>
            </div>
-           
+
            <div class="epic-grid">
              <button *ngFor="let node of activeDrillDown.nodes"
                   class="epic-card"
@@ -207,7 +214,7 @@
                 </div>
                 <div class="epic-footer">
                    <span class="epic-category">{{ getCategoryDisplay(node.metadata['category'] || 'General') }}</span>
-                   <div class="hex-badge" 
+                   <div class="hex-badge"
                         [class]="'affinity-' + node.affinityLevel"
                         [title]="'Affinity: ' + getAffinityPercentage(node.affinity) + '%'">
                    </div>
