@@ -221,50 +221,60 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  /* Ensure header doesn't grow too tall */
   .lamad-header {
     padding: 0.5rem 1rem;
+    height: 60px;
   }
 
   .lamad-header-content {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: flex-start;
+    /* Keep horizontal layout to prevent stacking */
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .lamad-logo {
+    flex: 0 0 auto;
   }
 
   .lamad-logo h1 {
-    font-size: 1rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .lamad-nav {
+    display: flex;
     gap: 0.5rem;
-    flex-wrap: wrap;
-    width: 100%;
+    flex: 1;
+    justify-content: flex-end;
+    overflow-x: auto;
   }
 
+  /* Hide the "Back to Site" link on mobile to save space */
+  .lamad-nav .back-link {
+    display: none;
+  }
+
+  /* Hide search on mobile to save space */
   .search-container {
-    width: 100%;
-    order: 3;
-  }
-
-  .search-form {
-    max-width: 100%;
-  }
-
-  .search-input {
-    font-size: 0.875rem;
+    display: none;
   }
 
   .toolbar-theme-toggle {
-    order: 2;
+    flex: 0 0 auto;
   }
 
   .toolbar-theme-toggle ::ng-deep .theme-toggle {
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
   }
 
   .toolbar-theme-toggle ::ng-deep .theme-icon {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
 
   .lamad-main {

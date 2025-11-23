@@ -424,11 +424,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Install UI Playground Dependencies') {
             when {
-                anyOf {
-                    changeset "elohim-library/**"
-                    changeset "elohim-ui-playground/**"
-                    changeset "images/Dockerfile.ui-playground"
-                    changeset "images/nginx-ui-playground.conf"
+                allOf {
+                    not { branch 'main' }
+                    anyOf {
+                        changeset "elohim-library/**"
+                        changeset "elohim-ui-playground/**"
+                        changeset "images/Dockerfile.ui-playground"
+                        changeset "images/nginx-ui-playground.conf"
+                    }
                 }
             }
             steps {
@@ -445,11 +448,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build UI Playground') {
             when {
-                anyOf {
-                    changeset "elohim-library/**"
-                    changeset "elohim-ui-playground/**"
-                    changeset "images/Dockerfile.ui-playground"
-                    changeset "images/nginx-ui-playground.conf"
+                allOf {
+                    not { branch 'main' }
+                    anyOf {
+                        changeset "elohim-library/**"
+                        changeset "elohim-ui-playground/**"
+                        changeset "images/Dockerfile.ui-playground"
+                        changeset "images/nginx-ui-playground.conf"
+                    }
                 }
             }
             steps {
@@ -470,11 +476,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Build UI Playground Image') {
             when {
-                anyOf {
-                    changeset "elohim-library/**"
-                    changeset "elohim-ui-playground/**"
-                    changeset "images/Dockerfile.ui-playground"
-                    changeset "images/nginx-ui-playground.conf"
+                allOf {
+                    not { branch 'main' }
+                    anyOf {
+                        changeset "elohim-library/**"
+                        changeset "elohim-ui-playground/**"
+                        changeset "images/Dockerfile.ui-playground"
+                        changeset "images/nginx-ui-playground.conf"
+                    }
                 }
             }
             steps {
@@ -520,11 +529,14 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
         stage('Push UI Playground to Harbor Registry') {
             when {
-                anyOf {
-                    changeset "elohim-library/**"
-                    changeset "elohim-ui-playground/**"
-                    changeset "images/Dockerfile.ui-playground"
-                    changeset "images/nginx-ui-playground.conf"
+                allOf {
+                    not { branch 'main' }
+                    anyOf {
+                        changeset "elohim-library/**"
+                        changeset "elohim-ui-playground/**"
+                        changeset "images/Dockerfile.ui-playground"
+                        changeset "images/nginx-ui-playground.conf"
+                    }
                 }
             }
             steps {
