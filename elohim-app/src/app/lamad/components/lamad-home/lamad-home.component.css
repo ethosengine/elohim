@@ -912,8 +912,15 @@
     padding: 0.5rem 1rem;
   }
 
+  /* Hide intermediate breadcrumbs on mobile to prevent wrapping */
+  .toolbar-breadcrumbs .separator,
+  .toolbar-breadcrumbs .breadcrumb-link {
+    display: none;
+  }
+
+  /* Only show the current location on mobile */
   .current-node {
-    max-width: 150px;
+    max-width: 200px;
   }
 
   .graph-section.expanded {
