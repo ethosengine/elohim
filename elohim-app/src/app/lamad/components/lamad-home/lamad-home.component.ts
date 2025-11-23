@@ -129,16 +129,16 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     this.navigationService.context$
       .pipe(takeUntil(this.destroy$))
       .subscribe(context => {
-        if (context && context.currentNode) {
+        if (context?.currentNode) {
           // URL has a node selected
           // Update local state without navigating again
           this.selectedNode = context.currentNode;
           this.selectedAffinity = this.affinityService.getAffinity(this.selectedNode.id);
           this.affinityService.trackView(this.selectedNode.id);
-          
+
           window.scrollTo(0, 0);
           this.closeSidebar();
-        } else if (context && context.viewMode === 'home') {
+        } else if (context?.viewMode === 'home') {
           // At root /lamad
           this.goHome(false); // false = don't navigate router
         }
@@ -235,7 +235,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       node,
       order: index,
       depth: 1,
-      category: node.metadata?.['category'] || 'general',
+      category: node.metadata?.['category'] ?? 'general',
       affinity: node.affinity,
       affinityLevel: node.affinityLevel
     }));
@@ -253,7 +253,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       const related = this.allContentNodes.find(n => n.id === id);
       if (related) {
         const type = related.contentType;
-        counts.set(type, (counts.get(type) || 0) + 1);
+        counts.set(type, (counts.get(type) ?? 0) + 1);
       }
     });
 
@@ -320,17 +320,16 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   selectNode(node: ContentNode): void {
     // Use navigation service to update URL
     // The local state update will happen via subscription to context$
-    
-    const currentContext = this.navigationService.getCurrentContext();
+
     let parentPath: string | undefined;
-    
+
     // Check if it's a child of active drilldown parent
-    if (this.activeDrillDown && this.activeDrillDown.parent) {
+    if (this.activeDrillDown?.parent) {
         // Construct parent path from parent node
         // parentType:parentId
         parentPath = `${this.activeDrillDown.parent.contentType}:${this.activeDrillDown.parent.id}`;
     }
-    
+
     this.navigationService.navigateTo(node.contentType, node.id, {
         parentPath
     });
@@ -543,7 +542,7 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       '"': '&quot;',
       "'": '&#039;'
     };
-    return text.replace(/[&<>'"']/g, (m) => map[m]);
+    return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 }
 

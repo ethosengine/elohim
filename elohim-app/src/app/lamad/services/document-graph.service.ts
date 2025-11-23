@@ -79,7 +79,7 @@ export class DocumentGraphService {
    */
   getNodesByType(type: string): ContentNode[] {
     const graph = this.graphSubject.value;
-    if (!graph || !graph.nodesByType.has(type)) return [];
+    if (!graph?.nodesByType?.has(type)) return [];
 
     const ids = graph.nodesByType.get(type)!;
     return Array.from(ids)
@@ -132,7 +132,7 @@ export class DocumentGraphService {
   private loadContentFiles(): Observable<ContentNode[]> {
     return this.http.get<{ files: { path: string; type: string }[] }>(this.MANIFEST_PATH).pipe(
       switchMap(manifest => {
-        if (!manifest || !manifest.files) {
+        if (!manifest?.files) {
             console.warn('Manifest empty or invalid');
             return of([]);
         }
@@ -153,15 +153,9 @@ export class DocumentGraphService {
                   featureNode.contentType = 'feature';
                   featureNode.contentFormat = 'gherkin';
                   featureNode.type = 'feature';
-                  
-                  const scenarioNodes = result.scenarios.map(s => {
-                      const node = s as unknown as ContentNode;
-                      node.contentType = 'scenario';
-                      node.contentFormat = 'gherkin';
-                      node.type = 'scenario';
-                      return node;
-                  });
-                  
+
+                  const scenarioNodes = this.convertScenariosToContentNodes(result.scenarios);
+
                   return [featureNode, ...scenarioNodes];
                 } else {
                   // Default to markdown parser
@@ -382,5 +376,15 @@ export class DocumentGraphService {
     if (node.tags.some(tag => tag.toLowerCase().includes(query))) score += 75;
 
     return score;
+  }
+
+  private convertScenariosToContentNodes(scenarios: any[]): ContentNode[] {
+    return scenarios.map(s => {
+      const node = s as unknown as ContentNode;
+      node.contentType = 'scenario';
+      node.contentFormat = 'gherkin';
+      node.type = 'scenario';
+      return node;
+    });
   }
 }

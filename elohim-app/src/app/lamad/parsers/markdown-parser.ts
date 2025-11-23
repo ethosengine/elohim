@@ -1,4 +1,4 @@
-import { ContentNode, ContentFormat, ContentMetadata } from '../models/content-node.model';
+import { ContentNode, ContentMetadata } from '../models/content-node.model';
 import { EpicSection, EmbeddedReference } from '../models/epic-node.model';
 
 /**
@@ -32,7 +32,7 @@ export class MarkdownParser {
     const { featureIds, relatedEpicIds } = this.extractReferences(content, tags);
 
     // Determine content type
-    const contentType = frontmatter?.['type'] || 'epic'; 
+    const contentType = frontmatter?.['type'] ?? 'epic'; 
 
     // Extract metadata
     const metadata: ContentMetadata = {
@@ -177,8 +177,8 @@ export class MarkdownParser {
    */
   private static findEmbeddedReferences(line: string, position: number): EmbeddedReference[] {
     const references: EmbeddedReference[] = [];
-    const featurePattern = /\ \[Feature:\s*([^\\]+)\]/g;
-    const scenarioPattern = /\ \[Scenario:\s*([^\\]+)\]/g;
+    const featurePattern = /\[Feature:\s*([^\]]+)\]/g;
+    const scenarioPattern = /\[Scenario:\s*([^\]]+)\]/g;
 
     let match;
 

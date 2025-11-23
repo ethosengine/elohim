@@ -149,7 +149,10 @@
         <div
           *ngFor="let child of children"
           class="child-card"
-          (click)="navigateToChild(child)">
+          (click)="navigateToChild(child)"
+          (keydown.enter)="navigateToChild(child)"
+          tabindex="0"
+          role="button">
           <div class="child-header">
             <span class="child-icon">{{ getContentTypeIcon() }}</span>
             <span class="child-type">{{ child.contentType }}</span>
