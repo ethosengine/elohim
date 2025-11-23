@@ -69,7 +69,13 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
       });
     }
   }
-  
+
+  navigateToAbout(): void {
+    // Navigate to the About content in the knowledge graph
+    // The ID is generated from the filename: lamad-about.md -> lamad-about
+    this.router.navigate(['/lamad/content', 'lamad-about']);
+  }
+
   private checkIfHomePage(): void {
     this.isHomePage = this.router.url === '/lamad' || this.router.url === '/lamad/';
   }
