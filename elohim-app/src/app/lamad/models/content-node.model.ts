@@ -1,3 +1,5 @@
+import { GeographicContext, Place } from './place.model';
+
 /**
  * ContentNode - The fundamental unit of content in the Territory.
  *

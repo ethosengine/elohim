@@ -250,7 +250,7 @@ describe('ContentNode Model', () => {
       const metadata: ContentGraphMetadata = {
         nodeCount: 0,
         relationshipCount: 0,
-        lastUpdated: new Date(),
+        lastUpdated: new Date().toISOString(),
         version: '1.0'
       };
 
@@ -305,14 +305,14 @@ describe('ContentNode Model', () => {
       const metadata: ContentGraphMetadata = {
         nodeCount: 100,
         relationshipCount: 250,
-        lastUpdated: new Date('2025-01-01'),
+        lastUpdated: '2025-01-01T00:00:00.000Z',
         version: '2.0'
       };
 
       expect(metadata.nodeCount).toBe(100);
       expect(metadata.relationshipCount).toBe(250);
       expect(metadata.version).toBe('2.0');
-      expect(metadata.lastUpdated instanceof Date).toBe(true);
+      expect(typeof metadata.lastUpdated).toBe('string');
     });
   });
 });
