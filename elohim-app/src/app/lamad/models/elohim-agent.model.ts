@@ -291,7 +291,7 @@ export interface AttestationRecommendationParams {
 export interface KnowledgeMapSynthesisParams {
   type: 'knowledge-map-synthesis';
   mapId?: string;
-  subjectType: 'domain' | 'person' | 'collective';
+  subjectType: 'domain' | 'person' | 'self' | 'collective';
   subjectId: string;
 }
 
@@ -379,7 +379,7 @@ export interface ConstitutionalReasoning {
 export type ElohimResponsePayload =
   | ContentReviewResult
   | AttestationRecommendation
-  | KnowledgeMapUpdate
+  | ElohimKnowledgeMapUpdate
   | SpiralDetectionResult
   | PathAnalysisResult;
 
@@ -406,7 +406,7 @@ export interface AttestationRecommendation {
   reasoning: string;
 }
 
-export interface KnowledgeMapUpdate {
+export interface ElohimKnowledgeMapUpdate {
   type: 'knowledge-map-update';
   mapId: string;
   nodesAdded?: number;

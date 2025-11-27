@@ -83,7 +83,7 @@ export class ElohimAgentService {
           id: agent.id,
           displayName: agent.displayName,
           layer: agent.layer as ElohimLayer,
-          bio: agent.bio,
+          bio: agent.bio || '',
           attestations: agent.attestations || [],
           capabilities: (agent.capabilities || []) as ElohimCapability[],
           visibility: agent.visibility as 'public' | 'private',

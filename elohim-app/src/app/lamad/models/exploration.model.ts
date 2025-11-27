@@ -214,7 +214,7 @@ export interface QueryCost {
   canExecute: boolean;
 
   /** If cannot execute, why not */
-  blockedReason?: 'rate-limit-exceeded' | 'insufficient-attestation' | 'query-too-expensive';
+  blockedReason?: 'rate-limit-exceeded' | 'insufficient-attestation' | 'query-too-expensive' | 'invalid-query';
 }
 
 // ============================================================================

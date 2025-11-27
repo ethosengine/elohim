@@ -86,6 +86,39 @@ export class AgentService {
   }
 
   /**
+   * Get the current agent synchronously.
+   * @deprecated Use getCurrentAgent() observable instead
+   */
+  getAgent(): Agent | null {
+    return this.agentSubject.value;
+  }
+
+  /**
+   * Get all progress records for the current agent.
+   * Scans localStorage for all progress entries.
+   */
+  getAgentProgress(): Observable<AgentProgress[]> {
+    const progress: AgentProgress[] = [];
+    const agentId = this.getCurrentAgentId();
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(`lamad-progress-${agentId}-`)) {
+        try {
+          const data = localStorage.getItem(key);
+          if (data) {
+            progress.push(JSON.parse(data) as AgentProgress);
+          }
+        } catch {
+          // Skip malformed entries
+        }
+      }
+    }
+
+    return of(progress);
+  }
+
+  /**
    * Get the current agent ID (synchronous, for cache keys).
    */
   getCurrentAgentId(): string {

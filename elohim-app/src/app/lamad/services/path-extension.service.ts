@@ -644,7 +644,7 @@ export class PathExtensionService {
         }
 
         // Only path owner can enable collaboration
-        if (path.authorId !== this.currentAgentId) {
+        if (path.createdBy !== this.currentAgentId) {
           return throwError(() => ({
             code: 'UNAUTHORIZED',
             message: 'Only path owner can enable collaboration'
