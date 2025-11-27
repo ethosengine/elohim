@@ -148,7 +148,10 @@ describe('AgentService', () => {
     });
 
     it('should check content access via session service', () => {
-      const metadata: ContentAccessMetadata = { requiredLevel: 'member' };
+      const metadata: ContentAccessMetadata = {
+        accessLevel: 'gated',
+        requirements: { minLevel: 'member' }
+      };
       const result = service.checkContentAccess(metadata);
       expect(sessionUserServiceSpy.checkContentAccess).toHaveBeenCalledWith(metadata);
     });
