@@ -26,7 +26,7 @@ describe('ContentService', () => {
     id: 'related-1',
     title: 'Related Content',
     description: 'Related content node',
-    contentType: 'example',
+    contentType: 'concept',
     contentFormat: 'markdown',
     content: '# Related',
     tags: ['related'],
@@ -47,14 +47,14 @@ describe('ContentService', () => {
         id: 'content-2',
         title: 'Angular Tutorial',
         description: 'Build apps with Angular',
-        contentType: 'tutorial' as ContentType,
+        contentType: 'video' as ContentType,
         tags: ['angular', 'framework']
       },
       {
         id: 'content-3',
         title: 'Testing Guide',
         description: 'Write tests for Angular',
-        contentType: 'guide' as ContentType,
+        contentType: 'book-chapter' as ContentType,
         tags: ['testing', 'angular']
       }
     ]
@@ -134,10 +134,10 @@ describe('ContentService', () => {
     });
 
     it('should handle undefined relatedNodeIds', (done) => {
-      const contentNoProperty: ContentNode = {
-        ...mockContent,
-        relatedNodeIds: undefined
+      const contentNoProperty: any = {
+        ...mockContent
       };
+      delete contentNoProperty.relatedNodeIds;
       dataLoaderSpy.getContent.and.returnValue(of(contentNoProperty));
 
       service.getRelatedResourceIds('test-content').subscribe(ids => {
@@ -262,7 +262,7 @@ describe('ContentService', () => {
     });
 
     it('should return empty array for no matches', (done) => {
-      service.getContentByType('reference').subscribe(results => {
+      service.getContentByType('assessment').subscribe(results => {
         expect(results.length).toBe(0);
         done();
       });
@@ -274,16 +274,16 @@ describe('ContentService', () => {
           ...mockContentIndex.nodes,
           {
             id: 'content-4',
-            title: 'Another Tutorial',
-            description: 'More tutorials',
-            contentType: 'tutorial' as ContentType,
+            title: 'Another Video',
+            description: 'More videos',
+            contentType: 'video' as ContentType,
             tags: ['example']
           }
         ]
       };
       dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithDuplicates));
 
-      service.getContentByType('tutorial').subscribe(results => {
+      service.getContentByType('video').subscribe(results => {
         expect(results.length).toBe(2);
         expect(results[0].id).toBe('content-2');
         expect(results[1].id).toBe('content-4');
