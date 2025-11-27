@@ -40,11 +40,11 @@ export interface Attestation {
   /** The unique journey taken to earn this attestation */
   journey?: AttestationJourney;
 
-  /** When this attestation was earned */
-  earnedAt: Date;
+  /** When this attestation was earned (ISO 8601 string) */
+  earnedAt: string;
 
-  /** Optional expiration (some attestations may need renewal) */
-  expiresAt?: Date;
+  /** Optional expiration (some attestations may need renewal, ISO 8601 string) */
+  expiresAt?: string;
 
   /** Who/what issued this attestation */
   issuedBy?: string;  // 'system', 'community', or specific steward ID
@@ -81,9 +81,9 @@ export interface AttestationJourney {
   /** Time invested in the journey */
   timeInvested?: number;  // milliseconds
 
-  /** Duration of the journey */
-  startDate: Date;
-  endDate: Date;
+  /** Duration of the journey (ISO 8601 strings) */
+  startDate: string;
+  endDate: string;
 }
 
 /**
@@ -92,7 +92,7 @@ export interface AttestationJourney {
 export interface Endorsement {
   endorserId: string;
   endorserName?: string;
-  endorsedAt: Date;
+  endorsedAt: string;
   reason?: string;
   weight?: number;  // Some endorsers may have more weight based on their own attestations
 }
@@ -124,10 +124,14 @@ export interface AttestationRequirement {
 }
 
 /**
- * Content access requirements - what attestations unlock which content
+ * Attestation-based access requirements - what attestations unlock which content
  * (Smart contracts for human flourishing, negotiated by agents, expressed in plain text)
+ *
+ * NOTE: This is distinct from ContentAccessRequirement in content-access.model.ts
+ * - AttestationAccessRequirement: What ATTESTATIONS unlock (earned credentials → content access)
+ * - ContentAccessRequirement: What ACCESS LEVEL is required (visitor/member/attested → content tiers)
  */
-export interface ContentAccessRequirement {
+export interface AttestationAccessRequirement {
   contentNodeId: string;
 
   /** Attestations required to view this content (OR logic) */
@@ -164,7 +168,7 @@ export interface ContentAccessRequirement {
 export interface UserAttestations {
   userId: string;
   attestations: Attestation[];
-  lastUpdated: Date;
+  lastUpdated: string;
 }
 
 /**
@@ -182,5 +186,5 @@ export interface AttestationProgress {
     durationSoFar: number;
   };
   percentComplete: number;
-  estimatedCompletion?: Date;
+  estimatedCompletion?: string;
 }

@@ -103,7 +103,7 @@ export class AffinityTrackingService {
         ...current.affinity,
         [nodeId]: clampedValue,
       },
-      lastUpdated: new Date(),
+      lastUpdated: new Date().toISOString(),
     };
 
     this.affinitySubject.next(updated);
@@ -114,7 +114,7 @@ export class AffinityTrackingService {
       nodeId,
       oldValue,
       newValue: clampedValue,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     });
 
     // Notify session service of affinity change
@@ -250,7 +250,7 @@ export class AffinityTrackingService {
     const fresh: UserAffinity = {
       userId: this.getUserId(),
       affinity: {},
-      lastUpdated: new Date(),
+      lastUpdated: new Date().toISOString(),
     };
     this.affinitySubject.next(fresh);
     this.saveToStorage(fresh);
@@ -265,8 +265,10 @@ export class AffinityTrackingService {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Restore Date object
-        parsed.lastUpdated = new Date(parsed.lastUpdated);
+        // Ensure lastUpdated is ISO 8601 string (migration from Date objects)
+        if (parsed.lastUpdated && typeof parsed.lastUpdated !== 'string') {
+          parsed.lastUpdated = new Date(parsed.lastUpdated).toISOString();
+        }
         return parsed;
       }
     } catch (error) {
@@ -277,7 +279,7 @@ export class AffinityTrackingService {
     return {
       userId: this.getUserId(),
       affinity: {},
-      lastUpdated: new Date(),
+      lastUpdated: new Date().toISOString(),
     };
   }
 

@@ -104,6 +104,53 @@ export interface ContentNode {
   flags?: ContentFlag[];
 
   // =========================================================================
+  // Feedback Profile (What engagement is permitted)
+  // =========================================================================
+
+  /**
+   * Feedback profile governing what engagement mechanisms are permitted.
+   * Orthogonal to reach (reach = WHERE, feedbackProfile = HOW).
+   * See feedback-profile.model.ts for details.
+   *
+   * "Virality is a privilege, not an entitlement."
+   */
+  feedbackProfileId?: string;
+
+  /**
+   * Denormalized permitted mechanisms for quick access.
+   * Full profile fetched separately when needed.
+   */
+  permittedFeedbackMechanisms?: string[];
+
+  // =========================================================================
+  // Geographic Context (Embodied Place Awareness)
+  // =========================================================================
+
+  /**
+   * Geographic context for this content (parallel to social reach).
+   *
+   * Social reach (ContentReach) determines WHO can access content.
+   * Geographic reach determines WHERE content is physically relevant.
+   * Elohim apply wisdom to align both dimensions with constitutional values.
+   *
+   * Example: A neighborhood newsletter might have:
+   * - reach: 'community' (social - community members)
+   * - geographicContext.reach: 'neighborhood' (spatial - only locally relevant)
+   *
+   * See place.model.ts for full geographic types.
+   */
+  geographicContext?: GeographicContext;
+
+  /**
+   * If this content IS a place (contentType: 'place').
+   * Places are first-class ContentNodes - they have attestations, reach, governance.
+   * Place names are Elohim-negotiated social constructs subject to deliberation.
+   *
+   * See place.model.ts for the full Place interface.
+   */
+  placeData?: Place;
+
+  // =========================================================================
   // Timestamps
   // =========================================================================
 
@@ -301,8 +348,8 @@ export interface ContentGraphMetadata {
   /** Total number of relationships */
   relationshipCount: number;
 
-  /** Last updated timestamp */
-  lastUpdated: Date;
+  /** Last updated timestamp (ISO 8601 string) */
+  lastUpdated: string;
 
   /** Version of the graph schema */
   version: string;

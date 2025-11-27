@@ -19,8 +19,8 @@ export interface UserAffinity {
   /** Map of node IDs to affinity values (0.0 to 1.0) */
   affinity: { [nodeId: string]: number };
 
-  /** Last updated timestamp */
-  lastUpdated: Date;
+  /** Last updated timestamp (ISO 8601 string) */
+  lastUpdated: string;
 }
 
 export interface AffinityStats {
@@ -73,5 +73,5 @@ export interface AffinityChangeEvent {
   nodeId: string;
   oldValue: number;
   newValue: number;
-  timestamp: Date;
+  timestamp: string;
 }

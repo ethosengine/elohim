@@ -26,14 +26,20 @@
  *
  * From most immutable (global) to most flexible (individual):
  * - Global: Universal principles, existential boundaries
+ * - Bioregional: Ecological boundaries that human governance CANNOT override
  * - Nation-state: Constitutional interpretations, cultural expressions
  * - Provincial/Municipal: Local policy, regional adaptation
  * - Community: Group norms, specific practices
  * - Family: Household values, private governance
  * - Individual: Personal sovereignty within bounds
+ *
+ * The BIOREGIONAL layer is special: it represents ecological limits that are
+ * constitutional constraints on human activity. The watershed Elohim doesn't
+ * advise - it enforces. "The earth is the Lord's" (Psalm 24:1).
  */
 export type ElohimLayer =
   | 'global'
+  | 'bioregional'    // NEW: Ecological boundary enforcers (constitutional limits)
   | 'nation-state'
   | 'provincial'
   | 'municipal'
@@ -44,15 +50,20 @@ export type ElohimLayer =
 /**
  * Layer hierarchy for constitutional precedence.
  * Higher layers override lower layers in case of conflict.
+ *
+ * NOTE: Bioregional is at level 6 alongside nation-state, but has
+ * ECOLOGICAL OVERRIDE on matters of ecological limits. The watershed
+ * Elohim can override nation-state on water availability limits.
  */
 export const ELOHIM_LAYER_HIERARCHY: Record<ElohimLayer, number> = {
-  'global': 6,
-  'nation-state': 5,
-  'provincial': 4,
-  'municipal': 3,
-  'community': 2,
-  'family': 1,
-  'individual': 0
+  'global': 7,
+  'bioregional': 6,    // Same level as nation-state but with ecological override
+  'nation-state': 6,
+  'provincial': 5,
+  'municipal': 4,
+  'community': 3,
+  'family': 2,
+  'individual': 1
 };
 
 // ============================================================================
@@ -95,7 +106,23 @@ export type ElohimCapability =
 
   // Family/Individual Operations
   | 'family-value-alignment'       // Align with family-specific values
-  | 'personal-agent-support';      // Support individual agent needs
+  | 'personal-agent-support'       // Support individual agent needs
+
+  // Feedback Profile Operations (Virality is a privilege)
+  | 'feedback-profile-negotiation' // Negotiate content feedback profiles
+  | 'feedback-profile-enforcement' // Enforce feedback mechanism restrictions
+  | 'feedback-profile-upgrade'     // Approve profile upgrades (more mechanisms)
+  | 'feedback-profile-downgrade'   // Execute profile downgrades (intellectual humility)
+
+  // Place & Geographic Operations (Embodied awareness)
+  | 'place-attestation'           // Attest to place existence/boundaries
+  | 'place-naming-governance'     // Participate in naming deliberation
+  | 'geographic-reach-assignment' // Assign geographic reach to content
+  | 'bioregional-enforcement'     // Enforce ecological limits (boundary enforcer)
+  | 'cultural-context-mediation'  // Mediate cultural place disputes
+  | 'place-relationship-mapping'  // Map place relationships
+  | 'ecological-limit-assessment' // Assess ecological limits
+  | 'place-stewardship';          // General place stewardship
 
 // ============================================================================
 // Elohim Agent Entity
@@ -133,12 +160,44 @@ export interface ElohimAgent {
   /** Constitutional binding proof (in production: cryptographic verification) */
   constitutionalBinding?: ConstitutionalBinding;
 
+  /** Place-awareness configuration (for geographically-aware Elohim) */
+  placeAwareness?: ElohimPlaceAwareness;
+
   /** Timestamps */
   createdAt: string;
   updatedAt: string;
 
   /** Metadata */
   metadata?: Record<string, unknown>;
+}
+
+/**
+ * ElohimPlaceAwareness - Place-specific configuration for an Elohim.
+ *
+ * Bioregional Elohim are boundary enforcers - they represent ecological limits
+ * that human governance cannot override.
+ */
+export interface ElohimPlaceAwareness {
+  /** What places does this Elohim serve? (Place IDs) */
+  servicePlaces: string[];
+
+  /** Is this a bioregional Elohim (boundary enforcer)? */
+  isBioregionalEnforcer: boolean;
+
+  /** If bioregional, reference to the authority record */
+  bioregionalAuthorityId?: string;
+
+  /** Geographic scope even without specific places */
+  geographicScope?: 'hyperlocal' | 'neighborhood' | 'municipal' | 'regional' | 'national' | 'continental' | 'global';
+
+  /** Languages this Elohim serves in these places */
+  serviceLanguages?: string[];
+
+  /** Cultural contexts this Elohim understands */
+  culturalCompetencies?: string[];
+
+  /** For bioregional enforcers: what ecological limits? (EcologicalLimitType references) */
+  enforcedLimitTypes?: string[];
 }
 
 /**
