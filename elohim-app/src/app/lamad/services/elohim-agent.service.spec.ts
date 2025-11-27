@@ -3,12 +3,13 @@ import { of } from 'rxjs';
 import { ElohimAgentService } from './elohim-agent.service';
 import { DataLoaderService } from './data-loader.service';
 import { ElohimRequest, ElohimCapability } from '../models/elohim-agent.model';
+import { Agent } from '../models/agent.model';
 
 describe('ElohimAgentService', () => {
   let service: ElohimAgentService;
   let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
 
-  const mockAgentIndex = {
+  const mockAgentIndex: { agents: Agent[] } = {
     agents: [
       {
         id: 'elohim-guardian',
