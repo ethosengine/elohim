@@ -454,5 +454,42 @@ describe('PathService', () => {
         done();
       });
     });
+
+    it('should handle empty path (no steps)', (done) => {
+      const emptyPath: LearningPath = {
+        ...mockPath,
+        steps: []
+      };
+      dataLoaderSpy.getPath.and.returnValue(of(emptyPath));
+
+      service.getCompletionPercentage('test-path').subscribe(percentage => {
+        expect(percentage).toBe(0);
+        done();
+      });
+    });
+  });
+
+  describe('additional coverage', () => {
+    it('should handle getPath errors in getPathStep', (done) => {
+      dataLoaderSpy.getPath.and.returnValue(throwError(() => new Error('Path load failed')));
+
+      service.getPathStep('test-path', 0).subscribe({
+        error: err => {
+          expect(err.message).toContain('Path load failed');
+          done();
+        }
+      });
+    });
+
+    it('should handle getContent errors in getPathStep', (done) => {
+      dataLoaderSpy.getContent.and.returnValue(throwError(() => new Error('Content load failed')));
+
+      service.getPathStep('test-path', 0).subscribe({
+        error: err => {
+          expect(err.message).toContain('Content load failed');
+          done();
+        }
+      });
+    });
   });
 });

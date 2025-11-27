@@ -283,6 +283,9 @@ describe('AgentService', () => {
   describe('updateAffinity', () => {
     beforeEach(() => {
       service.clearProgressCache();
+      dataLoaderSpy.getAgentProgress.calls.reset();
+      dataLoaderSpy.saveAgentProgress.calls.reset();
+      dataLoaderSpy.getAgentProgress.and.returnValue(of(mockProgress));
     });
 
     it('should update affinity for a step', (done) => {
