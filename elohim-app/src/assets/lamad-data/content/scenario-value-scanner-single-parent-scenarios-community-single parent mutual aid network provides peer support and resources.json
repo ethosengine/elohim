@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-single parent mutual aid network provides peer support and resources",
+  "contentType": "scenario",
+  "title": "Single parent mutual aid network provides peer support and resources",
+  "description": "Single parent mutual aid network provides peer support and resources",
+  "content": "Scenario: Single parent mutual aid network provides peer support and resources\n    Given Maria shares specific challenges with other single parents\n    And they can support each other in ways non-single-parents cannot\n    When Maria connects to community single parent networks\n    Then the community_elohim should facilitate single parent mutual aid\n    And it should coordinate resource sharing specific to solo parenting needs\n    And it should enable peer support among those with lived experience\n    And single parent network should provide understanding and practical help\n    And Maria should have community that truly comprehends solo parenting reality\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm financial transparency builds trust and informed decision-making",
+  "contentType": "scenario",
+  "title": "Farm financial transparency builds trust and informed decision-making",
+  "description": "Farm financial transparency builds trust and informed decision-making",
+  "content": "Scenario: Farm financial transparency builds trust and informed decision-making\n    Given farmworkers previously had no visibility into farm finances\n    And lack of transparency created distrust and uninformed compensation discussions\n    When democratic governance requires financial transparency\n    Then farmworkers see complete financial picture: revenue, costs, margins, investments\n    And compensation decisions are informed by transparent profit distribution\n    And financial education is provided helping workers understand farm economics\n    And trust builds through transparency replacing suspicion from opacity\n    And workplace_elohim provides financial transparency dashboards for democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

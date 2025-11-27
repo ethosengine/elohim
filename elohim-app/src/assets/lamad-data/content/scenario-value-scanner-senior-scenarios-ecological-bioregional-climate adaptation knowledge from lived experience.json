@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-climate adaptation knowledge from lived experience",
+  "contentType": "scenario",
+  "title": "Climate adaptation knowledge from lived experience",
+  "description": "Climate adaptation knowledge from lived experience",
+  "content": "Scenario: Climate adaptation knowledge from lived experience\n    Given Margaret has observed environmental changes over decades\n    And adaptation requires long-term observation\n    When the bioregional_elohim coordinates climate adaptation\n    Then Margaret's observations should inform adaptation strategies\n    And her knowledge of changing patterns should be valued\n    And long-term perspective should shape bioregional planning\n    And senior experience should guide community resilience\n    And climate adaptation should benefit from elder wisdom\n    And Margaret's lifetime of observation should serve collective response\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

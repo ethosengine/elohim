@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+  "contentType": "scenario",
+  "title": "Child contributes to science fair project collaboration",
+  "description": "Child contributes to science fair project collaboration",
+  "content": "Scenario: Child contributes to science fair project collaboration\n    Given Emma is working on a science fair project about local ecology\n    And several classmates are working on related projects\n    When Emma creates a contribution about discovering salamanders in the creek\n    And she shares photos and observations with classmates\n    Then the contribution reaches her project team immediately\n    And her teacher can provide feedback and guidance\n    And the learning agent surfaces related educational resources\n    And Emma learns collaborative research skills\n    And the project documentation is preserved for science fair presentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:elder,content_creator,community_moderator",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:guardian_agent,learning_agent,moderation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-educational",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-educational",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

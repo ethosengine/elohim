@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-sustainable protein choices within budget",
+  "contentType": "scenario",
+  "title": "Sustainable protein choices within budget",
+  "description": "Sustainable protein choices within budget",
+  "content": "Scenario: Sustainable protein choices within budget\n    Given protein production has varied environmental impact\n    And Aisha wants to make sustainable choices\n    When Aisha selects protein sources\n    Then the bioregional_elohim should show environmental impact differences\n    And it should highlight lower-impact protein options\n    And it should help her access affordable sustainable proteins\n    And plant-based options should be presented when cheaper\n    And environmental impact should inform protein decisions\n    And sustainable nutrition should be achievable on her budget\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

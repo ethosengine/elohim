@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-appeal involving adolescent autonomy within family",
+  "contentType": "scenario",
+  "title": "Appeal involving adolescent autonomy within family",
+  "description": "Appeal involving adolescent autonomy within family",
+  "content": "Scenario: Appeal involving adolescent autonomy within family\n    Given I am a teenager whose Family Elohim restricted my social media use\n    And I believe this violates my developing autonomy\n    And my parents supported the agent's decision\n    When I file an appeal for my individual autonomy rights\n    Then the Constitutional Council considers \"developing autonomy\" as constitutional value\n    And They balance parental care responsibility with adolescent independence\n    And They evaluate if the restriction was proportionate to actual risk\n    And They consider age-appropriate autonomy recognition\n    And The appeal may establish family-specific boundaries for future interventions\n    And My voice is heard even within family authority structures\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

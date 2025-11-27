@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-right to disconnect maintained for teen autonomy",
+  "contentType": "scenario",
+  "title": "Right to disconnect maintained for teen autonomy",
+  "description": "Right to disconnect maintained for teen autonomy",
+  "content": "Scenario: Right to disconnect maintained for teen autonomy\n    Given Jasmine has been using the Value Scanner extensively\n    And constitutional constraints protect her agency\n    When Jasmine chooses to disconnect from the system\n    Then the disconnection must be honored immediately\n    And no data retention beyond legal requirements should occur\n    And no manipulative patterns to retain usage should be employed\n    And her right to not participate must be respected\n    And her care contributions should be exportable in standard format\n    And she should maintain full control over her participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

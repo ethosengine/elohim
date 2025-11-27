@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-managing shared grocery shopping efficiently",
+  "contentType": "scenario",
+  "title": "Managing shared grocery shopping efficiently",
+  "description": "Managing shared grocery shopping efficiently",
+  "content": "Scenario: Managing shared grocery shopping efficiently\n    Given household members pool resources for shared groceries\n    And I have limited time for shopping due to work\n    When the household needs groceries\n    Then the protocol should optimize shared shopping lists\n    And coordinate who shops when based on availability\n    And track shared expenses fairly\n    And minimize my individual shopping burden through cooperation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

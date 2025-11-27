@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm knowledge transfer becomes systematic institutional practice",
+  "contentType": "scenario",
+  "title": "Farm knowledge transfer becomes systematic institutional practice",
+  "description": "Farm knowledge transfer becomes systematic institutional practice",
+  "content": "Scenario: Farm knowledge transfer becomes systematic institutional practice\n    Given Tom's knowledge was concentrated in his experience and tacit expertise\n    And knowledge loss would occur if he exited without systematic transfer\n    When democratic conversion requires knowledge documentation\n    Then Tom's expertise is systematically documented and shared with worker-owners\n    And apprenticeship programs formalize knowledge transfer to new farmworkers\n    And institutional memory develops preventing knowledge loss through turnover\n    And democratic governance ensures continuous learning and knowledge circulation\n    And workplace_elohim manages knowledge transfer protocols and documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-educational-parent advocacy for better educational policies",
+  "contentType": "scenario",
+  "title": "Parent advocacy for better educational policies",
+  "description": "Parent advocacy for better educational policies",
+  "content": "Scenario: Parent advocacy for better educational policies\n    Given Sarah understands education from both sides\n    And she advocates for family-friendly school policies\n    When Sarah participates in educational policy discussions\n    Then her dual perspective should be recognized as valuable\n    And advocacy labor should accumulate care tokens\n    And parent organizing for educational improvement should be valued\n    And Sarah's work to improve schools should be community contribution\n    And the system should recognize education advocacy as care labor\n    And parent voices should be amplified in education governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

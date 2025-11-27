@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator experiences relief from dual extraction trap",
+  "contentType": "scenario",
+  "title": "Operator experiences relief from dual extraction trap",
+  "description": "Operator experiences relief from dual extraction trap",
+  "content": "Scenario: Operator experiences relief from dual extraction trap\n    Given corporate extracts from above (fees, mandatory purchasing, controlled pricing)\n    And profitability required worker extraction from below (low wages, speedup, surveillance)\n    When EAE conversion eliminates corporate extraction entirely\n    Then $100K+ annually per location is freed from franchise fees and markups\n    And workers receive substantial wage increases without threatening sustainability\n    And James escapes impossible position of implementing exploitation he knows is harmful\n    And dual extraction trap that made ethical operation impossible is broken\n    And workplace_elohim documents liberation from extraction on both levels\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

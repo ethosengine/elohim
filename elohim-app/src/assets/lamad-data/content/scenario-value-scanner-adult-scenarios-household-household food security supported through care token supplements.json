@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-household food security supported through care token supplements",
+  "contentType": "scenario",
+  "title": "Household food security supported through care token supplements",
+  "description": "Household food security supported through care token supplements",
+  "content": "Scenario: Household food security supported through care token supplements\n    Given household income is $65k/year\n    And food costs are rising\n    When household's economic status qualifies for support\n    Then care token supplements should be available\n    And the Value Scanner should remain accessible\n    And household should not face food insecurity\n    And care economy should function as economic support system\n    And access should be dignified, not stigmatizing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

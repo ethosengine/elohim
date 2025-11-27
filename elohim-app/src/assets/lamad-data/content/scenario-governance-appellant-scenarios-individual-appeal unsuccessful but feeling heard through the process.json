@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-appeal unsuccessful but feeling heard through the process",
+  "contentType": "scenario",
+  "title": "Appeal unsuccessful but feeling heard through the process",
+  "description": "Appeal unsuccessful but feeling heard through the process",
+  "content": "Scenario: Appeal unsuccessful but feeling heard through the process\n    Given I filed an appeal about a life-saving intervention I felt was invasive\n    And the Constitutional Council has deliberated on my case\n    When the council affirms the agent's decision as constitutionally aligned\n    But also recommends protocol enhancements for pre-specified preferences\n    Then I receive detailed explanation of why the decision was upheld\n    And I can see how my appeal influenced protocol improvements\n    And I am offered support to update my future preferences\n    And My dissent is honored and recorded even though I didn't win\n    And I understand my voice mattered in making the system better\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual",
+    "related_users:constitutional_council_member,technical_expert,community_leader",
+    "related_layers:family,community",
+    "elohim_agents:family_elohim,individual_support_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

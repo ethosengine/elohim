@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-community-preventing sarah's overcommitment through community coordination",
+  "contentType": "scenario",
+  "title": "Preventing Sarah's overcommitment through community coordination",
+  "description": "Preventing Sarah's overcommitment through community coordination",
+  "content": "Scenario: Preventing Sarah's overcommitment through community coordination\n    Given Sarah is highly engaged in community\n    And she tends to say yes to too many requests\n    When community organizations ask Sarah to contribute\n    Then the community_elohim should track her total commitments\n    And it should warn Sarah when she's approaching overcommitment\n    And it should help her maintain sustainable participation\n    And community should benefit from Sarah's long-term engagement\n    And burnout should be prevented through coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:community",
+    "related_users:parent,worker,educator,caregiver,community_member",
+    "related_layers:neighborhood,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

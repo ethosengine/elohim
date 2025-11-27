@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator gains autonomy through liberation from franchise agreement constraints",
+  "contentType": "scenario",
+  "title": "Operator gains autonomy through liberation from franchise agreement constraints",
+  "description": "Operator gains autonomy through liberation from franchise agreement constraints",
+  "content": "Scenario: Operator gains autonomy through liberation from franchise agreement constraints\n    Given franchise agreement prohibited innovation, local adaptation, and independent decisions\n    And James bore all risk while having no autonomy\n    When franchise termination succeeds and corporate control ends\n    Then (if staying as steward) James finally exercises local knowledge corporate ignored\n    And business responds to community needs rather than distant corporate mandates\n    And workers implement innovations he suggested but corporate prohibited\n    And autonomy is experienced after years of constrained servitude to franchise rules\n    And workplace_elohim documents operational improvements from liberation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

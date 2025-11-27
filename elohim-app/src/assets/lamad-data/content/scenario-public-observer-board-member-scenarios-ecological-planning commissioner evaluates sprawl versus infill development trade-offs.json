@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-ecological-planning commissioner evaluates sprawl versus infill development trade-offs",
+  "contentType": "scenario",
+  "title": "Planning commissioner evaluates sprawl versus infill development trade-offs",
+  "description": "Planning commissioner evaluates sprawl versus infill development trade-offs",
+  "content": "Scenario: Planning commissioner evaluates sprawl versus infill development trade-offs\n    Given commission faces pressure to approve suburban expansion development\n    And developers argue expansion provides affordable housing opportunities\n    And environmentalists advocate for urban infill to reduce sprawl\n    When the commissioner requests Observer growth pattern analysis\n    Then they receive comparison of infrastructure costs for sprawl versus infill\n    And see environmental impacts analysis including habitat, emissions, and water use\n    And access true affordability analysis accounting for transportation costs\n    And understand fiscal impacts on municipality over time\n    And accessible expertise helps commissioner evaluate complex growth trade-offs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:ecological",
+    "related_users:citizen,developer_interests,activist,politician,community_organizer",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

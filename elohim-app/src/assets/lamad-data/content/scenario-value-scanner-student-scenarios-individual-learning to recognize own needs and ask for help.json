@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-individual-learning to recognize own needs and ask for help",
+  "contentType": "scenario",
+  "title": "Learning to recognize own needs and ask for help",
+  "description": "Learning to recognize own needs and ask for help",
+  "content": "Scenario: Learning to recognize own needs and ask for help\n    Given Kenji is navigating adult independence for first time\n    And college culture often treats struggling as weakness\n    When Kenji faces challenges beyond his current capacity\n    Then the personal_agent should teach him to recognize when he needs help\n    And it should normalize asking for support as strength, not failure\n    And it should connect him to available resources (food bank, counseling, emergency aid)\n    And the agent should validate that everyone needs help sometimes\n    And the system should counteract toxic independence culture\n    And Kenji should learn that care economy includes receiving care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

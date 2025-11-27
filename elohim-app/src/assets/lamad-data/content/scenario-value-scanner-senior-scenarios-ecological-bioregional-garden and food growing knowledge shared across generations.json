@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-garden and food growing knowledge shared across generations",
+  "contentType": "scenario",
+  "title": "Garden and food growing knowledge shared across generations",
+  "description": "Garden and food growing knowledge shared across generations",
+  "content": "Scenario: Garden and food growing knowledge shared across generations\n    Given Margaret may grow some of her own food\n    And gardening knowledge is both ecological and practical\n    When the bioregional_elohim coordinates food growing\n    Then Margaret's gardening should be recognized as care contribution\n    And growing food reduces industrial agriculture dependence\n    And her knowledge should be shared with neighbors and family\n    And community gardens should connect seniors with others\n    And food growing should be supported as ecological practice\n    And Margaret's skills should strengthen community food security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

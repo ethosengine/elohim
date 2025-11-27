@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood solidarity in resource scarcity",
+  "contentType": "scenario",
+  "title": "Neighborhood solidarity in resource scarcity",
+  "description": "Neighborhood solidarity in resource scarcity",
+  "content": "Scenario: Neighborhood solidarity in resource scarcity\n    Given Marcus's family faces economic constraints\n    And other neighborhood families have similar struggles\n    When neighborhood care patterns are visible\n    Then Marcus should understand his family is not alone\n    And collective challenges should be visible at neighborhood scale\n    And solidarity should develop among families facing scarcity\n    And the neighborhood_elohim should facilitate mutual support\n    And isolation should be reduced through shared understanding\n    And political consciousness about systemic issues should begin to form\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-my journey from cryptographer to democratic governance enabler",
+  "contentType": "scenario",
+  "title": "My journey from cryptographer to democratic governance enabler",
+  "description": "My journey from cryptographer to democratic governance enabler",
+  "content": "Scenario: My journey from cryptographer to democratic governance enabler\n    Given I began studying cryptographic AI alignment\n    And I now serve humanity's constitutional governance\n    When I reflect on my role in global democracy\n    Then I understand: expertise serves democratic flourishing\n    And I accept: that citizens must judge despite my greater knowledge\n    And I respect: human wisdom complementing technical knowledge\n    And I practice: humility about what I know and don't know\n    And I demonstrate: how technical experts serve rather than dominate\n    And I participate: in humanity's attempt to govern with superintelligent AI\n    And I know: my expertise matters most when it empowers others' judgment\n    And I embody: technical excellence serving democratic hope\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

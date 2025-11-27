@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investor participates in bioregional ecological governance",
+  "contentType": "scenario",
+  "title": "Investor participates in bioregional ecological governance",
+  "description": "Investor participates in bioregional ecological governance",
+  "content": "Scenario: Investor participates in bioregional ecological governance\n    Given bioregional ecosystems need coordinated stewardship beyond market forces\n    And Patricia wants ecological voice in investment governance\n    When bioregional democratic economy includes ecological representation\n    Then watershed councils, indigenous nations, and ecological scientists participate in investment governance\n    And investment decisions consider ecological health alongside economic returns\n    And bioregional governance protects ecosystems through democratic accountability\n    And ecological limits are respected in economic planning\n    And bioregional_elohim facilitates ecological governance participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

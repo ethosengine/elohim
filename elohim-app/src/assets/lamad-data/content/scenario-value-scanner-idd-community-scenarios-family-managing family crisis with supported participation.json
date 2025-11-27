@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-managing family crisis with supported participation",
+  "contentType": "scenario",
+  "title": "Managing family crisis with supported participation",
+  "description": "Managing family crisis with supported participation",
+  "content": "Scenario: Managing family crisis with supported participation\n    Given there's a family emergency requiring quick decisions\n    And Jordan's input is important but time is limited\n    When the family gathers to respond to the crisis\n    Then the personal_agent helps Jordan understand the situation quickly\n    And the interface presents information in most accessible format\n    And Jordan's voice is heard even under time pressure\n    And the family doesn't automatically exclude Jordan from decisions\n    And supported decision-making works even in crisis\n    And Jordan's family membership is honored in difficult times\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

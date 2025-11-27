@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-investor participation in municipal economic development planning",
+  "contentType": "scenario",
+  "title": "Investor participation in municipal economic development planning",
+  "description": "Investor participation in municipal economic development planning",
+  "content": "Scenario: Investor participation in municipal economic development planning\n    Given economic development planning typically excludes community voices\n    And Patricia has expertise from community investment experience\n    When municipal planning includes community investor participation\n    Then she serves on economic development advisory committees\n    And community investment perspective informs municipal strategy\n    And policy development benefits from investor practical knowledge\n    And democratic economy becomes recognized municipal economic development approach\n    And municipality_elohim facilitates community investor participation in municipal planning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-bulk buying coordination with neighborhood families",
+  "contentType": "scenario",
+  "title": "Bulk buying coordination with neighborhood families",
+  "description": "Bulk buying coordination with neighborhood families",
+  "content": "Scenario: Bulk buying coordination with neighborhood families\n    Given multiple families buy similar groceries and supplies\n    And bulk purchasing reduces costs\n    When Sarah participates in neighborhood bulk buying\n    Then the neighborhood_elohim should coordinate group purchases\n    And it should manage logistics of ordering and distribution\n    And it should track cost savings for participating families\n    And care tokens should reflect coordination labor\n    And neighborhood cooperation should create economic benefit\n    And the system should enable collective resource efficiency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

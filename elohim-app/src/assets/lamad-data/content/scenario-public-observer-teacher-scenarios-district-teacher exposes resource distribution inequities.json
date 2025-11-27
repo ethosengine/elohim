@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher exposes resource distribution inequities",
+  "contentType": "scenario",
+  "title": "Teacher exposes resource distribution inequities",
+  "description": "Teacher exposes resource distribution inequities",
+  "content": "Scenario: Teacher exposes resource distribution inequities\n    Given some schools have abundant materials while others lack basics\n    And district claims equitable allocation\n    When teachers document resources across schools through Observer\n    Then data reveals wealthy-area schools get $800/student discretionary\n    And high-poverty schools get $200/student discretionary\n    And teachers coordinate with parents in under-resourced schools\n    And bring evidence of systematic inequity to board\n    And resource distribution becomes equity accountability issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

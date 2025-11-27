@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-supporting adult children through financial constraints",
+  "contentType": "scenario",
+  "title": "Supporting adult children through financial constraints",
+  "description": "Supporting adult children through financial constraints",
+  "content": "Scenario: Supporting adult children through financial constraints\n    Given Margaret has very limited resources herself\n    And her adult children sometimes face financial challenges\n    When Margaret provides non-financial support\n    Then her care contributions should be recognized as valuable\n    And the family_elohim should show how her labor saves money\n    And childcare provided prevents need for paid care\n    And her contributions have real economic impact\n    And Margaret's value to family doesn't require financial resources\n    And care economy should be visible alongside financial economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

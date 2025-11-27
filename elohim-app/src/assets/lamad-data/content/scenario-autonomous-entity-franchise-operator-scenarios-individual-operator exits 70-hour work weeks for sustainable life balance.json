@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator exits 70-hour work weeks for sustainable life balance",
+  "contentType": "scenario",
+  "title": "Operator exits 70-hour work weeks for sustainable life balance",
+  "description": "Operator exits 70-hour work weeks for sustainable life balance",
+  "content": "Scenario: Operator exits 70-hour work weeks for sustainable life balance\n    Given franchise operation demanded constant presence and crushing time commitment\n    And James sacrificed family time, health, and personal life to business survival\n    When conversion enables his exit or transition to reasonable steward role\n    Then 70-hour weeks end, replaced by balanced schedule if staying or complete exit\n    And family relationships can heal after years of absence and stress\n    And personal health improves through reduced stress and reasonable hours\n    And life beyond business becomes possible for first time in years\n    And workplace_elohim ensures transition protects his wellbeing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

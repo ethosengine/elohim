@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-refugee-scenarios-global-refugee documents journey for family reunification",
+  "contentType": "scenario",
+  "title": "Refugee documents journey for family reunification",
+  "description": "Refugee documents journey for family reunification",
+  "content": "Scenario: Refugee documents journey for family reunification\n    Given Amira is working toward bringing her family to Germany\n    When she documents her journey and establishes housing and employment\n    And she needs to prove family relationships for legal process\n    Then critical documents are cryptographically secured\n    And they're backed up across sanctuary institutions\n    And the documentation supports family reunification application\n    And legal aid organizations can access needed evidence\n    And the family reunification process is supported by secure documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:refugee",
+    "governance_layer:global",
+    "related_users:displaced_person,activist,family",
+    "related_layers:nation_state,cultural_linguistic,family",
+    "elohim_agents:translation_agent,protection_agent,sanctuary_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/refugee/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-refugee-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-refugee-scenarios-global",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

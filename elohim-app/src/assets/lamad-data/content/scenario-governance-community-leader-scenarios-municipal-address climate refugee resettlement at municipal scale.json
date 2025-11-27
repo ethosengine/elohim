@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipal-address climate refugee resettlement at municipal scale",
+  "contentType": "scenario",
+  "title": "Address climate refugee resettlement at municipal scale",
+  "description": "Address climate refugee resettlement at municipal scale",
+  "content": "Scenario: Address climate refugee resettlement at municipal scale\n    Given climate refugees are arriving faster than housing can accommodate\n    And Municipal Elohim coordinates capacity mapping\n    When Jamal works with agent on integration strategy\n    Then agent matches refugee skills to job availability\n    And agent suggests phased integration by neighborhood\n    And agent monitors integration outcomes for adjustment\n    And Jamal ensures community voice in resettlement decisions\n    And integration succeeds better than without coordination\n    And Riverside demonstrates scalable humanitarian response\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipal",
+    "related_users:constitutional_council_member,policy_maker",
+    "related_layers:community,provincial_state",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipal.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipal",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipal",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

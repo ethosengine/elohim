@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood walking companionship for caregiver well-being",
+  "contentType": "scenario",
+  "title": "Neighborhood walking companionship for caregiver well-being",
+  "description": "Neighborhood walking companionship for caregiver well-being",
+  "content": "Scenario: Neighborhood walking companionship for caregiver well-being\n    Given James needs exercise and fresh air for his own health\n    And he cannot leave David alone for walks\n    When neighbors offer companionship\n    Then the neighborhood_elohim should coordinate walking support\n    And neighbors could stay with David while James walks\n    And they could accompany James and David together\n    And regular walks should be protected for James's well-being\n    And neighborhood should actively support caregiver health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

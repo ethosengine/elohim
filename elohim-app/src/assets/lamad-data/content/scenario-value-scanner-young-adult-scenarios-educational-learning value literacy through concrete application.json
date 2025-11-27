@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-learning value literacy through concrete application",
+  "contentType": "scenario",
+  "title": "Learning value literacy through concrete application",
+  "description": "Learning value literacy through concrete application",
+  "content": "Scenario: Learning value literacy through concrete application\n    Given abstract economic theory is less effective than practice\n    And Aisha learns best through direct experience\n    When Aisha uses the Value Scanner\n    Then value education should happen through application\n    And concepts should be taught in context of real decisions\n    And theory should emerge from practice\n    And learning should be concrete and immediately applicable\n    And value literacy should develop through lived experience\n    And education should be embodied, not abstract\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

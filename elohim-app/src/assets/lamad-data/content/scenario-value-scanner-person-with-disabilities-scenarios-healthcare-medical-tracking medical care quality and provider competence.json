@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-tracking medical care quality and provider competence",
+  "contentType": "scenario",
+  "title": "Tracking medical care quality and provider competence",
+  "description": "Tracking medical care quality and provider competence",
+  "content": "Scenario: Tracking medical care quality and provider competence\n    Given medical providers vary widely in disability competence\n    And poor care from ableist providers causes harm\n    When Alex receives medical care\n    Then the personal_agent should help Alex track care quality\n    And it should document which providers respect Alex's autonomy\n    And it should identify patterns of ableist treatment\n    And Alex should be able to rate providers on disability competence\n    And quality tracking should help Alex find better providers\n    And the protocol should make provider accountability visible\n    And Alex should have data to advocate for better care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-financial autonomy maintained while supporting multiple generations",
+  "contentType": "scenario",
+  "title": "Financial autonomy maintained while supporting multiple generations",
+  "description": "Financial autonomy maintained while supporting multiple generations",
+  "content": "Scenario: Financial autonomy maintained while supporting multiple generations\n    Given Robert provides financial support to children\n    And he contributes to parents' long-term care costs\n    And he maintains his household\n    And he saves for his own retirement\n    When his personal_agent analyzes his financial situation\n    Then it should help him balance competing financial demands\n    And protect his own financial security\n    And surface when generational support threatens his retirement\n    And provide analysis: \"Continuing current support level will delay retirement by 3 years\"\n    And help him make informed tradeoffs\n    And ensure he doesn't sacrifice his own future for present generational needs\n    And support sustainable multigenerational financial planning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

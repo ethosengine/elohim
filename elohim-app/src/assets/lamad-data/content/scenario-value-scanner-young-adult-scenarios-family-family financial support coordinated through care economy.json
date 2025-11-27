@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-family financial support coordinated through care economy",
+  "contentType": "scenario",
+  "title": "Family financial support coordinated through care economy",
+  "description": "Family financial support coordinated through care economy",
+  "content": "Scenario: Family financial support coordinated through care economy\n    Given Aisha's family sometimes needs financial help\n    And Aisha wants to contribute within her means\n    When Aisha provides financial support to family\n    Then the contribution should be recognized as care work\n    And it should be coordinated through family_elohim\n    And the system should help her determine sustainable amounts\n    And family financial support should be visible care contribution\n    And her limited resources should be acknowledged\n    And financial care should strengthen rather than strain relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

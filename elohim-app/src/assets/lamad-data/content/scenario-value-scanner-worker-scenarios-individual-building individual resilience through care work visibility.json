@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-building individual resilience through care work visibility",
+  "contentType": "scenario",
+  "title": "Building individual resilience through care work visibility",
+  "description": "Building individual resilience through care work visibility",
+  "content": "Scenario: Building individual resilience through care work visibility\n    Given the protocol tracks all my care contributions\n    Including my paid labor and household self-care\n    When I review my care economy participation\n    Then I should see comprehensive evidence of my contributions\n    And understand that I am providing valuable service to community\n    And recognize that I deserve better compensation and conditions\n    And feel empowered to advocate for my needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

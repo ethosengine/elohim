@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-teaching and sharing skills in community education",
+  "contentType": "scenario",
+  "title": "Teaching and sharing skills in community education",
+  "description": "Teaching and sharing skills in community education",
+  "content": "Scenario: Teaching and sharing skills in community education\n    Given Margaret has skills in health, crafts, traditional knowledge\n    And community members want to learn these skills\n    When Margaret teaches classes or workshops\n    Then the community_elohim should recognize teaching as care work\n    And it should facilitate skill-sharing opportunities\n    And it should connect Margaret with learners\n    And community education should be valued and supported\n    And Margaret's teaching should accumulate care tokens\n    And community should benefit from skill transmission\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

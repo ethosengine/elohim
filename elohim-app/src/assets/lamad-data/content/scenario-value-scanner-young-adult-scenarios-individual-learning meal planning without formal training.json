@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-learning meal planning without formal training",
+  "contentType": "scenario",
+  "title": "Learning meal planning without formal training",
+  "description": "Learning meal planning without formal training",
+  "content": "Scenario: Learning meal planning without formal training\n    Given Aisha has minimal cooking experience\n    And she wants to eat nutritiously on a tight budget\n    When Aisha requests meal planning assistance\n    Then the personal_agent should suggest recipes based on her skill level\n    And recommendations should optimize nutrition per dollar\n    And the system should consider ingredients she already has\n    And the agent should teach cooking skills progressively\n    And meal plans should fit her time constraints\n    And the interface should feel like a patient teacher, not a critic\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

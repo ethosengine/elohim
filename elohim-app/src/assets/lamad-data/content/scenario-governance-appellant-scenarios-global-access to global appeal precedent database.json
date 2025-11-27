@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-access to global appeal precedent database",
+  "contentType": "scenario",
+  "title": "Access to global appeal precedent database",
+  "description": "Access to global appeal precedent database",
+  "content": "Scenario: Access to global appeal precedent database\n    Given Marcus wants to understand how similar appeals were resolved globally\n    When Marcus searches the global constitutional precedent database\n    Then he finds anonymized cases from dozens of countries\n    And he sees how different cultures interpret privacy versus care\n    And he understands constitutional reasoning across contexts\n    And he can cite global precedent in his own appeal\n    And he learns his case is not isolated but part of human pattern\n    And the database empowers appellants worldwide with shared knowledge\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

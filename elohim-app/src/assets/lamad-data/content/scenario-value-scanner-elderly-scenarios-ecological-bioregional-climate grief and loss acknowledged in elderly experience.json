@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-climate grief and loss acknowledged in elderly experience",
+  "contentType": "scenario",
+  "title": "Climate grief and loss acknowledged in elderly experience",
+  "description": "Climate grief and loss acknowledged in elderly experience",
+  "content": "Scenario: Climate grief and loss acknowledged in elderly experience\n    Given Helen has witnessed massive environmental change\n    And loss of familiar ecosystems causes grief\n    When Helen expresses climate grief\n    Then her emotional response should be validated and supported\n    And loss of familiar nature should be acknowledged as legitimate grief\n    And the protocol should recognize that elders witness most environmental loss\n    And climate change impacts include psychological dimensions\n    And Helen's grief should be honored, not dismissed\n    And witnessing ecological destruction across lifetime should be recognized as trauma\n    And elder perspectives should inform community understanding of what's being lost\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_member,environmental_steward,young_adult",
+    "related_layers:community,educational,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

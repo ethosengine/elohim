@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-individual-coordinating multiple contexts of care contribution",
+  "contentType": "scenario",
+  "title": "Coordinating multiple contexts of care contribution",
+  "description": "Coordinating multiple contexts of care contribution",
+  "content": "Scenario: Coordinating multiple contexts of care contribution\n    Given Frank contributes across multiple contexts simultaneously\n    And he volunteers with Habitat, provides family care, serves on council\n    When his personal_agent tracks contributions across contexts\n    Then it should integrate volunteer work, family care, and civic participation\n    And it should coordinate scheduling across multiple commitments\n    And it should prevent overcommitment and burnout\n    And it should surface conflicts and help prioritize\n    And Frank should see his full contribution across all contexts\n    And multi-context participation should be supported and celebrated\n    And the system should help him balance diverse contributions effectively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:individual",
+    "related_users:senior,elderly,middle_aged,worker,volunteer",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

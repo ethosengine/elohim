@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator transitions become industry sector leadership development",
+  "contentType": "scenario",
+  "title": "Franchise operator transitions become industry sector leadership development",
+  "description": "Franchise operator transitions become industry sector leadership development",
+  "content": "Scenario: Franchise operator transitions become industry sector leadership development\n    Given converted operators have unique expertise in franchise-to-democratic conversion\n    And sector transformation requires knowledgeable advocates and mentors\n    When James and other converted operators share learning across industry\n    Then they become thought leaders in food service democratic transformation\n    And industry conferences feature democratic conversion case studies\n    And sector media covers democratic model as emerging alternative to franchise\n    And operators' expertise guides policy development and network expansion\n    And industry_sector_elohim amplifies converted operators' voices in sector transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

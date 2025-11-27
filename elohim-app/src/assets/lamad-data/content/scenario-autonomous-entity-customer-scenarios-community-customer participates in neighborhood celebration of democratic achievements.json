@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer participates in neighborhood celebration of democratic achievements",
+  "contentType": "scenario",
+  "title": "Customer participates in neighborhood celebration of democratic achievements",
+  "description": "Customer participates in neighborhood celebration of democratic achievements",
+  "content": "Scenario: Customer participates in neighborhood celebration of democratic achievements\n    Given economic development typically celebrates corporate recruitment\n    And democratic conversions deserve community recognition\n    When neighborhood celebrates democratic business milestones\n    Then Ms. Johnson attends public celebrations of worker ownership conversions\n    And community honors workers' ownership and business founders' choices\n    And celebrations build collective pride and solidarity\n    And democratic culture strengthens through community recognition\n    And community_elohim coordinates celebration events amplifying democratic achievements\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

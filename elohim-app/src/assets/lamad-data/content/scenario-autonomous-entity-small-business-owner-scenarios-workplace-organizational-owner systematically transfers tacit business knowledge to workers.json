@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-owner systematically transfers tacit business knowledge to workers",
+  "contentType": "scenario",
+  "title": "Owner systematically transfers tacit business knowledge to workers",
+  "description": "Owner systematically transfers tacit business knowledge to workers",
+  "content": "Scenario: Owner systematically transfers tacit business knowledge to workers\n    Given Rosa has 15 years of operational expertise workers need to succeed\n    And her knowledge includes supplier relationships, customer preferences, and workflow optimization\n    When workplace_elohim initiates knowledge transfer protocols\n    Then Rosa participates in documented teaching sessions covering key business areas\n    And her expertise is captured through video demonstrations and written guides\n    And workers learn bookkeeping, supplier negotiation, and customer relations\n    And relationship maps show supplier and customer networks with context\n    And knowledge becomes institutional memory, not dependent on Rosa's presence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

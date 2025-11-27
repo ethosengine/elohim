@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist investigates charter school performance claims",
+  "contentType": "scenario",
+  "title": "Journalist investigates charter school performance claims",
+  "description": "Journalist investigates charter school performance claims",
+  "content": "Scenario: Journalist investigates charter school performance claims\n    Given charter schools claim superior outcomes for disadvantaged students\n    And receive public funding based on performance claims\n    When the Observer analyzes charter outcomes versus district schools\n    Then the journalist sees charters are more racially segregated\n    And finds test gains disappear when controlling for selective enrollment\n    And documents higher suspension rates for students of color\n    And shows charter expansion drains resources from district\n    And publishes investigation questioning charter expansion policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-emergency child pickup when maria is stuck at work",
+  "contentType": "scenario",
+  "title": "Emergency child pickup when Maria is stuck at work",
+  "description": "Emergency child pickup when Maria is stuck at work",
+  "content": "Scenario: Emergency child pickup when Maria is stuck at work\n    Given Maria's medical assistant job sometimes requires staying late unexpectedly\n    And she has no co-parent to handle emergencies\n    When Maria needs emergency child pickup from school or activities\n    Then the neighborhood_elohim should connect her to nearby trusted neighbors\n    And neighbors who can help should be identified quickly\n    And emergency care should be available based on reciprocal care economy\n    And Maria should have backup for inevitable work-parenting conflicts\n    And neighborhood mutual aid should replace missing co-parent for emergencies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

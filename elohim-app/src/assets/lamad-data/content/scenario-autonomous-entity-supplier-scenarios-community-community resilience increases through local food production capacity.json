@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-community-community resilience increases through local food production capacity",
+  "contentType": "scenario",
+  "title": "Community resilience increases through local food production capacity",
+  "description": "Community resilience increases through local food production capacity",
+  "content": "Scenario: Community resilience increases through local food production capacity\n    Given communities dependent on global supply chains are vulnerable to disruption\n    And COVID-19 demonstrated fragility of corporate food system\n    When local democratic farm provides community food security\n    Then community is less vulnerable to supply chain disruptions\n    And local food production capacity serves as resilience infrastructure\n    And crisis response can prioritize community feeding over profit\n    And democratic governance ensures farm serves community needs during emergencies\n    And community_elohim coordinates community resilience and food security planning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,small_business_owner]",
+    "related_layers:[workplace_organizational,industry_sector,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

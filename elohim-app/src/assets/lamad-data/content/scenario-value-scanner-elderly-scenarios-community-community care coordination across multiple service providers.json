@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-community care coordination across multiple service providers",
+  "contentType": "scenario",
+  "title": "Community care coordination across multiple service providers",
+  "description": "Community care coordination across multiple service providers",
+  "content": "Scenario: Community care coordination across multiple service providers\n    Given Helen receives support from multiple sources\n    And coordination prevents gaps and duplication\n    When the community_elohim tracks Helen's care network\n    Then it should coordinate home health aides, medical providers, and volunteers\n    And it should identify gaps before they become crises\n    And it should prevent duplication of services\n    And it should ensure Helen's preferences are communicated across providers\n    And care should happen around Helen, not to her\n    And the protocol should provide infrastructure for complex care coordination\n    And Helen should be center of coordinated care web\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

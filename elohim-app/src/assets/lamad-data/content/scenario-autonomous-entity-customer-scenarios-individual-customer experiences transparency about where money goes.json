@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer experiences transparency about where money goes",
+  "contentType": "scenario",
+  "title": "Customer experiences transparency about where money goes",
+  "description": "Customer experiences transparency about where money goes",
+  "content": "Scenario: Customer experiences transparency about where money goes\n    Given corporate spending is opaque\u2014customers don't know how their payment distributes\n    And Ms. Johnson cares about supporting fair wages but had no information\n    When democratic business provides complete value distribution transparency\n    Then she sees exactly: 60% to worker wages and benefits, 30% to community programs, 10% to sustainability\n    And workers earn $18/hour minimum vs. previous corporate $11/hour\n    And her $8.99 meal supports specific visible outcomes\n    And transparency enables ethical consumption through informed choice\n    And community_elohim provides accessible transparency dashboard for interested customers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

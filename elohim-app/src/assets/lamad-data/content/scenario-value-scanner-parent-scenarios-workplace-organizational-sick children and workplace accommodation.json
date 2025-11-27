@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-sick children and workplace accommodation",
+  "contentType": "scenario",
+  "title": "Sick children and workplace accommodation",
+  "description": "Sick children and workplace accommodation",
+  "content": "Scenario: Sick children and workplace accommodation\n    Given children get sick frequently\n    And Sarah needs to care for sick children\n    When Tommy or Emma is sick\n    Then the workplace_elohim should help Sarah navigate work accommodations\n    And it should recognize parent's obligation to care for sick child\n    And it should support requesting necessary time off\n    And the system should validate that child care is priority\n    And workplace should accommodate parent responsibilities\n    And Sarah should not face professional penalty for parenting obligations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

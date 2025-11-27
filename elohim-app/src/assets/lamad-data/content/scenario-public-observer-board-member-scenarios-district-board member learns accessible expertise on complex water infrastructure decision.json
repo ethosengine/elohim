@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-district-board member learns accessible expertise on complex water infrastructure decision",
+  "contentType": "scenario",
+  "title": "Board member learns accessible expertise on complex water infrastructure decision",
+  "description": "Board member learns accessible expertise on complex water infrastructure decision",
+  "content": "Scenario: Board member learns accessible expertise on complex water infrastructure decision\n    Given water district faces decision on $50M infrastructure upgrade\n    And engineering staff presentation uses technical jargon and assumptions\n    And board member has no engineering background but must vote responsibly\n    When the board member uses Observer to understand the decision\n    Then they receive plain-language explanation of technical trade-offs\n    And see comparison of infrastructure approaches used by similar districts\n    And access key questions to ask staff about cost estimates and alternatives\n    And get context on long-term maintenance and rate impacts\n    And accessible expertise enables informed decision without full-time study\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:district",
+    "related_users:citizen,parent,teacher,politician,activist",
+    "related_layers:municipality,community,educational",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

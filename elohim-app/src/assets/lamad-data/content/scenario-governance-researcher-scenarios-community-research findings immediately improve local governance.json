@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-community-research findings immediately improve local governance",
+  "contentType": "scenario",
+  "title": "Research findings immediately improve local governance",
+  "description": "Research findings immediately improve local governance",
+  "content": "Scenario: Research findings immediately improve local governance\n    Given my research identified that Constitutional Council deliberations improve with certain information tools\n    And I shared findings with Mayor Jamal and council members\n    When community decides to implement recommended improvements\n    Then research serves practical improvement not just academic knowledge\n    And Rapid feedback loop connects insight to implementation\n    And Community sees research benefiting them directly\n    And Researcher-community trust strengthens through mutual value\n    And Knowledge serves flourishing not just publication\n    And Research demonstrates: scholarship in service of democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,appellant,technical_expert",
+    "related_layers:provincial_state,nation_state",
+    "elohim_agents:community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

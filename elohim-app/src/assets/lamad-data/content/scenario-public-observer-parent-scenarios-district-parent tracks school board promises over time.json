@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent tracks school board promises over time",
+  "contentType": "scenario",
+  "title": "Parent tracks school board promises over time",
+  "description": "Parent tracks school board promises over time",
+  "content": "Scenario: Parent tracks school board promises over time\n    Given the school board promised to \"address transportation issues by Q2\"\n    And the parent's child still has unreliable bus service three months later\n    When the parent checks Observer's commitment tracking\n    Then they see the exact promise made in the February meeting\n    And view that no action has been taken despite deadline passing\n    And can raise specific accountability question at next meeting\n    And institutional memory persists beyond administrator turnover\n    And board commitments to parents aren't forgotten when attention shifts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

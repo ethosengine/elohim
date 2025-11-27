@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor receives transparent impact reports showing measurable community benefits",
+  "contentType": "scenario",
+  "title": "Investor receives transparent impact reports showing measurable community benefits",
+  "description": "Investor receives transparent impact reports showing measurable community benefits",
+  "content": "Scenario: Investor receives transparent impact reports showing measurable community benefits\n    Given stock market investing provides opaque financial returns with invisible social impacts\n    And Patricia couldn't verify her portfolio's real effects\n    When community investment provides radical transparency\n    Then quarterly reports show: 12 workers received ownership and wage increases ($11\u2192$18/hour)\n    And 340 community meals served to isolated seniors\n    And 1,200 lbs regenerative produce sourced from Johnson Farm\n    And $40K circulating locally vs. extracting to distant shareholders\n    And community_elohim provides detailed, verifiable impact documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:community",
+    "related_users:[worker,small_business_owner,franchise_operator,customer]",
+    "related_layers:[municipality,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

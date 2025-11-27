@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-next generation grows up assuming care economy is normal",
+  "contentType": "scenario",
+  "title": "Next generation grows up assuming care economy is normal",
+  "description": "Next generation grows up assuming care economy is normal",
+  "content": "Scenario: Next generation grows up assuming care economy is normal\n    Given Sarah is teaching value literacy to many children\n    And children form baseline expectations from early experience\n    When children who learn care economy reach adulthood\n    Then they should assume care work creates value\n    And they should expect care to be visible and recognized\n    And they should see care economy as normal, not alternative\n    And Sarah's teaching should transform next generation's economic understanding\n    And cultural transformation should happen through education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

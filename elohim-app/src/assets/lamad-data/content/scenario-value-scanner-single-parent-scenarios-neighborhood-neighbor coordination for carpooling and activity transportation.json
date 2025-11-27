@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-neighbor coordination for carpooling and activity transportation",
+  "contentType": "scenario",
+  "title": "Neighbor coordination for carpooling and activity transportation",
+  "description": "Neighbor coordination for carpooling and activity transportation",
+  "content": "Scenario: Neighbor coordination for carpooling and activity transportation\n    Given Maria struggles with impossible logistics of three children's different schedules\n    And she has no partner to split transportation duties\n    When children need transportation to school, activities, and appointments\n    Then the neighborhood_elohim should coordinate carpooling with other families\n    And it should match families with compatible schedules and destinations\n    And it should track reciprocal transportation contributions\n    And carpooling should reduce Maria's impossible logistics burden\n    And neighborhood coordination should make solo parenting more manageable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

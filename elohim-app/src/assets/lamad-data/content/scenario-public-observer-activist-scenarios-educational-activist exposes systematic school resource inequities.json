@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-educational-activist exposes systematic school resource inequities",
+  "contentType": "scenario",
+  "title": "Activist exposes systematic school resource inequities",
+  "description": "Activist exposes systematic school resource inequities",
+  "content": "Scenario: Activist exposes systematic school resource inequities\n    Given the activist campaigns for education equity\n    And suspects systematic under-resourcing of schools serving students of color\n    When the Observer analyzes district resource distribution\n    Then the activist sees experienced teachers concentrate in white affluent schools\n    And gifted programs and AP courses cluster in privileged areas\n    And facility quality and maintenance vary by neighborhood\n    And per-student spending disparities reach thousands of dollars\n    And segregation pattern becomes legally actionable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

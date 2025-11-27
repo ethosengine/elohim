@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-individual-young child makes autonomous care decision within boundaries",
+  "contentType": "scenario",
+  "title": "Young child makes autonomous care decision within boundaries",
+  "description": "Young child makes autonomous care decision within boundaries",
+  "content": "Scenario: Young child makes autonomous care decision within boundaries\n    Given Tommy is selecting fruit for his sister Emma\n    And Emma has nut allergies configured in the system\n    And the family budget constraints are active\n    When Tommy scans strawberries for Emma\n    Then his personal_agent should recognize the care intention\n    And the agent should say \"Remember, Emma loves the red ones\"\n    And the choice should be recorded as a care contribution\n    And Tommy should experience genuine autonomy\n    And invisible guardrails should prevent allergen selection\n    And Tommy should not be aware of the protective boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:individual",
+    "related_users:parent,child,grandparent",
+    "related_layers:family,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.199597",
+  "updatedAt": "2025-11-21T18:54:29.199597"
+}

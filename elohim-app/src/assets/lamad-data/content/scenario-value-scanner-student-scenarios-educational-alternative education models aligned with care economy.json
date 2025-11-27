@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-alternative education models aligned with care economy",
+  "contentType": "scenario",
+  "title": "Alternative education models aligned with care economy",
+  "description": "Alternative education models aligned with care economy",
+  "content": "Scenario: Alternative education models aligned with care economy\n    Given traditional higher education often fails care economy principles\n    And alternative models exist (cooperative education, free universities, community learning)\n    When Kenji explores educational alternatives\n    Then the educational_elohim should inform him of care-aligned options\n    And it should help him evaluate educational models against care principles\n    And it should recognize diverse pathways for learning and development\n    And the system should support student exploration of alternative education\n    And education should serve flourishing, not just credential accumulation\n    And care economy education should be accessible and diverse\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

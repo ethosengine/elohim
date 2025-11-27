@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal accountability to care economy principles",
+  "contentType": "scenario",
+  "title": "Municipal accountability to care economy principles",
+  "description": "Municipal accountability to care economy principles",
+  "content": "Scenario: Municipal accountability to care economy principles\n    Given Robert and others participate in municipal care economy\n    And municipalities should be accountable to care principles\n    And municipal decisions affect care economy functioning\n    When municipal_elohim monitors municipal accountability\n    Then it should track whether municipal policy supports care economy\n    And surface when municipal decisions harm caregivers\n    And help Robert hold municipality accountable to care principles\n    And provide tools for monitoring municipal care economy performance\n    And support resident advocacy for accountability\n    And build municipal governance that serves care economy\n    And demonstrate that municipalities should be accountable to residents' care needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

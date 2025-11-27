@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating with teachers about children's circumstances",
+  "contentType": "scenario",
+  "title": "Coordinating with teachers about children's circumstances",
+  "description": "Coordinating with teachers about children's circumstances",
+  "content": "Scenario: Coordinating with teachers about children's circumstances\n    Given teachers need some information to support my children appropriately\n    And I need to protect privacy while ensuring teachers understand context\n    When I communicate with children's teachers\n    Then the Value Scanner helps me determine what to disclose\n    And provides language for explaining relevant context without oversharing\n    And helps me advocate for appropriate accommodations\n    And tracks teacher communications and commitments\n    And validates that teachers should know enough to support children\n    And my personal_agent drafts communications that balance privacy and advocacy\n    And recognizes school communication as ongoing parenting labor\n    And supports appropriate teacher partnership in children's support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

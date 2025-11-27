@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-individual-personal growth trajectory becomes visible and owned",
+  "contentType": "scenario",
+  "title": "Personal growth trajectory becomes visible and owned",
+  "description": "Personal growth trajectory becomes visible and owned",
+  "content": "Scenario: Personal growth trajectory becomes visible and owned\n    Given Emma has demonstrated supply chain optimization genius over 6 months\n    And the REA system has documented her 23% waste reduction\n    When Emma views her growth trajectory dashboard\n    Then she sees her optimization pattern recognition abilities documented\n    And she sees skill tokens accumulating toward higher roles\n    And she discovers teaching opportunities based on her expertise\n    And she can pursue cross-training based on witnessed interests\n    And her development path is self-determined, not management-assigned\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:individual",
+    "related_users:[manager,customer,supplier,community_investor]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

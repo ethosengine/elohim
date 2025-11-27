@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-educational-developer school impact fees gain accountability",
+  "contentType": "scenario",
+  "title": "Developer school impact fees gain accountability",
+  "description": "Developer school impact fees gain accountability",
+  "content": "Scenario: Developer school impact fees gain accountability\n    Given a developer paid $1.2M in school impact fees\n    And fees were supposed to address enrollment impacts\n    When the Observer tracks how district used impact fees\n    Then analysis shows: fees went to general operations not capacity expansion\n    And school still lacks capacity to serve development's students\n    And impact fee mechanism failed to actually mitigate impacts\n    And accountability creates pressure for effective mitigation requirements\n    And communities demand better school impact policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,citizen",
+    "related_layers:municipality,county_regional,community",
+    "elohim_agents:public_observer,educational_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

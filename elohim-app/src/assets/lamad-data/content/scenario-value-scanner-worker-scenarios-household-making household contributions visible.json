@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-making household contributions visible",
+  "contentType": "scenario",
+  "title": "Making household contributions visible",
+  "description": "Making household contributions visible",
+  "content": "Scenario: Making household contributions visible\n    Given I contribute to household care when my schedule allows\n    Including shopping, cooking, cleaning, and bills management\n    When household members want to understand contribution distribution\n    Then the protocol should make all care work visible\n    And show my contributions relative to available time\n    And recognize that my irregular schedule affects participation\n    And facilitate fair distribution accounting for work constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-caregiver employee resource groups provide peer support",
+  "contentType": "scenario",
+  "title": "Caregiver employee resource groups provide peer support",
+  "description": "Caregiver employee resource groups provide peer support",
+  "content": "Scenario: Caregiver employee resource groups provide peer support\n    Given James is isolated from professional community by caregiving\n    And connection to other caregiver employees would help\n    When the workplace_elohim organizes caregiver support\n    Then employee resource groups should include caregivers\n    And caregiver employees should connect with each other\n    And workplace should facilitate caregiver peer support\n    And professional isolation should be reduced through connection\n    And caregivers should have voice in workplace policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,middle_aged,employee,contractor",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

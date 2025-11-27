@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer generates accessible materials for citywide campaign",
+  "contentType": "scenario",
+  "title": "Organizer generates accessible materials for citywide campaign",
+  "description": "Organizer generates accessible materials for citywide campaign",
+  "content": "Scenario: Organizer generates accessible materials for citywide campaign\n    Given the coalition is campaigning against developer tax breaks\n    And needs to explain complex tax increment financing to residents\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of TIF mechanics\n    And see actual dollar flows (who benefits, who pays)\n    And get talking points for testimony and media\n    And access fact-checking data to counter developer claims\n    And technical policy becomes accessible community education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,politician,journalist",
+    "related_layers:community,district,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

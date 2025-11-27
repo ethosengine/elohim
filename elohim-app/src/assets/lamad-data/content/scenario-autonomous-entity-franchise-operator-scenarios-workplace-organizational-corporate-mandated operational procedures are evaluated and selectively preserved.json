@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-corporate-mandated operational procedures are evaluated and selectively preserved",
+  "contentType": "scenario",
+  "title": "Corporate-mandated operational procedures are evaluated and selectively preserved",
+  "description": "Corporate-mandated operational procedures are evaluated and selectively preserved",
+  "content": "Scenario: Corporate-mandated operational procedures are evaluated and selectively preserved\n    Given franchise required standardized procedures (some useful, others extractive)\n    And workers had no voice in which procedures served quality vs. extraction\n    When democratic governance reviews all franchise operational requirements\n    Then health and safety protocols are preserved and improved\n    And useful training structures are kept while eliminating degrading aspects\n    And extractive mechanisms (bathroom time limits, speedup metrics) are eliminated\n    And workers decide democratically which standards serve quality and dignity\n    And workplace_elohim documents procedural changes and rationale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-community-workers share facility space for community organizing after hours",
+  "contentType": "scenario",
+  "title": "Workers share facility space for community organizing after hours",
+  "description": "Workers share facility space for community organizing after hours",
+  "content": "Scenario: Workers share facility space for community organizing after hours\n    Given ChickenMax dining space sits empty evenings and weekends\n    And community groups need meeting space\n    When community requests use of space for organizing meetings\n    Then workers democratically decide to share space with community groups\n    And workers establish guidelines for community space use\n    And workers charge minimal fee to cover utilities\n    And community groups organize tenants' rights, immigrant support, etc.\n    And business becomes community hub beyond meal service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,supplier,small_business_owner]",
+    "related_layers:[workplace_organizational,individual,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

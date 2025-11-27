@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-addressing global inequality in protocol access",
+  "contentType": "scenario",
+  "title": "Addressing global inequality in protocol access",
+  "description": "Addressing global inequality in protocol access",
+  "content": "Scenario: Addressing global inequality in protocol access\n    Given research shows protocol adoption correlates with national wealth\n    And poor nations lack infrastructure for implementation\n    When I advocate for global equity in access\n    Then I promote: international funding mechanisms\n    And I support: technology transfer without strings attached\n    And I push: for open source hardware and software\n    And I challenge: intellectual property barriers to adoption\n    And I ensure: protocol doesn't exacerbate global inequality\n    And I work: for democratic AI governance as universal right\n    And I recognize: justice requires addressing structural barriers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

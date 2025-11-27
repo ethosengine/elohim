@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-parenting skills recognized as professional capabilities",
+  "contentType": "scenario",
+  "title": "Parenting skills recognized as professional capabilities",
+  "description": "Parenting skills recognized as professional capabilities",
+  "content": "Scenario: Parenting skills recognized as professional capabilities\n    Given Sarah has professional-grade skills from parenting\n    And she manages complex logistics, conflict resolution, developmental psychology\n    When the workplace_elohim assesses Sarah's capabilities\n    Then it should recognize parenting skills as professional assets\n    And it should translate care skills to workplace context\n    And Sarah's parenting should enhance her professional value\n    And the system should make invisible skills visible to employers\n    And parenting experience should be recognized as professional development\n    And care work should be valued as capability-building\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

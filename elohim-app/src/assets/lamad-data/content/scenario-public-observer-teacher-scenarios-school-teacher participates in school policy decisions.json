@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher participates in school policy decisions",
+  "contentType": "scenario",
+  "title": "Teacher participates in school policy decisions",
+  "description": "Teacher participates in school policy decisions",
+  "content": "Scenario: Teacher participates in school policy decisions\n    Given the school site council is revising discipline policy\n    And teachers have frontline knowledge about what works\n    When the Observer facilitates teacher input on policy options\n    Then teachers share evidence-based practices anonymously\n    And successful approaches from other schools are surfaced\n    And student outcome data informs policy design\n    And final policy reflects teacher professional expertise\n    And school governance becomes genuinely participatory\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

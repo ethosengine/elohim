@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager provides operational expertise without information asymmetry",
+  "contentType": "scenario",
+  "title": "Manager provides operational expertise without information asymmetry",
+  "description": "Manager provides operational expertise without information asymmetry",
+  "content": "Scenario: Manager provides operational expertise without information asymmetry\n    Given Marcus has knowledge of inventory levels, supplier costs, and operational data\n    And corporate model used information asymmetry to maintain power\n    When Marcus uses operational information for coordination\n    Then all data Marcus sees is equally visible to workers\n    And Marcus cannot hoard information to manipulate outcomes\n    And workers access same dashboards, reports, and metrics\n    And Marcus's value comes from synthesizing information, not controlling it\n    And workplace_elohim ensures transparency of all operational data\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

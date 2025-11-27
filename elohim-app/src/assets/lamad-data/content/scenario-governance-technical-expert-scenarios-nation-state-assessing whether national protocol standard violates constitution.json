@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-assessing whether national protocol standard violates constitution",
+  "contentType": "scenario",
+  "title": "Assessing whether national protocol standard violates constitution",
+  "description": "Assessing whether national protocol standard violates constitution",
+  "content": "Scenario: Assessing whether national protocol standard violates constitution\n    Given appellant challenges nationwide implementation standard\n    And National Council must evaluate technical conformance\n    When I audit national protocol against constitutional principles\n    Then I examine: whether implementation drifted from constitutional alignment\n    And I verify: cryptographic proofs across national deployment\n    And I identify: systematic technical issues affecting millions\n    And I assess: whether correction is feasible\n    And I provide: honest evaluation even if unflattering to protocol\n    And I serve: truth-telling and constitutional accountability\n    And my independence: enables genuine oversight\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

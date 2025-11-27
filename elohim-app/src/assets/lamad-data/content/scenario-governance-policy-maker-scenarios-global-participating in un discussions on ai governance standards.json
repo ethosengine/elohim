@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-participating in un discussions on ai governance standards",
+  "contentType": "scenario",
+  "title": "Participating in UN discussions on AI governance standards",
+  "description": "Participating in UN discussions on AI governance standards",
+  "content": "Scenario: Participating in UN discussions on AI governance standards\n    Given United Nations addresses global AI governance\n    And standards will affect billions of people\n    When I represent my nation in UN deliberations\n    Then I share: experience with protocol in my country\n    And I advocate: for constitutional minimums as global standard\n    And I present: evidence about sortition governance effectiveness\n    And I promote: transparency and recourse as universal requirements\n    And I resist: standards that advantage authoritarian control\n    And I support: interoperability enabling coordination\n    And I work: toward global framework respecting diversity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

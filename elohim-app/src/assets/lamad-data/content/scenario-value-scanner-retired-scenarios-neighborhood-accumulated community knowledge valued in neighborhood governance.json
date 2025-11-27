@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-accumulated community knowledge valued in neighborhood governance",
+  "contentType": "scenario",
+  "title": "Accumulated community knowledge valued in neighborhood governance",
+  "description": "Accumulated community knowledge valued in neighborhood governance",
+  "content": "Scenario: Accumulated community knowledge valued in neighborhood governance\n    Given Frank has lived in the neighborhood for decades\n    And he knows neighborhood history, patterns, and relationships\n    And institutional knowledge is valuable governance resource\n    When Frank participates in neighborhood decisions\n    Then his accumulated knowledge should be recognized and valued\n    And long-term perspective should inform neighborhood planning\n    And the neighborhood_elohim should surface relevant historical context\n    And Frank's memory of neighborhood patterns should guide policy\n    And elder knowledge should shape community decisions\n    And decades of participation should confer legitimate standing\n    And his experience should be actively sought, not marginalized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

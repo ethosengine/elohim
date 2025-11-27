@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-aging in place supported by neighborhood care economy",
+  "contentType": "scenario",
+  "title": "Aging in place supported by neighborhood care economy",
+  "description": "Aging in place supported by neighborhood care economy",
+  "content": "Scenario: Aging in place supported by neighborhood care economy\n    Given Helen wants to remain in her home and neighborhood\n    And successful aging in place requires community support\n    When the neighborhood_elohim coordinates care resources\n    Then it should connect Helen to local support services\n    And informal care networks should be strengthened\n    And volunteer help should be matched to Helen's needs\n    And Helen's accumulated contributions should create claims on support\n    And care should flow as reciprocity, not charity\n    And the protocol should demonstrate that neighborhoods can support aging in place\n    And community care economy should enable elders to remain home\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

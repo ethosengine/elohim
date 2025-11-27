@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-navigating student-resident tensions in shared neighborhood",
+  "contentType": "scenario",
+  "title": "Navigating student-resident tensions in shared neighborhood",
+  "description": "Navigating student-resident tensions in shared neighborhood",
+  "content": "Scenario: Navigating student-resident tensions in shared neighborhood\n    Given long-term residents might resent student noise, parties, or turnover\n    And students might be unaware of neighborhood norms\n    When the neighborhood_elohim facilitates student-resident relationships\n    Then it should educate students about neighborhood expectations\n    And it should help residents recognize students as temporary but real members\n    And it should facilitate communication between students and long-term residents\n    And it should build understanding across different neighborhood groups\n    And the system should reduce student-resident conflict\n    And mixed neighborhoods should be navigable for all residents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

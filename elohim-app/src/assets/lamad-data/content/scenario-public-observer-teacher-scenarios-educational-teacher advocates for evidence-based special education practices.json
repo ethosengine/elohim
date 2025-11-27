@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-educational-teacher advocates for evidence-based special education practices",
+  "contentType": "scenario",
+  "title": "Teacher advocates for evidence-based special education practices",
+  "description": "Teacher advocates for evidence-based special education practices",
+  "content": "Scenario: Teacher advocates for evidence-based special education practices\n    Given students with learning differences need specialized support\n    And current special education approach is compliance-focused not learning-focused\n    When teachers coordinate around special education reform through Observer\n    Then teachers document what actually helps students with diverse needs\n    And share successful inclusive practices across schools\n    And identify barriers to effective special education (caseloads, resources, training)\n    And build coalition with parents of students with disabilities\n    And special education becomes about student learning not just paperwork\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:educational",
+    "related_users:parent,board_member,student,administrator,community_organizer",
+    "related_layers:school,district,provincial_state",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

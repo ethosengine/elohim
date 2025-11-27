@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-affinity-network-elder shares cultural knowledge across generations",
+  "contentType": "scenario",
+  "title": "Elder shares cultural knowledge across generations",
+  "description": "Elder shares cultural knowledge across generations",
+  "content": "Scenario: Elder shares cultural knowledge across generations\n    Given Rose is second-generation Italian American\n    And she knows traditional recipes and cultural practices\n    When she joins a cultural preservation affinity network\n    And she documents her grandmother's recipes with stories\n    Then her contributions reach others interested in Italian American heritage\n    And younger generations learn traditional knowledge\n    And her cultural memory is preserved for future generations\n    And Rose experiences pride in cultural contribution\n    And intergenerational cultural transmission succeeds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,child",
+    "related_layers:neighborhood,community,cultural_linguistic",
+    "elohim_agents:guardian_agent,matching_agent,wisdom_preservation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.188597",
+  "updatedAt": "2025-11-21T18:54:29.188597"
+}

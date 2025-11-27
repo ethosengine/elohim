@@ -1,47 +1,415 @@
-# Lamad: Vision & Context
+# Lamad: Agentic Implementation Guide
 
-*Note: This document provides the high-level vision and conceptual inspirations. For technical implementation details, strictly refer to `LAMAD_API_SPECIFICATION_v1.0.md`.*
+*This document provides layered guidance for AI agents implementing Lamad. Less capable agents should focus on narrowly scoped tasks in subdirectory `claude.md` files. More capable agents can use this root document for architectural context.*
 
-## The Vision
+## Document Hierarchy
 
-**Lamad** is a graph-based learning platform where:
-*   **Attention is Sacred**: Content is presented with context and purpose, not as an endless feed.
-*   **Reach is Earned**: Contribution rights are unlocked through proven capacity.
-*   **Visibility is Earned** ("Fog of War"): Advanced or sensitive content is revealed only when the learner has the necessary foundation (Attestations).
+```
+lamad/
+├── claude.md           <-- YOU ARE HERE (Architecture & Coordination)
+├── LAMAD_API_SPECIFICATION_v1.0.md  <-- AUTHORITATIVE SPEC
+├── IMPLEMENTATION_PLAN.md  <-- STATUS TRACKER (v5.0)
+├── Imago Dei Framework.md  <-- Human-centered identity principles
+├── models/claude.md    <-- Data model interfaces
+├── services/claude.md  <-- Service layer implementation
+├── components/claude.md <-- UI components
+└── renderers/claude.md <-- Rendering system
+```
 
-### Conceptual Inspirations
+**Authority Chain:**
+1. `LAMAD_API_SPECIFICATION_v1.0.md` - The definitive source of truth for all interfaces
+2. `IMPLEMENTATION_PLAN.md` - Status tracker and phase summaries
+3. Directory-level `claude.md` files - Scoped guidance for specific modules
 
-1.  **Khan Academy's "World of Math"**:
-    *   **Target Subject**: "The Elohim Protocol" (mastery goal).
-    *   **Orientation**: You are here, the goal is there.
-    *   **Mastery**: Progress is measured by demonstrated understanding, not just time spent.
+---
 
-2.  **Gottman's Love Maps**:
-    *   **Affinity**: Learning is about building a relationship with the subject. We track *affinity* (0.0 - 1.0) as a measure of this relationship depth.
-    *   **Knowing**: To know the protocol is to love it; to understand its "inner world."
+## Quick Reference: Current State
 
-3.  **Zelda: Breath of the Wild**:
-    *   **Fog of War**: You can see the "Sheikah Towers" (goals) in the distance, but the map details are hidden until you make the journey.
-    *   **Earned Access**: You must climb the tower (prove capacity) to download the map data.
+### MVP Status (as of 2025-11-27)
 
-## Architecture: Territory, Journey, Traveler
+**The MVP service layer is feature-complete. REA economic interface contracts established.** All 15 phases implemented, 13 services active.
 
-To support this vision, we distinguish three layers:
+**Active Services:**
+| Service | Purpose |
+|---------|---------|
+| DataLoaderService | JSON file loading (Holochain adapter point) |
+| PathService | Path & step navigation |
+| ContentService | Content access with reach checking, back-links |
+| AgentService | Agent profiles and attestations |
+| AffinityTrackingService | Engagement tracking (session-integrated) |
+| ExplorationService | Graph traversal, pathfinding, rate limiting |
+| KnowledgeMapService | Polymorphic maps, synthesis |
+| PathExtensionService | Learner-owned path mutations |
+| TrustBadgeService | UI-ready trust badge computation |
+| SearchService | Enhanced search with scoring and facets |
+| SessionUserService | Temporary session identity for MVP |
+| ProfileService | Human-centered profile (Imago Dei aligned) |
+| ElohimAgentService | Autonomous constitutional guardians |
 
-*   **Territory (The Graph)**: The immutable nodes of content. A video is a video; it doesn't know about your learning path.
-*   **Journey (The Path)**: The narrative overlay. "Watch this video *because* it explains X, which you need for Y." The same territory can be part of multiple journeys.
-*   **Traveler (The Agent)**: You. Your history, your affinity scores, your earned attestations. In the future, this data lives on your sovereign Holochain source chain.
+**Active Components:**
+- LamadHome (path-centric with tabs)
+- LamadLayout (session human UI, upgrade prompts)
+- PathOverview, PathNavigator (journey navigation)
+- ContentViewer (with back-links)
+- GraphExplorer (D3.js visualization)
+- LearnerDashboard
 
-## Terminology: Elohim vs. Lamad
+**Active Renderers:**
+- MarkdownRenderer, GherkinRenderer, IframeRenderer, QuizRenderer
 
-*   **Lamad** is the **Structure**: The library, the map, the roads. It is passive.
-*   **Elohim** are the **Agents**: The active intelligence (software services or AI) that guides you. "You seem stuck on this concept; try this path instead."
+---
 
-## Migration Note
+## The Five-Layer Architecture
 
-We are transitioning from a "Document Graph" prototype (where structure was inferred from file folders) to a "Path Centric" v1.0 architecture (where paths are first-class entities).
+### Layer 1: Territory (Content Nodes)
+The immutable knowledge graph. Content exists independently of how it's navigated.
 
-**Key Changes in v1.0:**
-*   **Lazy Loading**: We do not load the whole graph. We load the Path, and fetch steps as needed.
-*   **Renderer Registry**: We don't hardcode views for Markdown/Gherkin. We use a registry to support any content type (VR, Audio, etc.).
-*   **Attestations**: We are moving from simple "view tracking" to "proven capacity" (Quizzes, manual sign-offs, etc.).
+**Key Interface:** `ContentNode`
+```typescript
+interface ContentNode {
+  id: string;
+  title: string;
+  description: string;
+  contentType: 'epic' | 'concept' | 'simulation' | 'video' | 'assessment' | ...;
+  contentFormat: 'markdown' | 'html5-app' | 'video-embed' | 'quiz-json' | ...;
+  content: string | object;  // Payload depends on format
+  tags: string[];
+  relatedNodeIds: string[];
+  metadata: ContentMetadata;
+}
+```
+
+### Layer 2: Journey (Learning Paths)
+Curated sequences that add narrative meaning to Territory resources.
+
+**Key Interfaces:** `LearningPath`, `PathStep`
+```typescript
+interface LearningPath {
+  id: string;
+  title: string;
+  description: string;
+  purpose: string;
+  steps: PathStep[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedDuration: string;
+  visibility: 'public' | 'organization' | 'private';
+  attestationsGranted?: string[];
+}
+
+interface PathStep {
+  order: number;
+  resourceId: string;  // Links to ContentNode.id
+  stepTitle: string;
+  stepNarrative: string;  // WHY this content matters HERE
+  learningObjectives: string[];
+  completionCriteria: string[];
+  optional: boolean;
+  attestationRequired?: string;
+  attestationGranted?: string;
+}
+```
+
+### Layer 3: Traveler (Humans & Progress)
+Sovereign humans whose progress shapes their experience.
+
+**Key Interfaces:** `Agent`, `AgentProgress`, `SessionUser`
+```typescript
+interface Agent {
+  id: string;
+  displayName: string;
+  type: 'human' | 'organization' | 'ai-agent';
+  visibility: 'public' | 'connections' | 'private';
+}
+
+interface AgentProgress {
+  agentId: string;
+  pathId: string;
+  currentStepIndex: number;
+  completedStepIndices: number[];
+  stepAffinity: Record<number, number>;  // 0.0 to 1.0
+  stepNotes: Record<number, string>;
+  attestationsEarned: string[];
+}
+
+interface SessionUser {
+  sessionId: string;       // Generated UUID
+  displayName: string;
+  isAnonymous: true;
+  accessLevel: 'visitor';  // Always visitor for session humans
+  stats: SessionStats;
+}
+```
+
+### Layer 4: Profile (Human Identity - Imago Dei)
+Human-centered identity view aligned with Imago Dei framework principles.
+
+**Key Interfaces:** `HumanProfile`, `JourneyStats`
+```typescript
+interface HumanProfile {
+  id: string;
+  displayName: string;
+  isSessionBased: boolean;
+  journeyStartedAt: string;
+  lastActiveAt: string;
+  journeyStats: JourneyStats;
+  currentFocus: CurrentFocus[];
+  developedCapabilities: DevelopedCapability[];
+}
+
+interface JourneyStats {
+  territoryExplored: number;    // Content viewed (breadth)
+  journeysStarted: number;       // Paths begun
+  journeysCompleted: number;     // Paths completed (milestones)
+  stepsCompleted: number;        // Total steps across all paths
+  meaningfulEncounters: number;  // High-affinity content
+  timeInvested: number;          // Learning time (ms)
+  sessionsCount: number;         // Return visits
+}
+```
+
+### Layer 5: Economic (REA Coordination)
+ValueFlows-based economic coordination for recognition, stewardship, and value flows.
+
+**Key Interfaces:** `ContributorPresence`, `EconomicEvent`
+```typescript
+// Lifecycle: unclaimed → stewarded → claimed
+type PresenceState = 'unclaimed' | 'stewarded' | 'claimed';
+
+interface ContributorPresence extends REAAgent {
+  type: 'contributor-presence';
+  presenceState: PresenceState;
+  accumulatedRecognition: AccumulatedRecognition;
+  stewardship?: PresenceStewardship;
+  claim?: PresenceClaim;
+}
+
+interface EconomicEvent {
+  id: string;
+  action: REAAction;  // 'use' | 'cite' | 'produce' | 'transfer' | 'accept'
+  provider: string;   // Who gave
+  receiver: string;   // Who received
+  resourceQuantity?: Measure;
+  hasPointInTime: string;
+}
+
+type LamadEventType =
+  | 'content-view'      // Human viewed content
+  | 'affinity-mark'     // Human marked affinity (recognition flows)
+  | 'presence-claim'    // Contributor claimed their presence
+  | 'recognition-transfer'; // Recognition transferred on claim
+```
+
+---
+
+## Service Layer Summary
+
+| Service | Purpose | Depends On |
+|---------|---------|------------|
+| `DataLoaderService` | JSON file fetching (Holochain adapter) | HttpClient |
+| `PathService` | Path & step navigation | DataLoader |
+| `ContentService` | Territory access, reach checking, back-links | DataLoader, AgentService |
+| `AgentService` | Auth, progress, attestations | DataLoader, SessionUserService |
+| `AffinityTrackingService` | Engagement tracking | SessionUserService, localStorage |
+| `ExplorationService` | BFS traversal, pathfinding | DataLoader, AgentService |
+| `KnowledgeMapService` | Polymorphic maps (domain, person, collective) | DataLoader |
+| `PathExtensionService` | Learner path mutations | DataLoader |
+| `TrustBadgeService` | UI-ready trust badge computation | DataLoader, AgentService |
+| `SearchService` | Enhanced search with scoring, facets | DataLoader, TrustBadgeService |
+| `SessionUserService` | Temporary session identity, activity tracking | localStorage |
+| `ProfileService` | Human-centered profile (Imago Dei aligned) | SessionUser, Path, Affinity, Agent |
+| `RendererRegistryService` | Content format → Component mapping | None |
+
+---
+
+## Route Structure
+
+```typescript
+const LAMAD_ROUTES: Routes = [
+  { path: '', component: LamadHomeComponent },
+  { path: 'path/:pathId', component: PathOverviewComponent },
+  { path: 'path/:pathId/step/:stepIndex', component: PathNavigatorComponent },
+  { path: 'resource/:resourceId', component: ContentViewerComponent },
+  { path: 'me', component: LearnerDashboardComponent },
+  { path: 'explore', component: MeaningMapComponent },  // Deprecated, keep for research
+];
+```
+
+---
+
+## Session Human Architecture (MVP)
+
+The MVP uses a **session human** model that provides:
+1. **Zero-friction entry** - Anyone can explore immediately without signup
+2. **Progress tracking** - Session state stored in localStorage
+3. **Holochain upgrade path** - Session data migrates when human installs app
+
+### Access Levels
+| Level | Identity | Can Access |
+|-------|----------|------------|
+| `visitor` | Session human (localStorage) | Open content only |
+| `member` | Holochain AgentPubKey | Gated content |
+| `attested` | Member + attestations | Protected content |
+
+### Content Access Tiers
+| Tier | Description | Example |
+|------|-------------|---------|
+| `open` | Freely explorable by anyone | General learning content |
+| `gated` | Requires Holochain identity | Community discussions |
+| `protected` | Requires attestations + path completion | CSAM handling training |
+
+### Session-to-Network Flow
+```
+1. Human explores freely as visitor (session identity)
+2. Meaningful moments trigger upgrade prompts
+3. Human installs Holochain app
+4. prepareMigration() packages session data
+5. Session data imports to agent's source chain
+6. clearAfterMigration() removes localStorage
+7. Human continues with full network identity
+```
+
+### Upgrade Prompts
+Session humans see contextual prompts encouraging Holochain installation:
+- `first-affinity`: When human marks first content as resonant
+- `path-completed`: After completing a learning path
+- `notes-saved`: When saving personal notes
+- `network-feature`: When trying a gated feature
+
+---
+
+## Human Profile (Imago Dei Framework)
+
+The ProfileService provides a human-centered view of identity aligned with the Imago Dei framework:
+
+| Imago Dei Module | ProfileService Method | Purpose |
+|------------------|----------------------|---------|
+| `imagodei-core` | `getProfile()` | Stable identity center |
+| `imagodei-experience` | `getTimeline()`, `getCurrentFocus()` | Learning and transformation |
+| `imagodei-gifts` | `getDevelopedCapabilities()` | Skills and attestations earned |
+| `imagodei-synthesis` | `getTopEngagedContent()`, `getAllNotes()` | Growth and meaning-making |
+
+**Key Design Principles:**
+- Use "human" not "user" throughout codebase
+- Growth-oriented metrics (not consumption metrics)
+- Narrative view of journey (not activity logs)
+- Honor dignity and agency
+
+---
+
+## Critical Implementation Constraints
+
+### 1. Lazy Loading is NON-NEGOTIABLE
+- Never load "all paths" or "all content"
+- Content fetched by ID, one node at a time
+- Path metadata loads without step content
+- Step content loads only when navigating to that step
+
+### 2. Fog of War
+- Humans can only access: completed steps, current step, or one step ahead
+- Attestation gates can lock content until prerequisites met
+- This is pedagogical wisdom, not artificial scarcity
+
+### 3. IDs are Opaque Strings
+- Never parse or depend on ID format
+- In prototype: human-readable slugs (`epic-social-medium`)
+- In production: Holochain hashes (`uhCkk...`)
+
+### 4. Territory vs Journey Separation
+- Content nodes are generic, reusable across paths
+- Path steps add context: "Why does THIS matter HERE?"
+- Same video can appear in marriage path and workplace path with different narratives
+
+### 5. Human-Centered Terminology
+- Use "human" not "user"
+- Use "journey" not "consumption"
+- Use "meaningful encounters" not "views"
+
+---
+
+## Completed Implementation Phases
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1: Data Foundation | ✅ | JSON schemas, 3,097 content nodes |
+| 2: Service Layer | ✅ | DataLoader, Path, Content, Agent services |
+| 3: Rendering Engine | ✅ | Registry pattern, 4 renderers |
+| 4: Journey UI | ✅ | PathNavigator, PathOverview, path-centric home |
+| 5: Graph Explorer | ✅ | D3.js visualization |
+| 6: Integration | ✅ | Build passes, routes working |
+| 7: Mastery System | 🔮 Post-MVP | Spaced repetition, concept quizzes |
+| 8: Graph API | ✅ | ExplorationService with BFS, pathfinding |
+| 9: Knowledge Maps | ✅ | KnowledgeMapService, PathExtensionService |
+| 10: Bidirectional Trust | ✅ | ContentAttestation, reach-based access |
+| 11: Trust Badges | ✅ | TrustBadgeService, unified indicators |
+| 12: Enhanced Search | ✅ | SearchService with scoring, facets |
+| 13: Session Human | ✅ | Zero-friction identity, upgrade path |
+| 14: Human Profile | ✅ | Imago Dei-aligned profile service |
+| 15: REA Economic Models | ✅ | ValueFlows types, ContributorPresence, EconomicEvent |
+
+See `IMPLEMENTATION_PLAN.md` for detailed phase summaries.
+
+---
+
+## Remaining Work
+
+### Priority 1: Profile UI
+- [ ] Profile page component (render HumanProfile data)
+- [ ] Journey timeline visualization
+- [ ] Resume point card ("Continue where you left off")
+- [ ] Paths overview with progress bars
+
+### Priority 2: Content Access UI
+- [ ] Gated content lock indicator
+- [ ] Access denial modal with unlock actions
+- [ ] "Join Network" flow (Holochain install placeholder)
+
+### Priority 3: Polish & Bugs
+- [ ] CSS budget cleanup (content-viewer, lamad-layout exceed 6kb)
+- [ ] Error handling refinement
+- [ ] Loading state animations
+
+### Priority 4: Testing
+- [ ] Cypress e2e tests for path navigation
+- [ ] Unit tests for services (ProfileService, SessionUserService)
+- [ ] Accessibility audit
+
+---
+
+## For Agents
+
+**The MVP service layer is feature-complete. REA interface contracts established.** Future work should focus on:
+1. UI implementation using existing services (Profile, Content Access)
+2. Testing and polish (not new features)
+3. Holochain/hREA migration (when ready)
+4. Contributor Presence service implementation (uses REA models)
+5. Economic event tracking service (uses REA models)
+
+### Do NOT:
+- Add new services without explicit instruction
+- Modify working interfaces
+- Load "all content" or "all paths" anywhere
+- Use "user" terminology - use "human" instead
+- Use "creator" terminology - use "contributor" instead
+
+---
+
+## Terminology Quick Reference
+
+| Term | Meaning |
+|------|---------|
+| **Territory** | The content graph (ContentNodes) |
+| **Journey** | A curated learning path |
+| **Traveler** | A human/agent in the system |
+| **Human** | A person using the platform (never "user") |
+| **Contributor** | Someone who creates content (never "creator") |
+| **Elohim** | Active intelligence agents (services, AI) |
+| **Lamad** | The static structure (graph, paths) |
+| **Affinity** | How deeply you've engaged with content (0.0-1.0) |
+| **Attestation** | Earned credential/badge |
+| **Fog of War** | Content visibility earned through progression |
+| **Imago Dei** | Human-centered identity framework |
+| **Session Human** | Temporary visitor identity (localStorage) |
+| **Presence** | Placeholder identity for external contributors |
+| **Recognition** | Value acknowledgment flowing to contributors |
+| **REA** | Resources, Events, Agents - accounting ontology |
+| **ValueFlows** | REA implementation standard (hREA uses this) |

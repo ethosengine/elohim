@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-connecting community care with family care responsibilities",
+  "contentType": "scenario",
+  "title": "Connecting community care with family care responsibilities",
+  "description": "Connecting community care with family care responsibilities",
+  "content": "Scenario: Connecting community care with family care responsibilities\n    Given Margaret provides both family care and community service\n    And these responsibilities must be balanced\n    When the community_elohim tracks Margaret's total contributions\n    Then it should recognize both family and community care\n    And it should help Margaret balance multiple care obligations\n    And it should ensure community service is sustainable alongside family care\n    And total care burden should be visible and manageable\n    And Margaret should be able to contribute without burnout\n    And community should respect her family care commitments\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

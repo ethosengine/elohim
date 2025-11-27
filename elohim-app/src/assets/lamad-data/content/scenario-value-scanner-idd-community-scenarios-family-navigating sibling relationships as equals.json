@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-navigating sibling relationships as equals",
+  "contentType": "scenario",
+  "title": "Navigating sibling relationships as equals",
+  "description": "Navigating sibling relationships as equals",
+  "content": "Scenario: Navigating sibling relationships as equals\n    Given Jordan has two younger siblings who are now adults\n    And sibling relationships are evolving\n    When Jordan's siblings gather for a family event\n    Then Jordan participates as a peer adult sibling\n    And the Value Scanner helps coordinate sibling care exchanges\n    And Jordan's contributions to siblings are recognized (encouragement, presence)\n    And siblings treat Jordan as brother/sister, not as someone to manage\n    And the family_elohim helps siblings navigate appropriate support\n    And Jordan experiences adult sibling relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "governance-audio-future-thinkers-daniel-schmachtenberger-the-existential-game-readme",
+  "contentType": "video",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Daniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes with Daniel Schmachtenberger: http://futurethinkers.org/daniel\u2026",
+  "content": "---\nnode_type: audio\norg_id: future_thinkers_daniel_schmachtenberger_the_existential_game\nname: \"Future Thinkers - Daniel Schmachtenberger - The Existential Game\"\nurl: \"https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA\"\ngem_id: \"cJfrbjpKw7dvOeBQ6ELX\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Future Thinkers - Daniel Schmachtenberger - The Existential Game inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Future Thinkers - Daniel Schmachtenberger - The Existential Game\n\n## Description\n\nDaniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes with Daniel Schmachtenberger: http://futurethinkers.org/daniel\u2026\n\n**Publisher:** Google Podcasts\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Future Thinkers - Daniel Schmachtenberger - The Existential Game relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "video",
+    "governance"
+  ],
+  "sourcePath": "governance/audio/future_thinkers_daniel_schmachtenberger_the_existential_game/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

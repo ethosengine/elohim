@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent evaluates development affecting school routes",
+  "contentType": "scenario",
+  "title": "Parent evaluates development affecting school routes",
+  "description": "Parent evaluates development affecting school routes",
+  "content": "Scenario: Parent evaluates development affecting school routes\n    Given a developer proposes construction near their child's school\n    And claims it will \"benefit the community\"\n    When the parent reviews Observer analysis\n    Then they see traffic impacts on school walking routes\n    And understand safety implications for children's commutes\n    And view how construction timing affects school access\n    And can challenge developer claims with child-safety data\n    And parent concerns are grounded in evidence not just fear\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

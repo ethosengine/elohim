@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-affinity-network-activist creates cross-geographic climate justice network",
+  "contentType": "scenario",
+  "title": "Activist creates cross-geographic climate justice network",
+  "description": "Activist creates cross-geographic climate justice network",
+  "content": "Scenario: Activist creates cross-geographic climate justice network\n    Given activists in 40 cities are working on climate action\n    And they share commitment to Indigenous leadership and just transition\n    When a founding group creates a climate justice affinity network\n    And they establish network charter emphasizing subsidiarity and equity\n    And they invite activists from participating communities\n    Then the affinity network space is created\n    And participants maintain connection to their local communities\n    And the network provides coordination without centralized control\n    And local autonomy is preserved while enabling collective action\n    And shared resources, tactics, and patterns flow through the network\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:affinity_network",
+    "related_users:activist,content_creator,refugee,displaced_person",
+    "related_layers:community,nation_state,global,cultural_linguistic",
+    "elohim_agents:coordination_agent,translation_agent,pattern_recognition_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

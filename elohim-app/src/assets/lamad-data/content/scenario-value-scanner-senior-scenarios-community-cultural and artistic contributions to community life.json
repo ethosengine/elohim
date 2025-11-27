@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-cultural and artistic contributions to community life",
+  "contentType": "scenario",
+  "title": "Cultural and artistic contributions to community life",
+  "description": "Cultural and artistic contributions to community life",
+  "content": "Scenario: Cultural and artistic contributions to community life\n    Given Margaret has time for cultural and creative pursuits\n    And community cultural life requires participation\n    When Margaret engages in community cultural activities\n    Then her participation and leadership should be tracked\n    And cultural contributions should be recognized as care work\n    And community flourishing includes cultural richness\n    And Margaret's creative labor should be valued\n    And seniors should be visible in community cultural life\n    And arts and culture should be part of care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-part-time and flexible work options support intensive care periods",
+  "contentType": "scenario",
+  "title": "Part-time and flexible work options support intensive care periods",
+  "description": "Part-time and flexible work options support intensive care periods",
+  "content": "Scenario: Part-time and flexible work options support intensive care periods\n    Given Sarah may need reduced hours during intensive care periods\n    And full-time work may be unsustainable at some life stages\n    When Sarah's care responsibilities increase\n    Then workplace should offer part-time and flexible work options\n    And reduced hours should not mean career penalty\n    And the workplace_elohim should coordinate schedule adjustments\n    And Sarah should be able to modulate work commitment based on care needs\n    And career paths should accommodate care economy participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

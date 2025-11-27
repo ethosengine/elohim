@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-identifying unsafe or harmful workplace conditions",
+  "contentType": "scenario",
+  "title": "Identifying unsafe or harmful workplace conditions",
+  "description": "Identifying unsafe or harmful workplace conditions",
+  "content": "Scenario: Identifying unsafe or harmful workplace conditions\n    Given restaurant work involves physical demands and potential hazards\n    When I experience unsafe conditions or health risks\n    Then the workplace_elohim should help me identify hazards\n    And provide information about workplace safety rights\n    And support me in reporting unsafe conditions\n    And advocate for conditions that protect workers' health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

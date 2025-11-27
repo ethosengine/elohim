@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-end-of-life ecological considerations in care planning",
+  "contentType": "scenario",
+  "title": "End-of-life ecological considerations in care planning",
+  "description": "End-of-life ecological considerations in care planning",
+  "content": "Scenario: End-of-life ecological considerations in care planning\n    Given Helen is planning for end of life\n    And death has ecological dimensions\n    When Helen makes end-of-life care decisions\n    Then ecological options should be presented as available choices\n    And natural burial or green funeral options should be surfaced\n    And her values about environmental impact should extend through death\n    And the protocol should support ecological considerations in dying\n    And bioregional care economy should include sustainable death practices\n    And Helen's environmental values should guide her death as they guided her life\n    And end of life should be opportunity to minimize environmental harm\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_member,environmental_steward,young_adult",
+    "related_layers:community,educational,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

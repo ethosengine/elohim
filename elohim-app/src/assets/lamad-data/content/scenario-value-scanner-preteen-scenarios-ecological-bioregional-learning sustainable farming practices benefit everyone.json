@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-learning sustainable farming practices benefit everyone",
+  "contentType": "scenario",
+  "title": "Learning sustainable farming practices benefit everyone",
+  "description": "Learning sustainable farming practices benefit everyone",
+  "content": "Scenario: Learning sustainable farming practices benefit everyone\n    Given Marcus is developing systems thinking\n    And agricultural practices affect long-term food security\n    When Marcus learns about food production methods\n    Then the personal_agent should explain sustainable vs. extractive farming\n    And it should teach that care for soil creates long-term abundance\n    And it should connect farm stewardship to household stewardship\n    And he should understand that ecological care serves human flourishing\n    And sustainable agriculture should be framed through care economy\n    And his generation should expect farming that cares for land\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

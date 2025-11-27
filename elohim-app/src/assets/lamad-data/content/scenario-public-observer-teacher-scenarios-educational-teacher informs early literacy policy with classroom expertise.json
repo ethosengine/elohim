@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-educational-teacher informs early literacy policy with classroom expertise",
+  "contentType": "scenario",
+  "title": "Teacher informs early literacy policy with classroom expertise",
+  "description": "Teacher informs early literacy policy with classroom expertise",
+  "content": "Scenario: Teacher informs early literacy policy with classroom expertise\n    Given state mandates specific reading instruction approach\n    And approach contradicts teacher professional knowledge and research\n    When teachers document reading instruction reality through Observer\n    Then teachers show mandated approach doesn't work for all students\n    And provide evidence on effective literacy practices for diverse learners\n    And document student reading outcomes under different approaches\n    And coordinate with literacy researchers and reading specialists\n    And reading policy becomes informed by professional expertise not ideology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:educational",
+    "related_users:parent,board_member,student,administrator,community_organizer",
+    "related_layers:school,district,provincial_state",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

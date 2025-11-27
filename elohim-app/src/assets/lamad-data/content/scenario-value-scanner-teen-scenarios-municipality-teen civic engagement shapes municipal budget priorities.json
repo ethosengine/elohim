@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-teen civic engagement shapes municipal budget priorities",
+  "contentType": "scenario",
+  "title": "Teen civic engagement shapes municipal budget priorities",
+  "description": "Teen civic engagement shapes municipal budget priorities",
+  "content": "Scenario: Teen civic engagement shapes municipal budget priorities\n    Given the municipality uses participatory budgeting processes\n    And Jasmine has demonstrated civic engagement\n    When municipal budget decisions are made\n    Then youth voice should be included in budget priority conversations\n    And Jasmine's care contributions should give her standing in budget discussions\n    And municipal_elohim should facilitate youth participation in participatory budgeting\n    And teen input should shape allocation of public resources\n    And she should learn that civic participation means influencing resource decisions\n    And democratic governance should include all age groups in budget processes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

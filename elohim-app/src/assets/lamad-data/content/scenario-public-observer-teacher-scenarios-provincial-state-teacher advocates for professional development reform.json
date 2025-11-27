@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher advocates for professional development reform",
+  "contentType": "scenario",
+  "title": "Teacher advocates for professional development reform",
+  "description": "Teacher advocates for professional development reform",
+  "content": "Scenario: Teacher advocates for professional development reform\n    Given state mandates professional development hours annually\n    But current PD is generic and unhelpful for actual teaching\n    When teachers provide evidence on PD effectiveness through Observer\n    Then aggregated data shows teachers rate 80% of PD as not useful\n    And teachers propose evidence-based PD reform based on what actually helps\n    And document successful PD models from other states\n    And coordinate with education researchers and reform advocates\n    And state professional development policy respects teacher expertise\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-learning cooking skills progressively through recipe suggestions",
+  "contentType": "scenario",
+  "title": "Learning cooking skills progressively through recipe suggestions",
+  "description": "Learning cooking skills progressively through recipe suggestions",
+  "content": "Scenario: Learning cooking skills progressively through recipe suggestions\n    Given Aisha has minimal cooking experience\n    And she wants to develop culinary capability\n    When the personal_agent suggests recipes\n    Then recommendations should match her current skill level\n    And difficulty should increase gradually as she learns\n    And it should teach techniques through practice\n    And it should explain why certain methods work\n    And cooking education should be progressive and achievable\n    And she should build confidence and competence incrementally\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

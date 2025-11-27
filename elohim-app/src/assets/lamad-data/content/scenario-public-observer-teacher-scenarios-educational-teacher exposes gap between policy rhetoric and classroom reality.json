@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-educational-teacher exposes gap between policy rhetoric and classroom reality",
+  "contentType": "scenario",
+  "title": "Teacher exposes gap between policy rhetoric and classroom reality",
+  "description": "Teacher exposes gap between policy rhetoric and classroom reality",
+  "content": "Scenario: Teacher exposes gap between policy rhetoric and classroom reality\n    Given administrators promote new \"personalized learning\" initiative\n    And claim technology will revolutionize teaching\n    When teachers document actual implementation through Observer\n    Then teachers show \"personalized learning\" means students on computers alone\n    And reduced human interaction and teacher-student relationships\n    And technology substitutes for reduced staffing\n    And student engagement declining not improving\n    And teacher evidence reveals policy rhetoric vs learning reality\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:educational",
+    "related_users:parent,board_member,student,administrator,community_organizer",
+    "related_layers:school,district,provincial_state",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

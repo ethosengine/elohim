@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-advising on global technical standards with cultural sensitivity",
+  "contentType": "scenario",
+  "title": "Advising on global technical standards with cultural sensitivity",
+  "description": "Advising on global technical standards with cultural sensitivity",
+  "content": "Scenario: Advising on global technical standards with cultural sensitivity\n    Given global protocol needs technical standards\n    And different cultures have different technical capacities\n    When I help develop culturally-sensitive technical requirements\n    Then I ensure: standards work with varying infrastructure\n    And I avoid: assuming Global North technical context\n    And I support: diverse implementation approaches\n    And I enable: low-resource communities to participate\n    And I collaborate: with Global South technical experts\n    And I resist: digital colonialism in technical design\n    And I demonstrate: that technical standards can honor diversity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

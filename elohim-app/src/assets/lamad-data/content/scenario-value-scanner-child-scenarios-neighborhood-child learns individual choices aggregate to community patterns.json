@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-neighborhood-child learns individual choices aggregate to community patterns",
+  "contentType": "scenario",
+  "title": "Child learns individual choices aggregate to community patterns",
+  "description": "Child learns individual choices aggregate to community patterns",
+  "content": "Scenario: Child learns individual choices aggregate to community patterns\n    Given Emma makes consistent purchasing choices\n    And other neighborhood families also use the Value Scanner\n    When Emma's personal_agent provides context about her choices\n    Then the agent should share age-appropriate community insights\n    And the agent should say \"Five other families bought this brand this week\u2014they're all trying to eat healthier\"\n    And Emma should learn her choices are part of larger patterns\n    And she should understand individual agency connects to collective outcomes\n    And community context should expand her economic understanding\n    And she should see herself as part of care economy ecosystem\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

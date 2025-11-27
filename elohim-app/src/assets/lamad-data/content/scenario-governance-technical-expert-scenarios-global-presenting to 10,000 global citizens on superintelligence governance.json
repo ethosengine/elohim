@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-presenting to 10,000 global citizens on superintelligence governance",
+  "contentType": "scenario",
+  "title": "Presenting to 10,000 global citizens on superintelligence governance",
+  "description": "Presenting to 10,000 global citizens on superintelligence governance",
+  "content": "Scenario: Presenting to 10,000 global citizens on superintelligence governance\n    Given Global Constitutional Convention deliberates superintelligent AI oversight\n    And I am invited to provide technical expert testimony\n    When I address delegates from every nation and culture\n    Then I explain: what \"superintelligence\" means technically\n    And I clarify: when agents might exceed human comprehension\n    And I present: technical mechanisms for constitutional alignment\n    And I explore: whether \"explain-down\" capability is possible\n    And I acknowledge: deep uncertainty about solvability\n    And I translate: across language and cultural barriers\n    And I demonstrate: how expertise serves global democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

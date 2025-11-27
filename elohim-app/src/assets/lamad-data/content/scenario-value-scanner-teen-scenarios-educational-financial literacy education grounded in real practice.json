@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-financial literacy education grounded in real practice",
+  "contentType": "scenario",
+  "title": "Financial literacy education grounded in real practice",
+  "description": "Financial literacy education grounded in real practice",
+  "content": "Scenario: Financial literacy education grounded in real practice\n    Given Jasmine manages real budgets and makes real economic decisions\n    And school provides financial literacy education\n    When educational_elohim integrates school learning with lived experience\n    Then abstract financial concepts should connect to her real practice\n    And she should learn budgeting through managing actual household budget\n    And understand compound interest through her real college savings\n    And learn financial planning by making real financial plans\n    And develop sophisticated financial capability through practice, not just theory\n    And integrate formal education with applied learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

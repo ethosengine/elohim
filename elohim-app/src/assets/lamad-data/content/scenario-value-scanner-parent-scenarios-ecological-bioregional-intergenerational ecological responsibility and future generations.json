@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-intergenerational ecological responsibility and future generations",
+  "contentType": "scenario",
+  "title": "Intergenerational ecological responsibility and future generations",
+  "description": "Intergenerational ecological responsibility and future generations",
+  "content": "Scenario: Intergenerational ecological responsibility and future generations\n    Given Sarah is raising children who will face climate consequences\n    And current generation's choices affect future generations\n    When the ecological_elohim assesses intergenerational care\n    Then it should recognize Sarah's work preparing children for climate future\n    And it should value her teaching of environmental responsibility\n    And raising environmentally conscious children should be recognized as service to future\n    And the system should honor intergenerational ecological care\n    And Sarah's parenting should be valued as investment in planetary future\n    And care for future generations should be fundamental care economy principle\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

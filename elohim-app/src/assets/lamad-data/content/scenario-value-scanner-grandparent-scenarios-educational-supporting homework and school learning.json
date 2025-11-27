@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-supporting homework and school learning",
+  "contentType": "scenario",
+  "title": "Supporting homework and school learning",
+  "description": "Supporting homework and school learning",
+  "content": "Scenario: Supporting homework and school learning\n    Given Emma has homework and school projects\n    And Margaret helps with reading, math, and assignments\n    When Margaret provides academic support\n    Then the educational_elohim should recognize homework help as teaching\n    And it should coordinate with Emma's school learning goals\n    And it should value Margaret's educational support labor\n    And academic assistance should accumulate care tokens\n    And Margaret should be recognized as part of Emma's educational team\n    And grandparent learning support should complement formal schooling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-advising council without dominating their judgment",
+  "contentType": "scenario",
+  "title": "Advising council without dominating their judgment",
+  "description": "Advising council without dominating their judgment",
+  "content": "Scenario: Advising council without dominating their judgment\n    Given I have deep knowledge council lacks\n    And I could easily dominate deliberation if I pushed too hard\n    When I testify about technical implications of constitutional interpretations\n    Then I explain: what's technically possible and impossible\n    And I clarify: tradeoffs between different approaches\n    And I stop: before crossing into values judgment\n    And I respect: council's authority to choose among technically viable options\n    And I accept: when they choose values over optimization\n    And I honor: the boundary between expertise and democratic judgment\n    And I demonstrate: how expertise serves rather than replaces democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

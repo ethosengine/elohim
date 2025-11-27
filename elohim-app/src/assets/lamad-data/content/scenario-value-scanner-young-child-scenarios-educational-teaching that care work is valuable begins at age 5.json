@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-teaching that care work is valuable begins at age 5",
+  "contentType": "scenario",
+  "title": "Teaching that care work is valuable begins at age 5",
+  "description": "Teaching that care work is valuable begins at age 5",
+  "content": "Scenario: Teaching that care work is valuable begins at age 5\n    Given traditional economics makes care work invisible\n    And Tommy is forming foundational understanding of value\n    When Tommy performs care labor in the scanner\n    Then the system should explicitly teach that care creates value\n    And Tommy should learn \"You helped. Your care matters.\"\n    And his care contributions should be recognized immediately\n    And he should understand that caring for others is valuable work\n    And foundational belief that care has worth should be established\n    And this teaching should precede any exposure to market economics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

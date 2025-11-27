@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-household care tokens reflect combined family contributions",
+  "contentType": "scenario",
+  "title": "Household care tokens reflect combined family contributions",
+  "description": "Household care tokens reflect combined family contributions",
+  "content": "Scenario: Household care tokens reflect combined family contributions\n    Given household participates in care token economy\n    And both adults and children contribute care labor\n    When household care tokens are calculated\n    Then tokens should accumulate from all members' contributions\n    And Sarah's care work should be valued appropriately\n    And partner's contributions should be recognized\n    And children's age-appropriate care work should count\n    And household should receive care token supplements for income level\n    And the scanner should be accessible regardless of economic status\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

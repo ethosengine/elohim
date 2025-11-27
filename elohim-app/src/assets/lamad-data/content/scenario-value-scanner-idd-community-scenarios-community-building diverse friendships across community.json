@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-building diverse friendships across community",
+  "contentType": "scenario",
+  "title": "Building diverse friendships across community",
+  "description": "Building diverse friendships across community",
+  "content": "Scenario: Building diverse friendships across community\n    Given Jordan's social circle includes both IDD and non-IDD people\n    And diverse friendships enrich Jordan's life\n    When Jordan participates in mixed-ability social activities\n    Then the personal_agent supports social coordination\n    And friends engage with Jordan as a peer, not a project\n    And Jordan contributes to friendships through presence, joy, and care\n    And relationships are genuine and reciprocal\n    And Jordan experiences belonging in diverse community\n    And Jordan's social connections are honored and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member tracks promised jobs from past incentives",
+  "contentType": "scenario",
+  "title": "Economic development board member tracks promised jobs from past incentives",
+  "description": "Economic development board member tracks promised jobs from past incentives",
+  "content": "Scenario: Economic development board member tracks promised jobs from past incentives\n    Given board previously approved incentive packages for business attraction\n    And businesses promised specific job creation targets as incentive condition\n    And board wants to know if incentives produced promised economic benefits\n    When the board member uses Observer accountability tracking\n    Then they see actual job creation versus promises for past incentive deals\n    And discover many businesses created fewer jobs than committed\n    And find weak enforcement mechanisms allowing businesses to keep incentives despite failures\n    And access fiscal impact analysis showing poor return on incentive investment\n    And accountability tracking reveals incentive outcomes diverged from projections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:workplace_organizational",
+    "related_users:citizen,politician,activist,community_organizer,worker",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-practices of frugality and resource conservation",
+  "contentType": "scenario",
+  "title": "Practices of frugality and resource conservation",
+  "description": "Practices of frugality and resource conservation",
+  "content": "Scenario: Practices of frugality and resource conservation\n    Given Margaret's generation learned to waste nothing and maximize resources\n    And these practices are essential for ecological sustainability\n    When the bioregional_elohim tracks resource conservation\n    Then it should recognize Margaret's frugal practices as ecological wisdom\n    And it should value conservation skills and waste reduction\n    And it should track resource efficiency and reuse practices\n    And frugality should be reframed as environmental stewardship\n    And Margaret's practices should be recognized as climate action\n    And traditional conservation knowledge should be valued and transmitted\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

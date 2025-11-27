@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-recognizing family investment as care economy transaction",
+  "contentType": "scenario",
+  "title": "Recognizing family investment as care economy transaction",
+  "description": "Recognizing family investment as care economy transaction",
+  "content": "Scenario: Recognizing family investment as care economy transaction\n    Given Kenji's family invests time, money, and emotional energy in his development\n    And Kenji invests in family relationships and contributes what he can\n    When the family_elohim tracks family care economy\n    Then it should recognize mutual investment across generations\n    And it should value family support of student as care contribution\n    And it should value student's family participation as reciprocal care\n    And family economy should be understood as long-term reciprocal exchange\n    And the system should frame family support as investment in flourishing\n    And intergenerational care should be recognized as care economy foundation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

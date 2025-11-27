@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-negotiating employment flexibility for childcare and recovery needs",
+  "contentType": "scenario",
+  "title": "Negotiating employment flexibility for childcare and recovery needs",
+  "description": "Negotiating employment flexibility for childcare and recovery needs",
+  "content": "Scenario: Negotiating employment flexibility for childcare and recovery needs\n    Given I need employment flexibility for childcare, therapy, legal appointments, and crisis management\n    And employers may resist flexibility or see it as liability\n    When I negotiate employment terms\n    Then the workplace_elohim helps me request appropriate accommodations\n    And provides language for negotiating flexibility professionally\n    And helps me understand my legal rights to reasonable accommodation\n    And validates that my needs are reasonable and should be accommodated\n    And identifies employers more likely to provide needed flexibility\n    And my personal_agent coaches me through negotiation conversations\n    And recognizes that advocating for my needs is professional strength\n    And supports me in finding employment compatible with my life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

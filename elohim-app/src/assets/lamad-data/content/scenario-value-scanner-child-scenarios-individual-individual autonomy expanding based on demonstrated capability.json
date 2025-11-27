@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-individual autonomy expanding based on demonstrated capability",
+  "contentType": "scenario",
+  "title": "Individual autonomy expanding based on demonstrated capability",
+  "description": "Individual autonomy expanding based on demonstrated capability",
+  "content": "Scenario: Individual autonomy expanding based on demonstrated capability\n    Given Emma has shown good stewardship decisions over time\n    And parents can adjust autonomy levels in the system\n    When Emma's decision-making patterns are reviewed\n    Then her boundaries should expand to reflect capability\n    And she should earn more freedom through demonstrated judgment\n    And the system should track maturity indicators\n    And Emma should understand that autonomy grows with responsibility\n    And her increasing capability should be recognized\n    And freedom should be matched to demonstrated stewardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

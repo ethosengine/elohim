@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-family-teen provides sibling care as valued family contribution",
+  "contentType": "scenario",
+  "title": "Teen provides sibling care as valued family contribution",
+  "description": "Teen provides sibling care as valued family contribution",
+  "content": "Scenario: Teen provides sibling care as valued family contribution\n    Given Jasmine provides regular after-school care for Jordan\n    And this care enables parent Maya to work full-time\n    And Jasmine's care work has substantial economic value\n    When Jasmine's sibling care is tracked\n    Then it should be valued as the labor it is, not dismissed as \"just babysitting\"\n    And the care should be recognized in family care token allocation\n    And Maya should receive prompts to explicitly acknowledge this contribution\n    And Jordan should learn to recognize Jasmine's care work\n    And the family should understand that Jasmine's care enables their current lifestyle\n    And if external childcare would cost $15/hour, Jasmine's care should be valued accordingly\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:family",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

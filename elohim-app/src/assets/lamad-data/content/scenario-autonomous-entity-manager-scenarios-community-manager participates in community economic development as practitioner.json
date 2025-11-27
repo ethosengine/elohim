@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-community-manager participates in community economic development as practitioner",
+  "contentType": "scenario",
+  "title": "Manager participates in community economic development as practitioner",
+  "description": "Manager participates in community economic development as practitioner",
+  "content": "Scenario: Manager participates in community economic development as practitioner\n    Given municipality seeks input on economic development strategies\n    And Marcus has practical experience with democratic business model\n    When community economic development planning occurs\n    Then Marcus shares operational insights about democratic coordination\n    And Marcus explains how eliminating extraction enabled higher wages and community programs\n    And Marcus advocates for policies supporting democratic business conversions\n    And Marcus participates as community member with expertise, not as business representative\n    And community_elohim connects his testimony to broader movement for economic democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,worker]",
+    "related_layers:[workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

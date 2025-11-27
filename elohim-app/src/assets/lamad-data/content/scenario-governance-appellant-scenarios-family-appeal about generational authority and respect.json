@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-appeal about generational authority and respect",
+  "contentType": "scenario",
+  "title": "Appeal about generational authority and respect",
+  "description": "Appeal about generational authority and respect",
+  "content": "Scenario: Appeal about generational authority and respect\n    Given Family Elohim intervened in way that undermined parental authority\n    And I believe this damages family cohesion and cultural values\n    When I appeal the intervention approach rather than the outcome\n    Then the Constitutional Council evaluates how intervention affected family structure\n    And They balance individual protection with respect for family authority\n    And They consider if the agent could achieve same care goal differently\n    And They examine if family repair mechanisms were offered\n    And The appeal establishes protocols for intervention that preserve family dignity\n    And Recognition that how care is delivered matters as much as that it's delivered\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

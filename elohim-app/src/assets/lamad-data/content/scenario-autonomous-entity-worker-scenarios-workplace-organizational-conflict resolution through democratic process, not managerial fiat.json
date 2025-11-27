@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-conflict resolution through democratic process, not managerial fiat",
+  "contentType": "scenario",
+  "title": "Conflict resolution through democratic process, not managerial fiat",
+  "description": "Conflict resolution through democratic process, not managerial fiat",
+  "content": "Scenario: Conflict resolution through democratic process, not managerial fiat\n    Given DeShawn and another worker have a scheduling disagreement\n    And corporate model would have manager impose solution\n    When the conflict is brought to worker council\n    Then workplace_elohim facilitates mediated discussion\n    And both workers express their perspectives and needs\n    And council members propose compromise solutions\n    And workers reach consensus on fair schedule accommodation\n    And conflict is resolved through transparency and democratic process\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:workplace_organizational",
+    "related_users:[manager,supplier,small_business_owner,franchise_operator]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

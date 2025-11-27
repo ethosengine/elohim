@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-teaching children value literacy through family care participation",
+  "contentType": "scenario",
+  "title": "Teaching children value literacy through family care participation",
+  "description": "Teaching children value literacy through family care participation",
+  "content": "Scenario: Teaching children value literacy through family care participation\n    Given Sarah is raising Tommy and Emma in care economy\n    And she wants them to learn value literacy\n    When children participate in family care activities\n    Then the family_elohim should recognize their age-appropriate contributions\n    And Sarah should model care economy principles\n    And children should learn by doing within family context\n    And family should be primary site of care economy education\n    And next generation should assume care economy is normal\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

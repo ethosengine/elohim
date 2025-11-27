@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-transition from family household to independent household",
+  "contentType": "scenario",
+  "title": "Transition from family household to independent household",
+  "description": "Transition from family household to independent household",
+  "content": "Scenario: Transition from family household to independent household\n    Given Aisha recently moved out of her family home\n    And she's adapting to independent household management\n    When Aisha establishes her household practices\n    Then the system should recognize this is a major transition\n    And it should help her adapt family practices to solo living\n    And it should provide continuity from family care economy patterns\n    And the personal_agent should acknowledge the learning curve\n    And support should smooth the jarring transition to full responsibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

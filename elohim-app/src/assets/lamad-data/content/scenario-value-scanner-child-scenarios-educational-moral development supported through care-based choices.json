@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-moral development supported through care-based choices",
+  "contentType": "scenario",
+  "title": "Moral development supported through care-based choices",
+  "description": "Moral development supported through care-based choices",
+  "content": "Scenario: Moral development supported through care-based choices\n    Given Emma is at conventional morality stage (ages 7-11)\n    And she is developing sense of right and wrong\n    When Emma makes choices that affect others\n    Then the personal_agent should highlight moral dimensions\n    And the agent should ask \"How will this choice affect Tommy?\"\n    And care ethics should be made explicit in decisions\n    And Emma should develop moral reasoning through practice\n    And value decisions should be framed as care decisions\n    And moral development should be integrated with economic learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

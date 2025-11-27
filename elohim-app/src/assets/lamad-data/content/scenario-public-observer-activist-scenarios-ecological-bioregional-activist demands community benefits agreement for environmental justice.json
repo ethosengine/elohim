@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-ecological-bioregional-activist demands community benefits agreement for environmental justice",
+  "contentType": "scenario",
+  "title": "Activist demands community benefits agreement for environmental justice",
+  "description": "Activist demands community benefits agreement for environmental justice",
+  "content": "Scenario: Activist demands community benefits agreement for environmental justice\n    Given a development will impact the activist's environmental justice community\n    And community has disproportionate environmental burden\n    When the Observer documents cumulative environmental harms\n    Then the activist presents evidence of existing pollution exposure\n    And demands green infrastructure investment as mitigation\n    And proposes specific community benefits (parks, tree canopy, remediation)\n    And coalition negotiates from position of documented harm\n    And development must address environmental justice not just profit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_organizer,citizen,scientist",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,ecological_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-ecological-bioregional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

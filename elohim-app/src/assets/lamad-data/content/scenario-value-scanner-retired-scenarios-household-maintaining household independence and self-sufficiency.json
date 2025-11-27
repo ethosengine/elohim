@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-household-maintaining household independence and self-sufficiency",
+  "contentType": "scenario",
+  "title": "Maintaining household independence and self-sufficiency",
+  "description": "Maintaining household independence and self-sufficiency",
+  "content": "Scenario: Maintaining household independence and self-sufficiency\n    Given Frank and his wife value their independence\n    And they want to age in place as long as possible\n    When the household_elohim supports independence\n    Then it should help household maintain self-sufficiency\n    And it should optimize resources for maximum autonomy\n    And it should coordinate with family without creating dependence\n    And it should surface when external support is truly needed\n    And household should experience agency and dignity in aging\n    And independence should be supported as long as safe and sustainable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:household",
+    "related_users:senior,spouse,partner,elderly",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

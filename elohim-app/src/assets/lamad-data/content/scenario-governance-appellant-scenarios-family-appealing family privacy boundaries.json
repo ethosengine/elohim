@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-appealing family privacy boundaries",
+  "contentType": "scenario",
+  "title": "Appealing family privacy boundaries",
+  "description": "Appealing family privacy boundaries",
+  "content": "Scenario: Appealing family privacy boundaries\n    Given Family Elohim shares information between family members\n    And I believe some information should remain private even within family\n    When I appeal the information sharing protocols\n    Then the Constitutional Council examines privacy expectations within families\n    And They balance transparency needed for family care with individual privacy\n    And They consider cultural norms about family information sharing\n    And They evaluate if I had ability to set privacy boundaries beforehand\n    And The appeal can establish individual privacy zones within family context\n    And Family Elohim learns to respect graduated privacy based on information sensitivity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

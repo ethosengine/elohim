@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen understands worker rights and labor protections",
+  "contentType": "scenario",
+  "title": "Teen understands worker rights and labor protections",
+  "description": "Teen understands worker rights and labor protections",
+  "content": "Scenario: Teen understands worker rights and labor protections\n    Given Jasmine is entitled to labor protections as a worker\n    And many young workers don't know their rights\n    When workplace_elohim provides education about worker rights\n    Then it should teach her about minimum wage, overtime, breaks, and safety regulations\n    And explain youth-specific labor protections\n    And inform her about right to organize and collective bargaining\n    And provide resources about reporting labor violations\n    And help her understand that worker rights exist to prevent exploitation\n    And build her expectation that labor deserves legal protection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

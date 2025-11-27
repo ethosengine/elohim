@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-selected for national constitutional council serving entire nation",
+  "contentType": "scenario",
+  "title": "Selected for National Constitutional Council serving entire nation",
+  "description": "Selected for National Constitutional Council serving entire nation",
+  "content": "Scenario: Selected for National Constitutional Council serving entire nation\n    Given I have experience from community and regional council service\n    And I was randomly selected for national level\n    When I accept my 6-month national council appointment\n    Then I understand: my judgments will affect millions of people\n    And I receive: intensive training on national constitutional interpretation\n    And I meet: weekly with diverse citizens from across the nation\n    And I am supported: with full compensation and resources\n    And I feel: profound responsibility for democratic governance\n    And I bring: nurse-mother wisdom to questions of national importance\n    And I know: ordinary citizens like me are humanity's democratic hope\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:nation_state",
+    "related_users:appellant,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

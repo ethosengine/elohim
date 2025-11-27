@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-carbon sequestration through farming is measured and valued",
+  "contentType": "scenario",
+  "title": "Carbon sequestration through farming is measured and valued",
+  "description": "Carbon sequestration through farming is measured and valued",
+  "content": "Scenario: Carbon sequestration through farming is measured and valued\n    Given industrial agriculture is net carbon emitter through fossil inputs and soil degradation\n    And regenerative agriculture sequesters carbon through soil building\n    When democratic network values and compensates carbon sequestration\n    Then soil carbon is measured showing annual sequestration increases\n    And carbon sequestration is compensated through premium pricing or carbon credits\n    And farm becomes climate solution, not climate problem\n    And documented carbon impacts inform bioregional climate strategy\n    And bioregional_elohim tracks carbon sequestration across democratic farm network\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:ecological_bioregional",
+    "related_users:[worker,supplier,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[bioregional_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

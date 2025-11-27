@@ -1,0 +1,33 @@
+{
+  "id": "feature-social-medium-activist-scenarios-affinity-network",
+  "contentType": "feature",
+  "title": "Movement Building Through Affinity Networks for Activist",
+  "description": "As an activist in the social_medium system Operating at the affinity_network governance layer I want to build solidarity and coordinate action across geographies So that movements can grow while respecting local autonomy and context",
+  "content": "@epic:social_medium\n@user_type:activist\n@governance_layer:affinity_network\n@related_users:activist,content_creator,refugee,displaced_person\n@related_layers:community,nation_state,global,cultural_linguistic\n@elohim_agents:coordination_agent,translation_agent,pattern_recognition_agent\n\nFeature: Movement Building Through Affinity Networks for Activist\n  As an activist in the social_medium system\n  Operating at the affinity_network governance layer\n  I want to build solidarity and coordinate action across geographies\n  So that movements can grow while respecting local autonomy and context\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the affinity_network governance context is active\n    And multiple communities are organizing around related issues\n\n  Scenario: Activist creates cross-geographic climate justice network\n    Given activists in 40 cities are working on climate action\n    And they share commitment to Indigenous leadership and just transition\n    When a founding group creates a climate justice affinity network\n    And they establish network charter emphasizing subsidiarity and equity\n    And they invite activists from participating communities\n    Then the affinity network space is created\n    And participants maintain connection to their local communities\n    And the network provides coordination without centralized control\n    And local autonomy is preserved while enabling collective action\n    And shared resources, tactics, and patterns flow through the network\n\n  Scenario: Activist shares successful tactic that spreads through trust\n    Given a community successfully pressured a bank to divest from fossil fuels\n    And the activist documents the strategy with evidence of impact\n    When they contribute the tactic to the climate justice network\n    And other activists review and validate the approach\n    Then the tactic enters the network's pattern library\n    And it surfaces for communities facing similar challenges\n    And 23 communities adapt the tactic to their local context\n    And improvements flow back into the pattern library\n    And the network tracks collective impact across implementations\n\n  Scenario: Activist coordinates rapid response across network\n    Given Indigenous land defenders face immediate threat of eviction\n    And the situation requires urgent solidarity action\n    When the land defenders' community issues call for support\n    And the call is verified through network trust relationships\n    Then rapid response protocol activates across affinity network\n    And each community determines its capacity to respond\n    And coordination happens in real-time across time zones\n    And actions are culturally appropriate and locally determined\n    And the network mobilizes pressure while preventing burnout\n    And the land defenders receive coordinated solidarity support\n\n  Scenario: Activist prevents movement co-optation by bad actors\n    Given a corporate-funded organization tries to join the network\n    And they claim to support climate action but oppose systemic change\n    When they attempt to participate in network coordination\n    Then their limited community trust becomes visible\n    And their ties to fossil fuel funding are surfaced through documentation\n    And the network collectively evaluates the participation request\n    And communities share experiences with similar co-optation attempts\n    And the network maintains boundaries while remaining open to good-faith participation\n    And the movement's integrity is protected through transparent evaluation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:affinity_network",
+    "related_users:activist,content_creator,refugee,displaced_person",
+    "related_layers:community,nation_state,global,cultural_linguistic",
+    "elohim_agents:coordination_agent,translation_agent,pattern_recognition_agent",
+    "social-medium",
+    "feature"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "scenario-social-medium-activist-scenarios-affinity-network-activist creates cross-geographic climate justice network",
+    "scenario-social-medium-activist-scenarios-affinity-network-activist shares successful tactic that spreads through trust",
+    "scenario-social-medium-activist-scenarios-affinity-network-activist coordinates rapid response across network",
+    "scenario-social-medium-activist-scenarios-affinity-network-activist prevents movement co-optation by bad actors",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "scenarioCount": 4
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

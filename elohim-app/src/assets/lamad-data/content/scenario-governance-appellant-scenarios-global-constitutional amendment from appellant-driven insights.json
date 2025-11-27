@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-constitutional amendment from appellant-driven insights",
+  "contentType": "scenario",
+  "title": "Constitutional amendment from appellant-driven insights",
+  "description": "Constitutional amendment from appellant-driven insights",
+  "content": "Scenario: Constitutional amendment from appellant-driven insights\n    Given recurring appeals reveal \"developing autonomy is undervalued\"\n    And adolescent appellants worldwide report dignity violations from overprotection\n    When Constitutional Convention deliberates on adolescent autonomy amendment\n    Then the amendment proposal is drafted based on appellant experiences\n    And the amendment states \"developing autonomy is itself a constitutional value\"\n    And the amendment passes with 85% consensus\n    And global protocol is updated to balance safety with growth\n    And appellants see their suffering contributed to constitutional evolution\n    And future adolescents benefit from improved framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-franchise operator's community standing transforms through conversion choice",
+  "contentType": "scenario",
+  "title": "Franchise operator's community standing transforms through conversion choice",
+  "description": "Franchise operator's community standing transforms through conversion choice",
+  "content": "Scenario: Franchise operator's community standing transforms through conversion choice\n    Given James was invisible behind ChickenMax brand despite owning locations\n    And community saw franchise locations as corporate, didn't know operator existed\n    When James's conversion choice becomes visible to neighborhoods\n    Then community learns he chose democratic ownership over continuing corporate extraction\n    And neighbors respect decision to prioritize workers and community wealth\n    And his standing shifts from anonymous franchise operator to community member who chose well\n    And conversion demonstrates operators can be allies in community wealth-building\n    And community_elohim helps communicate operator's conversion choice and values\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

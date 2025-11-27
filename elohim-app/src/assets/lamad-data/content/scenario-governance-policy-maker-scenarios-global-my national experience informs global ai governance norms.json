@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-my national experience informs global ai governance norms",
+  "contentType": "scenario",
+  "title": "My national experience informs global AI governance norms",
+  "description": "My national experience informs global AI governance norms",
+  "content": "Scenario: My national experience informs global AI governance norms\n    Given my nation has years of protocol experience\n    And other nations learn from our successes and failures\n    When I share our experience in global forums\n    Then I provide: honest assessment of what worked\n    And I acknowledge: mistakes and challenges\n    And I share: legislative approaches that helped\n    And I describe: how we resisted capture\n    And I explain: how communities maintained sovereignty\n    And my testimony: informs global democratic governance development\n    And national experience: contributes to global wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

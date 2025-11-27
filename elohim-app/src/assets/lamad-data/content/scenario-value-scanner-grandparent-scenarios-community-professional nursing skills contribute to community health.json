@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-professional nursing skills contribute to community health",
+  "contentType": "scenario",
+  "title": "Professional nursing skills contribute to community health",
+  "description": "Professional nursing skills contribute to community health",
+  "content": "Scenario: Professional nursing skills contribute to community health\n    Given Margaret is a retired nurse with valuable expertise\n    And community health initiatives need skilled volunteers\n    When Margaret provides health education or clinic support\n    Then the community_elohim should recognize her professional skills\n    And it should value skilled labor more highly than unskilled\n    And her nursing background should be leveraged for community benefit\n    And professional retirees should be seen as community resources\n    And Margaret's expertise should serve community health\n    And skilled volunteering should accumulate significant care tokens\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

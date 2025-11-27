@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-understanding ecological impact of food systems work",
+  "contentType": "scenario",
+  "title": "Understanding ecological impact of food systems work",
+  "description": "Understanding ecological impact of food systems work",
+  "content": "Scenario: Understanding ecological impact of food systems work\n    Given food systems have significant ecological footprint\n    And my work is embedded in these systems\n    When I want to understand ecological implications\n    Then the protocol should provide information about food systems ecology\n    And help me see connections between my work and environmental impact\n    And support me in making choices that reduce ecological harm\n    And recognize that ecological care is part of my care economy participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

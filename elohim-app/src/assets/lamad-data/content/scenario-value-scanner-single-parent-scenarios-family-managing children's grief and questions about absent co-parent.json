@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-managing children's grief and questions about absent co-parent",
+  "contentType": "scenario",
+  "title": "Managing children's grief and questions about absent co-parent",
+  "description": "Managing children's grief and questions about absent co-parent",
+  "content": "Scenario: Managing children's grief and questions about absent co-parent\n    Given children may grieve or question their absent other parent\n    And Maria must handle these emotions while managing her own feelings\n    When children express feelings about family structure\n    Then the family_elohim should help Maria respond appropriately to each child's age\n    And it should remind her to validate their feelings without defensiveness\n    And it should help her maintain healthy narrative about family structure\n    And it should support her in helping children process complicated family reality\n    And Maria should have guidance for emotionally complex parenting situations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood resource library for children's items",
+  "contentType": "scenario",
+  "title": "Neighborhood resource library for children's items",
+  "description": "Neighborhood resource library for children's items",
+  "content": "Scenario: Neighborhood resource library for children's items\n    Given children outgrow clothing, toys, and equipment rapidly\n    And buying everything new is expensive and wasteful\n    When the neighborhood_elohim coordinates resource sharing\n    Then it should enable lending libraries for children's items\n    And it should track who has what available to share\n    And it should facilitate borrowing rather than buying\n    And resource sharing should be recognized as care contribution\n    And neighborhood sustainability should reduce family expenses\n    And the system should enable circular economy for child-rearing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

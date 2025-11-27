@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal policy experimentation enabled by care economy data",
+  "contentType": "scenario",
+  "title": "Municipal policy experimentation enabled by care economy data",
+  "description": "Municipal policy experimentation enabled by care economy data",
+  "content": "Scenario: Municipal policy experimentation enabled by care economy data\n    Given Sarah's municipality has care economy data unavailable elsewhere\n    And this data enables evidence-based policy innovation\n    When municipal government considers new policies\n    Then care economy data should enable experimentation\n    And policy innovations should be tested with evidence\n    And Sarah's municipality should lead in care economy policy\n    And successful experiments should be shared with other municipalities\n    And care economy should drive progressive municipal governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

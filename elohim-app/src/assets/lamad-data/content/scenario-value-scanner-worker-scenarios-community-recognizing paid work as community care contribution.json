@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-recognizing paid work as community care contribution",
+  "contentType": "scenario",
+  "title": "Recognizing paid work as community care contribution",
+  "description": "Recognizing paid work as community care contribution",
+  "content": "Scenario: Recognizing paid work as community care contribution\n    Given I work 50+ hours per week preparing food for people\n    And my labor serves community nourishment and flourishing\n    When the community assesses care contributions\n    Then the protocol should recognize my work as care labor\n    And accumulate care tokens reflecting my service to community\n    And make visible that all work serving others is care economy participation\n    And reframe employment from pure extraction to community contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

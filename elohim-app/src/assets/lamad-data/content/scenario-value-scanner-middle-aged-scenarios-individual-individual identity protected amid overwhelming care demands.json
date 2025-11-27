@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-individual identity protected amid overwhelming care demands",
+  "contentType": "scenario",
+  "title": "Individual identity protected amid overwhelming care demands",
+  "description": "Individual identity protected amid overwhelming care demands",
+  "content": "Scenario: Individual identity protected amid overwhelming care demands\n    Given Robert's care responsibilities could consume all available time\n    And he risks losing individual identity to caregiver role\n    When Robert's personal_agent monitors his wellbeing\n    Then it should protect space for his own flourishing\n    And flag if care demands are eliminating personal time\n    And surface when he needs rest, recreation, or personal development\n    And recognize: \"You haven't had time for yourself in 17 days\"\n    And help him understand that his own wellbeing enables sustainable care\n    And validate that maintaining individual identity is not selfishness\n    And support him in setting boundaries that preserve his personhood\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

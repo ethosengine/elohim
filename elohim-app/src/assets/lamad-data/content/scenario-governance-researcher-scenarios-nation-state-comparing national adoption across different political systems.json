@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-comparing national adoption across different political systems",
+  "contentType": "scenario",
+  "title": "Comparing national adoption across different political systems",
+  "description": "Comparing national adoption across different political systems",
+  "content": "Scenario: Comparing national adoption across different political systems\n    Given different nations with different political systems adopted protocol\n    And I want to understand how political context shapes implementation\n    When I conduct cross-national comparative analysis\n    Then I examine: adoption patterns in democracies vs mixed regimes\n    And I analyze: how existing institutions integrate or resist protocol\n    And I explore: whether protocol strengthens or threatens existing power structures\n    And I assess: cultural factors that predict adoption success\n    And I identify: universal patterns vs context-dependent adaptations\n    And My research tests: whether democratic AI governance is culturally specific or universal\n    And Findings inform: international adoption strategies and expectations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

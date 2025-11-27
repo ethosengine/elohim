@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-coordinating care across limited parental availability",
+  "contentType": "scenario",
+  "title": "Coordinating care across limited parental availability",
+  "description": "Coordinating care across limited parental availability",
+  "content": "Scenario: Coordinating care across limited parental availability\n    Given Sarah's work schedule limits her availability\n    And Marcus manages daily household operations\n    When coordination is needed between them\n    Then the family_elohim should facilitate asynchronous communication\n    And Sarah should be able to provide guidance during her available hours\n    And Marcus should be able to request help when needed\n    And the system should ensure Sarah stays informed despite time constraints\n    And coordination should happen efficiently without constant interruption\n    And their partnership should function despite scheduling challenges\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

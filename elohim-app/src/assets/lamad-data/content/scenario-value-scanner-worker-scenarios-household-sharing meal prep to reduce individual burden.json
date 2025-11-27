@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-sharing meal prep to reduce individual burden",
+  "contentType": "scenario",
+  "title": "Sharing meal prep to reduce individual burden",
+  "description": "Sharing meal prep to reduce individual burden",
+  "content": "Scenario: Sharing meal prep to reduce individual burden\n    Given cooking for one is inefficient and exhausting\n    When household members batch cook or share meals\n    Then the protocol should coordinate shared meal preparation\n    And track who cooks, who cleans, and who benefits\n    And help us establish sustainable shared cooking rhythms\n    And recognize this cooperation as care economy practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

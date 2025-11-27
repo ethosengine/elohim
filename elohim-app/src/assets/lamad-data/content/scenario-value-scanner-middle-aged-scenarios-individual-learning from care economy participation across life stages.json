@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-learning from care economy participation across life stages",
+  "contentType": "scenario",
+  "title": "Learning from care economy participation across life stages",
+  "description": "Learning from care economy participation across life stages",
+  "content": "Scenario: Learning from care economy participation across life stages\n    Given Robert has participated in care economy as child, parent, and adult child\n    And he now sees care patterns across the full lifecycle\n    When his personal_agent helps him reflect on his care economy journey\n    Then it should surface insights from his accumulated experience\n    And help him recognize: \"You learned care reciprocity from your parents' care for their parents\"\n    And connect past care received to present care given\n    And support him in understanding care as lifecycle reciprocity\n    And validate that his care contributions across decades have genuine value\n    And help him see that he's building care economy that will serve his own aging\n    And recognize his whole life as care economy participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

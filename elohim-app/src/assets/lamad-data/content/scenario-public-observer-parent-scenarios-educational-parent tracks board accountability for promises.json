@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent tracks board accountability for promises",
+  "contentType": "scenario",
+  "title": "Parent tracks board accountability for promises",
+  "description": "Parent tracks board accountability for promises",
+  "content": "Scenario: Parent tracks board accountability for promises\n    Given the school board promised to address transportation by Q2\n    And the parent's child still has unreliable dangerous bus service\n    When three months pass without action on the commitment\n    Then the Observer alerts parent about broken promise\n    And provides exact quote from February board meeting\n    And shows which board members made the commitment\n    And parent raises specific accountability question publicly\n    And board commitments to families persist despite turnover\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

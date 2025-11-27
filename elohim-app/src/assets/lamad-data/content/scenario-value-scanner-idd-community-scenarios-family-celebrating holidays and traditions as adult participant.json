@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-celebrating holidays and traditions as adult participant",
+  "contentType": "scenario",
+  "title": "Celebrating holidays and traditions as adult participant",
+  "description": "Celebrating holidays and traditions as adult participant",
+  "content": "Scenario: Celebrating holidays and traditions as adult participant\n    Given Jordan's family celebrates holidays together\n    And Jordan has their own traditions in the group home\n    When Thanksgiving approaches\n    Then Jordan decides where to spend the holiday\n    And the interface helps Jordan weigh options (family vs. housemates)\n    And Jordan's choice is honored by both family and household\n    And if Jordan chooses family, they participate as an adult guest\n    And Jordan's preferences about holiday activities are considered\n    And Jordan experiences adult autonomy in family traditions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

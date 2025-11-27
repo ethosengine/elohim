@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-elder care financial coordination across family",
+  "contentType": "scenario",
+  "title": "Elder care financial coordination across family",
+  "description": "Elder care financial coordination across family",
+  "content": "Scenario: Elder care financial coordination across family\n    Given Robert's parents' care costs are increasing\n    And long-term care may eventually be needed\n    And financial planning needs to involve siblings\n    When family_elohim coordinates elder care financing\n    Then it should help siblings discuss financial responsibility\n    And surface each sibling's capacity to contribute financially\n    And track actual financial contributions to parent care\n    And help coordinate long-term care insurance, Medicare, and family support\n    And ensure parents' dignity is protected in financial discussions\n    And prevent financial burden from falling entirely on one sibling\n    And support transparent, equitable financial planning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

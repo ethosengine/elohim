@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investor capital supports bioregional watershed protection",
+  "contentType": "scenario",
+  "title": "Investor capital supports bioregional watershed protection",
+  "description": "Investor capital supports bioregional watershed protection",
+  "content": "Scenario: Investor capital supports bioregional watershed protection\n    Given water quality depends on land use throughout watershed\n    And Patricia's investments affect and depend on watershed health\n    When democratic businesses prioritize watershed stewardship\n    Then farms implement water protection practices (buffer strips, reduced chemicals, wetland restoration)\n    And investment compensates watershed stewardship through sustainability premiums\n    And bioregional water quality improves through coordinated investment in sustainable practices\n    And community benefits from clean water enabled by investment priorities\n    And bioregional_elohim monitors watershed health and coordinates protection investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

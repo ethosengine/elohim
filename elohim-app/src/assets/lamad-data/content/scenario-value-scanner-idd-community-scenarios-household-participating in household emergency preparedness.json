@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-participating in household emergency preparedness",
+  "contentType": "scenario",
+  "title": "Participating in household emergency preparedness",
+  "description": "Participating in household emergency preparedness",
+  "content": "Scenario: Participating in household emergency preparedness\n    Given the household practices emergency procedures\n    And everyone needs to know safety protocols\n    When the household conducts a fire drill\n    Then Jordan receives emergency instructions in accessible format\n    And the interface shows evacuation steps with pictures and arrows\n    And Jordan can practice the procedures with support\n    And Jordan's understanding is verified in accessible ways\n    And Jordan's safety capability is enhanced through practice\n    And Jordan experiences being an active participant in household safety\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

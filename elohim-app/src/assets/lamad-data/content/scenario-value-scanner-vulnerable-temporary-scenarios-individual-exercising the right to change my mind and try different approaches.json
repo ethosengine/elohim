@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-exercising the right to change my mind and try different approaches",
+  "contentType": "scenario",
+  "title": "Exercising the right to change my mind and try different approaches",
+  "description": "Exercising the right to change my mind and try different approaches",
+  "content": "Scenario: Exercising the right to change my mind and try different approaches\n    Given I am trying various strategies for rebuilding stability\n    And some approaches work better than others\n    When I decide to change direction or try something new\n    Then the Value Scanner supports my experimentation without judgment\n    And does not penalize me for changing course\n    And helps me learn from what didn't work\n    And validates that finding the right path takes trial and error\n    And institutional partners respect my right to redirect\n    And my personal_agent helps me evaluate different approaches\n    And tracks what I've learned, not just what \"failed\"\n    And my agency to pivot is preserved and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

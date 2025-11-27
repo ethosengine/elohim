@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-family boundaries shape young child's scanner permissions",
+  "contentType": "scenario",
+  "title": "Family boundaries shape young child's scanner permissions",
+  "description": "Family boundaries shape young child's scanner permissions",
+  "content": "Scenario: Family boundaries shape young child's scanner permissions\n    Given Tommy's parents have set family values and boundaries\n    And the family has budget constraints of $40k/year household income\n    And Emma has a nut allergy\n    And the family prioritizes nutritional guidelines\n    When Tommy uses the Value Scanner\n    Then his personal_agent should enforce family boundaries invisibly\n    And budget-aware selections should be guided\n    And allergen items should be blocked without Tommy's awareness\n    And nutritionally appropriate options should be highlighted\n    And Tommy should experience boundaries as care, not control\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

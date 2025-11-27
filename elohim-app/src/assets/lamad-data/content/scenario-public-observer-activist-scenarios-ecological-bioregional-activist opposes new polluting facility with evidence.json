@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-ecological-bioregional-activist opposes new polluting facility with evidence",
+  "contentType": "scenario",
+  "title": "Activist opposes new polluting facility with evidence",
+  "description": "Activist opposes new polluting facility with evidence",
+  "content": "Scenario: Activist opposes new polluting facility with evidence\n    Given a company applies for permit to build polluting facility\n    And claims it will have minimal environmental impact\n    When the Observer analyzes company's environmental track record\n    Then the activist shows violations at their other facilities\n    And calculates health impacts on nearby residents\n    And demonstrates existing pollution burden in target neighborhood\n    And organizes affected community for testimony\n    And corporate claims meet community evidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_organizer,citizen,scientist",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,ecological_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-ecological-bioregional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

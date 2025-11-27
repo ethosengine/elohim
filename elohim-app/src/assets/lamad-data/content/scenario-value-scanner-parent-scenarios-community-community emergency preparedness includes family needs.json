@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-community emergency preparedness includes family needs",
+  "contentType": "scenario",
+  "title": "Community emergency preparedness includes family needs",
+  "description": "Community emergency preparedness includes family needs",
+  "content": "Scenario: Community emergency preparedness includes family needs\n    Given emergencies affect families with unique challenges\n    And children have specific needs during crisis\n    When the community_elohim coordinates emergency preparedness\n    Then it should ensure family needs are centered in planning\n    And Sarah's knowledge of family needs should inform planning\n    And emergency care resources should include childcare and family support\n    And parent expertise should shape community resilience\n    And the system should recognize that community safety includes child safety\n    And family preparedness should be community priority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

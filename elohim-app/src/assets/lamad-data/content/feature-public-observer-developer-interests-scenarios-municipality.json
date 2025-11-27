@@ -1,0 +1,36 @@
+{
+  "id": "feature-public-observer-developer-interests-scenarios-municipality",
+  "contentType": "feature",
+  "title": "Municipal Development Navigation for Developer Interests",
+  "description": "As a developer in the public_observer system Operating at the municipality governance layer I want transparent approval processes and honest engagement infrastructure So that responsible development gains competitive advantage over extractive practices",
+  "content": "@epic:public_observer\n@user_type:developer_interests\n@governance_layer:municipality\n@related_users:politician,board_member,citizen,community_organizer,activist\n@related_layers:county_regional,provincial_state,ecological\n@elohim_agents:public_observer,municipal_elohim,accountability_elohim\n\nFeature: Municipal Development Navigation for Developer Interests\n  As a developer in the public_observer system\n  Operating at the municipality governance layer\n  I want transparent approval processes and honest engagement infrastructure\n  So that responsible development gains competitive advantage over extractive practices\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the developer_interests user is registered in the system\n    And the municipality governance context is active\n\n  Scenario: Responsible developer navigates approval process transparently\n    Given a developer is proposing affordable housing project\n    And wants to understand complete approval pathway\n    When the Observer provides civic process navigation\n    Then the developer sees required steps: zoning review, planning commission, city council\n    And receives timeline estimates and submission requirements\n    And identifies relevant regulations and precedents\n    And connects to appropriate civic contacts\n    And navigates process efficiently without buying insider access\n    And transparent process reduces corruption opportunities\n\n  Scenario: Developer builds genuine community support through honest engagement\n    Given a developer is planning mixed-use development\n    And recognizes that authentic community input creates sustainable projects\n    When the Observer facilitates real community engagement\n    Then the developer accesses genuine community priorities not astroturf voices\n    And learns neighborhood actually needs affordable retail space and childcare\n    And adjusts project design to address real community needs\n    And negotiates community benefits agreement with accountability tracking\n    And builds lasting community relationships not managed opposition\n\n  Scenario: Responsible developer leverages positive track record\n    Given a responsible developer delivered promised benefits in three past projects\n    And competes against extractive developer with misleading claims\n    When the Observer makes track records visible\n    Then the responsible developer's history shows: jobs delivered matched projections\n    And community benefits were actually built and maintained\n    And environmental commitments were kept\n    And positive reputation becomes competitive advantage\n    And integrity creates market differentiation\n\n  Scenario: Developer faces accountability for past broken promises\n    Given a developer claimed \"200 jobs\" in previous project\n    But Observer tracking shows only 12 permanent jobs materialized\n    When the developer proposes new project with similar claims\n    Then planning commission sees documented gap between promises and delivery\n    And community members access track record evidence\n    And developer must explain past failures or adjust projections\n    And accountability creates pressure for honest projections\n    And extractive practices face uncomfortable transparency\n\n  Scenario: Developer receives honest cost-benefit analysis\n    Given a developer projects $5M annual tax revenue from proposed development\n    But omits infrastructure costs and school capacity burden\n    When the Observer provides independent analysis\n    Then the developer sees: net tax impact only $800K after infrastructure costs\n    And school enrollment increase requires $2M capacity expansion\n    And traffic impacts need $1.5M intersection improvements\n    And honest accounting reveals actual community trade-offs\n    And realistic projections inform better civic decisions\n\n  Scenario: Developer relationship transparency creates ethical incentives\n    Given a developer has made campaign donations to three council members\n    And those members must vote on the developer's project\n    When the Observer makes relationships visible\n    Then constituents see donation patterns and voting correlations\n    And the developer faces scrutiny about influence versus merit\n    And council members face accountability for conflicts of interest\n    And transparency creates pressure for decisions based on community benefit\n    And legitimate projects must stand on merits not political relationships\n\n  Scenario: Developer community benefits agreement gains enforcement mechanism\n    Given a developer negotiated affordable housing units as approval condition\n    And promised childcare facility and public greenspace\n    When the Observer tracks commitment delivery\n    Then community members monitor construction and occupancy\n    And see whether affordable units are actually rented to qualifying residents\n    And track whether childcare facility opens as promised\n    And developer reputation depends on honoring commitments\n    And binding accountability replaces unenforceable promises\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-developer-interests-scenarios-municipality-responsible developer navigates approval process transparently",
+    "scenario-public-observer-developer-interests-scenarios-municipality-developer builds genuine community support through honest engagement",
+    "scenario-public-observer-developer-interests-scenarios-municipality-responsible developer leverages positive track record",
+    "scenario-public-observer-developer-interests-scenarios-municipality-developer faces accountability for past broken promises",
+    "scenario-public-observer-developer-interests-scenarios-municipality-developer receives honest cost-benefit analysis",
+    "scenario-public-observer-developer-interests-scenarios-municipality-developer relationship transparency creates ethical incentives",
+    "scenario-public-observer-developer-interests-scenarios-municipality-developer community benefits agreement gains enforcement mechanism",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 7
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

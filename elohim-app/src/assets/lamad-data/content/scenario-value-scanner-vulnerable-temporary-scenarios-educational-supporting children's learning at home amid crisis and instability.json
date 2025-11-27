@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's learning at home amid crisis and instability",
+  "contentType": "scenario",
+  "title": "Supporting children's learning at home amid crisis and instability",
+  "description": "Supporting children's learning at home amid crisis and instability",
+  "content": "Scenario: Supporting children's learning at home amid crisis and instability\n    Given children need home learning support and homework help\n    And I am traumatized, stressed, and have limited time and energy\n    When I try to support children's learning despite constraints\n    Then the Value Scanner provides appropriate learning support strategies\n    And helps me access homework help resources (libraries, tutoring, online support)\n    And suggests realistic expectations for home learning support given my capacity\n    And validates that my limited bandwidth is reasonable given circumstances\n    And tracks children's learning progress and needs\n    And my personal_agent reminds me of important school deadlines and events\n    And recognizes home learning support as valuable educational labor\n    And celebrates my children's learning engagement despite crisis\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

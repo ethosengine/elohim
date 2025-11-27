@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-municipality-municipal services accessibility for aging residents",
+  "contentType": "scenario",
+  "title": "Municipal services accessibility for aging residents",
+  "description": "Municipal services accessibility for aging residents",
+  "content": "Scenario: Municipal services accessibility for aging residents\n    Given Frank is aging and may have mobility or transportation limitations\n    And municipal services should remain accessible to all residents\n    When the municipal_elohim coordinates service accessibility\n    Then it should ensure public buildings are physically accessible\n    And public transit should serve aging residents' mobility needs\n    And municipal services should be available in formats accessible to aging users\n    And digital services should accommodate aging-related changes\n    And Frank should access municipal services with dignity\n    And universal design should serve residents across lifespan\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:municipality",
+    "related_users:citizen,voter,senior,volunteer,advocate,elder",
+    "related_layers:community,neighborhood,individual,household",
+    "elohim_agents:personal_agent,community_elohim,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

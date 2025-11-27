@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-municipality-municipal care economy data informs retirement policy",
+  "contentType": "scenario",
+  "title": "Municipal care economy data informs retirement policy",
+  "description": "Municipal care economy data informs retirement policy",
+  "content": "Scenario: Municipal care economy data informs retirement policy\n    Given Frank's care contributions are tracked through Value Scanner\n    And municipal data reveals aggregate retired resident contributions\n    When the municipal_elohim analyzes retirement care economy\n    Then it should quantify total volunteer labor from retired residents\n    And calculate market value of unpaid care work (~millions annually)\n    And surface that retired residents provide massive municipal value\n    And inform policy recognizing caregiving in benefit calculations\n    And demonstrate that retirement is transition to care work, not exit from contribution\n    And support municipal policy that values and supports retired residents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:municipality",
+    "related_users:citizen,voter,senior,volunteer,advocate,elder",
+    "related_layers:community,neighborhood,individual,household",
+    "elohim_agents:personal_agent,community_elohim,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-supporting bioregional food security and resilience",
+  "contentType": "scenario",
+  "title": "Supporting bioregional food security and resilience",
+  "description": "Supporting bioregional food security and resilience",
+  "content": "Scenario: Supporting bioregional food security and resilience\n    Given bioregions need resilient local food systems\n    And my food preparation skills contribute to food security\n    When I want to support bioregional food resilience\n    Then the protocol should connect me to community food security initiatives\n    And help me contribute skills to mutual aid food programs\n    And recognize that local food systems support community and ecological resilience\n    And build bioregional capacity for food sovereignty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

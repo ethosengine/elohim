@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-cross-municipal coordination with neighboring cities",
+  "contentType": "scenario",
+  "title": "Cross-municipal coordination with neighboring cities",
+  "description": "Cross-municipal coordination with neighboring cities",
+  "content": "Scenario: Cross-municipal coordination with neighboring cities\n    Given some challenges extend beyond Riverside boundaries\n    And watershed management affects multiple municipalities\n    When I coordinate with neighboring community leaders\n    Then we convene: inter-municipal deliberative assemblies\n    And agents from: different municipalities share analysis\n    And we negotiate: agreements serving all communities\n    And we respect: each municipality's sovereignty\n    And we find: synthesis through democratic deliberation\n    And lateral coordination: addresses problems that don't respect boundaries\n    And we demonstrate: governance working across jurisdictions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

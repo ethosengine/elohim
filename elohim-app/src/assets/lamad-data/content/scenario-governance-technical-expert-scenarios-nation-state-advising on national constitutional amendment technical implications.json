@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-advising on national constitutional amendment technical implications",
+  "contentType": "scenario",
+  "title": "Advising on national constitutional amendment technical implications",
+  "description": "Advising on national constitutional amendment technical implications",
+  "content": "Scenario: Advising on national constitutional amendment technical implications\n    Given adolescent autonomy amendment is proposed\n    And technical implementation is uncertain\n    When I explain implementation possibilities to National Council\n    Then I clarify: how agents would operationalize new constitutional principle\n    And I assess: technical challenges in implementation\n    And I identify: what research or development would be needed\n    And I avoid: either blocking amendment due to difficulty or ignoring challenges\n    And I enable: informed democratic choice about constitutional evolution\n    And I serve: constitutional amendment process with technical honesty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

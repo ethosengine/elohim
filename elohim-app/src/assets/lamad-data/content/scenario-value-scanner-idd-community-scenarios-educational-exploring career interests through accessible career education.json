@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-exploring career interests through accessible career education",
+  "contentType": "scenario",
+  "title": "Exploring career interests through accessible career education",
+  "description": "Exploring career interests through accessible career education",
+  "content": "Scenario: Exploring career interests through accessible career education\n    Given Jordan might want to explore other career options\n    And career exploration supports life planning\n    When Jordan uses career exploration resources\n    Then the personal_agent shows career options with pictures and simple descriptions\n    And Jordan can learn about different jobs through videos and stories\n    And Jordan can explore interests without pressure to commit\n    And the educational_elohim provides information about training pathways\n    And Jordan's career dreams are taken seriously, not dismissed\n    And Jordan experiences hope and possibility through education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

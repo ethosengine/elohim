@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-multigenerational family gatherings coordinated with care recognition",
+  "contentType": "scenario",
+  "title": "Multigenerational family gatherings coordinated with care recognition",
+  "description": "Multigenerational family gatherings coordinated with care recognition",
+  "content": "Scenario: Multigenerational family gatherings coordinated with care recognition\n    Given Margaret often hosts or coordinates family gatherings\n    And these gatherings require significant labor\n    When Margaret organizes family events\n    Then the planning, preparation, and hosting labor should be tracked\n    And other family members should see the work involved\n    And equitable distribution of hosting burden should be encouraged\n    And Margaret's contributions should be recognized and appreciated\n    And family gatherings should not depend on her invisible labor\n    And care work that makes family connection possible should be valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

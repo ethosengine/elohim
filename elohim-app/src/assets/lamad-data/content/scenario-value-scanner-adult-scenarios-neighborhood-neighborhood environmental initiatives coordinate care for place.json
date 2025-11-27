@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood environmental initiatives coordinate care for place",
+  "contentType": "scenario",
+  "title": "Neighborhood environmental initiatives coordinate care for place",
+  "description": "Neighborhood environmental initiatives coordinate care for place",
+  "content": "Scenario: Neighborhood environmental initiatives coordinate care for place\n    Given neighborhood shares common environmental interests\n    And ecological care is part of care economy\n    When neighborhood organizes environmental initiatives\n    Then the neighborhood_elohim should coordinate collective action\n    And it should track contributions to neighborhood environment\n    And it should organize community gardens, clean-ups, sustainability efforts\n    And care for place should be recognized as care work\n    And neighborhood should steward shared environment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

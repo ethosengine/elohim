@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-explaining pattern detection without overwhelming council",
+  "contentType": "scenario",
+  "title": "Explaining pattern detection without overwhelming council",
+  "description": "Explaining pattern detection without overwhelming council",
+  "content": "Scenario: Explaining pattern detection without overwhelming council\n    Given complex machine learning algorithm detected Marcus's risk pattern\n    And council needs to understand how this works\n    When I explain pattern recognition in accessible terms\n    Then I describe: what data the agent analyzed\n    And I clarify: how patterns are detected across multiple factors\n    And I explain: what makes this pattern concerning vs normal variation\n    And I provide: counterfactuals showing what would change the outcome\n    And I avoid: technical details that don't serve constitutional judgment\n    And I ensure: council grasps enough to evaluate constitutional alignment\n    And I respect: that they don't need to be machine learning experts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

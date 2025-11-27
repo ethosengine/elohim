@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-teaching traditional crafts, arts, and creative skills",
+  "contentType": "scenario",
+  "title": "Teaching traditional crafts, arts, and creative skills",
+  "description": "Teaching traditional crafts, arts, and creative skills",
+  "content": "Scenario: Teaching traditional crafts, arts, and creative skills\n    Given Margaret has skills in knitting, cooking, gardening, or crafts\n    And grandchildren learn creativity through hands-on activities\n    When Margaret teaches traditional arts and crafts\n    Then the educational_elohim should recognize artistic teaching\n    And it should value traditional skills transmission\n    And it should track creative skill development\n    And arts education should accumulate care tokens\n    And Margaret's creative teaching should be recognized as valuable learning\n    And traditional knowledge should be preserved through teaching\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

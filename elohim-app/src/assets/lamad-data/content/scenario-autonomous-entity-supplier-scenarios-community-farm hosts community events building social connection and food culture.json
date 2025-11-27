@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-community-farm hosts community events building social connection and food culture",
+  "contentType": "scenario",
+  "title": "Farm hosts community events building social connection and food culture",
+  "description": "Farm hosts community events building social connection and food culture",
+  "content": "Scenario: Farm hosts community events building social connection and food culture\n    Given community lacks gathering spaces for celebration and connection\n    And food is central to culture and community building\n    When democratic farm space is available for community use\n    Then harvest festivals celebrate seasonal abundance and agricultural labor\n    And farm dinners feature locally-sourced meals with community storytelling\n    And cultural food traditions are shared and preserved through farm programming\n    And farm becomes community social infrastructure beyond food production\n    And community_elohim facilitates community programming and events at farm\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,small_business_owner]",
+    "related_layers:[workplace_organizational,industry_sector,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

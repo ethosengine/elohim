@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-community-organizer tracks accountability for community park improvements",
+  "contentType": "scenario",
+  "title": "Organizer tracks accountability for community park improvements",
+  "description": "Organizer tracks accountability for community park improvements",
+  "content": "Scenario: Organizer tracks accountability for community park improvements\n    Given the organizer led campaign that won park renovation commitment\n    And city promised completion in six months\n    When the Observer tracks implementation progress\n    Then the organizer sees weekly updates on construction status\n    And receives alerts when timeline slips\n    And documents the victory for community to see their power\n    And has evidence to pressure officials if implementation stalls\n    And communities learn their organizing creates real change\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,board_member",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

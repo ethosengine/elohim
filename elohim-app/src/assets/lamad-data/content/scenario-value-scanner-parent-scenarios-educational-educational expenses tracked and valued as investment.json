@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-educational-educational expenses tracked and valued as investment",
+  "contentType": "scenario",
+  "title": "Educational expenses tracked and valued as investment",
+  "description": "Educational expenses tracked and valued as investment",
+  "content": "Scenario: Educational expenses tracked and valued as investment\n    Given Sarah spends money on books, materials, educational experiences\n    And educational expenses are part of parenting work\n    When the educational_elohim tracks family educational investment\n    Then it should recognize financial investment in children's learning\n    And it should help Sarah budget for educational needs\n    And educational expenses should be visible to extended family\n    And the community should support family educational investment\n    And the system should recognize both time and money spent on education\n    And care tokens should reflect total educational contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

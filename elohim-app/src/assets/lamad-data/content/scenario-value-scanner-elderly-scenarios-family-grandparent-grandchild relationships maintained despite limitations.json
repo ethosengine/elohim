@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-grandparent-grandchild relationships maintained despite limitations",
+  "contentType": "scenario",
+  "title": "Grandparent-grandchild relationships maintained despite limitations",
+  "description": "Grandparent-grandchild relationships maintained despite limitations",
+  "content": "Scenario: Grandparent-grandchild relationships maintained despite limitations\n    Given Helen's mobility and cognitive limitations affect interaction\n    And grandchildren want relationship with Helen\n    When grandparent-grandchild connection is facilitated\n    Then the family_elohim should coordinate visits that don't overwhelm Helen\n    And communication should be adapted to her capabilities\n    And grandchildren should be guided on how to interact respectfully\n    And Helen's contributions to grandchildren should be recognized\n    And relationships should be preserved despite changing capabilities\n    And the protocol should support connection across limitations\n    And grandchildren should learn to value elders through maintained relationship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

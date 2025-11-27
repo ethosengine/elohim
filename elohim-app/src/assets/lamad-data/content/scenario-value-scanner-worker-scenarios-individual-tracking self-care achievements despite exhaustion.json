@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-tracking self-care achievements despite exhaustion",
+  "contentType": "scenario",
+  "title": "Tracking self-care achievements despite exhaustion",
+  "description": "Tracking self-care achievements despite exhaustion",
+  "content": "Scenario: Tracking self-care achievements despite exhaustion\n    Given I am exhausted after double shifts\n    And self-care feels impossible\n    When I manage to cook a nutritious meal for myself\n    Or maintain my living space\n    Or get adequate sleep\n    Then the protocol should recognize these achievements\n    And validate that caring for myself is valuable work\n    And celebrate small victories in maintaining well-being\n    And build evidence that I deserve conditions that make self-care possible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

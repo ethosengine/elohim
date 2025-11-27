@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher builds solidarity across educator roles",
+  "contentType": "scenario",
+  "title": "Teacher builds solidarity across educator roles",
+  "description": "Teacher builds solidarity across educator roles",
+  "content": "Scenario: Teacher builds solidarity across educator roles\n    Given teachers, paraprofessionals, and support staff share labor interests\n    But often lack coordination and mutual understanding\n    When the Observer facilitates cross-role working conditions analysis\n    Then educators see shared challenges (understaffing, disrespect, inadequate pay)\n    And identify how working conditions affect student support\n    And build coalition across educator roles for contract negotiations\n    And solidarity emerges from shared evidence and common interests\n    And labor advocacy becomes comprehensive not siloed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent challenges special education service cuts",
+  "contentType": "scenario",
+  "title": "Parent challenges special education service cuts",
+  "description": "Parent challenges special education service cuts",
+  "content": "Scenario: Parent challenges special education service cuts\n    Given the parent's child receives special education services\n    And the district proposes reducing support staff \"for efficiency\"\n    When the parent reviews Observer's analysis of legal requirements\n    Then they understand federal law mandates these services\n    And see which services would be cut and impacts on IEPs\n    And connect with other special education parents\n    And can cite specific legal protections in testimony\n    And district cannot quietly violate disability rights without accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-individual-privacy protection for parent's personal life",
+  "contentType": "scenario",
+  "title": "Privacy protection for parent's personal life",
+  "description": "Privacy protection for parent's personal life",
+  "content": "Scenario: Privacy protection for parent's personal life\n    Given Sarah's care work generates extensive data\n    And she has full privacy rights as an individual\n    When care economy data is collected\n    Then Sarah must have complete control over her personal information\n    And no third party access should be permitted without explicit consent\n    And her parenting patterns should not be monetized\n    And the system should protect her from surveillance capitalism\n    And privacy should be default, not opt-in\n    And Sarah's dignity should be protected through data sovereignty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:individual",
+    "related_users:adult,worker,child,partner",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-making visible that current conditions prevent care work",
+  "contentType": "scenario",
+  "title": "Making visible that current conditions prevent care work",
+  "description": "Making visible that current conditions prevent care work",
+  "content": "Scenario: Making visible that current conditions prevent care work\n    Given my 50+ hour work weeks leave no time or energy for self-care or family care\n    When I want to demonstrate that work conditions are unsustainable\n    Then the protocol should help me document how work prevents care\n    And make visible the contradiction between work demands and human needs\n    And provide evidence for advocacy around reduced hours and better conditions\n    And build case that \"labor shortage\" is really \"dignity and compensation shortage\"\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

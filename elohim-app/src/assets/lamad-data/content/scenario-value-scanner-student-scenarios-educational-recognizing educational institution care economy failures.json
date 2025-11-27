@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-recognizing educational institution care economy failures",
+  "contentType": "scenario",
+  "title": "Recognizing educational institution care economy failures",
+  "description": "Recognizing educational institution care economy failures",
+  "content": "Scenario: Recognizing educational institution care economy failures\n    Given Kenji's college charges high tuition while many students face food insecurity\n    And educational institutions can exploit student labor\n    When the educational_elohim helps Kenji analyze institutional practices\n    Then it should teach him to recognize extractive vs. care-based institutions\n    And it should help him see when colleges fail care economy principles\n    And it should validate his critique of exploitative educational models\n    And the system should build critical awareness of institutional care failures\n    And Kenji should learn to evaluate institutions through care economy lens\n    And educational institutions should be accountable to care economy standards\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

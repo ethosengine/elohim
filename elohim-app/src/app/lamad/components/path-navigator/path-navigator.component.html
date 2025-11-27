@@ -1,0 +1,149 @@
+<div class="path-navigator">
+  <!-- Loading State -->
+  @if (isLoading) {
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading step...</p>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error) {
+    <div class="error-state">
+      <h2>Unable to load step</h2>
+      <p>{{ error }}</p>
+      <button class="btn btn-primary" (click)="goToPathOverview()">
+        Back to Path Overview
+      </button>
+    </div>
+  }
+
+  <!-- Content -->
+  @if (!isLoading && !error && stepView) {
+    <!-- Path Header -->
+    <header class="path-header">
+      <button class="btn-back" (click)="goToPathOverview()" title="Back to path overview">
+        <span class="icon">&#8592;</span>
+        <span class="path-title">{{ path?.title }}</span>
+      </button>
+
+      <!-- Progress Bar -->
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="getProgressPercentage()"></div>
+        </div>
+        <span class="progress-text">
+          Step {{ stepIndex + 1 }} of {{ path?.steps?.length || 0 }}
+        </span>
+      </div>
+    </header>
+
+    <!-- Step Context (Journey layer) -->
+    <section class="step-context">
+      <h1 class="step-title">{{ stepView.step.stepTitle }}</h1>
+
+      @if (stepView.step.stepNarrative) {
+        <p class="step-narrative">{{ stepView.step.stepNarrative }}</p>
+      }
+
+      @if (stepView.step.learningObjectives && stepView.step.learningObjectives.length > 0) {
+        <div class="learning-objectives">
+          <h3>Learning Objectives</h3>
+          <ul>
+            @for (objective of stepView.step.learningObjectives; track objective) {
+              <li>{{ objective }}</li>
+            }
+          </ul>
+        </div>
+      }
+    </section>
+
+    <!-- Content Node (Territory layer) -->
+    <article class="content-area">
+      <!-- Content Header -->
+      <div class="content-header">
+        <span class="content-type-badge">{{ stepView.content.contentType }}</span>
+        <h2 class="content-title">{{ stepView.content.title }}</h2>
+      </div>
+
+      <!-- Rendered Content -->
+      <div class="content-body">
+        @if (isMarkdown()) {
+          <div class="markdown-content" [innerHTML]="renderMarkdown(getContentString())"></div>
+        } @else if (isQuiz()) {
+          <div class="quiz-content">
+            <p class="quiz-placeholder">
+              <strong>Quiz: {{ stepView.content.title }}</strong>
+            </p>
+            <p>{{ stepView.content.description }}</p>
+            <p class="coming-soon">Interactive quiz component coming soon...</p>
+          </div>
+        } @else if (isGherkin()) {
+          <div class="gherkin-content">
+            <pre><code>{{ getContentString() }}</code></pre>
+          </div>
+        } @else {
+          <div class="generic-content">
+            <pre>{{ getContentString() }}</pre>
+          </div>
+        }
+      </div>
+
+      <!-- Content Metadata -->
+      @if (stepView.content.tags && stepView.content.tags.length > 0) {
+        <div class="content-tags">
+          @for (tag of stepView.content.tags; track tag) {
+            <span class="tag">{{ tag }}</span>
+          }
+        </div>
+      }
+    </article>
+
+    <!-- Reflection Prompts -->
+    @if (stepView.step.reflectionPrompts && stepView.step.reflectionPrompts.length > 0) {
+      <section class="reflection-prompts">
+        <h3>Reflection</h3>
+        <ul>
+          @for (prompt of stepView.step.reflectionPrompts; track prompt) {
+            <li>{{ prompt }}</li>
+          }
+        </ul>
+      </section>
+    }
+
+    <!-- Progress Actions -->
+    <section class="step-actions">
+      @if (stepView.isCompleted) {
+        <div class="completed-badge">
+          <span class="checkmark">&#10003;</span>
+          Step Completed
+        </div>
+      } @else {
+        <button class="btn btn-success" (click)="markComplete()">
+          Mark as Complete
+        </button>
+      }
+    </section>
+
+    <!-- Navigation -->
+    <nav class="step-navigation">
+      <button
+        class="btn btn-nav btn-prev"
+        [disabled]="!stepView.hasPrevious"
+        (click)="goToPrevious()"
+      >
+        <span class="icon">&#8592;</span>
+        Previous Step
+      </button>
+
+      <button
+        class="btn btn-nav btn-next"
+        [disabled]="!stepView.hasNext"
+        (click)="goToNext()"
+      >
+        Next Step
+        <span class="icon">&#8594;</span>
+      </button>
+    </nav>
+  }
+</div>

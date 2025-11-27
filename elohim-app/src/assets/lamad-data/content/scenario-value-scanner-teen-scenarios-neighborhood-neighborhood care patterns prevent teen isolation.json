@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-neighborhood-neighborhood care patterns prevent teen isolation",
+  "contentType": "scenario",
+  "title": "Neighborhood care patterns prevent teen isolation",
+  "description": "Neighborhood care patterns prevent teen isolation",
+  "content": "Scenario: Neighborhood care patterns prevent teen isolation\n    Given Jasmine could experience typical teen social isolation\n    And care economy creates connection across age groups\n    When she participates in neighborhood care patterns\n    Then she should build relationships with neighbors beyond her peer group\n    And experience being known and valued by her community\n    And have access to support beyond her immediate family\n    And develop sense of belonging to neighborhood community\n    And learn that care economy builds social fabric\n    And experience reduced isolation through meaningful community connection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:neighborhood",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

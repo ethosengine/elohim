@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-connecting with local food producers and farmers",
+  "contentType": "scenario",
+  "title": "Connecting with local food producers and farmers",
+  "description": "Connecting with local food producers and farmers",
+  "content": "Scenario: Connecting with local food producers and farmers\n    Given local farmers are doing care work to grow food\n    And I am doing care work to prepare food\n    When I want to connect with bioregional food producers\n    Then the protocol should facilitate connections between workers and farmers\n    And support relationships that strengthen local food systems\n    And help me understand farming as care labor deserving dignity and fair compensation\n    And build solidarity between farm workers and food service workers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-maintaining household dignity and quality despite constraints",
+  "contentType": "scenario",
+  "title": "Maintaining household dignity and quality despite constraints",
+  "description": "Maintaining household dignity and quality despite constraints",
+  "content": "Scenario: Maintaining household dignity and quality despite constraints\n    Given Margaret's household operates on limited resources\n    And she has decades of experience making homes\n    When the household_elohim supports Margaret's household management\n    Then it should honor her expertise and knowledge\n    And it should help her maintain the home she wants\n    And it should preserve household dignity and beauty\n    And financial constraints should not mean deprivation\n    And Margaret's household should reflect her values and taste\n    And quality of life should be supported within resource limits\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

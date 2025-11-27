@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-supporting local businesses as valued patron",
+  "contentType": "scenario",
+  "title": "Supporting local businesses as valued patron",
+  "description": "Supporting local businesses as valued patron",
+  "content": "Scenario: Supporting local businesses as valued patron\n    Given Jordan visits the neighborhood coffee shop weekly\n    And the barista knows Jordan's regular order\n    When Jordan enters the coffee shop\n    Then the personal_agent might help with ordering if needed\n    And the barista greets Jordan by name and remembers their preference\n    And Jordan's weekly purchase contributes to business sustainability\n    And Jordan experiences being a valued, recognized customer\n    And the relationship is genuine, not charity or pity\n    And Jordan's economic participation in neighborhood is visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

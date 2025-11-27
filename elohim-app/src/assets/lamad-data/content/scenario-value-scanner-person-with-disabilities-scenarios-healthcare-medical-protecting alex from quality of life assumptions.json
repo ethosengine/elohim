@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-protecting alex from quality of life assumptions",
+  "contentType": "scenario",
+  "title": "Protecting Alex from quality of life assumptions",
+  "description": "Protecting Alex from quality of life assumptions",
+  "content": "Scenario: Protecting Alex from quality of life assumptions\n    Given medical providers often make negative assumptions about disabled people's quality of life\n    And these assumptions can lead to withheld or substandard care\n    When providers discuss treatment options\n    Then the personal_agent should help Alex challenge quality of life assumptions\n    And it should assert that Alex's life is valuable and worth full treatment\n    And it should document when providers suggest limiting care based on disability\n    And Alex should receive same standard of care as non-disabled patients\n    And the protocol should recognize that quality of life bias is discrimination\n    And Alex's right to full medical care should be defended\n    And assumptions about disability should never limit treatment options\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

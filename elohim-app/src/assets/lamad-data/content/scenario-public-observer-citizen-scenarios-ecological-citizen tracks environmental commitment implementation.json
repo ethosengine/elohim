@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-ecological-citizen tracks environmental commitment implementation",
+  "contentType": "scenario",
+  "title": "Citizen tracks environmental commitment implementation",
+  "description": "Citizen tracks environmental commitment implementation",
+  "content": "Scenario: Citizen tracks environmental commitment implementation\n    Given the city adopted a climate action plan two years ago\n    And promised specific sustainability measures\n    When the citizen reviews Observer tracking\n    Then they see which commitments have been implemented\n    And which remain unfulfilled promises\n    And view progress on measurable sustainability goals\n    And can hold officials accountable for climate action\n    And long-term environmental policy gets institutional memory\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:ecological_bioregional",
+    "related_users:activist,community_organizer,politician",
+    "related_layers:municipality,community,county_regional",
+    "elohim_agents:public_observer,community_elohim,ecological_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

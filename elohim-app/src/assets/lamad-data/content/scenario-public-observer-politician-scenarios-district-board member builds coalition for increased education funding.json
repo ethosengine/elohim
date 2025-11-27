@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-board member builds coalition for increased education funding",
+  "contentType": "scenario",
+  "title": "Board member builds coalition for increased education funding",
+  "description": "Board member builds coalition for increased education funding",
+  "content": "Scenario: Board member builds coalition for increased education funding\n    Given the politician seeks voter approval for tax levy\n    And needs broad community support\n    When the Observer identifies coalition potential\n    Then they see parents care about class sizes and programs\n    And identify business leaders concerned about workforce preparation\n    And connect with community organizations serving families\n    And facilitate coalition across diverse stakeholder groups\n    And build campaign for education investment with broad base\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

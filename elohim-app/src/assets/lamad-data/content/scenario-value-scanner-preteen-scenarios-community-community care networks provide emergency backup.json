@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-community care networks provide emergency backup",
+  "contentType": "scenario",
+  "title": "Community care networks provide emergency backup",
+  "description": "Community care networks provide emergency backup",
+  "content": "Scenario: Community care networks provide emergency backup\n    Given Marcus's household operates on thin margins\n    And emergencies could overwhelm family capacity\n    When crisis situations arise\n    Then the community_elohim should activate emergency support\n    And community care networks should provide rapid assistance\n    And Marcus's family should receive help through established relationships\n    And emergency support should flow through care economy channels\n    And crisis intervention should prevent family breakdown\n    And community should function as safety net for vulnerable families\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

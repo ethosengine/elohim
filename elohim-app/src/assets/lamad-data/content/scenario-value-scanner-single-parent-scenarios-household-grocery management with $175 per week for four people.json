@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-grocery management with $175 per week for four people",
+  "contentType": "scenario",
+  "title": "Grocery management with $175 per week for four people",
+  "description": "Grocery management with $175 per week for four people",
+  "content": "Scenario: Grocery management with $175 per week for four people\n    Given Maria feeds four people on $175/week budget\n    And this requires strategic planning and waste prevention\n    When Maria plans grocery shopping\n    Then the household_elohim should optimize for maximum nutrition per dollar\n    And it should coordinate strategic shopping across stores based on sales\n    And it should plan meals that stretch ingredients efficiently\n    And it should prevent food waste she cannot afford\n    And Maria should achieve remarkable efficiency with AI support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-maintaining family cultural practices across distance",
+  "contentType": "scenario",
+  "title": "Maintaining family cultural practices across distance",
+  "description": "Maintaining family cultural practices across distance",
+  "content": "Scenario: Maintaining family cultural practices across distance\n    Given Aisha's family has specific cultural traditions\n    And she wants to maintain cultural connection\n    When Aisha participates in family cultural practices\n    Then the family_elohim should support cultural continuity\n    And it should help coordinate cultural events across distance\n    And it should recognize cultural care work she performs\n    And family cultural values should shape her care economy participation\n    And distance shouldn't prevent cultural transmission\n    And her cultural identity should be maintained through family care bonds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

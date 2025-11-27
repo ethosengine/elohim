@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-local store relationships built through consistent presence",
+  "contentType": "scenario",
+  "title": "Local store relationships built through consistent presence",
+  "description": "Local store relationships built through consistent presence",
+  "content": "Scenario: Local store relationships built through consistent presence\n    Given Marcus shops weekly at neighborhood stores\n    And he is a regular, recognizable customer\n    When Marcus builds relationships with store workers\n    Then the neighborhood_elohim should facilitate positive recognition\n    And store workers should see Marcus's care contributions\n    And they should understand he's feeding his family, not just shopping\n    And informal support networks should develop\n    And local relationships should provide informal safety net\n    And Marcus should be known and looked after in his neighborhood\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

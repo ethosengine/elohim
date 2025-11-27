@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-food waste reduction serves both budget and ecology",
+  "contentType": "scenario",
+  "title": "Food waste reduction serves both budget and ecology",
+  "description": "Food waste reduction serves both budget and ecology",
+  "content": "Scenario: Food waste reduction serves both budget and ecology\n    Given Marcus must maximize value from $75 budget\n    And food waste represents economic and ecological loss\n    When Marcus manages food inventory\n    Then the personal_agent should help him minimize waste\n    And it should track what gets used and what spoils\n    And it should suggest meal planning that uses ingredients completely\n    And waste reduction should serve both his budget and environment\n    And ecological stewardship should align with economic necessity\n    And care for resources should extend to caring for earth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-business operations maintain continuity during ownership transition",
+  "contentType": "scenario",
+  "title": "Business operations maintain continuity during ownership transition",
+  "description": "Business operations maintain continuity during ownership transition",
+  "content": "Scenario: Business operations maintain continuity during ownership transition\n    Given customers depend on reliable auto repair service\n    And continuity protects both community institution and workers' livelihoods\n    When ownership structure transforms from individual to democratic\n    Then customer relationships are systematically introduced to workers as new decision-makers\n    And service quality remains consistent through documented procedures\n    And supplier relationships transfer with Rosa introducing workers personally\n    And equipment maintenance knowledge is shared and documented\n    And no disruption occurs to daily operations or customer service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

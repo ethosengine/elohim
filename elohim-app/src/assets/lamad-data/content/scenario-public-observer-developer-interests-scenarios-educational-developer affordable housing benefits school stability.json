@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-educational-developer affordable housing benefits school stability",
+  "contentType": "scenario",
+  "title": "Developer affordable housing benefits school stability",
+  "description": "Developer affordable housing benefits school stability",
+  "content": "Scenario: Developer affordable housing benefits school stability\n    Given a responsible developer builds genuinely affordable housing\n    And prioritizes families over luxury apartments\n    When the Observer tracks educational community impacts\n    Then analysis shows: stable affordable housing reduces student mobility\n    And children in affordable housing have better educational outcomes\n    And schools benefit from stable enrollment not constant turnover\n    And affordable development creates educational community benefit\n    And genuine affordability serves families not just developer profit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,citizen",
+    "related_layers:municipality,county_regional,community",
+    "elohim_agents:public_observer,educational_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

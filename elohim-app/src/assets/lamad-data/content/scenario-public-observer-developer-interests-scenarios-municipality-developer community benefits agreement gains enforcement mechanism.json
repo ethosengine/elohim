@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer community benefits agreement gains enforcement mechanism",
+  "contentType": "scenario",
+  "title": "Developer community benefits agreement gains enforcement mechanism",
+  "description": "Developer community benefits agreement gains enforcement mechanism",
+  "content": "Scenario: Developer community benefits agreement gains enforcement mechanism\n    Given a developer negotiated affordable housing units as approval condition\n    And promised childcare facility and public greenspace\n    When the Observer tracks commitment delivery\n    Then community members monitor construction and occupancy\n    And see whether affordable units are actually rented to qualifying residents\n    And track whether childcare facility opens as promised\n    And developer reputation depends on honoring commitments\n    And binding accountability replaces unenforceable promises\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

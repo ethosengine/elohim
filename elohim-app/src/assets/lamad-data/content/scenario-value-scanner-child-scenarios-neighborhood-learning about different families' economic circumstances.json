@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-neighborhood-learning about different families' economic circumstances",
+  "contentType": "scenario",
+  "title": "Learning about different families' economic circumstances",
+  "description": "Learning about different families' economic circumstances",
+  "content": "Scenario: Learning about different families' economic circumstances\n    Given Emma's family has $40k/year income\n    And neighborhood includes families with varied economic situations\n    When Emma learns about community economic diversity\n    Then teaching should be age-appropriate about economic difference\n    And the personal_agent should explain without judgment\n    And Emma should learn that families have different resources\n    And she should develop empathy about economic constraint\n    And class awareness should be taught with dignity for all\n    And care economy should serve families across income spectrum\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

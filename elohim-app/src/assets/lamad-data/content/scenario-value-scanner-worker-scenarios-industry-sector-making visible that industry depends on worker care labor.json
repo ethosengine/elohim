@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-making visible that industry depends on worker care labor",
+  "contentType": "scenario",
+  "title": "Making visible that industry depends on worker care labor",
+  "description": "Making visible that industry depends on worker care labor",
+  "content": "Scenario: Making visible that industry depends on worker care labor\n    Given the food service industry depends entirely on workers' care labor\n    And workers are serving essential human needs (nourishment and community)\n    When the industry narrative treats workers as disposable\n    Then the protocol should make visible workers' essential contributions\n    And reframe food service as care work serving community flourishing\n    And build consciousness that workers deserve dignity and fair compensation\n    And transform industry culture from extraction to care economy alignment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

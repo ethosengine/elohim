@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-connecting to bioregional ecological restoration efforts",
+  "contentType": "scenario",
+  "title": "Connecting to bioregional ecological restoration efforts",
+  "description": "Connecting to bioregional ecological restoration efforts",
+  "content": "Scenario: Connecting to bioregional ecological restoration efforts\n    Given her bioregion needs ecological restoration\n    And young adults can contribute to environmental healing\n    When Aisha explores environmental participation\n    Then the bioregional_elohim should surface restoration opportunities\n    And it should connect her to local environmental projects\n    And her ecological care work should be recognized\n    And environmental stewardship should extend beyond consumption\n    And she should participate in active ecological healing\n    And care tokens should value environmental restoration work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-participating in neighborhood sustainability initiatives",
+  "contentType": "scenario",
+  "title": "Participating in neighborhood sustainability initiatives",
+  "description": "Participating in neighborhood sustainability initiatives",
+  "content": "Scenario: Participating in neighborhood sustainability initiatives\n    Given the neighborhood has sustainability projects\n    And Aisha wants to reduce environmental impact\n    When Aisha joins local sustainability efforts\n    Then the neighborhood_elohim should coordinate her participation\n    And it should connect her to composting, recycling, or garden projects\n    And it should recognize her environmental care work\n    And neighborhood-level sustainability should be more effective than individual\n    And collective action should be facilitated through care economy\n    And environmental stewardship should build community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

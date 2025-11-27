@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-organizing for universal benefits in food service",
+  "contentType": "scenario",
+  "title": "Organizing for universal benefits in food service",
+  "description": "Organizing for universal benefits in food service",
+  "content": "Scenario: Organizing for universal benefits in food service\n    Given many food service workers lack health insurance, paid leave, or retirement\n    When workers advocate for universal benefits\n    Then the protocol should support campaigns for mandatory benefits\n    And help workers articulate need for healthcare, sick leave, and security\n    And coordinate advocacy for industry-wide benefit requirements\n    And push for decoupling essential benefits from individual employer provision\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

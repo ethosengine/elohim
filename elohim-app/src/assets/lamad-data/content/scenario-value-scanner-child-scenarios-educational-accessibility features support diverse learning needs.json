@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-accessibility features support diverse learning needs",
+  "contentType": "scenario",
+  "title": "Accessibility features support diverse learning needs",
+  "description": "Accessibility features support diverse learning needs",
+  "content": "Scenario: Accessibility features support diverse learning needs\n    Given Emma may have varied learning needs\n    And accessibility is required for equitable education\n    When Emma uses educational features of the scanner\n    Then multiple modalities should be available (visual, audio, text)\n    And reading support should be provided as needed\n    And math scaffolding should be accessible\n    And voice guidance should be option\n    And interface should serve children with diverse abilities\n    And educational access should be universal\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

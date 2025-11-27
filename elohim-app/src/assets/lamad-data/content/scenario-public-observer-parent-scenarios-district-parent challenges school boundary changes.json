@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent challenges school boundary changes",
+  "contentType": "scenario",
+  "title": "Parent challenges school boundary changes",
+  "description": "Parent challenges school boundary changes",
+  "content": "Scenario: Parent challenges school boundary changes\n    Given the district proposes \"boundary realignment for efficiency\"\n    And the parent's child would be moved to a different school\n    When the parent reviews Observer's impact analysis\n    Then they see which neighborhoods are most affected\n    And understand this separates siblings between different schools\n    And view maps showing longer commutes for certain families\n    And connect with other parents facing same disruption\n    And coordinate testimony about family impacts at boundary hearing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

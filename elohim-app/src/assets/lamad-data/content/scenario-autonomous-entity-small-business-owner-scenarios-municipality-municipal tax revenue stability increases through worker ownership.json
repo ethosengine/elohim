@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal tax revenue stability increases through worker ownership",
+  "contentType": "scenario",
+  "title": "Municipal tax revenue stability increases through worker ownership",
+  "description": "Municipal tax revenue stability increases through worker ownership",
+  "content": "Scenario: Municipal tax revenue stability increases through worker ownership\n    Given small business failure drains municipal tax base\n    And worker-owned businesses show higher survival rates and stability\n    When Rosa's conversion demonstrates enhanced business sustainability\n    Then municipality experiences more stable tax revenue from democratic businesses\n    And higher worker wages generate increased income tax revenue\n    And business continuity maintains property tax base\n    And city fiscal planners recognize democratic ownership reduces revenue volatility\n    And municipality_elohim documents tax revenue benefits for policy advocacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

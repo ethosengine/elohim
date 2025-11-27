@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-community board and committee participation",
+  "contentType": "scenario",
+  "title": "Community board and committee participation",
+  "description": "Community board and committee participation",
+  "content": "Scenario: Community board and committee participation\n    Given Margaret has time to attend meetings and do board work\n    And community organizations need committed board members\n    When Margaret participates in community governance\n    Then her board service should be tracked as significant labor\n    And the time, preparation, and decision-making should be quantified\n    And community leadership contributions should be visible\n    And Margaret's governance participation should be valued\n    And seniors should be recognized as having capacity for leadership\n    And her contributions should build community governance systems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

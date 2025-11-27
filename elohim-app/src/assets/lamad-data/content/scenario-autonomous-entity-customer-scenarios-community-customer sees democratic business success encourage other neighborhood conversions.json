@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer sees democratic business success encourage other neighborhood conversions",
+  "contentType": "scenario",
+  "title": "Customer sees democratic business success encourage other neighborhood conversions",
+  "description": "Customer sees democratic business success encourage other neighborhood conversions",
+  "content": "Scenario: Customer sees democratic business success encourage other neighborhood conversions\n    Given Ms. Johnson observed Maria's Kitchen conversion and success\n    And neighbors watch to see if democratic model works\n    When democratic business thrives serving community well\n    Then other small business owners (Rosa's Auto, neighborhood retail) consider conversion\n    And successful demonstration effect inspires broader democratic economy\n    And customer support proves democratic businesses are economically viable\n    And neighborhood economic transformation accelerates through cascading conversions\n    And community_elohim documents success stories encouraging further conversions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

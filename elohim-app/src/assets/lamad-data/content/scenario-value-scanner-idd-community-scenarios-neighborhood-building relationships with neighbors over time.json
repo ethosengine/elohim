@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-building relationships with neighbors over time",
+  "contentType": "scenario",
+  "title": "Building relationships with neighbors over time",
+  "description": "Building relationships with neighbors over time",
+  "content": "Scenario: Building relationships with neighbors over time\n    Given Jordan lives on the same block as many families\n    And Jordan walks past neighbors' homes daily\n    When Jordan encounters neighbors during daily activities\n    Then Jordan greets neighbors with friendliness\n    And the personal_agent might provide name reminders if Jordan forgets\n    And neighbors increasingly see Jordan as a person, not just disability\n    And Jordan develops reputation as the \"friendly neighbor\"\n    And simple conversations build relationship over time\n    And Jordan's social contribution to neighborhood is real and valued\n    And Jordan experiences genuine community connection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-managing tight budget for individual needs",
+  "contentType": "scenario",
+  "title": "Managing tight budget for individual needs",
+  "description": "Managing tight budget for individual needs",
+  "content": "Scenario: Managing tight budget for individual needs\n    Given I earn $32k/year and have $60/week food budget\n    And I need to maximize nutritional value per dollar\n    When I plan my grocery shopping\n    Then the protocol should provide sophisticated budget optimization\n    And suggest high-value nutritious ingredients\n    And identify sales and discounts at accessible stores\n    And help me stretch limited resources without sacrificing health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

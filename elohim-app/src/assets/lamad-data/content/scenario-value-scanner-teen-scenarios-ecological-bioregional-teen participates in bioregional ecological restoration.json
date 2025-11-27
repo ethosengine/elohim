@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-teen participates in bioregional ecological restoration",
+  "contentType": "scenario",
+  "title": "Teen participates in bioregional ecological restoration",
+  "description": "Teen participates in bioregional ecological restoration",
+  "content": "Scenario: Teen participates in bioregional ecological restoration\n    Given Jasmine volunteers for watershed cleanup events\n    And she plants native species in community restoration projects\n    When bioregional_elohim tracks her ecological care labor\n    Then it should recognize restoration work as care for land and ecosystem\n    And value her labor for ecosystem health at care economy rates\n    And calculate ecological benefits from restoration participation\n    And acknowledge that she's doing work professional ecologists would be paid for\n    And demonstrate that ecological labor deserves recognition and compensation\n    And support her understanding that ecosystem repair is collective responsibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

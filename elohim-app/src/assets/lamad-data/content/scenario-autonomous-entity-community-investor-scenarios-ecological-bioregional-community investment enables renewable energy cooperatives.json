@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment enables renewable energy cooperatives",
+  "contentType": "scenario",
+  "title": "Community investment enables renewable energy cooperatives",
+  "description": "Community investment enables renewable energy cooperatives",
+  "content": "Scenario: Community investment enables renewable energy cooperatives\n    Given fossil fuel dependence threatens climate stability\n    And Patricia wants investment supporting renewable energy transition\n    When community investment expands to renewable energy cooperatives\n    Then her capital supports community solar and wind projects\n    And democratic energy ownership replaces fossil fuel extraction\n    And bioregional energy sovereignty increases through distributed renewables\n    And climate mitigation is advanced through values-aligned investment\n    And bioregional_elohim coordinates renewable energy cooperative investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

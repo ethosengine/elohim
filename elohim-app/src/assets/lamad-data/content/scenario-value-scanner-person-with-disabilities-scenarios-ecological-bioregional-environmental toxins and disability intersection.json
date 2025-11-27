@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-environmental toxins and disability intersection",
+  "contentType": "scenario",
+  "title": "Environmental toxins and disability intersection",
+  "description": "Environmental toxins and disability intersection",
+  "content": "Scenario: Environmental toxins and disability intersection\n    Given environmental pollution causes and exacerbates disabilities\n    And disabled people are particularly vulnerable to environmental toxins\n    When environmental health is addressed\n    Then the bioregional_elohim should recognize disability-environment connections\n    And it should track how environmental factors affect disabled people\n    And Alex's experience should inform environmental health advocacy\n    And environmental justice should include preventing disability from toxins\n    And the protocol should connect environmental and disability health\n    And Alex's advocacy should strengthen environmental health protections\n    And prevention of environmentally-caused disability should be prioritized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

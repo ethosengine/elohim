@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-mayor builds coalition for affordable housing initiative",
+  "contentType": "scenario",
+  "title": "Mayor builds coalition for affordable housing initiative",
+  "description": "Mayor builds coalition for affordable housing initiative",
+  "content": "Scenario: Mayor builds coalition for affordable housing initiative\n    Given the politician champions affordable housing policy\n    And needs support from diverse stakeholders\n    When the Observer surfaces coalition potential\n    Then they see tenant organizations share policy interest\n    And identify labor unions, faith communities, and senior advocates as allies\n    And facilitate bringing stakeholders to table for policy design\n    And track negotiation positions and evolution\n    And build multi-stakeholder coalition for policy passage\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

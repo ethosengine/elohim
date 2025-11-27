@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-national media coverage of landmark appeal",
+  "contentType": "scenario",
+  "title": "National media coverage of landmark appeal",
+  "description": "National media coverage of landmark appeal",
+  "content": "Scenario: National media coverage of landmark appeal\n    Given my appeal involves constitutional question of widespread public interest\n    And National Constitutional Council ruling will affect millions\n    When my case receives national media attention\n    Then my privacy is protected (anonymized coverage if I choose)\n    And Public education about constitutional governance happens through my case\n    And Democratic discourse is enriched by constitutional deliberation\n    And Citizens understand Elohim Protocol governance through real example\n    And My appeal contributes to public constitutional literacy\n    And Transparency serves democratic accountability without violating dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

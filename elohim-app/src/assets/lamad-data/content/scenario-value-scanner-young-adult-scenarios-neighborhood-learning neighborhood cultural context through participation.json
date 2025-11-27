@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-learning neighborhood cultural context through participation",
+  "contentType": "scenario",
+  "title": "Learning neighborhood cultural context through participation",
+  "description": "Learning neighborhood cultural context through participation",
+  "content": "Scenario: Learning neighborhood cultural context through participation\n    Given Aisha's neighborhood has particular cultural character\n    And she's learning local norms and values\n    When Aisha engages neighborhood care economy\n    Then she should learn cultural patterns through participation\n    And the neighborhood_elohim should respect local culture\n    And her contributions should adapt to neighborhood context\n    And cultural integration should happen through care relationships\n    And the system should facilitate culturally appropriate participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

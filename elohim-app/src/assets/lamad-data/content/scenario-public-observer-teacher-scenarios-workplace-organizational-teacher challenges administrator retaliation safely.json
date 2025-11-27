@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher challenges administrator retaliation safely",
+  "contentType": "scenario",
+  "title": "Teacher challenges administrator retaliation safely",
+  "description": "Teacher challenges administrator retaliation safely",
+  "content": "Scenario: Teacher challenges administrator retaliation safely\n    Given a principal retaliates against teachers who question decisions\n    And individual teachers fear speaking up\n    When teachers report concerns anonymously through Observer\n    Then patterns of retaliation become visible (negative evaluations after dissent)\n    And aggregated evidence protects individual teachers\n    And union files grievance based on documented pattern\n    And district addresses hostile administrator behavior\n    And anonymous reporting enables accountability without individual risk\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

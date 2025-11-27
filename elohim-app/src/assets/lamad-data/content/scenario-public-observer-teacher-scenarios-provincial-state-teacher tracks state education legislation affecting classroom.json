@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher tracks state education legislation affecting classroom",
+  "contentType": "scenario",
+  "title": "Teacher tracks state education legislation affecting classroom",
+  "description": "Teacher tracks state education legislation affecting classroom",
+  "content": "Scenario: Teacher tracks state education legislation affecting classroom\n    Given state legislature is considering education bills\n    And teachers can't track complex legislative processes while teaching\n    When the Observer monitors state education legislation\n    Then teachers receive alerts on bills affecting their work\n    And get plain-language summaries of education policy changes\n    And see projected impact on classroom teaching and learning\n    And access advocacy pathways (testimony, legislator contact, coalition)\n    And state policy becomes visible and actionable for frontline professionals\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

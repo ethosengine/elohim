@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-household care economy visible to counter narrative of burden",
+  "contentType": "scenario",
+  "title": "Household care economy visible to counter narrative of burden",
+  "description": "Household care economy visible to counter narrative of burden",
+  "content": "Scenario: Household care economy visible to counter narrative of burden\n    Given society often frames disabled people as burdens on households\n    And Alex contributes substantial household labor\n    When household care contributions are displayed\n    Then Alex's management, coordination, and decision-making should be visible\n    And the household_elohim should quantify Alex's cognitive and emotional labor\n    And data should counter the narrative that Alex is dependent burden\n    And Alex should see themselves as household contributor\n    And visibility should shift cultural understanding of disability and contribution\n    And the protocol should make Alex's care work undeniable\n    And Alex should experience affirmation of their household value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:household",
+    "related_users:adult,young_adult,elderly,caregiver,support_worker",
+    "related_layers:individual,family,community,workplace_organizational",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

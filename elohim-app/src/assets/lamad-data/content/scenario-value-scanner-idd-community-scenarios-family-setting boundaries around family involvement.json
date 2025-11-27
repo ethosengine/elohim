@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-setting boundaries around family involvement",
+  "contentType": "scenario",
+  "title": "Setting boundaries around family involvement",
+  "description": "Setting boundaries around family involvement",
+  "content": "Scenario: Setting boundaries around family involvement\n    Given Jordan's father often visits unannounced at the group home\n    And Jordan values the visits but wants more notice\n    When Jordan expresses desire for planned visits\n    Then the personal_agent helps Jordan communicate boundaries\n    And the interface provides simple language for boundary expression\n    And the family_elohim communicates Jordan's preference to father\n    And Jordan's father learns to respect Jordan's adult boundaries\n    And Jordan's autonomy is supported through boundary maintenance\n    And the relationship improves through mutual respect\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

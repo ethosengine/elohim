@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-household-communication and decision-making supported amid stress",
+  "contentType": "scenario",
+  "title": "Communication and decision-making supported amid stress",
+  "description": "Communication and decision-making supported amid stress",
+  "content": "Scenario: Communication and decision-making supported amid stress\n    Given Robert and Jennifer are both under substantial stress\n    And care demands can strain even strong partnerships\n    And important household decisions must be made collaboratively\n    When household_elohim facilitates communication\n    Then it should provide structured decision-making support\n    And ensure both partners have voice in household governance\n    And surface when stress is affecting communication\n    And prompt for check-ins: \"You haven't had a planning conversation in 3 weeks\"\n    And support them in maintaining partnership health\n    And recognize that their relationship needs protection amid care demands\n    And prevent household governance breakdown under stress\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:household",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

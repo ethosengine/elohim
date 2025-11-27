@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-appealing community resource allocation decision",
+  "contentType": "scenario",
+  "title": "Appealing community resource allocation decision",
+  "description": "Appealing community resource allocation decision",
+  "content": "Scenario: Appealing community resource allocation decision\n    Given Community Elohim denied my small business loan application\n    And I believe the criteria were unfairly applied\n    When I appeal the economic decision\n    Then Community Constitutional Council reviews the resource allocation\n    And They evaluate if constitutional principles of care and equity were followed\n    And They examine if I had meaningful opportunity to present my case\n    And They consider community economic context and priorities\n    And They assess if the agent's risk analysis was sound or biased\n    And The appeal can result in decision reversal or modified evaluation criteria\n    And Local economic priorities are clarified through appeal precedents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

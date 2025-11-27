@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-provincial-state-my judgment influences policy maker legislation",
+  "contentType": "scenario",
+  "title": "My judgment influences policy maker legislation",
+  "description": "My judgment influences policy maker legislation",
+  "content": "Scenario: My judgment influences policy maker legislation\n    Given Senator Ruiz is drafting AI governance legislation\n    And she reviews our regional council precedents for insight\n    When our constitutional reasoning informs her policy\n    Then my citizen judgment: shapes democratic law\n    And my lived experience: enriches legislative wisdom\n    And my constitutional interpretation: guides government integration\n    And sortition governance: and representative democracy work together\n    And I contribute: to democratic governance beyond my council service\n    And my voice: matters in ways I never imagined as nurse\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:provincial_state",
+    "related_users:appellant,technical_expert,policy_maker,researcher,community_leader",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

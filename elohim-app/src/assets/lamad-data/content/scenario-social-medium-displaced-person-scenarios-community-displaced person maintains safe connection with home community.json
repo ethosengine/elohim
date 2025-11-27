@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+  "contentType": "scenario",
+  "title": "Displaced person maintains safe connection with home community",
+  "description": "Displaced person maintains safe connection with home community",
+  "content": "Scenario: Displaced person maintains safe connection with home community\n    Given Maria left her hometown to escape an abusive partner\n    And she wants to stay connected with friends and family back home\n    When Maria configures her privacy settings for selective visibility\n    And she marks her abuser and his associates as blocked\n    Then she can communicate with trusted home community members\n    And her new location is never revealed to blocked individuals\n    And her abuser cannot find or contact her through the system\n    And she maintains important relationships while staying safe\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:displaced_person",
+    "governance_layer:community",
+    "related_users:refugee,activist,community_moderator,elder",
+    "related_layers:family,district,affinity_network",
+    "elohim_agents:protection_agent,sanctuary_agent,connection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/displaced_person/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-displaced-person-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-displaced-person-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

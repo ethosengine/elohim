@@ -1,0 +1,36 @@
+{
+  "id": "feature-public-observer-developer-interests-scenarios-county-regional",
+  "contentType": "feature",
+  "title": "Regional Development Accountability for Developer Interests",
+  "description": "As a developer in the public_observer system Operating at the county_regional governance layer I want regional coordination and pattern transparency So that responsible regional development creates genuine value not extraction",
+  "content": "@epic:public_observer\n@user_type:developer_interests\n@governance_layer:county_regional\n@related_users:politician,board_member,citizen,community_organizer\n@related_layers:municipality,provincial_state,ecological\n@elohim_agents:public_observer,regional_elohim,accountability_elohim\n\nFeature: Regional Development Accountability for Developer Interests\n  As a developer in the public_observer system\n  Operating at the county_regional governance layer\n  I want regional coordination and pattern transparency\n  So that responsible regional development creates genuine value not extraction\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the developer_interests user is registered in the system\n    And the county_regional governance context is active\n\n  Scenario: Developer coordinates multi-jurisdictional project transparently\n    Given a developer is planning development spanning three municipalities\n    And wants to navigate regional coordination requirements\n    When the Observer provides regional process navigation\n    Then the developer sees: county planning requirements affect all three jurisdictions\n    And identifies regional coordination bodies and approval pathways\n    And understands environmental review at regional scale\n    And accesses precedents for similar multi-jurisdictional projects\n    And navigates complexity transparently not through manipulation\n\n  Scenario: Responsible developer demonstrates regional housing contribution\n    Given a developer builds affordable housing across the region\n    And wants regional approval bodies to recognize consistent track record\n    When the Observer surfaces regional development patterns\n    Then the developer shows: 600 affordable units built across five municipalities\n    And demonstrates 85% occupancy by local workforce\n    And proves commitment to regional affordability not just luxury development\n    And regional reputation supports new project approvals\n    And consistent value creation becomes visible at scale\n\n  Scenario: Developer faces accountability for regional pattern of extraction\n    Given a developer concentrates luxury developments in affluent areas\n    And avoids affordable housing obligations through jurisdictional arbitrage\n    When the Observer reveals regional development patterns\n    Then planning bodies see: 12 luxury projects, zero affordable housing contribution\n    And pattern shows developer plays municipalities against each other\n    And uses weakest regulations to avoid affordable housing requirements\n    And regional coordination can address jurisdictional arbitrage\n    And systematic extraction becomes visible and challengeable\n\n  Scenario: Developer receives honest regional impact analysis\n    Given a developer claims project creates regional economic benefit\n    But analysis omits regional infrastructure burden\n    When the Observer provides regional cost-benefit assessment\n    Then the developer sees: promised jobs mostly go to workers from outside region\n    And traffic impacts affect three counties' transportation networks\n    And environmental impacts span watershed affecting six municipalities\n    And honest regional accounting reveals actual trade-offs\n    And local extraction versus regional benefit becomes clear\n\n  Scenario: Developer negotiates regional community benefits agreement\n    Given a developer's project has significant regional impacts\n    And multiple communities demand input and benefits\n    When the Observer facilitates regional benefit negotiations\n    Then the developer engages stakeholders from all affected jurisdictions\n    And negotiates benefits addressing regional not just local impacts\n    And commits to workforce development benefiting regional residents\n    And Observer tracks delivery across jurisdictional boundaries\n    And regional accountability prevents divide-and-conquer tactics\n\n  Scenario: Developer track record follows across jurisdictions\n    Given a developer broke promises in one municipality\n    And now seeks approval in neighboring jurisdiction\n    When the Observer provides cross-jurisdictional track record\n    Then planning commission sees: developer promised 150 jobs, delivered 18\n    And community benefits agreement was not honored\n    And pattern shows developer moves to new jurisdiction after burning bridges\n    And regional transparency prevents serial extraction\n    And developers can't escape accountability through relocation\n\n  Scenario: Responsible developer gains regional competitive advantage\n    Given a responsible developer consistently delivers promised benefits\n    And has positive track record across multiple jurisdictions\n    When the Observer makes regional reputation visible\n    Then the developer shows: projects in four counties all met commitments\n    And community feedback is consistently positive\n    And environmental standards were exceeded not just met\n    And regional reputation creates access to better opportunities\n    And integrity pays dividends across jurisdictional boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-developer-interests-scenarios-county-regional-developer coordinates multi-jurisdictional project transparently",
+    "scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer demonstrates regional housing contribution",
+    "scenario-public-observer-developer-interests-scenarios-county-regional-developer faces accountability for regional pattern of extraction",
+    "scenario-public-observer-developer-interests-scenarios-county-regional-developer receives honest regional impact analysis",
+    "scenario-public-observer-developer-interests-scenarios-county-regional-developer negotiates regional community benefits agreement",
+    "scenario-public-observer-developer-interests-scenarios-county-regional-developer track record follows across jurisdictions",
+    "scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer gains regional competitive advantage",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 7
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-early childhood education policies inform pedagogical approach",
+  "contentType": "scenario",
+  "title": "Early childhood education policies inform pedagogical approach",
+  "description": "Early childhood education policies inform pedagogical approach",
+  "content": "Scenario: Early childhood education policies inform pedagogical approach\n    Given educational governance includes early childhood development research\n    And evidence-based practices exist for ages 5-7\n    When the personal_agent's pedagogy is configured\n    Then it should incorporate developmental psychology research\n    And it should follow evidence-based early learning principles\n    And it should respect limits of cognitive development at age 5\n    And it should support optimal development trajectories\n    And educational policy should shape how Tommy is taught\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

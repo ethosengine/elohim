@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-discovering neighborhood through care economy participation",
+  "contentType": "scenario",
+  "title": "Discovering neighborhood through care economy participation",
+  "description": "Discovering neighborhood through care economy participation",
+  "content": "Scenario: Discovering neighborhood through care economy participation\n    Given Aisha is new to her neighborhood\n    And she doesn't know local patterns yet\n    When Aisha explores neighborhood resources\n    Then the neighborhood_elohim should surface local care opportunities\n    And it should identify local shops and services\n    And it should highlight community initiatives she can join\n    And the system should help her learn neighborhood geography through care\n    And community building should happen through participation\n    And she should discover her neighborhood as care network, not just location\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

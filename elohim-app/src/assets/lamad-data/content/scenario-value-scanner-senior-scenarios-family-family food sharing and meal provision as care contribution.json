@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-family food sharing and meal provision as care contribution",
+  "contentType": "scenario",
+  "title": "Family food sharing and meal provision as care contribution",
+  "description": "Family food sharing and meal provision as care contribution",
+  "content": "Scenario: Family food sharing and meal provision as care contribution\n    Given Margaret sometimes cooks meals for her daughter's family\n    And she hosts family dinners and holiday meals\n    When Margaret's food provision is tracked as care\n    Then meal preparation and hosting should be recognized as labor\n    And the economic value of meals provided should be calculated\n    And family food sharing should be visible care contribution\n    And Margaret's cooking and hospitality should be valued\n    And food as care should be part of family care economy\n    And invisible domestic labor should become visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

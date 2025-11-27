@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-managing neighborhood social challenges",
+  "contentType": "scenario",
+  "title": "Managing neighborhood social challenges",
+  "description": "Managing neighborhood social challenges",
+  "content": "Scenario: Managing neighborhood social challenges\n    Given some neighborhood kids sometimes tease Jordan\n    And Jordan finds the teasing hurtful and confusing\n    When the teasing incidents occur\n    Then the personal_agent helps Jordan process feelings\n    And the neighborhood_elohim can facilitate education if appropriate\n    And supportive neighbors might intervene to protect Jordan\n    And Jordan learns strategies for responding with dignity\n    And the community addresses ableism through education\n    And Jordan's safety and dignity are prioritized\n    And Jordan receives support to continue neighborhood participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

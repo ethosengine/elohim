@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-neighborhood-elder's institutional memory aids community decision",
+  "contentType": "scenario",
+  "title": "Elder's institutional memory aids community decision",
+  "description": "Elder's institutional memory aids community decision",
+  "content": "Scenario: Elder's institutional memory aids community decision\n    Given the neighborhood is debating a proposed development\n    And there are questions about past flooding patterns\n    When Rose contributes her memory of the 1995 flood\n    And she describes how the proposed site was underwater\n    Then her historical knowledge is valued in the discussion\n    And her contribution earns reach based on relevance and credibility\n    And the community makes better-informed decisions\n    And Rose experiences being an essential community asset\n    And institutional memory is preserved and utilized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:neighborhood",
+    "related_users:community_moderator,content_creator,child",
+    "related_layers:family,community",
+    "elohim_agents:guardian_agent,coordination_agent,wisdom_surfacing_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-neighborhood",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-neighborhood",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.188597",
+  "updatedAt": "2025-11-21T18:54:29.188597"
+}

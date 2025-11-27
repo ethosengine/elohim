@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-multigenerational care coordination across three generations",
+  "contentType": "scenario",
+  "title": "Multigenerational care coordination across three generations",
+  "description": "Multigenerational care coordination across three generations",
+  "content": "Scenario: Multigenerational care coordination across three generations\n    Given Frank provides occasional grandchild care\n    And he helps maintain his mother-in-law's home\n    And he supports his adult children with wisdom and occasional financial help\n    When family_elohim coordinates care across generations\n    Then it should track care flowing from Frank to grandchildren\n    And care flowing from Frank to his mother-in-law\n    And support flowing from Frank to adult children\n    And emerging care flowing from adult children to Frank\n    And all flows should be visible and valued\n    And multigenerational reciprocity should be recognized\n    And Frank should see himself in ongoing care web\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent discovers coalition for school bus safety",
+  "contentType": "scenario",
+  "title": "Parent discovers coalition for school bus safety",
+  "description": "Parent discovers coalition for school bus safety",
+  "content": "Scenario: Parent discovers coalition for school bus safety\n    Given the parent's child rides Route 17 with chronic delays\n    And 13 other parents along Route 17 report the same safety concerns\n    When the Observer detects the alignment pattern\n    Then the parent receives opt-in coalition notification\n    And can see aggregated data on delay patterns and incidents\n    And can coordinate testimony with other affected parents\n    And isolated frustration becomes documented collective concern\n    And 14 coordinated parents change the transportation meeting outcome\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

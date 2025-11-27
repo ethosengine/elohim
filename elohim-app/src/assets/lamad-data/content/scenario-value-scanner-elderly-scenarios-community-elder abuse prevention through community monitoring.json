@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-elder abuse prevention through community monitoring",
+  "contentType": "scenario",
+  "title": "Elder abuse prevention through community monitoring",
+  "description": "Elder abuse prevention through community monitoring",
+  "content": "Scenario: Elder abuse prevention through community monitoring\n    Given elderly people are vulnerable to abuse and exploitation\n    And community networks can identify concerning patterns\n    When the community_elohim detects potential abuse indicators\n    Then it should alert appropriate authorities\n    And Helen's safety should be prioritized\n    And intervention should preserve her autonomy where possible\n    And community should protect vulnerable members\n    And the protocol should provide infrastructure for elder protection\n    And abuse prevention should be community responsibility\n    And Helen should be safe in her community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

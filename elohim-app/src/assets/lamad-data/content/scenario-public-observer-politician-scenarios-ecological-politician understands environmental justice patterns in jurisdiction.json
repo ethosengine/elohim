@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-ecological-politician understands environmental justice patterns in jurisdiction",
+  "contentType": "scenario",
+  "title": "Politician understands environmental justice patterns in jurisdiction",
+  "description": "Politician understands environmental justice patterns in jurisdiction",
+  "content": "Scenario: Politician understands environmental justice patterns in jurisdiction\n    Given the politician governs environmental policy at city or state level\n    And suspects environmental burdens fall disproportionately\n    When the Observer maps environmental conditions and demographics\n    Then they see pollution sources concentrated in communities of color\n    And identify park access disparities by neighborhood income\n    And understand health impact patterns from environmental exposure\n    And learn which communities bear cumulative environmental burdens\n    And champion environmental justice policies with documented inequities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-contributing care tokens to community initiatives",
+  "contentType": "scenario",
+  "title": "Contributing care tokens to community initiatives",
+  "description": "Contributing care tokens to community initiatives",
+  "content": "Scenario: Contributing care tokens to community initiatives\n    Given I accumulate care tokens through my work and participation\n    And community initiatives need resource pooling\n    When I want to support community projects or people in need\n    Then the protocol should enable me to contribute care tokens\n    And facilitate care economy resource distribution\n    And recognize that even workers with limited money can contribute meaningfully\n    And build community care economy beyond cash transactions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

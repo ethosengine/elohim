@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-explaining cryptographic impossibility of backdoor mandates",
+  "contentType": "scenario",
+  "title": "Explaining cryptographic impossibility of backdoor mandates",
+  "description": "Explaining cryptographic impossibility of backdoor mandates",
+  "content": "Scenario: Explaining cryptographic impossibility of backdoor mandates\n    Given policy makers consider requiring backdoors for law enforcement\n    And this would break constitutional verification\n    When I testify to National Council about technical implications\n    Then I explain: backdoors make cryptographic alignment proof impossible\n    And I clarify: cannot have both backdoors and constitutional verification\n    And I demonstrate: this is mathematical fact not implementation choice\n    And I present: security vulnerabilities backdoors create\n    And I acknowledge: this constrains what governance can mandate\n    And I provide: evidence policy makers need for informed choice\n    And I maintain: that I'm explaining constraints not dictating values\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

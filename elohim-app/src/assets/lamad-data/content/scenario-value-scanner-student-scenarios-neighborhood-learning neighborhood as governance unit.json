@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-learning neighborhood as governance unit",
+  "contentType": "scenario",
+  "title": "Learning neighborhood as governance unit",
+  "description": "Learning neighborhood as governance unit",
+  "content": "Scenario: Learning neighborhood as governance unit\n    Given Kenji is learning how communities function\n    And neighborhood is often invisible as governance layer\n    When the personal_agent teaches Kenji about neighborhood governance\n    Then it should help him see neighborhood as care coordination unit\n    And it should show how neighborhoods make collective decisions\n    And it should teach him that geography creates shared stakes\n    And neighborhood should be understood as governance layer\n    And the system should build Kenji's civic literacy\n    And students should learn that neighborhoods govern local flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

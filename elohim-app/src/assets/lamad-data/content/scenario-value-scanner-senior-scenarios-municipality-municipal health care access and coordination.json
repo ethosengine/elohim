@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-municipal health care access and coordination",
+  "contentType": "scenario",
+  "title": "Municipal health care access and coordination",
+  "description": "Municipal health care access and coordination",
+  "content": "Scenario: Municipal health care access and coordination\n    Given Margaret has changing health needs with aging\n    And she navigates complex health care systems\n    When the municipality_elohim coordinates health access\n    Then municipal health programs should be accessible\n    And senior health clinics should be available and affordable\n    And navigation support should help Margaret access care\n    And preventive health should be prioritized for seniors\n    And municipal health policy should support senior wellness\n    And Margaret should be able to age healthily in community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

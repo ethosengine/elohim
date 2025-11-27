@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-neighborhood-neighborhood bulk buying coordinated with teen participation",
+  "contentType": "scenario",
+  "title": "Neighborhood bulk buying coordinated with teen participation",
+  "description": "Neighborhood bulk buying coordinated with teen participation",
+  "content": "Scenario: Neighborhood bulk buying coordinated with teen participation\n    Given Jasmine's neighborhood organizes collective bulk food purchases\n    And she has transportation and time flexibility\n    When she participates in bulk buying coordination\n    Then the neighborhood_elohim should facilitate logistics\n    And track her contributions of labor (pickup, distribution, coordination)\n    And enable cost savings to be distributed equitably\n    And recognize that her participation makes bulk buying possible for others\n    And demonstrate that care economy creates real economic value\n    And show that youth participation strengthens neighborhood economic resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:neighborhood",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

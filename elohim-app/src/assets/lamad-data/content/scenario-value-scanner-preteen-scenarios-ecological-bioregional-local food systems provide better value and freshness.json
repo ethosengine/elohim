@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-local food systems provide better value and freshness",
+  "contentType": "scenario",
+  "title": "Local food systems provide better value and freshness",
+  "description": "Local food systems provide better value and freshness",
+  "content": "Scenario: Local food systems provide better value and freshness\n    Given Marcus shops in specific geographic region\n    And locally grown food can be cheaper and fresher\n    When Marcus compares food options\n    Then the personal_agent should identify local sources\n    And it should help him access farmers' markets and local growers\n    And it should explain benefits of shorter supply chains\n    And local food should be framed as both economic and ecological win\n    And he should learn that bioregional food systems serve his needs\n    And connection to local land and farmers should develop\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

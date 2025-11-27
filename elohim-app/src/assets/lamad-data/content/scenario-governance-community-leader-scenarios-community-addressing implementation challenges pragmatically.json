@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-addressing implementation challenges pragmatically",
+  "contentType": "scenario",
+  "title": "Addressing implementation challenges pragmatically",
+  "description": "Addressing implementation challenges pragmatically",
+  "content": "Scenario: Addressing implementation challenges pragmatically\n    Given Riverside faces practical problems with protocol\n    And elderly residents struggle with technology\n    When I work to solve accessibility issues\n    Then we maintain: human service windows for tech-reluctant residents\n    And we offer: paper-based alternatives to digital interfaces\n    And we run: continuous education programs\n    And we provide: in-person support and assistance\n    And we ensure: no resident excluded due to tech barriers\n    And we adapt: implementation to community reality\n    And protocol serves: everyone not just tech-savvy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

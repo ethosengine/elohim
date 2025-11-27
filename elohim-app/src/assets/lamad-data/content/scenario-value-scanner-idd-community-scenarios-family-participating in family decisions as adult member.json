@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-participating in family decisions as adult member",
+  "contentType": "scenario",
+  "title": "Participating in family decisions as adult member",
+  "description": "Participating in family decisions as adult member",
+  "content": "Scenario: Participating in family decisions as adult member\n    Given Jordan's family is planning a vacation together\n    And Jordan is invited to join the family trip\n    When the family discusses vacation options\n    Then Jordan participates in the planning with accessible support\n    And the personal_agent presents destination options visually\n    And Jordan can express preferences about activities and timing\n    And Jordan's vote counts in family decision-making\n    And the family treats Jordan as an adult participant, not a child\n    And Jordan experiences being a valued family member with voice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

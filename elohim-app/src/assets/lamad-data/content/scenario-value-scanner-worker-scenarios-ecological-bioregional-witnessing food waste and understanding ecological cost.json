@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-witnessing food waste and understanding ecological cost",
+  "contentType": "scenario",
+  "title": "Witnessing food waste and understanding ecological cost",
+  "description": "Witnessing food waste and understanding ecological cost",
+  "content": "Scenario: Witnessing food waste and understanding ecological cost\n    Given I see significant food waste in restaurant operations\n    And food waste represents wasted care labor and ecological resources\n    When I observe food system inefficiencies\n    Then the protocol should help me understand ecological and care economy costs\n    And support me in advocating for waste reduction\n    And connect me to food rescue or composting initiatives\n    And recognize that reducing waste is care work for ecology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

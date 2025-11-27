@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-municipality-municipal planning includes elder wisdom and long-term perspective",
+  "contentType": "scenario",
+  "title": "Municipal planning includes elder wisdom and long-term perspective",
+  "description": "Municipal planning includes elder wisdom and long-term perspective",
+  "content": "Scenario: Municipal planning includes elder wisdom and long-term perspective\n    Given Frank has lived in the municipality for decades\n    And he's observed long-term patterns and changes\n    When the municipal_elohim facilitates planning processes\n    Then it should actively seek Frank's long-term perspective\n    And elder wisdom should inform infrastructure and policy decisions\n    And decades of observation should guide municipal adaptation\n    And Frank's experience should be valued in planning conversations\n    And municipal governance should benefit from elder knowledge\n    And intergenerational planning should integrate experienced voices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:municipality",
+    "related_users:citizen,voter,senior,volunteer,advocate,elder",
+    "related_layers:community,neighborhood,individual,household",
+    "elohim_agents:personal_agent,community_elohim,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

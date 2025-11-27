@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional food systems participation supports care and ecology",
+  "contentType": "scenario",
+  "title": "Bioregional food systems participation supports care and ecology",
+  "description": "Bioregional food systems participation supports care and ecology",
+  "content": "Scenario: Bioregional food systems participation supports care and ecology\n    Given Robert's household needs food\n    And food choices affect ecological health and care economy\n    And bioregional food systems can serve both\n    When bioregional_elohim supports food system participation\n    Then it should connect Robert to bioregional food networks\n    And surface opportunities for local food sourcing, community gardens, and food cooperatives\n    And recognize that supporting regional farmers is care economy participation\n    And help him understand food system ecological impact\n    And support food choices that serve bioregional health and care economy\n    And demonstrate that eating is care for people and planet\n    And build bioregional food resilience through participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

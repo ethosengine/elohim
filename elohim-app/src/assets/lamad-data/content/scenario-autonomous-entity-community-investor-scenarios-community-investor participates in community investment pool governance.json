@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor participates in community investment pool governance",
+  "contentType": "scenario",
+  "title": "Investor participates in community investment pool governance",
+  "description": "Investor participates in community investment pool governance",
+  "content": "Scenario: Investor participates in community investment pool governance\n    Given traditional investing gives shareholders plutocratic pseudo-democracy\n    And Patricia wants genuine participation, not capital-weighted control\n    When community investment pool has democratic governance structure\n    Then she participates in pool governance as one voice among equals\n    And investment decisions consider community benefit alongside financial returns\n    And pool priorities are set democratically by investors, workers, and community representatives\n    And governance prevents capital from dominating democratic enterprises\n    And community_elohim manages investment pool democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:community",
+    "related_users:[worker,small_business_owner,franchise_operator,customer]",
+    "related_layers:[municipality,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

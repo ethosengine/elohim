@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-teaching next generation that ecological care is care work",
+  "contentType": "scenario",
+  "title": "Teaching next generation that ecological care is care work",
+  "description": "Teaching next generation that ecological care is care work",
+  "content": "Scenario: Teaching next generation that ecological care is care work\n    Given Sarah is raising children in care economy\n    And environmental crisis requires cultural transformation\n    When Sarah teaches children about environmental care\n    Then the bioregional_elohim should support ecological education\n    And children should learn that care for planet is care work\n    And environmental stewardship should be integrated into value literacy\n    And next generation should assume ecological care creates value\n    And cultural transformation should include environmental care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

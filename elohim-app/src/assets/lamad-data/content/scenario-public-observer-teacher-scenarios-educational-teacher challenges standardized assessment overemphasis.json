@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-educational-teacher challenges standardized assessment overemphasis",
+  "contentType": "scenario",
+  "title": "Teacher challenges standardized assessment overemphasis",
+  "description": "Teacher challenges standardized assessment overemphasis",
+  "content": "Scenario: Teacher challenges standardized assessment overemphasis\n    Given standardized testing dominates education policy decisions\n    And teachers know tests measure narrow slice of learning\n    When teachers provide professional perspective on assessment through Observer\n    Then teachers show how test prep narrows curriculum and reduces rich learning\n    And document student stress and declining engagement with testing\n    And present comprehensive assessment approaches that inform teaching\n    And build parent coalition around learning-centered not test-centered education\n    And assessment policy reflects professional expertise about student learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:educational",
+    "related_users:parent,board_member,student,administrator,community_organizer",
+    "related_layers:school,district,provincial_state",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

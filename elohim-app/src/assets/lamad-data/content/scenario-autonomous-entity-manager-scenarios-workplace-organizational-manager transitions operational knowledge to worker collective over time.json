@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager transitions operational knowledge to worker collective over time",
+  "contentType": "scenario",
+  "title": "Manager transitions operational knowledge to worker collective over time",
+  "description": "Manager transitions operational knowledge to worker collective over time",
+  "content": "Scenario: Manager transitions operational knowledge to worker collective over time\n    Given Marcus holds tacit knowledge from years of operations management\n    And democratic model requires distributing this knowledge to workers\n    When knowledge transfer process begins\n    Then Marcus documents operational procedures and decision frameworks\n    And Marcus trains workers in business operations through structured learning\n    And workers gradually take on tasks previously Marcus's sole domain\n    And after 18 months, workers govern operations with Marcus in purely advisory role\n    And workplace_elohim tracks knowledge distribution preventing re-concentration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

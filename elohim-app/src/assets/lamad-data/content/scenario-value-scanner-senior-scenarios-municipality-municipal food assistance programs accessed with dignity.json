@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-municipal food assistance programs accessed with dignity",
+  "contentType": "scenario",
+  "title": "Municipal food assistance programs accessed with dignity",
+  "description": "Municipal food assistance programs accessed with dignity",
+  "content": "Scenario: Municipal food assistance programs accessed with dignity\n    Given Margaret's budget is tight at $150/week\n    And municipal SNAP or food assistance may be available\n    When the municipality_elohim identifies assistance eligibility\n    Then Margaret should be informed without stigma\n    And enrollment should be simple and dignified\n    And her care contributions should be visible alongside receiving benefits\n    And the framing should be community resource access\n    And participation should feel like claiming entitlement, not begging\n    And municipal assistance should support fixed-income seniors\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

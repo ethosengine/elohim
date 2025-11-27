@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-health monitoring as robert recognizes his own aging",
+  "contentType": "scenario",
+  "title": "Health monitoring as Robert recognizes his own aging",
+  "description": "Health monitoring as Robert recognizes his own aging",
+  "content": "Scenario: Health monitoring as Robert recognizes his own aging\n    Given Robert is experiencing early signs of aging\n    And he watches his parents navigate health challenges\n    And he recognizes his own future care needs\n    When Robert tracks his health through his personal_agent\n    Then it should monitor age-related health indicators\n    And help him establish preventive health practices\n    And connect his parents' health patterns to his own future\n    And support planning for his own eventual care needs\n    And recognize: \"Regular exercise now reduces future care burden\"\n    And help him build health practices that will serve him as he ages\n    And prepare him for the transition from care provider to care receiver\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

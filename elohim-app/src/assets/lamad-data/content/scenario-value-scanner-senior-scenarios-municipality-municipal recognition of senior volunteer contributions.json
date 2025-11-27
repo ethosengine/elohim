@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-municipal recognition of senior volunteer contributions",
+  "contentType": "scenario",
+  "title": "Municipal recognition of senior volunteer contributions",
+  "description": "Municipal recognition of senior volunteer contributions",
+  "content": "Scenario: Municipal recognition of senior volunteer contributions\n    Given Margaret volunteers extensively in municipal programs\n    And her labor subsidizes municipal service provision\n    When the municipality_elohim tracks volunteer contributions\n    Then municipal government should see aggregate senior volunteer value\n    And policy should reflect dependence on senior volunteer labor\n    And seniors should be recognized as essential to municipal function\n    And Margaret's contributions should give her standing in municipal affairs\n    And volunteer labor should inform resource allocation\n    And senior productivity should be visible to government\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-maintaining regular family contact on own terms",
+  "contentType": "scenario",
+  "title": "Maintaining regular family contact on own terms",
+  "description": "Maintaining regular family contact on own terms",
+  "content": "Scenario: Maintaining regular family contact on own terms\n    Given Jordan's parents want to stay connected\n    And Jordan values family relationships\n    When Jordan decides how often to communicate with family\n    Then the personal_agent helps Jordan set communication preferences\n    And the interface shows simple options (daily calls, weekly visits, etc.)\n    And Jordan's communication preferences are communicated to family\n    And the family_elohim helps family honor Jordan's boundaries\n    And Jordan experiences autonomy over family connection frequency\n    And Jordan's adult status is respected through choice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

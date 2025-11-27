@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-senior center programs maintain social connection and engagement",
+  "contentType": "scenario",
+  "title": "Senior center programs maintain social connection and engagement",
+  "description": "Senior center programs maintain social connection and engagement",
+  "content": "Scenario: Senior center programs maintain social connection and engagement\n    Given Helen participates in senior center activities\n    And social connection prevents isolation and decline\n    When Helen engages with senior center programs\n    Then the community_elohim should coordinate transportation\n    And accessibility should be ensured for all programs\n    And her participation should be recognized as community contribution\n    And programs should preserve dignity and agency\n    And senior centers should be spaces of continued growth, not warehousing\n    And the protocol should support elder engagement in community life\n    And Helen should experience valued participation, not make-work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

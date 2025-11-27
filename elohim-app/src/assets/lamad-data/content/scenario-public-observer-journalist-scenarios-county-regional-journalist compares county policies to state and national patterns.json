@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist compares county policies to state and national patterns",
+  "contentType": "scenario",
+  "title": "Journalist compares county policies to state and national patterns",
+  "description": "Journalist compares county policies to state and national patterns",
+  "content": "Scenario: Journalist compares county policies to state and national patterns\n    Given county debates approach to criminal justice reform\n    And the journalist provides context on policy options\n    When the Observer enables comparative policy research\n    Then the journalist reviews outcomes from counties with reform policies\n    And analyzes data on recidivism, cost, and community safety\n    And interviews officials and residents in comparison jurisdictions\n    And provides evidence-based policy journalism\n    And regional coverage connects to national criminal justice debate\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:county_regional",
+    "related_users:journalist,activist,politician,citizen",
+    "related_layers:municipality,provincial_state,community",
+    "elohim_agents:public_observer,regional_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

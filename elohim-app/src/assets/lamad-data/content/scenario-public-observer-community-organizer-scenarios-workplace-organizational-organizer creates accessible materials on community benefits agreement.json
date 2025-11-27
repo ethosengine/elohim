@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer creates accessible materials on community benefits agreement",
+  "contentType": "scenario",
+  "title": "Organizer creates accessible materials on community benefits agreement",
+  "description": "Organizer creates accessible materials on community benefits agreement",
+  "content": "Scenario: Organizer creates accessible materials on community benefits agreement\n    Given developer seeks public subsidy for major project\n    And promises to \"create jobs\" but history shows otherwise\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of community benefits agreements\n    And see developer's labor track record from past projects\n    And get template for CBA with binding labor standards\n    And access wage and hiring data to counter developer claims\n    And complex economic development becomes community organizing opportunity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:workplace_organizational",
+    "related_users:activist,citizen,politician,journalist",
+    "related_layers:municipality,industry_sector,community",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

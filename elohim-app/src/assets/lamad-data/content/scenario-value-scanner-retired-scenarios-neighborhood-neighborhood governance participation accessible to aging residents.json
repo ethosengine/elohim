@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood governance participation accessible to aging residents",
+  "contentType": "scenario",
+  "title": "Neighborhood governance participation accessible to aging residents",
+  "description": "Neighborhood governance participation accessible to aging residents",
+  "content": "Scenario: Neighborhood governance participation accessible to aging residents\n    Given Frank is aging and may have mobility or accessibility needs\n    And neighborhood governance should remain accessible\n    When Frank participates in neighborhood governance\n    Then meetings should be accessible (location, seating, acoustics)\n    And remote participation options should be available\n    And meeting materials should be provided in accessible formats\n    And the neighborhood_elohim should coordinate accessibility needs\n    And Frank should be able to participate fully despite aging\n    And governance access should be universal, not assuming youth\n    And his participation should be welcomed and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

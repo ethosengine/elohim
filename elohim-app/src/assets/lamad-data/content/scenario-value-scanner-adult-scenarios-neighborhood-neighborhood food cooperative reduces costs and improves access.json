@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood food cooperative reduces costs and improves access",
+  "contentType": "scenario",
+  "title": "Neighborhood food cooperative reduces costs and improves access",
+  "description": "Neighborhood food cooperative reduces costs and improves access",
+  "content": "Scenario: Neighborhood food cooperative reduces costs and improves access\n    Given Sarah needs to feed family on budget\n    And food costs are significant household expense\n    When neighborhood organizes food cooperative\n    Then the neighborhood_elohim should coordinate bulk purchasing\n    And it should manage cooperative logistics\n    And it should track members' contributions and access\n    And food should be more affordable through collective action\n    And Sarah's family should have better food security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

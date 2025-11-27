@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-collaborating with national research on protocol effectiveness",
+  "contentType": "scenario",
+  "title": "Collaborating with national research on protocol effectiveness",
+  "description": "Collaborating with national research on protocol effectiveness",
+  "content": "Scenario: Collaborating with national research on protocol effectiveness\n    Given Dr. Chen studies national sortition governance patterns\n    And my technical expertise complements his social science\n    When we collaborate on research\n    Then I explain: technical mechanisms enabling democratic oversight\n    And I help: interpret technical aspects of council decisions\n    And I provide: data on agent behavior patterns\n    And I respect: his expertise on social and political dynamics\n    And we integrate: technical and democratic perspectives\n    And collaboration produces: richer understanding than either alone\n    And research serves: evidence-based governance improvement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

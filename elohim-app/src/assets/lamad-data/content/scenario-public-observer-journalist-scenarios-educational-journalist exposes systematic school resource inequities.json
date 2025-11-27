@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist exposes systematic school resource inequities",
+  "contentType": "scenario",
+  "title": "Journalist exposes systematic school resource inequities",
+  "description": "Journalist exposes systematic school resource inequities",
+  "content": "Scenario: Journalist exposes systematic school resource inequities\n    Given the journalist investigates education equity\n    And suspects under-resourcing of schools serving students of color\n    When the Observer analyzes district resource distribution\n    Then the journalist sees experienced teachers concentrate in white affluent schools\n    And documents gifted programs and AP courses cluster by race and class\n    And finds per-student spending disparities of thousands of dollars\n    And shows facility quality varies dramatically by neighborhood\n    And publishes investigation exposing structural educational racism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

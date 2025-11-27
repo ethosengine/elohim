@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-individual-recognition of care economy contributions builds continued purpose",
+  "contentType": "scenario",
+  "title": "Recognition of care economy contributions builds continued purpose",
+  "description": "Recognition of care economy contributions builds continued purpose",
+  "content": "Scenario: Recognition of care economy contributions builds continued purpose\n    Given Frank's contributions are substantial but unpaid\n    And traditional economics labels him as \"not working\"\n    And he's navigating the cultural narrative of retirement as obsolescence\n    When Frank reviews his care contribution data\n    Then he should see quantified value of his volunteer and care labor\n    And he should understand his economic contribution is significant (~$20k/year)\n    And he should experience himself as productive member of society\n    And the narrative of retirement as withdrawal should be countered\n    And Frank should have data to assert his continued value\n    And his dignity, purpose, and self-worth should be affirmed\n    And retirement should feel like transition to different contribution, not exit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:individual",
+    "related_users:senior,elderly,middle_aged,worker,volunteer",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

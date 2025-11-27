@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-individual-manager unlearns corporate extraction training through supported transition",
+  "contentType": "scenario",
+  "title": "Manager unlearns corporate extraction training through supported transition",
+  "description": "Manager unlearns corporate extraction training through supported transition",
+  "content": "Scenario: Manager unlearns corporate extraction training through supported transition\n    Given Marcus was trained by corporate to minimize labor costs and maximize productivity\n    And these extraction skills are actively harmful in democratic context\n    When he begins democratic coordinator role\n    Then he receives training in facilitation, mediation, and collaborative coordination\n    And workplace_elohim provides resources on horizontal organization practices\n    And other democratic coordinators mentor him through transition\n    And he unlearns surveillance instincts and command reflexes\n    And his skill evolution is documented and supported, not demanded instantly\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:individual",
+    "related_users:[worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

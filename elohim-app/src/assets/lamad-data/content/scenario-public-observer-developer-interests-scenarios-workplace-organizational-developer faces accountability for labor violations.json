@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer faces accountability for labor violations",
+  "contentType": "scenario",
+  "title": "Developer faces accountability for labor violations",
+  "description": "Developer faces accountability for labor violations",
+  "content": "Scenario: Developer faces accountability for labor violations\n    Given a developer has history of wage theft and safety violations\n    And now seeks public subsidies for new project\n    When the Observer surfaces labor practice track record\n    Then analysis shows: 47 wage and hour violations over five years\n    And 23 OSHA safety citations across projects\n    And pattern of worker exploitation not isolated incidents\n    And public subsidies shouldn't reward developers who exploit workers\n    And labor accountability becomes approval consideration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,activist,community_organizer,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

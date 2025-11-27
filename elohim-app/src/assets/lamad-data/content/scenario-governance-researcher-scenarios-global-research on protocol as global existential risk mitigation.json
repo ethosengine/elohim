@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-research on protocol as global existential risk mitigation",
+  "contentType": "scenario",
+  "title": "Research on protocol as global existential risk mitigation",
+  "description": "Research on protocol as global existential risk mitigation",
+  "content": "Scenario: Research on protocol as global existential risk mitigation\n    Given superintelligent AI poses existential risk to humanity\n    And I study whether democratic governance can address this risk\n    When I analyze protocol as existential risk mitigation strategy\n    Then I examine: whether constitutional accountability reduces AI risk\n    And I assess: whether sortition prevents elite capture of superintelligence\n    And I explore: whether transparency enables democratic oversight at scale\n    And I analyze: whether recourse mechanisms provide adaptation to unknown risks\n    And I investigate: whether protocol's distributed architecture increases resilience\n    And I conclude: honestly about uncertainties and limitations\n    And My research informs: humanity's response to its most important challenge\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

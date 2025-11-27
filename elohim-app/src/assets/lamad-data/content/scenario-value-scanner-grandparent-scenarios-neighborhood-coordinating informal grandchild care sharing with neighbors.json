@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating informal grandchild care sharing with neighbors",
+  "contentType": "scenario",
+  "title": "Coordinating informal grandchild care sharing with neighbors",
+  "description": "Coordinating informal grandchild care sharing with neighbors",
+  "content": "Scenario: Coordinating informal grandchild care sharing with neighbors\n    Given Margaret cares for her grandchildren regularly\n    And other neighborhood grandparents also provide childcare\n    When Margaret coordinates with other grandparents\n    Then the neighborhood_elohim should facilitate care coordination\n    And it should help grandparents share resources and support\n    And it should enable mutual aid among neighborhood grandparents\n    And grandparents should form care networks for collective benefit\n    And neighborhood care economy should strengthen through elder collaboration\n    And Margaret should connect with other grandparents in similar roles\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

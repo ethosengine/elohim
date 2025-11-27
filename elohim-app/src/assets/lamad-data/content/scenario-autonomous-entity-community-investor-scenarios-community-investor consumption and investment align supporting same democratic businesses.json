@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor consumption and investment align supporting same democratic businesses",
+  "contentType": "scenario",
+  "title": "Investor consumption and investment align supporting same democratic businesses",
+  "description": "Investor consumption and investment align supporting same democratic businesses",
+  "content": "Scenario: Investor consumption and investment align supporting same democratic businesses\n    Given Patricia's consumption and investment were previously disconnected activities\n    And roles as customer and investor didn't integrate\n    When she invests in and patronizes same democratic businesses\n    Then consumption supports investment supports values supports community\n    And economic activities align creating virtuous cycle\n    And integrated participation deepens commitment and impact\n    And community economic participation becomes holistic, not fragmented\n    And community_elohim helps investors see connections between consumption and investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:community",
+    "related_users:[worker,small_business_owner,franchise_operator,customer]",
+    "related_layers:[municipality,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

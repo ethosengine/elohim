@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-future career aligned with ecological care economy",
+  "contentType": "scenario",
+  "title": "Future career aligned with ecological care economy",
+  "description": "Future career aligned with ecological care economy",
+  "content": "Scenario: Future career aligned with ecological care economy\n    Given Kenji studies environmental science for future career\n    And he wants work that serves ecological flourishing\n    When the bioregional_elohim supports career development\n    Then it should help him identify care economy environmental careers\n    And it should connect his learning to ecological stewardship work\n    And it should validate environmental work as care economy contribution\n    And it should support him developing career serving planetary flourishing\n    And the system should recognize ecological professions as care work\n    And Kenji's career should serve care economy at planetary scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

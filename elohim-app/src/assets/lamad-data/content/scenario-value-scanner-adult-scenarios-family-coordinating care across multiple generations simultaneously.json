@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-coordinating care across multiple generations simultaneously",
+  "contentType": "scenario",
+  "title": "Coordinating care across multiple generations simultaneously",
+  "description": "Coordinating care across multiple generations simultaneously",
+  "content": "Scenario: Coordinating care across multiple generations simultaneously\n    Given Sarah provides care to her children, her partner, and increasingly to her parents\n    And she is in the sandwich generation\n    When the family_elohim tracks care flows\n    Then it should map care moving upward to parents\n    And it should track care downward to children\n    And it should recognize care inward for Sarah's own well-being\n    And it should value care outward to community\n    And Sarah should see the full complexity of her care work\n    And multi-generational care patterns should be visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

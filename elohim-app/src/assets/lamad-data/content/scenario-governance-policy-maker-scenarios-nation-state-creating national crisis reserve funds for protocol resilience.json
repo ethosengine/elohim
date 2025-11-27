@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-creating national crisis reserve funds for protocol resilience",
+  "contentType": "scenario",
+  "title": "Creating national crisis reserve funds for protocol resilience",
+  "description": "Creating national crisis reserve funds for protocol resilience",
+  "content": "Scenario: Creating national crisis reserve funds for protocol resilience\n    Given crises may threaten protocol infrastructure\n    And rapid response funding is needed\n    When I establish emergency reserves\n    Then I fund: rapid scaling for refugee crises\n    And I support: attack response against corporate or authoritarian threats\n    And I provide: disaster recovery for damaged infrastructure\n    And reserves ensure: protocol survives shocks\n    And resilience: is built into national support\n    And democratic governance: can weather emergencies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

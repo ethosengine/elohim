@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist monitors multiple school districts despite limited capacity",
+  "contentType": "scenario",
+  "title": "Journalist monitors multiple school districts despite limited capacity",
+  "description": "Journalist monitors multiple school districts despite limited capacity",
+  "content": "Scenario: Journalist monitors multiple school districts despite limited capacity\n    Given the journalist covers regional education\n    And must track 8 school districts plus state education department\n    When the Observer monitors all district school boards simultaneously\n    Then the journalist reviews all board meetings across districts\n    And receives alerts for newsworthy decisions and patterns\n    And identifies stories affecting multiple districts\n    And comprehensive regional education coverage becomes sustainable\n    And no consequential education decision escapes scrutiny\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

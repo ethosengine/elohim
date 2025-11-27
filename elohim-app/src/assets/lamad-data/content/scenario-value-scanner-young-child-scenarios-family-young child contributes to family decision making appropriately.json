@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-young child contributes to family decision making appropriately",
+  "contentType": "scenario",
+  "title": "Young child contributes to family decision making appropriately",
+  "description": "Young child contributes to family decision making appropriately",
+  "content": "Scenario: Young child contributes to family decision making appropriately\n    Given the family is making decisions about meals\n    And Tommy has preferences and care intentions\n    When Tommy's input is solicited through the scanner\n    Then his preferences should be honored age-appropriately\n    And his care intentions (choosing for others) should carry weight\n    And the family_elohim should balance Tommy's input with family needs\n    And Tommy should experience having voice in family governance\n    And his participation should be genuine, not token\n    And family decisions should reflect that all members contribute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

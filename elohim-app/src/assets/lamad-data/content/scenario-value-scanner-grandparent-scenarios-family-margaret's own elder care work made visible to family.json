@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-margaret's own elder care work made visible to family",
+  "contentType": "scenario",
+  "title": "Margaret's own elder care work made visible to family",
+  "description": "Margaret's own elder care work made visible to family",
+  "content": "Scenario: Margaret's own elder care work made visible to family\n    Given Margaret coordinates care for her 92-year-old mother\n    And she navigates \"sandwich generation\" care obligations\n    When the family_elohim tracks Margaret's elder care\n    Then it should recognize this as substantial care labor\n    And it should show Margaret is caring across three generations\n    And Sarah should see Margaret's total care burden\n    And grandchildren should see Margaret modeling elder care\n    And elder care should accumulate care tokens alongside grandparenting\n    And family should understand Margaret's comprehensive care work\n    And her care for her own mother should be visible and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

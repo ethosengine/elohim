@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-turnover decreases dramatically as workers gain ownership and dignity",
+  "contentType": "scenario",
+  "title": "Turnover decreases dramatically as workers gain ownership and dignity",
+  "description": "Turnover decreases dramatically as workers gain ownership and dignity",
+  "content": "Scenario: Turnover decreases dramatically as workers gain ownership and dignity\n    Given franchise locations experienced 150% annual turnover due to low wages and poor conditions\n    And constant turnover harmed service quality and training efficiency\n    When conversion provides ownership, living wages, and democratic voice\n    Then worker retention improves to 90%+ (turnover drops to 10% annually)\n    And institutional knowledge accumulates instead of constantly draining\n    And training investments pay off through worker longevity\n    And customer relationships deepen through consistent staffing\n    And workplace_elohim documents retention improvements and cost savings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

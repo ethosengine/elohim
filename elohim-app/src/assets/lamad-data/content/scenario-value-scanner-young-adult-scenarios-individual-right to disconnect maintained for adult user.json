@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-right to disconnect maintained for adult user",
+  "contentType": "scenario",
+  "title": "Right to disconnect maintained for adult user",
+  "description": "Right to disconnect maintained for adult user",
+  "content": "Scenario: Right to disconnect maintained for adult user\n    Given Aisha has full autonomy over technology use\n    And the constitutional constraints apply at all layers\n    When Aisha chooses to disconnect from the system\n    Then the disconnection must be honored immediately\n    And all data retention must follow legal minimums only\n    And no manipulative patterns should attempt to retain usage\n    And Aisha's right to opt out must be absolute\n    And the system must respect her sovereign choice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

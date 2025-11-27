@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-individual-manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+  "contentType": "scenario",
+  "title": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+  "description": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+  "content": "Scenario: Manager's personal growth shifts from extraction efficiency to facilitation effectiveness\n    Given corporate measured Marcus's success by labor cost minimization\n    And his career growth meant managing more extraction at larger scale\n    When he transitions to democratic coordinator\n    Then his growth trajectory shifts to facilitation skill development\n    And he learns consensus-building, conflict mediation, transparent communication\n    And his expertise becomes transferable to human flourishing, not just profit extraction\n    And he can mentor new EAE acquisitions through democratic transition\n    And his skills serve life instead of serving only capital\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:individual",
+    "related_users:[worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community policy advocacy based on caregiver data",
+  "contentType": "scenario",
+  "title": "Community policy advocacy based on caregiver data",
+  "description": "Community policy advocacy based on caregiver data",
+  "content": "Scenario: Community policy advocacy based on caregiver data\n    Given caregivers need employment protections and support policies\n    And policy requires data to demonstrate need\n    When the community_elohim aggregates caregiver data\n    Then it should demonstrate caregiving scope in community\n    And data should support advocacy for caregiver leave policies\n    And it should show economic impact of unsupported caregiving\n    And community should advocate for caregivers at policy level\n    And care economy data should drive systemic change\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

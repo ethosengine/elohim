@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-community-collaborating with mayor jamal on participatory action research",
+  "contentType": "scenario",
+  "title": "Collaborating with Mayor Jamal on participatory action research",
+  "description": "Collaborating with Mayor Jamal on participatory action research",
+  "content": "Scenario: Collaborating with Mayor Jamal on participatory action research\n    Given I want research to serve community not just extract data\n    And Mayor Jamal wants evidence to improve local governance\n    When we co-design research questions and methods\n    Then community priorities shape what we study\n    And Local residents participate in data collection\n    And We jointly interpret findings considering context I might miss\n    And Research addresses actual needs not just academic curiosity\n    And Riverside learns from comparative findings across communities\n    And Results improve local implementation immediately\n    And Research relationship respects community autonomy and knowledge\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,appellant,technical_expert",
+    "related_layers:provincial_state,nation_state",
+    "elohim_agents:community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-public transportation access supports senior independence",
+  "contentType": "scenario",
+  "title": "Public transportation access supports senior independence",
+  "description": "Public transportation access supports senior independence",
+  "content": "Scenario: Public transportation access supports senior independence\n    Given Margaret can no longer afford car ownership\n    And she needs transportation for medical appointments, shopping, and social life\n    When the municipality_elohim provides transportation information\n    Then accessible public transit should be available\n    And senior fare programs should be communicated clearly\n    And transportation should enable Margaret's continued independence\n    And mobility should be supported as key to aging in community\n    And municipal transit should be optimized for senior access\n    And affordable transportation should preserve autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

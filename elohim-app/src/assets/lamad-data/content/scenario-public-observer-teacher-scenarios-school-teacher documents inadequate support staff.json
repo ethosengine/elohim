@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher documents inadequate support staff",
+  "contentType": "scenario",
+  "title": "Teacher documents inadequate support staff",
+  "description": "Teacher documents inadequate support staff",
+  "content": "Scenario: Teacher documents inadequate support staff\n    Given the school lacks sufficient counselors and specialists\n    And students with learning needs aren't getting services\n    When teachers collectively document support staff gaps through Observer\n    Then aggregated data shows 300 students per counselor vs 250 recommended\n    And student impact patterns become visible\n    And teachers coordinate advocacy with parents for resources\n    And principal takes evidence to district for staffing increase\n    And professional knowledge drives resource allocation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

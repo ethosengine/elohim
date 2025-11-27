@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-shopping locally contributes to neighborhood economy",
+  "contentType": "scenario",
+  "title": "Shopping locally contributes to neighborhood economy",
+  "description": "Shopping locally contributes to neighborhood economy",
+  "content": "Scenario: Shopping locally contributes to neighborhood economy\n    Given Kenji buys groceries at neighborhood corner store and farmer's market\n    And local shopping supports neighborhood businesses\n    When the neighborhood_elohim tracks local economic participation\n    Then it should recognize Kenji's local purchases as neighborhood contribution\n    And it should show him \"You've spent $X at local businesses this month\"\n    And it should help him understand his economic impact on neighborhood\n    And local shopping should accumulate care tokens\n    And the system should make visible how spending choices support community\n    And students should see themselves as neighborhood economic participants\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

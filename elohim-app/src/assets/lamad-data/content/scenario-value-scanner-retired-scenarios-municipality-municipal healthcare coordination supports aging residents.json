@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-municipality-municipal healthcare coordination supports aging residents",
+  "contentType": "scenario",
+  "title": "Municipal healthcare coordination supports aging residents",
+  "description": "Municipal healthcare coordination supports aging residents",
+  "content": "Scenario: Municipal healthcare coordination supports aging residents\n    Given Frank and his wife both have aging-related healthcare needs\n    And navigating healthcare is increasingly complex\n    When the municipal_elohim coordinates healthcare access\n    Then it should help Frank navigate Medicare and healthcare systems\n    And coordinate with municipal health services\n    And support access to preventive and chronic care\n    And connect healthcare to care economy support systems\n    And Frank should maintain health through accessible municipal infrastructure\n    And municipal health policy should serve aging residents effectively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:municipality",
+    "related_users:citizen,voter,senior,volunteer,advocate,elder",
+    "related_layers:community,neighborhood,individual,household",
+    "elohim_agents:personal_agent,community_elohim,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

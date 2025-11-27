@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-municipal data about teen contributions informs youth policy",
+  "contentType": "scenario",
+  "title": "Municipal data about teen contributions informs youth policy",
+  "description": "Municipal data about teen contributions informs youth policy",
+  "content": "Scenario: Municipal data about teen contributions informs youth policy\n    Given thousands of teens participate in care economy across the municipality\n    And their contributions generate aggregate data about youth participation\n    When municipal_elohim analyzes youth care economy patterns\n    Then it should surface insights about teen contributions to city wellbeing\n    And show that youth provide substantial unpaid household labor\n    And demonstrate economic value of youth volunteering and community engagement\n    And inform municipal policy about youth employment and education\n    And shift public understanding from \"youth as problems\" to \"youth as contributors\"\n    And support evidence-based youth policy grounded in actual participation data\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

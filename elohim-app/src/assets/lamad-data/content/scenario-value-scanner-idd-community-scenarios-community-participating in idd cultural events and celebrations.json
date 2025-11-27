@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-participating in idd cultural events and celebrations",
+  "contentType": "scenario",
+  "title": "Participating in IDD cultural events and celebrations",
+  "description": "Participating in IDD cultural events and celebrations",
+  "content": "Scenario: Participating in IDD cultural events and celebrations\n    Given the IDD community is hosting a pride celebration\n    And the event celebrates IDD culture, identity, and accomplishments\n    When Jordan attends the celebration\n    Then the personal_agent provides event details accessibly\n    And the entire event is designed for cognitive accessibility\n    And Jordan sees IDD peers being celebrated for their contributions\n    And Jordan participates in activities, performances, and community\n    And Jordan experiences IDD pride and cultural affirmation\n    And Jordan rejects ableist narratives of tragedy and burden\n    And Jordan celebrates disability as difference and community strength\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

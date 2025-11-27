@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-transitioning between jobs with care economy continuity",
+  "contentType": "scenario",
+  "title": "Transitioning between jobs with care economy continuity",
+  "description": "Transitioning between jobs with care economy continuity",
+  "content": "Scenario: Transitioning between jobs with care economy continuity\n    Given Aisha may change jobs during her young adult years\n    And job transitions are stressful\n    When Aisha considers changing positions\n    Then the workplace_elohim should support transition planning\n    And it should help her assess new opportunities through care lens\n    And it should maintain record of skills and contributions\n    And career development should be continuous across jobs\n    And the system should support healthy professional mobility\n    And care economy principles should guide job transitions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

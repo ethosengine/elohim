@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for sustainable food practices at work",
+  "contentType": "scenario",
+  "title": "Advocating for sustainable food practices at work",
+  "description": "Advocating for sustainable food practices at work",
+  "content": "Scenario: Advocating for sustainable food practices at work\n    Given my workplace makes decisions about sourcing and operations\n    When I want to advocate for more sustainable and care-aligned practices\n    Then the protocol should help me propose sustainable improvements\n    Such as local sourcing, waste reduction, composting, sustainable packaging\n    And provide evidence for ecological and economic benefits\n    And support me in advocating for care-economy-aligned food operations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

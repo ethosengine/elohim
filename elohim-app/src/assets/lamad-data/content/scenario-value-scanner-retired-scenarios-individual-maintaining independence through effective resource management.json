@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-individual-maintaining independence through effective resource management",
+  "contentType": "scenario",
+  "title": "Maintaining independence through effective resource management",
+  "description": "Maintaining independence through effective resource management",
+  "content": "Scenario: Maintaining independence through effective resource management\n    Given Frank values his independence and self-sufficiency\n    And he wants to continue contributing without becoming \"a burden\"\n    When Frank uses the Value Scanner over time\n    Then it should help him maintain self-sufficiency and capability\n    And it should optimize his resources for maximum independence\n    And it should connect him to community resources without stigma\n    And it should make his care contributions visible and valued\n    And Frank should experience continued agency and autonomy\n    And the system should support him in aging on his own terms\n    And his continued productivity should be recognized and celebrated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:individual",
+    "related_users:senior,elderly,middle_aged,worker,volunteer",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

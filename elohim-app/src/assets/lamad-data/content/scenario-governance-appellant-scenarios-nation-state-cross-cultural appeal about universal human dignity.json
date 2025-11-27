@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-cross-cultural appeal about universal human dignity",
+  "contentType": "scenario",
+  "title": "Cross-cultural appeal about universal human dignity",
+  "description": "Cross-cultural appeal about universal human dignity",
+  "content": "Scenario: Cross-cultural appeal about universal human dignity\n    Given my community's practices were deemed unconstitutional by agent\n    And we believe our cultural values are being unfairly judged\n    When National Constitutional Council reviews the cultural conflict\n    Then they engage deeply with cultural relativism vs universal minimums\n    And They distinguish genuine cultural diversity from human rights violations\n    And They consider if constitutional framework reflects dominant culture bias\n    And They examine if subsidiarity allows cultural variation in this domain\n    And They create precedent protecting cultural diversity within dignity bounds\n    And My appeal strengthens constitutional respect for cultural pluralism\n    And Universal human dignity is upheld without cultural imperialism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

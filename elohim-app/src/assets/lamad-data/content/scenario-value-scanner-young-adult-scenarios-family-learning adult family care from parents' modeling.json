@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-learning adult family care from parents' modeling",
+  "contentType": "scenario",
+  "title": "Learning adult family care from parents' modeling",
+  "description": "Learning adult family care from parents' modeling",
+  "content": "Scenario: Learning adult family care from parents' modeling\n    Given Aisha's parents demonstrate care economy practices\n    And she's learning adult family participation\n    When Aisha observes family care patterns\n    Then the family_elohim should make parental care work visible\n    And Aisha should learn what adult family care looks like\n    And intergenerational knowledge transfer should occur\n    And she should understand family care as lifelong practice\n    And the system should facilitate learning from family elders\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

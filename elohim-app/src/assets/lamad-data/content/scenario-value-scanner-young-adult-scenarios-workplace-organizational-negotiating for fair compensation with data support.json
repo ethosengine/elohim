@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-negotiating for fair compensation with data support",
+  "contentType": "scenario",
+  "title": "Negotiating for fair compensation with data support",
+  "description": "Negotiating for fair compensation with data support",
+  "content": "Scenario: Negotiating for fair compensation with data support\n    Given Aisha deserves fair pay for her labor\n    And she lacks negotiation experience\n    When Aisha prepares for salary negotiation\n    Then the workplace_elohim should provide supporting data\n    And it should show market rates for her role\n    And it should quantify value of her contributions\n    And it should provide negotiation strategy guidance\n    And the system should empower her advocacy\n    And care economy principles should support fair compensation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

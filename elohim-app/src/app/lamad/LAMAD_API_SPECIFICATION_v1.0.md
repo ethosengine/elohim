@@ -59,7 +59,7 @@ To avoid architectural confusion, we maintain a strict distinction between the a
 
 These are the real-time, intelligent entities operating within the system. Examples include community_elohim (stewarding shared knowledge spaces), family_elohim (protecting household learning priorities), and personal_agent (your individual guide through the knowledge graph). They negotiate access based on your attestations and readiness. They track patterns in how you learn and what you struggle with. They facilitate coordination between your learning goals and available paths. They are the "ghost in the machine" - the intelligence layer that makes the static structure dynamic and responsive.
 
-**Lamad: The Static Structure**
+**Lamad: The Maps and Paths of Meaning**
 
 This is the graph-based learning platform and content repository. It defines the node types (epics, features, scenarios, concepts) and their metadata. It is the map showing the territory of available knowledge. It records the footprints - your affinity relationships with different concepts showing where you've traveled and how deeply you've engaged. It is the "machine" that the ghosts (Elohim agents) inhabit and curate. Without Elohim, Lamad is a library. With Elohim, Lamad becomes a living learning environment.
 
@@ -333,6 +333,99 @@ For authenticated learners, the page shows a personalized view. At the top is a 
 The page also provides search and browse interfaces for discovering new paths. Learners can search by keyword, filter by tags or difficulty level, or browse by category (relational learning, vocational training, civic education, etc.). Each path preview shows title, description, estimated duration, prerequisite paths if any, and social proof like number of learners who have completed it.
 
 Importantly, the landing page does NOT display raw lists of epics, features, resources, or other Territory artifacts. Those are accessible through the exploration interface for researchers and path creators, but the default learner experience emphasizes curated journeys over raw content browsing. This reflects the core philosophy that meaning comes from the path through knowledge, not from the knowledge artifacts themselves.
+
+### 1.7 Knowledge Maps - Polymorphic Learning Territory
+
+Knowledge maps extend the path-centric navigation to support three distinct but architecturally similar learning contexts: domain knowledge (like Khan Academy's World of Math), person knowledge (like Gottman's Love Maps), and collective knowledge (organizational intelligence).
+
+**Route Patterns:**
+```
+/lamad/map:{mapId}                           # View a specific knowledge map
+/lamad/map:{mapId}/node:{nodeId}             # View a node within a map
+/lamad/maps/mine                              # My knowledge maps
+/lamad/maps/shared                            # Maps shared with me
+/lamad/maps/new?type={domain|person|collective}  # Create new map
+```
+
+**Map Type-Specific Routes:**
+```
+# Domain maps (learning a subject)
+/lamad/map:domain:{subjectId}                # Map for a content graph
+
+# Person maps (learning about someone - Gottman Love Maps)
+/lamad/map:person:{subjectAgentId}           # Map about a specific person
+/lamad/maps/people                            # All my person maps
+
+# Collective maps (organizational knowledge)
+/lamad/map:collective:{orgId}                # Map for an organization
+/lamad/maps/collectives                       # Collective maps I'm part of
+```
+
+**Examples:**
+```
+/lamad/map:domain:elohim-protocol            # My understanding of the protocol
+/lamad/map:person:agent-sarah                # My knowledge map about Sarah
+/lamad/map:collective:acme-corp              # ACME's collective knowledge base
+/lamad/maps/people                           # All my relationship maps
+```
+
+**Behavior Contract:**
+
+For domain maps, the system loads the user's personalized view of the content graph. This includes their affinity levels for each node, their mastery progression, and their personal annotations. The map view shows the same content as the graph explorer but overlays the user's relationship with each piece of knowledge.
+
+For person maps, privacy is paramount. The map is private by default and only visible to the mapper. If the subject grants consent, both parties can see each other's maps (mutual visibility). The map structure follows Gottman's categories: life history, current stressors, dreams/aspirations, values/beliefs, preferences/dislikes, friends/family, work/career, and custom categories.
+
+For collective maps, access depends on membership. Members with appropriate roles can view and contribute. The map represents shared knowledge owned by the collective, not by any individual.
+
+**Consent Routes for Person Maps:**
+```
+/lamad/consent/requests                      # View pending consent requests
+/lamad/consent/grant:{requestId}             # Grant consent to a request
+/lamad/consent/revoke:{mapId}                # Revoke previously granted consent
+```
+
+When Agent A creates a person map about Agent B, Agent B receives a consent request. Agent B can grant access at various scopes: public-info (only what B shares publicly), shared-only (what B explicitly shares with A), or full-access (deep knowledge mapping permitted). Agent B can also set transparency level: none, categories-only, full-read, or collaborative.
+
+### 1.8 Path Extensions - Learner-Owned Customization
+
+Path extensions allow learners to personalize curated paths without modifying the original. This enables community contribution, A/B testing of variations, and adaptive learning.
+
+**Route Patterns:**
+```
+/lamad/path:{pathId}/extensions              # View extensions for a path
+/lamad/path:{pathId}/extend                  # Create new extension
+/lamad/extension:{extensionId}               # View specific extension
+/lamad/extension:{extensionId}/edit          # Edit my extension
+/lamad/extension:{extensionId}/fork          # Fork someone else's extension
+/lamad/extension:{extensionId}/propose       # Propose upstream merge
+```
+
+**Examples:**
+```
+/lamad/path:elohim-protocol/extensions       # Community extensions to the protocol
+/lamad/path:elohim-protocol/extend           # Create my own extension
+/lamad/extension:ext-sarah-deep-dive         # View Sarah's extension
+/lamad/extension:ext-sarah-deep-dive/fork    # Fork Sarah's approach
+```
+
+**Behavior Contract:**
+
+When viewing a path with extensions enabled, the system overlays the learner's extension (if any) on top of the base path. Inserted steps appear at their designated positions. Annotations appear alongside the original step content. Reorderings affect step sequence. Exclusions hide steps from view.
+
+Extensions are version-pinned to specific path versions. If the base path updates and the extension no longer applies cleanly, the system shows warnings about conflicts. The learner can update their extension to match the new version or continue with the old version.
+
+Shared extensions appear in the extension catalog for each path. Other learners can browse extensions, see usage statistics, and fork extensions they find valuable. Extension authors can propose their changes for upstream merge, where path maintainers review and potentially incorporate community contributions.
+
+**Collaborative Path Routes:**
+```
+/lamad/path:{pathId}/collaborate             # View collaboration settings
+/lamad/path:{pathId}/proposals               # View pending proposals
+/lamad/path:{pathId}/propose                 # Submit a proposal
+/lamad/proposal:{proposalId}                 # View specific proposal
+/lamad/proposal:{proposalId}/vote            # Vote on proposal
+```
+
+Collaborative paths have multiple authors with role-based permissions. Proposals go through review before being incorporated. This enables team-created training materials, community-curated paths, and mentor-mentee co-creation.
 
 ---
 
@@ -614,6 +707,259 @@ The attestationsEarned array tracks attestations granted specifically through th
 **Critical Holochain Note:**
 
 In production Holochain deployment, AgentProgress entries live entirely on the agent's private source chain. They are NOT published to the DHT unless the agent explicitly chooses to share progress data. This gives agents full sovereignty over their learning data. They can prove to third parties that they completed a path (by revealing specific progress entries), but the default is private. This contrasts with traditional LMS platforms where the institution owns all learner data centrally.
+
+### 2.6 KnowledgeMap Entity
+
+Knowledge maps are polymorphic containers for learnable territory. The same navigation and affinity mechanics apply to all three types: domain maps (content graphs), person maps (Gottman Love Maps), and collective maps (organizational knowledge).
+
+```typescript
+interface KnowledgeMap {
+  // Identity
+  id: string;                     // Opaque identifier
+  mapType: 'domain' | 'person' | 'collective';
+
+  // What is being mapped
+  subject: {
+    type: 'content-graph' | 'agent' | 'organization';
+    subjectId: string;
+    subjectName: string;
+  };
+
+  // Ownership
+  ownerId: string;                // Who created/owns this map
+  title: string;
+  description?: string;
+
+  // Access control
+  visibility: 'private' | 'mutual' | 'shared' | 'public';
+  sharedWith?: string[];          // Agent IDs when visibility is 'shared'
+
+  // The knowledge structure
+  nodes: KnowledgeNode[];
+  pathIds: string[];              // Paths through this map's territory
+
+  // Overall relationship strength
+  overallAffinity: number;        // 0.0 to 1.0
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface KnowledgeNode {
+  id: string;                     // Unique within the map
+  category: string;               // Category this knowledge belongs to
+  title: string;
+  content: string;
+  source?: KnowledgeSource;       // Where this knowledge came from
+  affinity: number;               // Confidence/familiarity (0.0 to 1.0)
+  lastVerified?: Date;            // When last confirmed accurate
+  relatedNodeIds: string[];       // Connections within the map
+  tags: string[];
+}
+
+interface KnowledgeSource {
+  type: 'direct-observation' | 'conversation' | 'shared-content' | 'inference' | 'external';
+  sourceId?: string;
+  timestamp: Date;
+  confidence: number;
+}
+```
+
+**PersonKnowledgeMap - Gottman Love Maps Implementation:**
+
+```typescript
+interface PersonKnowledgeMap extends KnowledgeMap {
+  mapType: 'person';
+
+  subject: {
+    type: 'agent';
+    subjectId: string;            // The person being mapped
+    subjectName: string;
+  };
+
+  // Relationship context
+  relationshipType: 'spouse' | 'partner' | 'parent' | 'child' | 'sibling' |
+                    'friend' | 'mentor' | 'mentee' | 'colleague' | 'other';
+
+  // Consent from the subject
+  subjectConsent?: {
+    granted: boolean;
+    scope: 'public-info' | 'shared-only' | 'full-access';
+    grantedAt?: Date;
+    expiresAt?: Date;
+    transparencyLevel: 'none' | 'categories-only' | 'full-read' | 'collaborative';
+  };
+
+  // Gottman-inspired categories
+  categories: PersonKnowledgeCategory[];
+
+  // If subject also maps the owner
+  reciprocalMapId?: string;
+}
+
+type PersonKnowledgeCategoryType =
+  | 'life-history'         // Past experiences, childhood, formative events
+  | 'current-stressors'    // Present challenges, worries, pressures
+  | 'dreams-aspirations'   // Future hopes, goals, ambitions
+  | 'values-beliefs'       // Core principles, worldview, ethics
+  | 'preferences-dislikes' // Daily preferences, pet peeves, favorites
+  | 'friends-family'       // Social network, important relationships
+  | 'work-career'          // Professional life, skills, ambitions
+  | 'health-wellbeing'     // Physical/mental health, self-care
+  | 'communication-style'  // How they express and receive love/feedback
+  | 'conflict-patterns'    // How they handle disagreement
+  | 'love-language'        // Primary ways of giving/receiving love
+  | 'custom';              // User-defined categories
+```
+
+**Implementation Notes:**
+
+The mapType discriminator enables polymorphic behavior while maintaining a unified navigation experience. The same affinity mechanics, node visualization, and path integration work across all three map types.
+
+For person maps, consent is crucial. Without explicit consent from the subject, the mapper is limited to publicly available information. Consent can be revoked at any time, and the subject can choose what transparency level they want into what the mapper has recorded.
+
+The reciprocalMapId field enables mutual mapping. When both parties in a relationship map each other, the system can surface opportunities for shared understanding: "You both have high affinity for 'dreams-aspirations' but Sarah's map shows a node about your career that doesn't appear in your own reflection."
+
+**Holochain Considerations:**
+
+Person maps live on the mapper's private source chain by default. Only when consent is granted (and stored as a link on the DHT) can the subject access the map. Collective maps use capability tokens to manage membership and editing permissions.
+
+### 2.7 PathExtension Entity
+
+Path extensions allow learners to personalize curated paths without modifying the original. This enables community contribution while preserving canonical curation.
+
+```typescript
+interface PathExtension {
+  // Identity
+  id: string;
+  basePathId: string;             // The canonical path being extended
+  basePathVersion: string;        // Pinned to specific version
+
+  // Ownership
+  extendedBy: string;             // Agent who created extension
+  title: string;
+  description?: string;
+
+  // The modifications
+  insertions: PathStepInsertion[];
+  annotations: PathStepAnnotation[];
+  reorderings: PathStepReorder[];
+  exclusions: PathStepExclusion[];
+
+  // Access control
+  visibility: 'private' | 'shared' | 'public';
+  sharedWith?: string[];
+
+  // Lineage
+  forkedFrom?: string;            // If forked from another extension
+  forks?: string[];               // Extensions forked from this one
+
+  // Upstream contribution
+  upstreamProposal?: {
+    status: 'draft' | 'submitted' | 'under-review' | 'accepted' | 'rejected' | 'partial';
+    submittedAt?: Date;
+    response?: string;
+    acceptedParts?: string[];
+  };
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface PathStepInsertion {
+  id: string;
+  afterStepIndex: number;         // Insert after this step (-1 for beginning)
+  steps: PathStep[];              // The steps to insert
+  rationale?: string;
+  source?: {
+    type: 'self' | 'ai-suggestion' | 'community' | 'instructor';
+    sourceId?: string;
+  };
+}
+
+interface PathStepAnnotation {
+  id: string;
+  stepIndex: number;              // Which step this annotates
+  type: 'note' | 'question' | 'insight' | 'connection' | 'struggle' |
+        'breakthrough' | 'application' | 'disagreement';
+  content: string;
+  additionalResources?: {
+    title: string;
+    url?: string;
+    resourceId?: string;          // If it's a Lamad content node
+  }[];
+  personalDifficulty?: 'easier' | 'as-expected' | 'harder';
+  actualTime?: string;            // Time actually spent vs estimated
+  createdAt: Date;
+}
+
+interface PathStepReorder {
+  id: string;
+  fromIndex: number;
+  toIndex: number;
+  rationale?: string;
+}
+
+interface PathStepExclusion {
+  id: string;
+  stepIndex: number;
+  reason: 'already-mastered' | 'not-relevant' | 'prerequisite-missing' |
+          'too-advanced' | 'accessibility' | 'other';
+  notes?: string;
+}
+```
+
+**Implementation Notes:**
+
+Extensions are version-pinned to prevent breaking when the base path updates. If the base path version changes, the extension may show warnings about conflicts that need resolution.
+
+The annotation types enable rich personal learning artifacts. A 'disagreement' annotation allows respectful scholarly dissent without modifying the canonical path. A 'breakthrough' annotation captures aha moments that could help other learners.
+
+Upstream proposals enable community contribution. When an extension author believes their modifications improve the path for everyone, they can submit a proposal to the path maintainers. Partial acceptance allows cherry-picking specific insertions or annotations.
+
+**CollaborativePath - Multi-Author Creation:**
+
+```typescript
+interface CollaborativePath {
+  pathId: string;                 // Same as LearningPath.id
+
+  collaborationType: 'sequential' | 'parallel' | 'review-required' | 'open';
+
+  roles: Map<string, 'owner' | 'editor' | 'suggester' | 'reviewer' | 'viewer'>;
+
+  pendingProposals: PathProposal[];
+
+  settings: {
+    requireApproval: boolean;
+    minApprovals?: number;
+    approvers?: string[];
+    allowAnonymousSuggestions: boolean;
+    notifyOnChange: boolean;
+  };
+}
+
+interface PathProposal {
+  id: string;
+  proposedBy: string;
+  changeType: 'add-step' | 'edit-step' | 'remove-step' | 'reorder' | 'edit-metadata';
+  change: {
+    step?: PathStep;
+    stepIndex?: number;
+    newIndex?: number;
+    metadata?: Record<string, unknown>;
+  };
+  rationale: string;
+  status: 'pending' | 'approved' | 'rejected' | 'withdrawn';
+  votes?: Map<string, 'approve' | 'reject' | 'abstain'>;
+  comments?: { authorId: string; content: string; createdAt: Date; }[];
+  createdAt: Date;
+  resolvedAt?: Date;
+}
+```
+
+Collaborative paths enable shared authorship. Teams can create training materials together. Communities can curate knowledge collectively. Mentors and mentees can co-create personalized learning journeys.
 
 ---
 
@@ -1848,6 +2194,241 @@ Month 11: Migrate agent progress to source chains. Each user runs local conducto
 Month 12: Decommission REST API. Web app talks exclusively to Holochain conductors. Organizations run their own nodes as content stewards. System is fully peer-to-peer.
 
 **Success Criteria:** Users can run local conductors and maintain data sovereignty. Content creators can steward their own content nodes. System continues functioning without centralized servers. Network is resilient to node failures.
+
+---
+
+## Part 4: Bidirectional Trust Model (Content Attestations)
+
+The previous sections describe **Agent Attestations** - credentials earned by learners that unlock access to gated content. This section introduces the symmetric counterpart: **Content Attestations** - trust credentials earned by content that unlock broader reach.
+
+### 4.1 The Symmetry Principle
+
+In a system with "boundaries around freedom of reach," accountability must be symmetric:
+
+```
+Agent (Traveler)              Content (Territory)
+─────────────────             ─────────────────
+Earns attestations            Earns attestations
+to ACCESS content             to REACH audiences
+
+private → public              private → commons
+visibility earned             reach earned
+```
+
+**Why Content Needs Attestations:**
+
+Traditional platforms default to public visibility: create content, it's instantly available to everyone. This creates problems at scale:
+- Misinformation spreads before verification
+- Harmful content reaches vulnerable audiences
+- Quantity overwhelms quality
+- No mechanism for community trust signals
+
+Lamad inverts this: content starts **private** and earns **reach** through attestation. Just as an agent earns the attestation "4th grade math mastery" to access advanced content, content earns the attestation "steward-approved" to reach community members.
+
+### 4.2 Content Reach Levels
+
+Content reach mirrors agent visibility, creating symmetric trust boundaries:
+
+| Reach Level | Who Can See | How Earned |
+|-------------|-------------|------------|
+| `private` | Only author | Default for new content |
+| `invited` | Specific agents | Author grants explicit access |
+| `local` | Author's connections | Author-verified attestation |
+| `community` | Community members | Steward-approved or community-endorsed |
+| `federated` | Multiple communities | Peer-reviewed or governance-ratified |
+| `commons` | All agents (public) | Governance-ratified + safety-reviewed + license-cleared |
+
+**Progression Example:**
+
+A new video tutorial starts at `private`. The author can share it with specific colleagues (`invited`). After refinement, their network sees it (`local`). A domain steward reviews and approves it for their community (`community`). Other communities adopt it (`federated`). Finally, governance ratifies it as curriculum-canonical for the commons (`commons`).
+
+### 4.3 Content Attestation Types
+
+| Attestation Type | Typical Grantor | Reach Granted |
+|------------------|-----------------|---------------|
+| `author-verified` | System | `local` |
+| `steward-approved` | Domain steward | `community` |
+| `community-endorsed` | N community members | `community` |
+| `peer-reviewed` | Qualified reviewers | `federated` |
+| `governance-ratified` | Governance process | `commons` |
+| `curriculum-canonical` | Curriculum authority | `commons` |
+| `safety-reviewed` | Safety moderators | `federated` |
+| `accuracy-verified` | Domain experts | `federated` |
+| `accessibility-checked` | Accessibility reviewers | `community` |
+| `license-cleared` | Legal/licensing review | `commons` |
+
+**Stacking Attestations:**
+
+Content can hold multiple attestations. Effective reach is the highest level granted by any active attestation. A video with both `steward-approved` (community) and `peer-reviewed` (federated) has effective reach of `federated`.
+
+### 4.4 URL Patterns for Content Attestations
+
+**Viewing Content Trust Profile:**
+```
+/lamad/resource:{resourceId}/trust
+```
+Returns the content's trust profile including effective reach, active attestations, trust score, and any flags.
+
+**Requesting Attestation for Content:**
+```
+POST /lamad/resource:{resourceId}/attestation/request
+```
+```json
+{
+  "attestationType": "steward-approved",
+  "justification": "Ready for community review after pilot testing",
+  "evidence": {
+    "type": "review",
+    "description": "Tested with 12 learners, 90% completion rate"
+  }
+}
+```
+
+**Steward Review Queue:**
+```
+/lamad/me/steward/pending-reviews
+```
+Shows content waiting for this steward's attestation decision.
+
+**Granting Attestation:**
+```
+POST /lamad/resource:{resourceId}/attestation/grant
+```
+```json
+{
+  "attestationType": "steward-approved",
+  "reachGranted": "community",
+  "scope": {
+    "communities": ["elohim-protocol-learners"]
+  },
+  "evidence": {
+    "type": "review",
+    "description": "Reviewed for accuracy and pedagogical value"
+  }
+}
+```
+
+**Revoking Attestation:**
+```
+POST /lamad/attestation:{attestationId}/revoke
+```
+```json
+{
+  "reason": "misinformation",
+  "explanation": "Contains factually incorrect claim about X",
+  "appealable": true,
+  "appealDeadline": "2024-12-31T23:59:59Z"
+}
+```
+
+**Discovering Content by Reach:**
+```
+/lamad/explore?reach=community&minTrustScore=0.5
+```
+Returns content available at community reach level with minimum trust score.
+
+### 4.5 Trust Score Calculation
+
+Trust scores (0.0 - 1.0) aggregate attestation quality and quantity:
+
+```
+trustScore = Σ(attestationWeight × grantorWeight) / maxPossibleScore
+```
+
+**Attestation Weights:**
+- `author-verified`: 0.1
+- `steward-approved`: 0.3
+- `community-endorsed`: 0.2 (per endorsement, capped)
+- `peer-reviewed`: 0.4
+- `governance-ratified`: 0.5
+- `safety-reviewed`: 0.2
+
+**Grantor Weights:**
+The grantor's own attestations influence weight. A steward with "curriculum-architect" attestation has higher weight than a newly-appointed steward.
+
+### 4.6 Content Flags and Disputes
+
+Content can be flagged, which may restrict reach regardless of attestations:
+
+| Flag Type | Effect |
+|-----------|--------|
+| `disputed` | Blocks progression beyond `local` |
+| `outdated` | Warning displayed, no reach restriction |
+| `under-review` | Blocks progression beyond current level |
+| `appeal-pending` | Reach frozen at pre-revocation level |
+| `partial-revocation` | Some attestations revoked, others active |
+
+**Flagging Content:**
+```
+POST /lamad/resource:{resourceId}/flag
+```
+```json
+{
+  "type": "disputed",
+  "reason": "Contains disputed claim about historical event",
+  "evidence": ["https://source1.example", "https://source2.example"]
+}
+```
+
+### 4.7 Integration with Agent Attestations
+
+The bidirectional model creates a complete trust ecosystem:
+
+**Agent → Content (Existing):**
+- Agent earns `4th-grade-math-mastery`
+- This unlocks access to `algebra-fundamentals` path
+- Gate: Agent attestations → Content access
+
+**Content → Agent (New):**
+- Content earns `governance-ratified`
+- This unlocks reach to `commons` audience
+- Gate: Content attestations → Audience reach
+
+**Circular Trust:**
+- Agent creates content
+- Content needs attestation to reach community
+- Steward (an agent with `steward` attestation) reviews
+- Steward grants `steward-approved`
+- Content reaches community
+- Community members (agents) can now access
+- Some earn attestations through engaging with content
+- Those agents may become stewards themselves
+
+### 4.8 Holochain Mapping
+
+**Entry Types:**
+- `content_attestation`: The attestation record
+- Link: `content_node` → `content_attestation`
+
+**Validation Rules:**
+- Only agents with appropriate attestations can grant certain attestation types
+- Revocations create new entries (no deletion in DHT)
+- Trust profiles computed locally by aggregating linked attestations
+
+**Privacy:**
+- Attestation requests may be private (author → steward channel)
+- Granted attestations are public (stored on DHT)
+- Flags are public with attribution
+
+### 4.9 ContentNode Schema Updates
+
+The ContentNode entity now includes trust fields:
+
+```typescript
+interface ContentNode {
+  // ... existing fields ...
+
+  // Trust & Reach
+  authorId: string;                    // Required - anonymous content cannot earn reach
+  reach: ContentReach;                 // Current effective reach level
+  trustScore: number;                  // Computed from attestations (0.0-1.0)
+  activeAttestationIds: string[];      // IDs of active attestations
+  invitedAgentIds?: string[];          // For 'invited' reach
+  communityIds?: string[];             // For 'community'/'federated' reach
+  flags?: ContentFlag[];               // Active warnings
+  trustComputedAt?: string;            // When trust profile last calculated
+}
+```
 
 ---
 

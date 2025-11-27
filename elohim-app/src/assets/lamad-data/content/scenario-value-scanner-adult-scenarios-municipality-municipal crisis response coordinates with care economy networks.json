@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal crisis response coordinates with care economy networks",
+  "contentType": "scenario",
+  "title": "Municipal crisis response coordinates with care economy networks",
+  "description": "Municipal crisis response coordinates with care economy networks",
+  "content": "Scenario: Municipal crisis response coordinates with care economy networks\n    Given municipal emergency management systems exist\n    And care economy has created mutual aid networks\n    When municipal crises occur (natural disasters, economic shocks, health emergencies)\n    Then the municipal_elohim should coordinate with emergency response\n    And existing care networks should be activated for crisis support\n    And municipal response should leverage community care capacity\n    And care economy should strengthen municipal resilience\n    And crisis response should be more effective through coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

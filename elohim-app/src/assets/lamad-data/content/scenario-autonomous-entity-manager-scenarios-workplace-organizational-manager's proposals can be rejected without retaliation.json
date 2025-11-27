@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's proposals can be rejected without retaliation",
+  "contentType": "scenario",
+  "title": "Manager's proposals can be rejected without retaliation",
+  "description": "Manager's proposals can be rejected without retaliation",
+  "content": "Scenario: Manager's proposals can be rejected without retaliation\n    Given Marcus proposes operational change he believes is beneficial\n    And workers deliberate and vote to reject the proposal\n    When rejection occurs\n    Then Marcus accepts worker decision gracefully\n    And Marcus does not retaliate through subtle means\n    And Marcus proposes alternative approaches respecting worker concerns\n    And workers know their democratic power is real, not performative\n    And workplace_elohim ensures rejected proposals don't resurface as subtle coercion\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

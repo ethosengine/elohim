@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-family decision-making about care arrangements and boundaries",
+  "contentType": "scenario",
+  "title": "Family decision-making about care arrangements and boundaries",
+  "description": "Family decision-making about care arrangements and boundaries",
+  "content": "Scenario: Family decision-making about care arrangements and boundaries\n    Given care arrangements affect multiple family members\n    And boundaries need to be negotiated and maintained\n    When the family discusses care commitments and changes\n    Then the family_elohim should facilitate clear communication\n    And it should help family make decisions that respect all members\n    And Margaret's capacity and boundaries should be honored\n    And Sarah's parenting authority should be respected\n    And care arrangements should be mutually agreed upon\n    And family governance should be participatory and equitable\n    And decisions should serve the flourishing of all generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

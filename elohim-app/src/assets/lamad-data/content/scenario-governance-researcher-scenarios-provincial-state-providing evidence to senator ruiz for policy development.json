@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-providing evidence to senator ruiz for policy development",
+  "contentType": "scenario",
+  "title": "Providing evidence to Senator Ruiz for policy development",
+  "description": "Providing evidence to Senator Ruiz for policy development",
+  "content": "Scenario: Providing evidence to Senator Ruiz for policy development\n    Given Senator Ruiz is drafting AI governance legislation\n    And she needs evidence about what regulatory approaches help vs harm\n    When I brief her committee on my regional research findings\n    Then I present: rigorous evaluation of protocol outcomes\n    And I explain: what factors predict successful adoption\n    And I provide: evidence about marginalized community access\n    And I offer: comparative findings about governance models\n    And I testify: honestly about limitations and uncertainties\n    And I maintain: independence by reporting truth not advocacy\n    And My research becomes: evidence base for democratic policy making\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

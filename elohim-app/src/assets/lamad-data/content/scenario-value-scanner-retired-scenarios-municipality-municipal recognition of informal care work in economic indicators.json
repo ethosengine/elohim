@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-municipality-municipal recognition of informal care work in economic indicators",
+  "contentType": "scenario",
+  "title": "Municipal recognition of informal care work in economic indicators",
+  "description": "Municipal recognition of informal care work in economic indicators",
+  "content": "Scenario: Municipal recognition of informal care work in economic indicators\n    Given Frank provides substantial unpaid care work\n    And traditional municipal economic indicators ignore care economy\n    When the municipal_elohim tracks economic activity\n    Then it should include care work in municipal economic reporting\n    And Frank's volunteer labor should be counted in economic indicators\n    And municipal GDP should reflect care economy contributions\n    And retirement should be understood as economic participation\n    And policy should be based on complete economic picture\n    And Frank's contributions should be visible in municipal economics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:municipality",
+    "related_users:citizen,voter,senior,volunteer,advocate,elder",
+    "related_layers:community,neighborhood,individual,household",
+    "elohim_agents:personal_agent,community_elohim,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

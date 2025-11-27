@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist tracks school board member voting patterns",
+  "contentType": "scenario",
+  "title": "Journalist tracks school board member voting patterns",
+  "description": "Journalist tracks school board member voting patterns",
+  "content": "Scenario: Journalist tracks school board member voting patterns\n    Given a board member campaigns on equity platform\n    And the journalist investigates whether actions match rhetoric\n    When the Observer analyzes 3 years of board voting records\n    Then the journalist sees board member voted against equity funding 7 times\n    And approved budget cutting programs serving disadvantaged students\n    And voted for charter expansion draining district resources\n    And identifies pattern of rhetoric contradicting voting record\n    And publishes accountability profile exposing hypocrisy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

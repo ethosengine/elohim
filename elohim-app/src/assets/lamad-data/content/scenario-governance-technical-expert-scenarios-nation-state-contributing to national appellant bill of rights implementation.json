@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-contributing to national appellant bill of rights implementation",
+  "contentType": "scenario",
+  "title": "Contributing to national appellant bill of rights implementation",
+  "description": "Contributing to national appellant bill of rights implementation",
+  "content": "Scenario: Contributing to national appellant bill of rights implementation\n    Given National Council established detailed appellant rights\n    And technical implementation is needed\n    When I help design systems supporting these rights\n    Then I specify: technical requirements for appeal interfaces\n    And I design: precedent search and tracking systems\n    And I ensure: accessibility for users with disabilities\n    And I implement: privacy protections for sensitive appeals\n    And I test: that systems actually serve appellant rights\n    And I demonstrate: technical development implementing constitutional values\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

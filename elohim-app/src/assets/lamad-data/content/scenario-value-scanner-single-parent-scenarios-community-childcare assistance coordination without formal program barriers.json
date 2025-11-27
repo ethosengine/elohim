@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-childcare assistance coordination without formal program barriers",
+  "contentType": "scenario",
+  "title": "Childcare assistance coordination without formal program barriers",
+  "description": "Childcare assistance coordination without formal program barriers",
+  "content": "Scenario: Childcare assistance coordination without formal program barriers\n    Given Maria cannot afford formal childcare for three children\n    And she needs flexible care support for work, emergencies, and sustainability\n    When Maria needs childcare assistance\n    Then the community_elohim should coordinate community childcare support\n    And it should connect her to subsidized programs without bureaucratic barriers\n    And it should facilitate informal care networks for flexible needs\n    And childcare support should be adequate and appropriate for her family\n    And Maria should access care help needed for solo parent survival\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

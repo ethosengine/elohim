@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-community-journalist tracks neighborhood promises over time",
+  "contentType": "scenario",
+  "title": "Journalist tracks neighborhood promises over time",
+  "description": "Journalist tracks neighborhood promises over time",
+  "content": "Scenario: Journalist tracks neighborhood promises over time\n    Given city officials promised park improvements at community meeting\n    And the journalist covers 12 neighborhoods with similar promises\n    When the Observer monitors promise implementation across neighborhoods\n    Then the journalist receives alert that 18 months have passed\n    And sees park still unimproved despite promise\n    And identifies pattern of broken promises in communities of color\n    And publishes accountability story on systematic neglect\n    And institutional memory prevents promises from being forgotten\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:community",
+    "related_users:citizen,activist,community_organizer,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

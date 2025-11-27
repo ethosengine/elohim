@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-refugee-scenarios-global-refugee maintains family connection across borders",
+  "contentType": "scenario",
+  "title": "Refugee maintains family connection across borders",
+  "description": "Refugee maintains family connection across borders",
+  "content": "Scenario: Refugee maintains family connection across borders\n    Given Amira's parents and siblings remain in Syria\n    And internet access in Syria is unreliable and monitored\n    When Amira communicates with her family through Elohim\n    And the translation agent provides Arabic-German translation\n    Then communication flows securely across borders\n    And her family's privacy is protected from Syrian surveillance\n    And Amira maintains vital family bonds despite separation\n    And the distributed architecture bypasses censorship\n    And family photos and memories are safely shared\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:refugee",
+    "governance_layer:global",
+    "related_users:displaced_person,activist,family",
+    "related_layers:nation_state,cultural_linguistic,family",
+    "elohim_agents:translation_agent,protection_agent,sanctuary_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/refugee/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-refugee-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-refugee-scenarios-global",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-caregiver advocacy when medical system fails patient",
+  "contentType": "scenario",
+  "title": "Caregiver advocacy when medical system fails patient",
+  "description": "Caregiver advocacy when medical system fails patient",
+  "content": "Scenario: Caregiver advocacy when medical system fails patient\n    Given medical systems sometimes fail patients with complex needs\n    And James must advocate for David's appropriate care\n    When the healthcare_elohim detects inadequate care\n    Then it should alert James to system failures\n    And it should provide information for advocacy\n    And it should help James escalate concerns effectively\n    And caregiver should be empowered to demand appropriate care\n    And healthcare system should be accountable to patient and caregiver\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

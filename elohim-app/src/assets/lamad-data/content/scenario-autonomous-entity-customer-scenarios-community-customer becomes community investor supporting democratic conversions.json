@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer becomes community investor supporting democratic conversions",
+  "contentType": "scenario",
+  "title": "Customer becomes community investor supporting democratic conversions",
+  "description": "Customer becomes community investor supporting democratic conversions",
+  "content": "Scenario: Customer becomes community investor supporting democratic conversions\n    Given Ms. Johnson has modest savings wanting to support community values-aligned\n    And community investment opportunities in democratic businesses exist\n    When she learns neighbors invested in Maria's Kitchen conversion\n    Then she considers investing in next democratic conversion (Rosa's Auto Repair)\n    And investment would provide fair return (5% annually) plus social benefit\n    And her capital would enable worker ownership and community wealth\n    And customer role can expand to investor role if desired\n    And community_elohim manages community investment accessible to customers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

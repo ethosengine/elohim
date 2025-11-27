@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-teen's educational needs supported by community care economy",
+  "contentType": "scenario",
+  "title": "Teen's educational needs supported by community care economy",
+  "description": "Teen's educational needs supported by community care economy",
+  "content": "Scenario: Teen's educational needs supported by community care economy\n    Given Jasmine needs school supplies, technology access, and learning resources\n    And she has contributed to community care economy\n    When educational needs arise\n    Then community care tokens should be usable for educational resources\n    And community_elohim should coordinate support for her educational success\n    And her care contributions should connect to educational opportunity\n    And barriers to education should be reduced through care economy networks\n    And community investment in her education should reflect her community contribution\n    And mutual care should extend to supporting each other's learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

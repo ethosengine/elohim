@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-building worker power through industry-wide organizing",
+  "contentType": "scenario",
+  "title": "Building worker power through industry-wide organizing",
+  "description": "Building worker power through industry-wide organizing",
+  "content": "Scenario: Building worker power through industry-wide organizing\n    Given individual workers and workplaces have limited power\n    When workers organize across the industry\n    Then the protocol should facilitate industry-wide organizing\n    And support union drives and worker organization formation\n    And coordinate collective action across workplaces\n    And build worker power sufficient to transform industry conditions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

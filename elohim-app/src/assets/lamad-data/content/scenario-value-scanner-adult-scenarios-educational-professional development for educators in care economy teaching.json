@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-professional development for educators in care economy teaching",
+  "contentType": "scenario",
+  "title": "Professional development for educators in care economy teaching",
+  "description": "Professional development for educators in care economy teaching",
+  "content": "Scenario: Professional development for educators in care economy teaching\n    Given Sarah wants to bring care economy into classroom\n    And she needs professional development support\n    When Sarah seeks educator training\n    Then the educational_elohim should provide professional development\n    And training should help teachers integrate care economy into curriculum\n    And it should respect existing teaching expertise\n    And it should provide practical classroom strategies\n    And Sarah should be equipped to teach care economy effectively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

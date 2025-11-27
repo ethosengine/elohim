@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent tracks implementation of new safety policies",
+  "contentType": "scenario",
+  "title": "Parent tracks implementation of new safety policies",
+  "description": "Parent tracks implementation of new safety policies",
+  "content": "Scenario: Parent tracks implementation of new safety policies\n    Given the school board passed new student safety protocols\n    And promised implementation at all schools by September\n    When September arrives and the parent's school lacks the protocols\n    Then the Observer alerts parent about implementation failure\n    And shows which schools have implemented vs which haven't\n    And reveals pattern of under-resourced schools being deprioritized\n    And parent can demand accountability for child safety commitments\n    And policy passage doesn't mean policy implementation without tracking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

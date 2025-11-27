@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-nutritional science learned through responsibility for health",
+  "contentType": "scenario",
+  "title": "Nutritional science learned through responsibility for health",
+  "description": "Nutritional science learned through responsibility for health",
+  "content": "Scenario: Nutritional science learned through responsibility for health\n    Given Marcus is responsible for his and Keisha's nutrition\n    And adequate nutrition requires scientific understanding\n    When Marcus makes food choices\n    Then he should be learning applied nutritional science\n    And the personal_agent should teach nutrition in context\n    And he should understand macronutrients, vitamins, balanced diet\n    And learning should be motivated by real care responsibility\n    And nutritional education should be deeper than typical age 12 curriculum\n    And his care work should accelerate domain-specific learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

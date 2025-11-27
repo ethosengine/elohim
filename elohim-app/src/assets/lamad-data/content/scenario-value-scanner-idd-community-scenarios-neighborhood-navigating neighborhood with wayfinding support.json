@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-navigating neighborhood with wayfinding support",
+  "contentType": "scenario",
+  "title": "Navigating neighborhood with wayfinding support",
+  "description": "Navigating neighborhood with wayfinding support",
+  "content": "Scenario: Navigating neighborhood with wayfinding support\n    Given Jordan is learning the neighborhood geography\n    And some streets and locations still confuse Jordan\n    When Jordan wants to visit a neighbor or shop\n    Then the personal_agent provides visual wayfinding assistance\n    And the interface shows landmarks and turn-by-turn pictures\n    And Jordan's navigation skills improve with accessible support\n    And Jordan gains increasing independence in the neighborhood\n    And support workers can reduce assistance as Jordan's capability grows\n    And Jordan experiences growing autonomy and confidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-ecological-journalist develops whistleblower source on environmental violations",
+  "contentType": "scenario",
+  "title": "Journalist develops whistleblower source on environmental violations",
+  "description": "Journalist develops whistleblower source on environmental violations",
+  "content": "Scenario: Journalist develops whistleblower source on environmental violations\n    Given an employee witnesses company illegally dumping waste\n    And fears job loss for reporting violations\n    When the Observer provides secure anonymous channel\n    Then the whistleblower shares evidence of illegal dumping\n    And journalist investigates without exposing source\n    And verifies claims through regulatory records and site investigation\n    And publishes investigation leading to enforcement action\n    And source protection enables environmental accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:ecological",
+    "related_users:activist,citizen,scientist,politician",
+    "related_layers:municipality,county_regional,provincial_state,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

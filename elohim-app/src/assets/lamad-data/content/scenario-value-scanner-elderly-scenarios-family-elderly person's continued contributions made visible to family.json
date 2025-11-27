@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-elderly person's continued contributions made visible to family",
+  "contentType": "scenario",
+  "title": "Elderly person's continued contributions made visible to family",
+  "description": "Elderly person's continued contributions made visible to family",
+  "content": "Scenario: Elderly person's continued contributions made visible to family\n    Given Helen shares family stories with great-grandchildren\n    And she provides wisdom from 82 years of experience\n    When Helen contributes to family flourishing\n    Then her contributions should be visible in care economy tracking\n    And family should see that Helen still gives, not just receives\n    And care tokens should reflect her mentoring and wisdom sharing\n    And reciprocity should be visible even when care flows are asymmetric\n    And Helen should experience herself as valued contributor, not burden\n    And younger generations should learn that elders have worth\n    And the protocol should make visible what market economics erases\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

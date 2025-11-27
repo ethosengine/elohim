@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-learning from diverse national approaches to protocol",
+  "contentType": "scenario",
+  "title": "Learning from diverse national approaches to protocol",
+  "description": "Learning from diverse national approaches to protocol",
+  "content": "Scenario: Learning from diverse national approaches to protocol\n    Given different nations implemented protocol differently\n    And cultural context shapes governance outcomes\n    When I study international variations in implementation\n    Then I learn: from collectivist societies' community emphasis\n    And I examine: how different political systems integrate protocol\n    And I identify: universal patterns vs context-specific adaptations\n    And I share: lessons with other policy makers\n    And I adapt: my legislation based on international evidence\n    And I contribute: to global learning community\n    And I practice: epistemic humility about cultural diversity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

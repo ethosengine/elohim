@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-personal agency maintained even when needing support",
+  "contentType": "scenario",
+  "title": "Personal agency maintained even when needing support",
+  "description": "Personal agency maintained even when needing support",
+  "content": "Scenario: Personal agency maintained even when needing support\n    Given Alex requires assistance with some aspects of life\n    And society often conflates needing help with lacking agency\n    When Alex makes decisions about their life\n    Then needing support should not diminish Alex's autonomy\n    And the system should separate assistance from authority\n    And Alex should maintain full decision-making power\n    And support should flow to Alex's direction, not override it\n    And interdependence should be recognized as human reality\n    And Alex's agency should be protected even when vulnerable\n    And the protocol should embody disability rights principle: \"Nothing about us without us\"\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

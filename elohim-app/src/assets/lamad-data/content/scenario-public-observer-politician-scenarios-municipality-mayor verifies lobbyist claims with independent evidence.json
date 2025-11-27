@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-mayor verifies lobbyist claims with independent evidence",
+  "contentType": "scenario",
+  "title": "Mayor verifies lobbyist claims with independent evidence",
+  "description": "Mayor verifies lobbyist claims with independent evidence",
+  "content": "Scenario: Mayor verifies lobbyist claims with independent evidence\n    Given business lobbyists claim regulations will kill jobs\n    And present alarming economic projections\n    When the Observer fact-checks lobbying claims\n    Then they see similar regulations in comparable cities\n    And review actual economic impacts versus predicted disasters\n    And identify which lobbyist projections proved accurate historically\n    And evaluate claims against track record\n    And resist manipulation through evidence-based analysis\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

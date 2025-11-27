@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent exposes systematic school funding inequities",
+  "contentType": "scenario",
+  "title": "Parent exposes systematic school funding inequities",
+  "description": "Parent exposes systematic school funding inequities",
+  "content": "Scenario: Parent exposes systematic school funding inequities\n    Given the parent's child attends an eastside elementary school\n    And suspects their school gets fewer resources than westside schools\n    When the parent reviews Observer's district funding analysis\n    Then they see westside schools spend $2,400 more per student\n    And westside schools have experienced teachers and enrichment programs\n    And eastside schools have newer teachers and cut arts programs\n    And pattern of inequity becomes documented and undeniable\n    And parent advocacy shifts from suspicion to evidence-based demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

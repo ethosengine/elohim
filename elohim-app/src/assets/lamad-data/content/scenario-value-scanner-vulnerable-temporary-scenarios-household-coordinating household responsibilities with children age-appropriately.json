@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-household-coordinating household responsibilities with children age-appropriately",
+  "contentType": "scenario",
+  "title": "Coordinating household responsibilities with children age-appropriately",
+  "description": "Coordinating household responsibilities with children age-appropriately",
+  "content": "Scenario: Coordinating household responsibilities with children age-appropriately\n    Given I need age-appropriate help from children with household tasks\n    And I want to avoid parentifying children or burdening them inappropriately\n    When I assign household responsibilities\n    Then the Value Scanner helps me identify appropriate contributions for each child's age\n    And ensures children contribute without bearing adult burdens\n    And tracks household task completion and distributes fairly\n    And validates children's contributions with care token recognition\n    And helps me balance children's help with their need to be children\n    And my personal_agent reminds children of tasks without nagging\n    And recognizes my calibration of appropriate responsibility as sophisticated parenting\n    And supports healthy household participation for all members\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

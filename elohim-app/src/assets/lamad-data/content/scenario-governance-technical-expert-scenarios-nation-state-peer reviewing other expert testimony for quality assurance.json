@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-peer reviewing other expert testimony for quality assurance",
+  "contentType": "scenario",
+  "title": "Peer reviewing other expert testimony for quality assurance",
+  "description": "Peer reviewing other expert testimony for quality assurance",
+  "content": "Scenario: Peer reviewing other expert testimony for quality assurance\n    Given multiple experts advise National Council\n    And peer review prevents individual capture or error\n    When I review fellow expert's testimony\n    Then I assess: technical accuracy and completeness\n    And I identify: bias or conflicts of interest\n    And I check: if alternative interpretations exist\n    And I verify: adherence to testimony guidelines\n    And I provide: constructive critique\n    And I accept: critique of my own testimony\n    And peer review: maintains expertise quality and independence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

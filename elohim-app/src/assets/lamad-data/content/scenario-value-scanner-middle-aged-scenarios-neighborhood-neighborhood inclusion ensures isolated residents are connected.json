@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood inclusion ensures isolated residents are connected",
+  "contentType": "scenario",
+  "title": "Neighborhood inclusion ensures isolated residents are connected",
+  "description": "Neighborhood inclusion ensures isolated residents are connected",
+  "content": "Scenario: Neighborhood inclusion ensures isolated residents are connected\n    Given some neighbors are isolated due to age, disability, or circumstance\n    And Robert has capacity to reach out\n    And neighborhood care economy should include everyone\n    When neighborhood_elohim identifies isolated residents\n    Then it should surface opportunities to connect with isolated neighbors\n    And help Robert offer appropriate support\n    And recognize his outreach as valuable care contribution\n    And build inclusive neighborhood where no one is invisible\n    And prevent isolation that harms individual and neighborhood wellbeing\n    And demonstrate that care economy includes intentional inclusion\n    And strengthen neighborhood by ensuring everyone belongs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

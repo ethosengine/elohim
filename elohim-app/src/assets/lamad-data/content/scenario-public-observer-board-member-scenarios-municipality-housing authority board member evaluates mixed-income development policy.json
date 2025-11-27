@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-municipality-housing authority board member evaluates mixed-income development policy",
+  "contentType": "scenario",
+  "title": "Housing authority board member evaluates mixed-income development policy",
+  "description": "Housing authority board member evaluates mixed-income development policy",
+  "content": "Scenario: Housing authority board member evaluates mixed-income development policy\n    Given authority considers policy requiring mixed-income units in new developments\n    And staff presents complex financing and legal considerations\n    And board member wants to make informed decision but has limited affordable housing expertise\n    When the board member uses Observer accessible expertise\n    Then they receive plain-language explanation of mixed-income development models\n    And see examples from peer housing authorities with outcomes data\n    And access key trade-offs between requiring affordability and reducing development\n    And get questions to ask staff about implementation and enforcement\n    And accessible expertise enables informed policy judgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:municipality",
+    "related_users:citizen,developer_interests,politician,activist,community_organizer",
+    "related_layers:district,community,ecological",
+    "elohim_agents:public_observer,domain_elohim,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

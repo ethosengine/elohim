@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-community investment enables municipal small business preservation",
+  "contentType": "scenario",
+  "title": "Community investment enables municipal small business preservation",
+  "description": "Community investment enables municipal small business preservation",
+  "content": "Scenario: Community investment enables municipal small business preservation\n    Given small business displacement threatens community character and economic diversity\n    And Patricia values preserving local businesses as community institutions\n    When community investment supports exit-to-community conversions\n    Then small businesses are preserved as democratic enterprises, not displaced by chains\n    And municipal economic diversity is maintained through democratic conversions\n    And community investment becomes small business preservation strategy\n    And neighborhood character is protected through democratic ownership\n    And municipality_elohim tracks small business preservation through community investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

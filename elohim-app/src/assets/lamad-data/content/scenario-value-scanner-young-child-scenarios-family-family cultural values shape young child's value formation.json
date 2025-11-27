@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-family cultural values shape young child's value formation",
+  "contentType": "scenario",
+  "title": "Family cultural values shape young child's value formation",
+  "description": "Family cultural values shape young child's value formation",
+  "content": "Scenario: Family cultural values shape young child's value formation\n    Given Tommy's family has specific cultural values\n    And these values are configured in the family_elohim\n    When Tommy makes care decisions\n    Then the guidance should align with family cultural context\n    And his personal_agent should reinforce family values\n    And value literacy should be culturally appropriate\n    And the protocol should serve the family's chosen value framework\n    And diverse family cultures should be respected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

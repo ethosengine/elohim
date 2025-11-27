@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-right to disconnect maintained with full accessibility",
+  "contentType": "scenario",
+  "title": "Right to disconnect maintained with full accessibility",
+  "description": "Right to disconnect maintained with full accessibility",
+  "content": "Scenario: Right to disconnect maintained with full accessibility\n    Given Alex has been using the Value Scanner\n    And constitutional constraints apply to all users equally\n    When Alex chooses to disconnect from the system\n    Then disconnection process must be fully accessible\n    And Alex should receive complete data export in accessible formats\n    And no manipulative retention patterns should be employed\n    And Alex's right to not participate must be absolute\n    And data portability should work with assistive technologies\n    And exit should be as accessible as entry\n    And Alex's autonomy includes the right to leave\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

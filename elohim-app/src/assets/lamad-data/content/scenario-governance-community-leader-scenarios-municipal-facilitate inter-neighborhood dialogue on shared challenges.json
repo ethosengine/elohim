@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipal-facilitate inter-neighborhood dialogue on shared challenges",
+  "contentType": "scenario",
+  "title": "Facilitate inter-neighborhood dialogue on shared challenges",
+  "description": "Facilitate inter-neighborhood dialogue on shared challenges",
+  "content": "Scenario: Facilitate inter-neighborhood dialogue on shared challenges\n    Given neighborhoods have conflicting priorities\n    And downtown wants nightlife economy\n    And residential areas want noise reduction\n    When Municipal Elohim identifies the conflict\n    Then Jamal convenes inter-neighborhood deliberative assembly\n    And assembly uses Polis-style clustering to find common ground\n    And assembly develops solution: nightlife district with sound barriers\n    And neighborhoods collaborate rather than compete\n    And municipal scale enables solutions impossible at neighborhood level\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipal",
+    "related_users:constitutional_council_member,policy_maker",
+    "related_layers:community,provincial_state",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipal.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipal",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipal",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

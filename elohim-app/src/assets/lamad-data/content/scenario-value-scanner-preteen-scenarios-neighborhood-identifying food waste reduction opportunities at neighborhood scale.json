@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-identifying food waste reduction opportunities at neighborhood scale",
+  "contentType": "scenario",
+  "title": "Identifying food waste reduction opportunities at neighborhood scale",
+  "description": "Identifying food waste reduction opportunities at neighborhood scale",
+  "content": "Scenario: Identifying food waste reduction opportunities at neighborhood scale\n    Given Marcus must maximize value from limited budget\n    And food waste represents lost resources\n    When the neighborhood_elohim identifies waste patterns\n    Then it should connect Marcus to gleaning opportunities\n    And it should facilitate food rescue programs\n    And it should help him access surplus food from stores\n    And neighborhood coordination should reduce waste while addressing need\n    And Marcus's family should benefit from systematic waste reduction\n    And ecological and economic goals should align\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

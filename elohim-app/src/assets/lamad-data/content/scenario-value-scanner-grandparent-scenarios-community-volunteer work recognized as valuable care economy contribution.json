@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-volunteer work recognized as valuable care economy contribution",
+  "contentType": "scenario",
+  "title": "Volunteer work recognized as valuable care economy contribution",
+  "description": "Volunteer work recognized as valuable care economy contribution",
+  "content": "Scenario: Volunteer work recognized as valuable care economy contribution\n    Given Margaret volunteers 10 hours/week in community\n    And she serves at food bank, library, or community health clinic\n    When the community_elohim tracks volunteer contributions\n    Then it should quantify Margaret's volunteer hours\n    And it should calculate economic value of her skilled labor\n    And it should accumulate care tokens for community service\n    And volunteer work should be recognized as substantial contribution\n    And Margaret should see herself as productive community member\n    And retirement should be liberation for care work, not obsolescence\n    And community should value and appreciate her service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

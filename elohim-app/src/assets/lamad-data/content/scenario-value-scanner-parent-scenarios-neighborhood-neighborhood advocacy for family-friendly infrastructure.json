@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood advocacy for family-friendly infrastructure",
+  "contentType": "scenario",
+  "title": "Neighborhood advocacy for family-friendly infrastructure",
+  "description": "Neighborhood advocacy for family-friendly infrastructure",
+  "content": "Scenario: Neighborhood advocacy for family-friendly infrastructure\n    Given neighborhoods need playgrounds, safe streets, family resources\n    And collective advocacy is more effective than individual effort\n    When the neighborhood_elohim supports collective action\n    Then it should coordinate parent advocacy for family needs\n    And it should enable organizing for better infrastructure\n    And advocacy labor should be recognized as care work\n    And Sarah's organizing should accumulate care tokens\n    And neighborhood improvement should be collective effort\n    And the system should amplify parent political power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

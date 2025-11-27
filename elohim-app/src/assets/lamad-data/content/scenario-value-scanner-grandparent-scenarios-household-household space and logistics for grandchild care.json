@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-household space and logistics for grandchild care",
+  "contentType": "scenario",
+  "title": "Household space and logistics for grandchild care",
+  "description": "Household space and logistics for grandchild care",
+  "content": "Scenario: Household space and logistics for grandchild care\n    Given Margaret cares for grandchildren in their household\n    And this requires child-friendly space and supplies\n    When the household_elohim tracks space usage\n    Then it should recognize household space devoted to grandchild care\n    And it should help maintain appropriate supplies (toys, books, safety items)\n    And it should coordinate space needs with household preferences\n    And both partners should agree on household modifications for care\n    And home should serve both grandparenting and household needs\n    And space allocation should be mutually agreed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-recognizing household labor in care economy",
+  "contentType": "scenario",
+  "title": "Recognizing household labor in care economy",
+  "description": "Recognizing household labor in care economy",
+  "content": "Scenario: Recognizing household labor in care economy\n    Given all household work is care contribution\n    When household members clean, cook, maintain, and organize\n    Then the protocol should recognize this as valuable care work\n    And accumulate care tokens for household contributions\n    And make visible that domestic labor supports everyone's flourishing\n    And validate that this work deserves recognition even though unpaid\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

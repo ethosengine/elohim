@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise corporate faces systemic challenge from conversion movement",
+  "contentType": "scenario",
+  "title": "Franchise corporate faces systemic challenge from conversion movement",
+  "description": "Franchise corporate faces systemic challenge from conversion movement",
+  "content": "Scenario: Franchise corporate faces systemic challenge from conversion movement\n    Given each franchise conversion reduces corporate extraction revenue\n    And corporate business model depends on franchise fee and purchasing extraction\n    When conversions reach critical mass across food service sector\n    Then franchise corporate faces existential threat to extraction model\n    And corporate resistance intensifies (legal threats, termination fights, operator intimidation)\n    And public narrative battle reveals franchise extraction to consumers and workers\n    And sector transformation accelerates as corporate resistance exposes model's exploitative nature\n    And industry_sector_elohim coordinates resistance strategy and public narrative\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

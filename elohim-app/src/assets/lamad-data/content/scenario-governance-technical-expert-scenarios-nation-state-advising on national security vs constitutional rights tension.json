@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-advising on national security vs constitutional rights tension",
+  "contentType": "scenario",
+  "title": "Advising on national security vs constitutional rights tension",
+  "description": "Advising on national security vs constitutional rights tension",
+  "content": "Scenario: Advising on national security vs constitutional rights tension\n    Given appeal involves claimed national security justification\n    And technical assessment is needed of security claims\n    When I evaluate security-rights tradeoff technically\n    Then I assess: whether claimed vulnerability is technically legitimate\n    And I explore: whether less rights-violating technical alternatives exist\n    And I examine: whether proposed security measure would actually work\n    And I clarify: technical reality vs security theater\n    And I avoid: dismissing security needs or exaggerating threats\n    And I provide: honest technical assessment\n    And I let: council judge values tradeoff given technical facts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

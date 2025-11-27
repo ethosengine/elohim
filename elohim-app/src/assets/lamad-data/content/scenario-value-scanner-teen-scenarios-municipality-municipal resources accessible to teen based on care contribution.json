@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-municipal resources accessible to teen based on care contribution",
+  "contentType": "scenario",
+  "title": "Municipal resources accessible to teen based on care contribution",
+  "description": "Municipal resources accessible to teen based on care contribution",
+  "content": "Scenario: Municipal resources accessible to teen based on care contribution\n    Given the municipality offers public services and resources\n    And Jasmine has demonstrated substantial care economy participation\n    When she seeks to access municipal programs\n    Then her care contributions should qualify her for access\n    And municipal_elohim should recognize her as a legitimate community member\n    And she should access libraries, recreation facilities, and public programs independently\n    And municipal services should be teen-accessible without parental mediation\n    And public resources should serve all ages based on contribution and need\n    And she should experience being a valued member of the city\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

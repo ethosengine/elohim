@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-contributing to family care economy while managing own resources",
+  "contentType": "scenario",
+  "title": "Contributing to family care economy while managing own resources",
+  "description": "Contributing to family care economy while managing own resources",
+  "content": "Scenario: Contributing to family care economy while managing own resources\n    Given Aisha has limited financial resources\n    And she wants to support her family\n    When Aisha decides what care to contribute\n    Then the system should help her balance competing obligations\n    And it should recognize that her care capacity is limited\n    And it should validate both family support and self-care\n    And the family_elohim should not create unsustainable demands\n    And Aisha should maintain boundaries while remaining connected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

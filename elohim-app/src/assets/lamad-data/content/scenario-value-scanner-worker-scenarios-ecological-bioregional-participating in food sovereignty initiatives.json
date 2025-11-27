@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in food sovereignty initiatives",
+  "contentType": "scenario",
+  "title": "Participating in food sovereignty initiatives",
+  "description": "Participating in food sovereignty initiatives",
+  "content": "Scenario: Participating in food sovereignty initiatives\n    Given corporate food systems extract from workers and communities\n    And alternative food systems can support local care economy\n    When I want to participate in food sovereignty organizing\n    Then the protocol should connect me to food justice initiatives\n    And support participation in food co-ops, community agriculture, or food policy\n    And recognize my expertise as food worker in food systems transformation\n    And build bioregional food systems aligned with care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

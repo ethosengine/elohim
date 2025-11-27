@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen's paid work recognized as care labor",
+  "contentType": "scenario",
+  "title": "Teen's paid work recognized as care labor",
+  "description": "Teen's paid work recognized as care labor",
+  "content": "Scenario: Teen's paid work recognized as care labor\n    Given Jasmine works in retail serving customers\n    And traditional economics treats this as market transaction only\n    When workplace_elohim processes her work\n    Then it should recognize that her labor is care work\n    And helping customers find what they need is care\n    And supporting co-workers is care\n    And contributing to community through her work is care\n    And she should learn to see all work through care economy lens\n    And understand that service work is valuable care labor\n    And expect her work to be valued as contribution to collective flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

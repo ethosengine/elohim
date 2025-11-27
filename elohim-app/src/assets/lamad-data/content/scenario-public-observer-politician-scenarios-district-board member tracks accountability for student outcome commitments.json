@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-board member tracks accountability for student outcome commitments",
+  "contentType": "scenario",
+  "title": "Board member tracks accountability for student outcome commitments",
+  "description": "Board member tracks accountability for student outcome commitments",
+  "content": "Scenario: Board member tracks accountability for student outcome commitments\n    Given the politician pledged to improve reading proficiency\n    And committed to closing achievement gaps\n    When the Observer monitors outcome tracking\n    Then they see reading proficiency trends by school and demographic\n    And identify which interventions work versus ineffective programs\n    And receive alerts when metrics decline\n    And understand whether district implements promised reforms\n    And maintain accountability for student outcome commitments\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns healthy work-life boundaries",
+  "contentType": "scenario",
+  "title": "Teen learns healthy work-life boundaries",
+  "description": "Teen learns healthy work-life boundaries",
+  "content": "Scenario: Teen learns healthy work-life boundaries\n    Given Jasmine's employer frequently requests last-minute schedule changes\n    And this disrupts her school and family commitments\n    When workplace_elohim tracks scheduling patterns\n    Then it should recognize the boundary violation\n    And help her understand that she has right to reasonable scheduling\n    And support her in negotiating better scheduling practices\n    And teach her that workers can and should set boundaries\n    And build her expectation that work should respect whole life\n    And prepare her for adult advocacy for work-life balance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

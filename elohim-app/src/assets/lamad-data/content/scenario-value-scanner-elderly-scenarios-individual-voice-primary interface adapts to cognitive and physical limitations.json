@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-voice-primary interface adapts to cognitive and physical limitations",
+  "contentType": "scenario",
+  "title": "Voice-primary interface adapts to cognitive and physical limitations",
+  "description": "Voice-primary interface adapts to cognitive and physical limitations",
+  "content": "Scenario: Voice-primary interface adapts to cognitive and physical limitations\n    Given Helen has difficulty with small text and complex navigation\n    And her mobility makes precise touch targets challenging\n    When Helen opens the Value Scanner application\n    Then the interface should use voice-primary interaction\n    And visual elements should have large fonts and high contrast\n    And touch targets should be large and forgiving\n    And navigation should be simple with minimal steps\n    And the pace should be slow with no time pressure\n    And error recovery should be patient and supportive\n    And the interface should preserve Helen's dignity throughout\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

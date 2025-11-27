@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-workplace skills development tracked and valued",
+  "contentType": "scenario",
+  "title": "Workplace skills development tracked and valued",
+  "description": "Workplace skills development tracked and valued",
+  "content": "Scenario: Workplace skills development tracked and valued\n    Given Aisha is building professional capabilities\n    And skill development benefits both her and employer\n    When the workplace_elohim tracks her skill growth\n    Then it should recognize learning as valuable labor\n    And it should help her advocate for development opportunities\n    And it should track skills acquired for her career benefit\n    And professional growth should be visible and valued\n    And the system should ensure development serves her long-term interests\n    And skill building should be recognized as mutual investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

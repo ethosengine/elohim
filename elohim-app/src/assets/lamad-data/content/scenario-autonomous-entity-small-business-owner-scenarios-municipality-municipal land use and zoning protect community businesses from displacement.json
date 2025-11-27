@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal land use and zoning protect community businesses from displacement",
+  "contentType": "scenario",
+  "title": "Municipal land use and zoning protect community businesses from displacement",
+  "description": "Municipal land use and zoning protect community businesses from displacement",
+  "content": "Scenario: Municipal land use and zoning protect community businesses from displacement\n    Given commercial real estate speculation threatens community institutions\n    And Rosa's Auto could face displacement through rising rents or property sale\n    When democratic ownership is recognized as community benefit\n    Then zoning policies prioritize long-term community business tenancy\n    And city explores community land trusts for commercial space\n    And democratic businesses receive preference in publicly-owned commercial properties\n    And land use policy protects against speculation displacing community institutions\n    And municipality_elohim advocates for commercial anti-displacement policies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

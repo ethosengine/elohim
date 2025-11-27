@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-accessing neighborhood time-banking system",
+  "contentType": "scenario",
+  "title": "Accessing neighborhood time-banking system",
+  "description": "Accessing neighborhood time-banking system",
+  "content": "Scenario: Accessing neighborhood time-banking system\n    Given neighborhood operates time-banking for service exchange\n    And I accumulate time credits through my work and contributions\n    When I need services I cannot afford to purchase\n    Then the protocol should connect me to time-banking opportunities\n    And help me exchange my labor/skills for needed services\n    And facilitate reciprocal care economy without money exchange\n    And recognize that care economy can operate beyond cash\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

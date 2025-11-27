@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-weekend respite care for desperately needed breaks",
+  "contentType": "scenario",
+  "title": "Weekend respite care for desperately needed breaks",
+  "description": "Weekend respite care for desperately needed breaks",
+  "content": "Scenario: Weekend respite care for desperately needed breaks\n    Given Maria parents intensively seven days per week with no co-parent breaks\n    And everyone needs occasional rest to remain sustainable\n    When Maria needs brief respite from parenting demands\n    Then the neighborhood_elohim should coordinate respite care offers\n    And neighbors should be able to take her children for a few hours\n    And Maria should be able to accept respite without guilt or stigma\n    And respite should be framed as care economy reciprocity, not charity\n    And Maria should get occasional breaks that partnered parents get from co-parents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

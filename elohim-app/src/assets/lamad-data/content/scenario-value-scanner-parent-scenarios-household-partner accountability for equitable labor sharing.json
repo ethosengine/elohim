@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-partner accountability for equitable labor sharing",
+  "contentType": "scenario",
+  "title": "Partner accountability for equitable labor sharing",
+  "description": "Partner accountability for equitable labor sharing",
+  "content": "Scenario: Partner accountability for equitable labor sharing\n    Given the household_elohim makes labor distribution visible\n    And the partner can see he performs only 25% of household work\n    When the partner commits to increasing his contribution\n    Then the system should track whether he follows through\n    And it should provide accountability for behavioral change\n    And it should show whether labor distribution is actually improving\n    And accountability should be built into the care economy system\n    And moving toward equity should be trackable and measurable\n    And the system should support partnership transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

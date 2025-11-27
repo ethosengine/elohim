@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-ecological-planning commissioner evaluates environmental impacts of large development",
+  "contentType": "scenario",
+  "title": "Planning commissioner evaluates environmental impacts of large development",
+  "description": "Planning commissioner evaluates environmental impacts of large development",
+  "content": "Scenario: Planning commissioner evaluates environmental impacts of large development\n    Given developer proposes major commercial development on vacant land\n    And environmental impact report prepared by developer's consultants\n    And staff recommendation supports approval with mitigation measures\n    When the planning commissioner requests Observer independent analysis\n    Then they receive assessment of impact report methodology and limitations\n    And see comparison to development impacts documented in peer jurisdictions\n    And access air quality, water, and habitat impact analysis independent of developer framing\n    And discover mitigation measures less effective than presented\n    And independent analysis reveals environmental impacts developer report minimized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:ecological",
+    "related_users:citizen,developer_interests,activist,politician,community_organizer",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

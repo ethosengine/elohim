@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-community learning spaces for parent education and support",
+  "contentType": "scenario",
+  "title": "Community learning spaces for parent education and support",
+  "description": "Community learning spaces for parent education and support",
+  "content": "Scenario: Community learning spaces for parent education and support\n    Given parents need ongoing education and skill development\n    And Sarah both teaches and learns from other parents\n    When the community_elohim coordinates parent education\n    Then it should provide spaces for parent learning and skill-sharing\n    And it should recognize teaching labor and learning participation\n    And parent education should be accessible and valued\n    And the community should invest in parent capability-building\n    And the system should create communities of practice for parents\n    And parenting skills should be continuously developed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

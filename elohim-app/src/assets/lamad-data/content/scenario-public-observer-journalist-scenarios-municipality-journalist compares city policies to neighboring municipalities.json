@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist compares city policies to neighboring municipalities",
+  "contentType": "scenario",
+  "title": "Journalist compares city policies to neighboring municipalities",
+  "description": "Journalist compares city policies to neighboring municipalities",
+  "content": "Scenario: Journalist compares city policies to neighboring municipalities\n    Given city council debates new approach to homelessness\n    And politicians claim no alternatives exist\n    When the Observer provides comparative policy analysis\n    Then the journalist sees 3 nearby cities using housing-first approach\n    And reviews outcome data showing reduced homelessness\n    And finds cost comparison showing housing cheaper than criminalization\n    And interviews officials in cities with successful programs\n    And publishes story presenting evidence-based alternatives\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

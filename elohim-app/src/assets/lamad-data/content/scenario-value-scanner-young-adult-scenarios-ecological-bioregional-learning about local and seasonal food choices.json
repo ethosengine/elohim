@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-learning about local and seasonal food choices",
+  "contentType": "scenario",
+  "title": "Learning about local and seasonal food choices",
+  "description": "Learning about local and seasonal food choices",
+  "content": "Scenario: Learning about local and seasonal food choices\n    Given local and seasonal food has lower environmental impact\n    And Aisha is learning about bioregional food systems\n    When Aisha shops for produce\n    Then the bioregional_elohim should highlight local options\n    And it should explain seasonal availability\n    And it should teach about her bioregion's food production\n    And local food choices should be encouraged when affordable\n    And she should learn her region's agricultural patterns\n    And bioregional food literacy should develop\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

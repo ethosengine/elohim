@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent discovers coalition for youth recreation programs",
+  "contentType": "scenario",
+  "title": "Parent discovers coalition for youth recreation programs",
+  "description": "Parent discovers coalition for youth recreation programs",
+  "content": "Scenario: Parent discovers coalition for youth recreation programs\n    Given municipal budget cuts threaten youth sports and rec programs\n    And the parent's child participates in city soccer league\n    When the Observer detects 180 parents whose children use these programs\n    Then parents form rapid coalition to defend youth programs\n    And present coordinated data on program participation and benefits\n    And show economic value of city programs vs private alternatives\n    And municipal budget priorities respond to organized parent power\n    And youth recreation programs are preserved\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

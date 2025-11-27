@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-personal agent helps prevent expensive mistakes",
+  "contentType": "scenario",
+  "title": "Personal agent helps prevent expensive mistakes",
+  "description": "Personal agent helps prevent expensive mistakes",
+  "content": "Scenario: Personal agent helps prevent expensive mistakes\n    Given Aisha bought too much fresh produce last week\n    And the produce spoiled before she could use it\n    When the personal_agent analyzes her shopping patterns\n    Then it should identify the waste pattern\n    And it should suggest buying smaller quantities\n    And it should recommend frozen alternatives when appropriate\n    And the feedback should be constructive, not judgmental\n    And Aisha should learn from the mistake without shame\n    And the system should help her optimize future purchases\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

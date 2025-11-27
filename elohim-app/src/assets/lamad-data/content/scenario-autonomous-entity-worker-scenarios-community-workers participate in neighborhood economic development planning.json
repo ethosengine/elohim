@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-community-workers participate in neighborhood economic development planning",
+  "contentType": "scenario",
+  "title": "Workers participate in neighborhood economic development planning",
+  "description": "Workers participate in neighborhood economic development planning",
+  "content": "Scenario: Workers participate in neighborhood economic development planning\n    Given municipality is developing economic revitalization plan\n    And workers represent community institution through democratic ownership\n    When neighborhood planning meetings occur\n    Then Maria attends as ChickenMax worker-owner representative\n    And Maria shares experience of democratic business model\n    And Maria advocates for policies supporting worker ownership\n    And community recognizes workers as stakeholders, not just employees\n    And worker voice shapes community economic development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,supplier,small_business_owner]",
+    "related_layers:[workplace_organizational,individual,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

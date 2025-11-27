@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-deliberating on ecological standing constitutional amendment",
+  "contentType": "scenario",
+  "title": "Deliberating on ecological standing constitutional amendment",
+  "description": "Deliberating on ecological standing constitutional amendment",
+  "content": "Scenario: Deliberating on ecological standing constitutional amendment\n    Given proposal to grant ecosystems legal personhood at scale\n    And this challenges human-centered constitutional framework\n    When we deliberate whether nature has standing in protocol governance\n    Then we hear: indigenous perspectives on human-nature relationships\n    And we consider: ecological science and planetary boundaries\n    And we examine: practical implications for resource allocation\n    And we grapple: with expanding moral circle beyond humanity\n    And we discuss: what dignity means for non-human beings\n    And we create: constitutional framework for planetary flourishing\n    And we show: citizens can address civilizational questions with wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

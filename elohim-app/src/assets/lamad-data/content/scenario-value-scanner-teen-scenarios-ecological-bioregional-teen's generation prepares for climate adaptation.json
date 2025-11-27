@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-teen's generation prepares for climate adaptation",
+  "contentType": "scenario",
+  "title": "Teen's generation prepares for climate adaptation",
+  "description": "Teen's generation prepares for climate adaptation",
+  "content": "Scenario: Teen's generation prepares for climate adaptation\n    Given Jasmine's generation will face climate change impacts\n    And bioregional resilience requires preparation and adaptation\n    When bioregional_elohim engages climate preparation\n    Then it should help her understand local climate vulnerabilities\n    And support her developing adaptive capabilities\n    And recognize her climate preparation as care for future self and community\n    And connect her to bioregional climate adaptation networks\n    And value her generation's work to build climate resilience\n    And support realistic engagement with ecological challenges her generation inherits\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

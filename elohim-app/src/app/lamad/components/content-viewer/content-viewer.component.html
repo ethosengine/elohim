@@ -8,44 +8,17 @@
   <!-- Error state -->
   <div *ngIf="error && !isLoading" class="error-state">
     <h2>⚠️ {{ error }}</h2>
-    <button class="btn-primary" (click)="backToMap()">Back to Mission Map</button>
+    <button class="btn-primary" (click)="backToHome()">Back to Lamad</button>
   </div>
 
   <!-- Content -->
   <div *ngIf="node && !isLoading" class="content">
-    <!-- Breadcrumb Navigation -->
-    <nav *ngIf="isHierarchicalMode() && breadcrumbs.length > 0" class="breadcrumb-nav">
-      <ol class="breadcrumb">
-        <li *ngFor="let crumb of breadcrumbs; let last = last" class="breadcrumb-item">
-          <a
-            *ngIf="!last"
-            (click)="navigateToBreadcrumb(crumb.path)"
-            class="breadcrumb-link">
-            <span *ngIf="crumb.typeLabel" class="breadcrumb-type">{{ crumb.typeLabel }}:</span>
-            {{ crumb.label }}
-          </a>
-          <span *ngIf="last" class="breadcrumb-current">
-            <span *ngIf="crumb.typeLabel" class="breadcrumb-type">{{ crumb.typeLabel }}:</span>
-            {{ crumb.label }}
-          </span>
-          <span *ngIf="!last" class="breadcrumb-separator">/</span>
-        </li>
-      </ol>
-    </nav>
-
     <!-- Header -->
     <div class="content-header">
       <button
-        *ngIf="isHierarchicalMode()"
         class="back-button"
-        (click)="navigateUp()">
-        ← Back
-      </button>
-      <button
-        *ngIf="!isHierarchicalMode()"
-        class="back-button"
-        (click)="backToMap()">
-        ← Back to Map
+        (click)="backToHome()">
+        ← Back to Lamad
       </button>
 
       <div class="header-main">
@@ -113,54 +86,54 @@
 
     <!-- Main content -->
     <div class="content-body">
-      <!-- Markdown content -->
-      <div
-        *ngIf="node.contentFormat === 'markdown'"
-        class="markdown-content"
-        [innerHTML]="renderMarkdown(node.content)">
-      </div>
+      <!-- Dynamic renderer host - renders content via registered renderers -->
+      <ng-container #rendererHost></ng-container>
 
-      <!-- Gherkin content -->
+      <!-- Fallback: Plain text content (when no renderer registered) -->
       <div
-        *ngIf="node.contentFormat === 'gherkin'"
-        class="gherkin-content">
-        <pre [innerHTML]="renderGherkin(node.content)"></pre>
-      </div>
-
-      <!-- Plain text content -->
-      <div
-        *ngIf="node.contentFormat === 'plaintext'"
+        *ngIf="!hasRegisteredRenderer && node.contentFormat === 'plaintext'"
         class="plaintext-content">
-        <pre>{{ node.content }}</pre>
+        <pre>{{ getStringContent(node.content) }}</pre>
       </div>
 
-      <!-- HTML content -->
+      <!-- Fallback: HTML content (when no renderer registered) -->
       <div
-        *ngIf="node.contentFormat === 'html'"
+        *ngIf="!hasRegisteredRenderer && node.contentFormat === 'html'"
         class="html-content"
         [innerHTML]="node.content">
       </div>
+
+      <!-- Fallback: Unknown format -->
+      <div
+        *ngIf="!hasRegisteredRenderer && node.contentFormat !== 'plaintext' && node.contentFormat !== 'html'"
+        class="fallback-content">
+        <p class="fallback-notice">Content format: {{ node.contentFormat }}</p>
+        <pre>{{ getStringContent(node.content) }}</pre>
+      </div>
     </div>
 
-    <!-- Children Panes (Hierarchical Navigation) -->
-    <div *ngIf="hasChildren()" class="children-section">
-      <h2>📂 Contents</h2>
-      <div class="children-grid">
+    <!-- Appears in Paths (Wikipedia-style back-links) -->
+    <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">
+      <h2>📚 Appears in Learning Paths</h2>
+      <p class="paths-description">This content is part of the following curated learning journeys:</p>
+
+      <div *ngIf="loadingPaths" class="paths-loading">
+        <span class="spinner-small"></span> Loading paths...
+      </div>
+
+      <div *ngIf="!loadingPaths && containingPaths.length > 0" class="paths-list">
         <button
-          *ngFor="let child of children"
-          class="child-card"
-          (click)="navigateToChild(child)"
+          *ngFor="let pathRef of containingPaths"
+          class="path-card"
+          (click)="navigateToPath(pathRef.pathId, pathRef.stepIndex)"
           type="button">
-          <div class="child-header">
-            <span class="child-icon">{{ getContentTypeIcon() }}</span>
-            <span class="child-type">{{ child.contentType }}</span>
+          <div class="path-header">
+            <span class="path-icon">🗺️</span>
+            <span class="path-title">{{ pathRef.pathTitle }}</span>
           </div>
-          <h3 class="child-title">{{ child.title }}</h3>
-          <p class="child-description">{{ child.description }}</p>
-          <div class="child-meta">
-            <span class="child-affinity">
-              Affinity: {{ getRelatedNodeAffinity(child.id) }}%
-            </span>
+          <div class="path-meta">
+            <span class="path-step">Step {{ pathRef.stepIndex + 1 }}</span>
+            <span class="path-action">View in context →</span>
           </div>
         </button>
       </div>

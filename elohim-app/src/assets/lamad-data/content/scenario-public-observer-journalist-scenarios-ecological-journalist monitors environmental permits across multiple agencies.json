@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-ecological-journalist monitors environmental permits across multiple agencies",
+  "contentType": "scenario",
+  "title": "Journalist monitors environmental permits across multiple agencies",
+  "description": "Journalist monitors environmental permits across multiple agencies",
+  "content": "Scenario: Journalist monitors environmental permits across multiple agencies\n    Given the journalist covers regional environmental issues\n    And must track city, county, state, and federal environmental agencies\n    When the Observer monitors all environmental agencies simultaneously\n    Then the journalist reviews all permit applications and approvals\n    And receives alerts for controversial permits and violations\n    And tracks cumulative environmental impacts across jurisdictions\n    And comprehensive environmental surveillance becomes sustainable\n    And polluters cannot hide in bureaucratic complexity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:ecological",
+    "related_users:activist,citizen,scientist,politician",
+    "related_layers:municipality,county_regional,provincial_state,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

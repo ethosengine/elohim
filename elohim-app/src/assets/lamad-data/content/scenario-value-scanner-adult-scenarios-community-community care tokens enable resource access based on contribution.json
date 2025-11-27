@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-community-community care tokens enable resource access based on contribution",
+  "contentType": "scenario",
+  "title": "Community care tokens enable resource access based on contribution",
+  "description": "Community care tokens enable resource access based on contribution",
+  "content": "Scenario: Community care tokens enable resource access based on contribution\n    Given Sarah has accumulated care tokens through community participation\n    And community resources are allocated based on care contributions\n    When Sarah needs community support\n    Then her care tokens should give her access to resources\n    And community mutual aid should be available\n    And support should be based on demonstrated contribution\n    And care economy should function as community resource system\n    And Sarah's care work should have tangible value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:community",
+    "related_users:parent,worker,educator,caregiver,community_member",
+    "related_layers:neighborhood,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

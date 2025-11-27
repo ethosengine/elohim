@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-participating in neighborhood decision-making and collective action",
+  "contentType": "scenario",
+  "title": "Participating in neighborhood decision-making and collective action",
+  "description": "Participating in neighborhood decision-making and collective action",
+  "content": "Scenario: Participating in neighborhood decision-making and collective action\n    Given my neighborhood faces issues that affect residents\n    And I have stake in neighborhood decisions despite housing temporariness\n    When neighborhood collective action or decision-making occurs\n    Then the Value Scanner connects me to neighborhood organizing\n    And validates my right to participate in neighborhood governance\n    And helps me contribute despite time and energy constraints\n    And facilitates my voice in decisions affecting my household\n    And tracks neighborhood issues and actions\n    And my personal_agent surfaces opportunities matching my capacity\n    And recognizes community organizing as valuable civic labor\n    And supports my participation as full neighborhood member\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-municipal planning commission uses agent constitutional analysis",
+  "contentType": "scenario",
+  "title": "Municipal planning commission uses agent constitutional analysis",
+  "description": "Municipal planning commission uses agent constitutional analysis",
+  "content": "Scenario: Municipal planning commission uses agent constitutional analysis\n    Given planning commission reviews development proposals\n    And developments affect multiple neighborhoods and city environment\n    When Municipal Elohim provides constitutional analysis\n    Then agent flags: if development would harm watershed\n    And agent assesses: effects on housing affordability, traffic, equity\n    And agent provides: constitutional principles analysis\n    And planning commission: still makes final decision\n    And commissioners: use information but maintain judgment authority\n    And development review: incorporates constitutional considerations\n    And city planning: serves broader values beyond narrow economics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

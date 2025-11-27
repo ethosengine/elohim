@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-living wage that enables sole provider to support family",
+  "contentType": "scenario",
+  "title": "Living wage that enables sole provider to support family",
+  "description": "Living wage that enables sole provider to support family",
+  "content": "Scenario: Living wage that enables sole provider to support family\n    Given Maria is the only income earner for household of four\n    And $42k/year is barely sustainable for her family size\n    When Maria's compensation is determined\n    Then the workplace_elohim should provide data on single parent economic needs\n    And wage should enable household flourishing, not just survival\n    And employers should understand many workers are sole household providers\n    And fair compensation should account for single-income household realities\n    And Maria should earn enough to support her family with dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

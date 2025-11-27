@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-professional development coordinated with parenting constraints",
+  "contentType": "scenario",
+  "title": "Professional development coordinated with parenting constraints",
+  "description": "Professional development coordinated with parenting constraints",
+  "content": "Scenario: Professional development coordinated with parenting constraints\n    Given Sarah wants to pursue professional growth\n    And she has limited time due to parenting responsibilities\n    When Sarah considers professional development opportunities\n    Then the workplace_elohim should help her assess feasibility\n    And it should integrate family constraints into planning\n    And it should help her find development opportunities compatible with parenting\n    And professional growth should be possible despite parenting demands\n    And the system should support career development for working parents\n    And Sarah should not have to choose between career and family\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

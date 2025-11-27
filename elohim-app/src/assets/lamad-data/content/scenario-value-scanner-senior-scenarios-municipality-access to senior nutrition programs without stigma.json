@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-access to senior nutrition programs without stigma",
+  "contentType": "scenario",
+  "title": "Access to senior nutrition programs without stigma",
+  "description": "Access to senior nutrition programs without stigma",
+  "content": "Scenario: Access to senior nutrition programs without stigma\n    Given Margaret manages nutrition on $32k/year fixed income\n    And municipal senior nutrition programs exist\n    When the municipality_elohim connects Margaret to food resources\n    Then she should be informed about senior meal programs\n    And Meals on Wheels or congregate dining should be accessible\n    And the framing should be senior service, not poverty relief\n    And Margaret should access programs with dignity\n    And her care contributions should be visible to counterbalance receiving\n    And municipal food resources should support senior health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

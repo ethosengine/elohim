@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community future planning supports caregiver sustainability",
+  "contentType": "scenario",
+  "title": "Community future planning supports caregiver sustainability",
+  "description": "Community future planning supports caregiver sustainability",
+  "content": "Scenario: Community future planning supports caregiver sustainability\n    Given James's caregiving could last years or decades\n    And he needs to build future care economy resources\n    When James plans for long-term sustainability\n    Then the community_elohim should track his accumulating care contributions\n    And his care tokens should build toward future when he may need care\n    And community should recognize caregiving as investment in mutual aid\n    And care economy should function across decades, not just immediate needs\n    And James should build care economy standing for his own future vulnerability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-customer relationships institutionalize beyond individual owner",
+  "contentType": "scenario",
+  "title": "Customer relationships institutionalize beyond individual owner",
+  "description": "Customer relationships institutionalize beyond individual owner",
+  "content": "Scenario: Customer relationships institutionalize beyond individual owner\n    Given Rosa built customer loyalty through personal trust over 15 years\n    And these relationships are valuable but currently dependent on her\n    When customer relationship transition process begins\n    Then Rosa introduces workers to customers as new business leaders\n    And customer histories are documented (with privacy protection)\n    And workers learn customer preferences and build direct relationships\n    And customers discover democratic ownership often deepens their loyalty\n    And relationships survive and strengthen beyond Rosa's involvement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

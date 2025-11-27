@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-teen participates in municipal sustainability initiatives",
+  "contentType": "scenario",
+  "title": "Teen participates in municipal sustainability initiatives",
+  "description": "Teen participates in municipal sustainability initiatives",
+  "content": "Scenario: Teen participates in municipal sustainability initiatives\n    Given the municipality has climate action and sustainability goals\n    And Jasmine makes consumption choices reflecting environmental values\n    When she participates in municipal environmental programs\n    Then her ecological care work should be tracked and valued\n    And municipal_elohim should aggregate youth environmental contributions\n    And recognize that youth climate activism is care work for future generations\n    And connect individual choices to municipal sustainability metrics\n    And demonstrate that youth environmental leadership advances city goals\n    And support her generation's investment in climate action\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

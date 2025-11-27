@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children that environmental care is care work",
+  "contentType": "scenario",
+  "title": "Teaching children that environmental care is care work",
+  "description": "Teaching children that environmental care is care work",
+  "content": "Scenario: Teaching children that environmental care is care work\n    Given Sarah wants Tommy and Emma to understand ecological stewardship\n    And she's teaching them care economy principles\n    When Sarah teaches environmental practices\n    Then the ecological_elohim should recognize this as value literacy education\n    And teaching ecological care should accumulate care tokens\n    And children should learn that caring for environment is care work\n    And the system should value environmental education as parenting labor\n    And next generation should internalize ecological care as fundamental\n    And Sarah's environmental teaching should be recognized and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

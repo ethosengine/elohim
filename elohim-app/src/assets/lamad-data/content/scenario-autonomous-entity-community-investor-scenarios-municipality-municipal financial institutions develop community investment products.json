@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-municipal financial institutions develop community investment products",
+  "contentType": "scenario",
+  "title": "Municipal financial institutions develop community investment products",
+  "description": "Municipal financial institutions develop community investment products",
+  "content": "Scenario: Municipal financial institutions develop community investment products\n    Given banks and credit unions lack experience with democratic business investment\n    And institutional support would scale community investment dramatically\n    When Patricia and other investors demonstrate model viability\n    Then local banks develop community investment accounts and funds\n    And credit unions prioritize democratic business lending\n    And financial institutions see community investment as sound business opportunity\n    And municipal policy supports financial institution democratic business focus\n    And municipality_elohim coordinates with financial institutions on product development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

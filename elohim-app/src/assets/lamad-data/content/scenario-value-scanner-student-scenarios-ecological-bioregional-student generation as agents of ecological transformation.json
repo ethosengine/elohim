@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-student generation as agents of ecological transformation",
+  "contentType": "scenario",
+  "title": "Student generation as agents of ecological transformation",
+  "description": "Student generation as agents of ecological transformation",
+  "content": "Scenario: Student generation as agents of ecological transformation\n    Given Kenji's generation will inherit climate crisis and ecological breakdown\n    And students are developing patterns that will shape future\n    When the bioregional_elohim recognizes generational context\n    Then it should validate student ecological anxiety and grief\n    And it should empower students as agents of ecological transformation\n    And it should support collective action for systemic change\n    And it should recognize that care economy is ecological imperative\n    And the system should foster student leadership in ecological care\n    And Kenji's generation should be empowered to build ecological care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

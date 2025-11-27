@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-preparing community for potential authoritarian resistance",
+  "contentType": "scenario",
+  "title": "Preparing community for potential authoritarian resistance",
+  "description": "Preparing community for potential authoritarian resistance",
+  "content": "Scenario: Preparing community for potential authoritarian resistance\n    Given authoritarian threat to protocol might emerge\n    And I plan for protecting community sovereignty\n    When I establish contingency plans for resistance\n    Then we maintain: encrypted backups of community data\n    And we prepare: mesh networking for internet disruption\n    And we identify: sanctuary partners (university, churches)\n    And we plan: civil disobedience protocols if needed\n    And we retain: community fork option as last resort\n    And we hope: never to use these\n    And we know: community sovereignty matters more than protocol uniformity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

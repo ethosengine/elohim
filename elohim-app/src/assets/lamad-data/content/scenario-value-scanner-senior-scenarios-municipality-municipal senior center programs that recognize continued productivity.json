@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-municipal senior center programs that recognize continued productivity",
+  "contentType": "scenario",
+  "title": "Municipal senior center programs that recognize continued productivity",
+  "description": "Municipal senior center programs that recognize continued productivity",
+  "content": "Scenario: Municipal senior center programs that recognize continued productivity\n    Given Margaret is active and engaged, not waiting to die\n    And senior centers sometimes reinforce obsolescence narratives\n    When the municipality_elohim connects Margaret to senior programs\n    Then programs should treat seniors as productive contributors\n    And opportunities should include volunteering, teaching, organizing\n    And the focus should be engagement and contribution, not entertainment\n    And Margaret should find programs that honor her capability\n    And senior centers should be care economy hubs\n    And municipal programs should support active aging\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

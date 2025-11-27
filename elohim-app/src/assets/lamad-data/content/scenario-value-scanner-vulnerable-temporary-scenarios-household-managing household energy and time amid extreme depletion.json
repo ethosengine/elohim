@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household energy and time amid extreme depletion",
+  "contentType": "scenario",
+  "title": "Managing household energy and time amid extreme depletion",
+  "description": "Managing household energy and time amid extreme depletion",
+  "content": "Scenario: Managing household energy and time amid extreme depletion\n    Given I am traumatized, stressed, and exhausted\n    And household operations require consistent energy and attention\n    When I allocate my limited capacity across household demands\n    Then the Value Scanner helps me identify what's truly essential vs. what can wait\n    And provides realistic expectations for what's achievable in my state\n    And suggests efficiency strategies that reduce cognitive load\n    And validates that \"good enough\" is genuinely good enough right now\n    And helps me ask for and coordinate household help\n    And my personal_agent prevents me from over-committing my depleted resources\n    And recognizes that managing household while traumatized is extraordinary\n    And celebrates my household care work under extreme constraint\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-responding to national security agencies' concerns",
+  "contentType": "scenario",
+  "title": "Responding to national security agencies' concerns",
+  "description": "Responding to national security agencies' concerns",
+  "content": "Scenario: Responding to national security agencies' concerns\n    Given intelligence agencies claim protocol creates vulnerabilities\n    And they request backdoors or monitoring capabilities\n    When I evaluate security claims critically\n    Then I consult: cryptographers about technical impossibility\n    And I examine: whether concerns are legitimate or pretext\n    And I compare: risks of backdoors vs risks they claim to address\n    And I consider: historical abuse of security exceptions\n    And I establish: oversight mechanisms if special provisions needed\n    And I resist: security becoming excuse for unaccountable power\n    And I protect: democracy even under security claims\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

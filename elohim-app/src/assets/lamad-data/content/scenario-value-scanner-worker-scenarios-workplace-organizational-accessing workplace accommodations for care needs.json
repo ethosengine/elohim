@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-accessing workplace accommodations for care needs",
+  "contentType": "scenario",
+  "title": "Accessing workplace accommodations for care needs",
+  "description": "Accessing workplace accommodations for care needs",
+  "content": "Scenario: Accessing workplace accommodations for care needs\n    Given I may need accommodations for health, family, or care responsibilities\n    When I need to request workplace accommodations\n    Then the workplace_elohim should help me understand my rights\n    And support me in making formal accommodation requests\n    And provide guidance on documentation and process\n    And advocate for my right to work conditions that don't destroy my capacity for care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

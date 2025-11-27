@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-balancing environmental responsibility with budget constraints",
+  "contentType": "scenario",
+  "title": "Balancing environmental responsibility with budget constraints",
+  "description": "Balancing environmental responsibility with budget constraints",
+  "content": "Scenario: Balancing environmental responsibility with budget constraints\n    Given Aisha has limited financial resources\n    And sustainable options often cost more\n    When Aisha makes purchasing decisions\n    Then the personal_agent should help navigate trade-offs\n    And it should identify affordable sustainable choices\n    And it should explain when spending more reduces environmental impact\n    And it should validate doing her best within constraints\n    And the system should never shame financial limitations\n    And environmental responsibility should be accessible at all income levels\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

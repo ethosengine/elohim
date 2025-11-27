@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-bioregional care economy integrates human and ecosystem flourishing",
+  "contentType": "scenario",
+  "title": "Bioregional care economy integrates human and ecosystem flourishing",
+  "description": "Bioregional care economy integrates human and ecosystem flourishing",
+  "content": "Scenario: Bioregional care economy integrates human and ecosystem flourishing\n    Given Jasmine participates in care economy across multiple contexts\n    And all human care depends on functioning ecosystems\n    When her personal_agent provides comprehensive care economy view\n    Then it should integrate ecological care with social and economic care\n    And show that caring for ecosystems enables caring for people\n    And demonstrate that bioregional health is inseparable from community health\n    And help her understand care economy as integrated human-ecological system\n    And build expectation that economy must serve both human and ecosystem flourishing\n    And internalize that her generation must heal relationship between economy and ecology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

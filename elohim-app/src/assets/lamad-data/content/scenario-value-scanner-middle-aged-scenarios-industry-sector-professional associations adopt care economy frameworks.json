@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-professional associations adopt care economy frameworks",
+  "contentType": "scenario",
+  "title": "Professional associations adopt care economy frameworks",
+  "description": "Professional associations adopt care economy frameworks",
+  "content": "Scenario: Professional associations adopt care economy frameworks\n    Given Robert participates in professional associations\n    And professional associations shape industry norms and practices\n    And care economy principles should inform professional standards\n    When industry_elohim supports professional association engagement\n    Then it should help Robert advocate within professional associations\n    And support proposals for care economy professional development\n    And connect him with other care economy advocates in the profession\n    And help professional associations adopt care-friendly certification standards\n    And build professional identity that includes care economy principles\n    And advance care economy through professional credentialing\n    And demonstrate that all professions can integrate care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:industry_sector",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:workplace_organizational,municipality,community,ecological_bioregional",
+    "elohim_agents:personal_agent,industry_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

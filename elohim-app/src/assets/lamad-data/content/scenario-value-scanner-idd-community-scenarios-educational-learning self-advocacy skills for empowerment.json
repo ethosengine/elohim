@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning self-advocacy skills for empowerment",
+  "contentType": "scenario",
+  "title": "Learning self-advocacy skills for empowerment",
+  "description": "Learning self-advocacy skills for empowerment",
+  "content": "Scenario: Learning self-advocacy skills for empowerment\n    Given Jordan wants to speak up for their needs and preferences\n    And self-advocacy skills support autonomy and dignity\n    When Jordan participates in self-advocacy training\n    Then Jordan learns to identify and express their needs\n    And the training uses accessible methods (visual aids, role-play, practice)\n    And Jordan practices advocating in low-stakes situations\n    And Jordan's advocacy voice grows stronger over time\n    And support workers honor Jordan's self-advocacy\n    And Jordan experiences empowerment through skill development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

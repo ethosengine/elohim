@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-solo household labor tracking shows work of two parents",
+  "contentType": "scenario",
+  "title": "Solo household labor tracking shows work of two parents",
+  "description": "Solo household labor tracking shows work of two parents",
+  "content": "Scenario: Solo household labor tracking shows work of two parents\n    Given Maria performs all household labor alone\n    And she does cooking, cleaning, laundry, maintenance, logistics, planning\n    When household labor is tracked\n    Then the household_elohim should quantify all of Maria's work\n    And it should make visible that she's doing work normally split between two adults\n    And tracking should validate that solo parenting is literally double the labor\n    And Maria's care token accumulation should reflect superhuman household contribution\n    And society should see quantified proof of single parents' extraordinary work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

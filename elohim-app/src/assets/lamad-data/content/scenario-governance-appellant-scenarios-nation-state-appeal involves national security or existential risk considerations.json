@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-appeal involves national security or existential risk considerations",
+  "contentType": "scenario",
+  "title": "Appeal involves national security or existential risk considerations",
+  "description": "Appeal involves national security or existential risk considerations",
+  "content": "Scenario: Appeal involves national security or existential risk considerations\n    Given an agent decision involved claimed national security justification\n    And I believe my rights were violated despite security concerns\n    When National Constitutional Council reviews the appeal\n    Then they evaluate if security claim was legitimate or pretext\n    And They examine if security need was balanced with individual dignity\n    And They consider if less rights-violating alternatives existed\n    And They assess transparency appropriate to security context\n    And They create precedent for security-rights balance at national scale\n    And My appeal prevents security from becoming excuse for unchecked power\n    And Constitutional limits on authority are maintained even under threat\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

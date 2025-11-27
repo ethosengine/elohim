@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-bioregional connection through local food and resources",
+  "contentType": "scenario",
+  "title": "Bioregional connection through local food and resources",
+  "description": "Bioregional connection through local food and resources",
+  "content": "Scenario: Bioregional connection through local food and resources\n    Given Sarah's family lives in specific bioregion\n    And connecting to local ecology builds stewardship\n    When the ecological_elohim supports bioregional connection\n    Then it should help Sarah source local food and resources\n    And it should provide information about regional ecology\n    And it should recognize Sarah's work to build local connections\n    And bioregional care should be valued in care economy\n    And the system should support regional ecological engagement\n    And Sarah should be rewarded for choosing local over global\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

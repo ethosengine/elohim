@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-receiving community support framed as reciprocal care, not charity",
+  "contentType": "scenario",
+  "title": "Receiving community support framed as reciprocal care, not charity",
+  "description": "Receiving community support framed as reciprocal care, not charity",
+  "content": "Scenario: Receiving community support framed as reciprocal care, not charity\n    Given I need substantial support with resources, childcare, and crisis navigation\n    And I worry about being seen as \"taker\" or burden\n    When I access community support through care economy network\n    Then the Value Scanner frames support as reciprocal care, not charity\n    And recognizes my parenting labor as valuable care contribution\n    And validates that everyone needs support during vulnerability\n    And connects me to support based on my care economy participation\n    And ensures support is offered with dignity and respect\n    And my personal_agent helps me access help without shame\n    And tracks my ongoing care contributions even during crisis\n    And validates that receiving support when needed is how care economy works\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

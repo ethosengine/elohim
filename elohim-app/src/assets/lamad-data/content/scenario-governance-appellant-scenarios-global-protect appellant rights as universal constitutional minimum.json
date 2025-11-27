@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-protect appellant rights as universal constitutional minimum",
+  "contentType": "scenario",
+  "title": "Protect appellant rights as universal constitutional minimum",
+  "description": "Protect appellant rights as universal constitutional minimum",
+  "content": "Scenario: Protect appellant rights as universal constitutional minimum\n    Given authoritarian government attempts to suppress appeals\n    And the government wants agents to operate without oversight\n    When global Constitutional Council evaluates the attempt\n    Then the council reaffirms appeal rights as universal minimum\n    And the council declares that human dignity requires recourse\n    And no jurisdiction can eliminate appellant rights while claiming protocol alignment\n    And international community recognizes council authority\n    And appellants worldwide are protected by global constitutional floor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

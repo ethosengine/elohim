@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member detects conflicts in incentive recommendation",
+  "contentType": "scenario",
+  "title": "Economic development board member detects conflicts in incentive recommendation",
+  "description": "Economic development board member detects conflicts in incentive recommendation",
+  "content": "Scenario: Economic development board member detects conflicts in incentive recommendation\n    Given staff recommends tax incentives for company relocating to municipality\n    And presentation emphasizes economic benefits and competitive pressure\n    And board will vote on multi-year incentive package at next meeting\n    When the board member uses Observer capture protection analysis\n    Then they discover company executives donated to city officials who appoint board\n    And see consultant hired to evaluate deal previously worked for the company\n    And find incentive terms more generous than peer municipalities offered similar companies\n    And access independent economic analysis showing marginal public benefit\n    And capture protection makes conflicts of interest and manipulation visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:workplace_organizational",
+    "related_users:citizen,politician,activist,community_organizer,worker",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

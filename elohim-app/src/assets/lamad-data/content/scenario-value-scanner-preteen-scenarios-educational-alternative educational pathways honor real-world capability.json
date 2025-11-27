@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-alternative educational pathways honor real-world capability",
+  "contentType": "scenario",
+  "title": "Alternative educational pathways honor real-world capability",
+  "description": "Alternative educational pathways honor real-world capability",
+  "content": "Scenario: Alternative educational pathways honor real-world capability\n    Given Marcus has demonstrated sophisticated stewardship\n    And traditional school may not capture his capabilities\n    When educational pathways are considered\n    Then alternative credentials should recognize his applied skills\n    And competency-based advancement should be available\n    And his household management should qualify for advanced placement\n    And educational system should honor multiple forms of intelligence\n    And practical capability should open doors to opportunity\n    And care economy should create pathways beyond traditional academics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

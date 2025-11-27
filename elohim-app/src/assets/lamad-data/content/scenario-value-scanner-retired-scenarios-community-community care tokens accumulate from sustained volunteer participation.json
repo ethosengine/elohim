@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-community care tokens accumulate from sustained volunteer participation",
+  "contentType": "scenario",
+  "title": "Community care tokens accumulate from sustained volunteer participation",
+  "description": "Community care tokens accumulate from sustained volunteer participation",
+  "content": "Scenario: Community care tokens accumulate from sustained volunteer participation\n    Given Frank has volunteered consistently over years\n    And his contributions are substantial and ongoing\n    When the community_elohim calculates care tokens\n    Then tokens should accumulate from Frank's volunteer hours\n    And skill level should affect token value (skilled trades valued highly)\n    And sustained participation should be recognized over time\n    And accumulated tokens should represent Frank's community standing\n    And tokens should create claims on community resources and support\n    And his years of contribution should be visible and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

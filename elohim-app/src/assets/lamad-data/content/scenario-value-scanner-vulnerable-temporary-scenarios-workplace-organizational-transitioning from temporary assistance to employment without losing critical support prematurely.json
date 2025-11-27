@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-transitioning from temporary assistance to employment without losing critical support prematurely",
+  "contentType": "scenario",
+  "title": "Transitioning from temporary assistance to employment without losing critical support prematurely",
+  "description": "Transitioning from temporary assistance to employment without losing critical support prematurely",
+  "content": "Scenario: Transitioning from temporary assistance to employment without losing critical support prematurely\n    Given I receive temporary assistance (SNAP, TANF, housing support, childcare subsidies)\n    And employment may affect benefit eligibility\n    When I transition from assistance to employment\n    Then the workplace_elohim helps me understand benefits cliff dynamics\n    And calculates whether employment genuinely improves my financial situation after benefit loss\n    And identifies transition supports that prevent benefit cliff harm\n    And validates that benefits cliff is policy failure, not my failure\n    And helps me time employment transition to minimize harm\n    And my personal_agent tracks benefit eligibility thresholds and employment income\n    And recognizes that benefits navigation is complex policy navigation labor\n    And ensures employment transition genuinely serves rather than harms my family\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

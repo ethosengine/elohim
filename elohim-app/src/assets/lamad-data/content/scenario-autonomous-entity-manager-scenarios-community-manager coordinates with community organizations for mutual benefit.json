@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-community-manager coordinates with community organizations for mutual benefit",
+  "contentType": "scenario",
+  "title": "Manager coordinates with community organizations for mutual benefit",
+  "description": "Manager coordinates with community organizations for mutual benefit",
+  "content": "Scenario: Manager coordinates with community organizations for mutual benefit\n    Given workers decided to partner with youth employment program\n    And operational coordination is needed for internship program\n    When Marcus coordinates youth internship logistics\n    Then Marcus works with youth program on participant selection and scheduling\n    And Marcus ensures youth interns receive quality training and mentorship\n    And Marcus tracks program outcomes (skill development, employment, community impact)\n    And Marcus reports to workers who govern program strategic decisions\n    And community organization recognizes Marcus as reliable coordinator supporting youth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,worker]",
+    "related_layers:[workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

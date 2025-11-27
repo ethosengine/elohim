@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-community food systems and nutrition access for seniors",
+  "contentType": "scenario",
+  "title": "Community food systems and nutrition access for seniors",
+  "description": "Community food systems and nutrition access for seniors",
+  "content": "Scenario: Community food systems and nutrition access for seniors\n    Given Margaret manages nutrition on limited budget\n    And community food systems affect senior health\n    When the community_elohim coordinates food access\n    Then Margaret should help shape senior-appropriate food programs\n    And her needs and knowledge should inform program design\n    And community should ensure affordable nutritious food for seniors\n    And Margaret should influence resource allocation\n    And senior nutritional needs should be community priority\n    And her participation should improve services for all seniors\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

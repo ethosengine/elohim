@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal data privacy protects residents while enabling planning",
+  "contentType": "scenario",
+  "title": "Municipal data privacy protects residents while enabling planning",
+  "description": "Municipal data privacy protects residents while enabling planning",
+  "content": "Scenario: Municipal data privacy protects residents while enabling planning\n    Given municipal care economy involves data about many residents\n    And privacy must be rigorously protected\n    When municipal planning uses care economy data\n    Then the municipal_elohim should only provide aggregated anonymized data\n    And no individual household should be identifiable\n    And Sarah's privacy should be absolute unless she chooses disclosure\n    And municipal benefits should not require privacy sacrifice\n    And data governance should be transparent and accountable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

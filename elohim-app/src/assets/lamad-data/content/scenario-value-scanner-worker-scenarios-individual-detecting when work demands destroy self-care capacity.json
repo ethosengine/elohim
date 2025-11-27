@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-detecting when work demands destroy self-care capacity",
+  "contentType": "scenario",
+  "title": "Detecting when work demands destroy self-care capacity",
+  "description": "Detecting when work demands destroy self-care capacity",
+  "content": "Scenario: Detecting when work demands destroy self-care capacity\n    Given my personal_agent monitors my nutrition and rest patterns\n    When my meal quality decreases for multiple consecutive days\n    And my sleep falls below healthy minimums\n    And I show signs of chronic exhaustion\n    Then the protocol should surface a crisis alert\n    And provide resources for immediate support\n    And suggest workplace advocacy options\n    And connect me to community care resources\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

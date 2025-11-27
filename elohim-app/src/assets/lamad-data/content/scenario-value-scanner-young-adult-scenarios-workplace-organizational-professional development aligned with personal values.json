@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-professional development aligned with personal values",
+  "contentType": "scenario",
+  "title": "Professional development aligned with personal values",
+  "description": "Professional development aligned with personal values",
+  "content": "Scenario: Professional development aligned with personal values\n    Given Aisha is building her career\n    And she wants work aligned with her values\n    When Aisha makes professional development decisions\n    Then the personal_agent should help her assess value alignment\n    And it should highlight opportunities matching her principles\n    And it should flag when work conflicts with core values\n    And professional growth should support personal integrity\n    And the system should help her build career consistent with values\n    And work should serve her flourishing, not just employment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

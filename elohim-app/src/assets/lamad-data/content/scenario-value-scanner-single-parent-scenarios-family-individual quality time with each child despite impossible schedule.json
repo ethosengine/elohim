@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-individual quality time with each child despite impossible schedule",
+  "contentType": "scenario",
+  "title": "Individual quality time with each child despite impossible schedule",
+  "description": "Individual quality time with each child despite impossible schedule",
+  "content": "Scenario: Individual quality time with each child despite impossible schedule\n    Given each child needs one-on-one parent time\n    And Maria must provide all individual attention alone across three children\n    When Maria allocates time with children\n    Then the family_elohim should help her protect individual connection time\n    And it should remind her that each child needs her undivided attention sometimes\n    And it should coordinate schedules to create brief one-on-one moments\n    And it should prevent any child from being consistently neglected\n    And Maria should maintain individual relationships with each child despite constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

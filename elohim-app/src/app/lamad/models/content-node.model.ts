@@ -1,27 +1,28 @@
-import { DocumentNode } from './document-node.model';
-
 /**
- * Generic content node model inspired by WordPress's post concept.
+ * ContentNode - The fundamental unit of content in the Territory.
  *
- * This flexible model can represent any type of content across domains:
+ * Holochain mapping:
+ * - Entry type: "content_node"
+ * - id becomes ActionHash
+ * - Published to DHT based on reach level (not automatic)
+ *
+ * This flexible model can represent any type of content:
  * - Documentation (epics, features, scenarios)
  * - Learning content (tutorials, exercises, assessments)
- * - Social content (posts, comments, discussions)
+ * - Media (videos, simulations, interactive apps)
  * - Any custom domain content
  *
- * The key is the graph-based structure with flexible metadata that allows
- * each domain to extend the base model without rigid type hierarchies.
+ * Trust Model:
+ * Content earns reach through attestations. New content starts at 'private'
+ * and can expand to 'commons' through steward approval, community endorsement,
+ * or governance ratification. See content-attestation.model.ts for details.
  */
-
-export interface ContentNode extends Omit<DocumentNode, 'type'> {
-  /** Unique identifier */
+export interface ContentNode {
+  /** Unique identifier (ActionHash in Holochain) */
   id: string;
 
-  /** Content type - domain-specific (e.g., 'epic', 'feature', 'scenario', 'tutorial') */
-  contentType: string;
-
-  /** Type property for compatibility with DocumentNode (same as contentType, but string) */
-  type?: string;
+  /** Content type - domain-specific semantic category */
+  contentType: ContentType;
 
   /** Display title */
   title: string;
@@ -29,17 +30,17 @@ export interface ContentNode extends Omit<DocumentNode, 'type'> {
   /** Brief description/summary */
   description: string;
 
-  /** Full content body (markdown, HTML, Gherkin, etc.) */
-  content: string;
+  /** Full content body (markdown, HTML, URL, JSON, etc.) */
+  content: string | object;
 
-  /** Content format for rendering ('markdown' | 'gherkin' | 'html' | 'plaintext') */
+  /** Content format for rendering */
   contentFormat: ContentFormat;
 
   /** Tags for categorization and search */
   tags: string[];
 
-  /** Source file path */
-  sourcePath: string;
+  /** Source file path (for development/debugging) */
+  sourcePath?: string;
 
   /** Related node IDs (bidirectional relationships) */
   relatedNodeIds: string[];
@@ -47,14 +48,127 @@ export interface ContentNode extends Omit<DocumentNode, 'type'> {
   /** Flexible metadata for domain-specific data */
   metadata: ContentMetadata;
 
-  /** Creation timestamp */
-  createdAt?: Date;
+  // =========================================================================
+  // Trust & Reach (Bidirectional Attestation Model)
+  // =========================================================================
 
-  /** Last updated timestamp */
-  updatedAt?: Date;
+  /**
+   * Author/creator of this content (AgentPubKey).
+   * Required for trust model - anonymous content cannot earn reach beyond 'local'.
+   * Optional during migration; defaults to 'system' for legacy content.
+   */
+  authorId?: string;
+
+  /**
+   * Current reach level - determines who can discover/access this content.
+   * Computed from active attestations. See ContentReach type.
+   * Defaults to 'commons' for legacy content (existing content is public).
+   *
+   * - 'private': Only author
+   * - 'invited': Specific agents
+   * - 'local': Author's network
+   * - 'community': Community members
+   * - 'federated': Multiple communities
+   * - 'commons': Public/global
+   */
+  reach?: ContentReach;
+
+  /**
+   * Trust score (0.0 - 1.0) computed from attestation quality/quantity.
+   * Higher scores indicate more/stronger attestations.
+   * Defaults to 1.0 for legacy content.
+   */
+  trustScore?: number;
+
+  /**
+   * IDs of active attestations that grant this content's current reach.
+   * Full attestation details fetched separately.
+   * Empty array for legacy content.
+   */
+  activeAttestationIds?: string[];
+
+  /**
+   * Agents explicitly invited to access this content (when reach is 'invited').
+   */
+  invitedAgentIds?: string[];
+
+  /**
+   * Communities this content is shared with (when reach is 'community' or 'federated').
+   */
+  communityIds?: string[];
+
+  /**
+   * Active flags/warnings on this content (disputed, under-review, etc.).
+   * Content with certain flags may have restricted reach.
+   */
+  flags?: ContentFlag[];
+
+  // =========================================================================
+  // Timestamps
+  // =========================================================================
+
+  /** Creation timestamp (ISO 8601) */
+  createdAt?: string;
+
+  /** Last updated timestamp (ISO 8601) */
+  updatedAt?: string;
+
+  /** When trust profile was last computed */
+  trustComputedAt?: string;
 }
 
-export type ContentFormat = 'markdown' | 'gherkin' | 'html' | 'plaintext';
+/**
+ * ContentReach - The audience a piece of content can reach.
+ * Re-exported from content-attestation.model.ts for convenience.
+ */
+export type ContentReach =
+  | 'private'
+  | 'invited'
+  | 'local'
+  | 'community'
+  | 'federated'
+  | 'commons';
+
+/**
+ * ContentFlag - Warning/issue on content (denormalized from trust profile).
+ */
+export interface ContentFlag {
+  type: 'disputed' | 'outdated' | 'partial-revocation' | 'under-review' | 'appeal-pending';
+  reason: string;
+  flaggedAt: string;
+}
+
+/**
+ * ContentType - The semantic type of content in the Territory.
+ * Maps to different rendering strategies and metadata schemas.
+ */
+export type ContentType =
+  | 'epic'
+  | 'feature'
+  | 'scenario'
+  | 'concept'
+  | 'simulation'
+  | 'video'
+  | 'assessment'
+  | 'organization'
+  | 'book-chapter'
+  | 'tool';
+
+/**
+ * ContentFormat - How the content payload should be interpreted and rendered.
+ * Maps to specific renderer components via RendererRegistryService.
+ */
+export type ContentFormat =
+  | 'markdown'
+  | 'html5-app'
+  | 'video-embed'
+  | 'video-file'
+  | 'quiz-json'
+  | 'external-link'
+  | 'epub'
+  | 'gherkin'
+  | 'html'
+  | 'plaintext';
 
 /**
  * Flexible metadata that can be extended per domain
@@ -66,6 +180,9 @@ export interface ContentMetadata {
   /** Authors/contributors */
   authors?: string[];
 
+  /** Primary author */
+  author?: string;
+
   /** Version number */
   version?: string;
 
@@ -74,6 +191,30 @@ export interface ContentMetadata {
 
   /** Priority or order */
   priority?: number;
+
+  /** Content source identifier */
+  source?: string;
+
+  /** Original source URL */
+  sourceUrl?: string;
+
+  /** Content license */
+  license?: string;
+
+  /** Estimated time to consume/complete */
+  estimatedTime?: string;
+
+  /** Embedding strategy for interactive content */
+  embedStrategy?: 'iframe' | 'native' | 'web-component';
+
+  /** Required browser/runtime capabilities */
+  requiredCapabilities?: string[];
+
+  /** Security policy for embedded content */
+  securityPolicy?: {
+    sandbox?: string[];
+    csp?: string;
+  };
 
   /** Custom domain-specific fields */
   [key: string]: any;
@@ -165,14 +306,6 @@ export interface ContentGraphMetadata {
 
   /** Version of the graph schema */
   version: string;
-}
-
-/**
- * Utility type for migrating from old DocumentNode to ContentNode
- */
-export interface DocumentNodeAdapter {
-  fromDocumentNode(documentNode: any): ContentNode;
-  toDocumentNode(contentNode: ContentNode): any;
 }
 
 // Alias for backward compatibility

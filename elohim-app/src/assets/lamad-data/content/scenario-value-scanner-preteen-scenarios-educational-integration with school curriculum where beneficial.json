@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-integration with school curriculum where beneficial",
+  "contentType": "scenario",
+  "title": "Integration with school curriculum where beneficial",
+  "description": "Integration with school curriculum where beneficial",
+  "content": "Scenario: Integration with school curriculum where beneficial\n    Given Marcus's real-world learning is substantial\n    And school integration could recognize his capabilities\n    When Marcus grants permission for school integration\n    Then the Value Scanner could share relevant learning data\n    And schools could award credit for applied learning\n    And his care contributions could supplement traditional coursework\n    And integration should benefit Marcus academically\n    And his consent and privacy should be absolute requirements\n    And school recognition should honor his real-world competence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

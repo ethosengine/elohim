@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-concrete operations stage supports numerical comparison",
+  "contentType": "scenario",
+  "title": "Concrete operations stage supports numerical comparison",
+  "description": "Concrete operations stage supports numerical comparison",
+  "content": "Scenario: Concrete operations stage supports numerical comparison\n    Given Emma can handle basic math at age 8\n    And she is developing numerical reasoning\n    When Emma compares prices or quantities\n    Then the personal_agent should support mathematical thinking\n    And the agent should ask \"How much money would we save?\"\n    And simple calculations should be scaffolded\n    And Emma should practice applying math to real decisions\n    And numerical literacy should be built through authentic use\n    And abstract concepts should be grounded in concrete comparisons\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

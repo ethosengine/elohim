@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood technology support for overwhelmed caregiver",
+  "contentType": "scenario",
+  "title": "Neighborhood technology support for overwhelmed caregiver",
+  "description": "Neighborhood technology support for overwhelmed caregiver",
+  "content": "Scenario: Neighborhood technology support for overwhelmed caregiver\n    Given James manages complex care coordination systems\n    And technology problems become overwhelming when also caregiving\n    When the neighborhood_elohim identifies tech-skilled neighbors\n    Then neighbors should help with technology issues\n    And they should support James with care coordination tech\n    And technical support should reduce burden, not increase it\n    And neighborhood should include practical technology assistance\n    And James should access help when systems become overwhelming\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

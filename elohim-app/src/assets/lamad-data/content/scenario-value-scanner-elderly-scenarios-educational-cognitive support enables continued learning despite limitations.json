@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-cognitive support enables continued learning despite limitations",
+  "contentType": "scenario",
+  "title": "Cognitive support enables continued learning despite limitations",
+  "description": "Cognitive support enables continued learning despite limitations",
+  "content": "Scenario: Cognitive support enables continued learning despite limitations\n    Given Helen's dementia affects learning and memory\n    And cognitive support can enable continued engagement\n    When Helen participates in educational activities\n    Then her personal_agent should provide cognitive scaffolding\n    And material should be adapted to her cognitive capabilities\n    And she should experience success, not frustration\n    And limitations should be accommodated, not treated as disqualification\n    And the protocol should enable learning despite cognitive changes\n    And Helen should remain engaged with intellectual life\n    And dementia should not end her identity as learner\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

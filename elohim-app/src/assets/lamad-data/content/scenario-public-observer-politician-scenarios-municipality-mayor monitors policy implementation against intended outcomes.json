@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-mayor monitors policy implementation against intended outcomes",
+  "contentType": "scenario",
+  "title": "Mayor monitors policy implementation against intended outcomes",
+  "description": "Mayor monitors policy implementation against intended outcomes",
+  "content": "Scenario: Mayor monitors policy implementation against intended outcomes\n    Given the politician voted for homelessness intervention program\n    And expected specific outcomes from policy\n    When the Observer tracks implementation\n    Then they see which programs launched versus stalled\n    And learn actual outcomes compared to projections\n    And identify bureaucratic barriers to implementation\n    And intervene to align execution with legislative intent\n    And ensure votes translate to real community impact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

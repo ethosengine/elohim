@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist investigates municipal service delivery disparities",
+  "contentType": "scenario",
+  "title": "Journalist investigates municipal service delivery disparities",
+  "description": "Journalist investigates municipal service delivery disparities",
+  "content": "Scenario: Journalist investigates municipal service delivery disparities\n    Given residents in certain neighborhoods report neglected infrastructure\n    And the journalist suspects systematic discrimination\n    When the Observer analyzes municipal operations by neighborhood\n    Then the journalist sees pothole repairs average 2 days in white areas\n    And same repairs take 47 days in Black neighborhoods\n    And code enforcement targets rental properties in immigrant communities\n    And documents service quality correlating with neighborhood race and income\n    And publishes investigation exposing structural racism in city operations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

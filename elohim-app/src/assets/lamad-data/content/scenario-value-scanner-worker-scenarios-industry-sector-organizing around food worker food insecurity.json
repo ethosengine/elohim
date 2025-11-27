@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-organizing around food worker food insecurity",
+  "contentType": "scenario",
+  "title": "Organizing around food worker food insecurity",
+  "description": "Organizing around food worker food insecurity",
+  "content": "Scenario: Organizing around food worker food insecurity\n    Given food service workers often cannot afford adequate food despite preparing food\n    When this contradiction becomes visible\n    Then the protocol should help organize around food worker food security\n    And advocate for meal provisions as standard for food workers\n    And push for wages that enable workers to afford quality food\n    And make visible the injustice of hungry people feeding others\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-pension board member evaluates investment strategy balancing returns and values",
+  "contentType": "scenario",
+  "title": "Pension board member evaluates investment strategy balancing returns and values",
+  "description": "Pension board member evaluates investment strategy balancing returns and values",
+  "content": "Scenario: Pension board member evaluates investment strategy balancing returns and values\n    Given pension fund considers divesting from fossil fuel investments\n    And staff analysis emphasizes fiduciary duty and projected investment returns\n    And some beneficiaries advocate for climate-conscious investing\n    When the board member requests Observer independent analysis\n    Then they receive comparison of fossil fuel versus clean energy investment performance\n    And see examples from peer pension funds that divested with outcome data\n    And access analysis of climate risk to long-term portfolio value\n    And understand fiduciary duty in context of environmental and social factors\n    And independent analysis helps board balance competing considerations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:workplace_organizational",
+    "related_users:citizen,politician,activist,community_organizer,worker",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

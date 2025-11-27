@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-identifying technical error that strengthens appellant's case",
+  "contentType": "scenario",
+  "title": "Identifying technical error that strengthens appellant's case",
+  "description": "Identifying technical error that strengthens appellant's case",
+  "content": "Scenario: Identifying technical error that strengthens appellant's case\n    Given I audit agent reasoning for appeal\n    And I discover genuine technical mistake (like Wisconsin address confusion)\n    When I report the error to Constitutional Council\n    Then I explain: clearly what went wrong\n    And I assess: impact on the decision\n    And I recommend: whether decision should be overturned\n    And I serve: truth-telling over defending agents\n    And I strengthen: appellant's case when agent erred\n    And I demonstrate: that technical oversight is genuine\n    And my independence: makes expertise credible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-senior knowledge of waste reduction valued as ecological wisdom",
+  "contentType": "scenario",
+  "title": "Senior knowledge of waste reduction valued as ecological wisdom",
+  "description": "Senior knowledge of waste reduction valued as ecological wisdom",
+  "content": "Scenario: Senior knowledge of waste reduction valued as ecological wisdom\n    Given Margaret's generation learned to minimize waste\n    And reducing waste is both budget necessity and ecological imperative\n    When the bioregional_elohim tracks waste reduction practices\n    Then Margaret's waste minimization should be recognized\n    And her knowledge of using everything should be valued\n    And practices like saving containers, composting scraps should be tracked\n    And generational wisdom should inform community sustainability\n    And frugality should be reframed as ecological stewardship\n    And Margaret's practices should be teaching resource for younger generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

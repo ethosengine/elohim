@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-mentoring younger volunteers in construction and community work",
+  "contentType": "scenario",
+  "title": "Mentoring younger volunteers in construction and community work",
+  "description": "Mentoring younger volunteers in construction and community work",
+  "content": "Scenario: Mentoring younger volunteers in construction and community work\n    Given Frank has both construction expertise and volunteering experience\n    And younger volunteers need skill development and guidance\n    When the community_elohim coordinates mentoring\n    Then it should connect Frank to volunteers seeking construction skills\n    And facilitate teaching and skill transmission\n    And recognize mentoring as multiplying Frank's contribution\n    And value teaching labor as care contribution\n    And build community capacity through intergenerational skill sharing\n    And Frank should experience meaningful role as mentor and teacher\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist tracks city promises to accountability",
+  "contentType": "scenario",
+  "title": "Journalist tracks city promises to accountability",
+  "description": "Journalist tracks city promises to accountability",
+  "content": "Scenario: Journalist tracks city promises to accountability\n    Given city council approved affordable housing plan 3 years ago\n    And the journalist covered initial announcement and then moved on\n    When the Observer alerts on promise implementation timeline\n    Then the journalist investigates and finds only 12% of promised units built\n    And sees budget that was supposed to fund program redirected elsewhere\n    And identifies which council members voted for budget changes\n    And publishes accountability story on broken housing commitments\n    And politicians learn promises will be tracked and verified\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

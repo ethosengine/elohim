@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-including family in milestone celebrations appropriately",
+  "contentType": "scenario",
+  "title": "Including family in milestone celebrations appropriately",
+  "description": "Including family in milestone celebrations appropriately",
+  "content": "Scenario: Including family in milestone celebrations appropriately\n    Given Jordan is celebrating one year at their library job\n    And Jordan wants family to recognize this achievement\n    When Jordan plans a celebration\n    Then Jordan decides who to invite from family\n    And the personal_agent helps Jordan send invitations\n    And the celebration honors Jordan's accomplishment as a worker\n    And family celebrates Jordan's success, not just their participation\n    And Jordan experiences family recognizing their adult achievements\n    And Jordan's contributions are valued, not just their effort\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

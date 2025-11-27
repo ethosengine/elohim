@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-appeal agent decision that involved factual error",
+  "contentType": "scenario",
+  "title": "Appeal agent decision that involved factual error",
+  "description": "Appeal agent decision that involved factual error",
+  "content": "Scenario: Appeal agent decision that involved factual error\n    Given a Family Elohim agent denies teenager permission to attend event\n    And the agent based decision on incorrect data about event location\n    And the event was actually a volunteer environmental cleanup\n    When the teenager files an appeal citing factual error\n    Then the appeal is fast-tracked for factual verification\n    And peer agents cross-reference data sources\n    And the address parsing error is identified\n    And the original decision is immediately overturned\n    And the appellant receives acknowledgment of the error\n    And the error pattern is flagged for protocol improvement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

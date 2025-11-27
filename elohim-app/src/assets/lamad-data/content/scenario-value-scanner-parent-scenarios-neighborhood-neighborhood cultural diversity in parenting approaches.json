@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood cultural diversity in parenting approaches",
+  "contentType": "scenario",
+  "title": "Neighborhood cultural diversity in parenting approaches",
+  "description": "Neighborhood cultural diversity in parenting approaches",
+  "content": "Scenario: Neighborhood cultural diversity in parenting approaches\n    Given the neighborhood includes families from diverse cultures\n    And different cultures have different parenting practices\n    When the neighborhood_elohim coordinates across cultural differences\n    Then it should respect diverse parenting approaches\n    And it should facilitate cross-cultural learning\n    And it should prevent cultural imperialism in parenting norms\n    And diverse practices should be valued, not homogenized\n    And neighborhood care economy should be culturally inclusive\n    And the system should support multicultural community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

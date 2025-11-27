@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-household schedule coordination across four people",
+  "contentType": "scenario",
+  "title": "Household schedule coordination across four people",
+  "description": "Household schedule coordination across four people",
+  "content": "Scenario: Household schedule coordination across four people\n    Given Sarah coordinates schedules for herself, partner, Tommy, and Emma\n    And everyone has different needs, activities, and constraints\n    When Sarah manages the family calendar\n    Then the household_elohim should recognize this as complex coordination\n    And it should track the cognitive labor of schedule management\n    And it should value the dozens of micro-decisions required\n    And Sarah's coordination work should be made visible\n    And schedule management should accumulate significant care tokens\n    And this invisible orchestration should be recognized as skilled work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

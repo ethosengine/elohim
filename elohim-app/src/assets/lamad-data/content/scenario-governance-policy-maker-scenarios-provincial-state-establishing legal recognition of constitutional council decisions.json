@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-establishing legal recognition of constitutional council decisions",
+  "contentType": "scenario",
+  "title": "Establishing legal recognition of Constitutional Council decisions",
+  "description": "Establishing legal recognition of Constitutional Council decisions",
+  "content": "Scenario: Establishing legal recognition of Constitutional Council decisions\n    Given courts need to know how to treat council precedents\n    And government agencies must understand council authority\n    When I craft legislation recognizing council legitimacy\n    Then I establish: statutory basis for council decisions\n    And I specify: courts recognize precedents in protocol-related cases\n    And I ensure: agencies defer to council constitutional interpretation\n    And I maintain: judicial review for constitutional questions\n    And I create: legal framework for sortition governance\n    And councils gain: legitimacy within existing legal system\n    And new democratic form: integrates with traditional structures\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

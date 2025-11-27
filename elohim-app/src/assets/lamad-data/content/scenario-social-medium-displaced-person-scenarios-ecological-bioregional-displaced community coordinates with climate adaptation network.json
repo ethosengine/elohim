@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates with climate adaptation network",
+  "contentType": "scenario",
+  "title": "Displaced community coordinates with climate adaptation network",
+  "description": "Displaced community coordinates with climate adaptation network",
+  "content": "Scenario: Displaced community coordinates with climate adaptation network\n    Given multiple coastal communities face similar climate displacement\n    When they form a climate displacement affinity network\n    And they share strategies for community preservation\n    Then communities learn from each other's experiences\n    And successful resettlement patterns are documented and shared\n    And coordinated advocacy for climate displacement support emerges\n    And the network coordinates with climate justice activists\n    And systemic support for climate migrants is organized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:displaced_person",
+    "governance_layer:ecological_bioregional",
+    "related_users:activist,elder,community_moderator",
+    "related_layers:community,district,nation_state",
+    "elohim_agents:pattern_recognition_agent,coordination_agent,resource_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/displaced_person/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

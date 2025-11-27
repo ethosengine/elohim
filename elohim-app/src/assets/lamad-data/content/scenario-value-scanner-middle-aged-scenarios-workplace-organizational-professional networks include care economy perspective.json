@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-professional networks include care economy perspective",
+  "contentType": "scenario",
+  "title": "Professional networks include care economy perspective",
+  "description": "Professional networks include care economy perspective",
+  "content": "Scenario: Professional networks include care economy perspective\n    Given Robert participates in professional networks and associations\n    And professional networks often ignore care economy\n    And his networks could advance care economy professionally\n    When workplace_elohim supports professional network engagement\n    Then it should help Robert bring care economy perspective to professional networks\n    And support him in advocating within professional associations\n    And help him connect with other care economy professionals\n    And build professional networks that normalize care economy principles\n    And advance care economy through professional channels\n    And demonstrate that all professions can adopt care economy lens\n    And spread care economy principles through professional influence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,household,family,industry_sector",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

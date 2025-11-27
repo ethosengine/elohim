@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-coordinating support schedules respectfully",
+  "contentType": "scenario",
+  "title": "Coordinating support schedules respectfully",
+  "description": "Coordinating support schedules respectfully",
+  "content": "Scenario: Coordinating support schedules respectfully\n    Given the group home has support workers on rotating shifts\n    And each housemate has different support needs and preferences\n    When the household reviews the support schedule\n    Then Jordan can express preferences for support worker assignments\n    And the scheduling system honors Jordan's preferences when possible\n    And Jordan's input is weighted equally with other housemates\n    And the household_elohim coordinates fair schedule distribution\n    And Jordan experiences having voice in who supports them\n    And Jordan's preferences shape their daily life experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

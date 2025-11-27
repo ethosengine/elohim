@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-community-community celebrates farm as democratic institution and food security asset",
+  "contentType": "scenario",
+  "title": "Community celebrates farm as democratic institution and food security asset",
+  "description": "Community celebrates farm as democratic institution and food security asset",
+  "content": "Scenario: Community celebrates farm as democratic institution and food security asset\n    Given agricultural institutions are typically invisible or taken for granted\n    And democratic farm conversion represents major community achievement\n    When farm reaches milestones in democratic governance and community service\n    Then community celebrates with public events honoring farmworkers and transformation\n    And farm story becomes source of community pride and inspiration\n    And successful democratic farm model encourages other agricultural conversions\n    And community recognizes farm as essential democratic institution\n    And community_elohim coordinates celebration events and community farm storytelling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,small_business_owner]",
+    "related_layers:[workplace_organizational,industry_sector,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

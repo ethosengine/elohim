@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investment returns include documented environmental benefits",
+  "contentType": "scenario",
+  "title": "Investment returns include documented environmental benefits",
+  "description": "Investment returns include documented environmental benefits",
+  "content": "Scenario: Investment returns include documented environmental benefits\n    Given traditional investment ignores or externalizes environmental impacts\n    And Patricia wants to know investment's ecological effects\n    When democratic businesses document environmental stewardship\n    Then impact reports include: carbon sequestered, water quality protected, biodiversity supported\n    And environmental benefits are measured using bioregional ecological indicators\n    And investment returns are financial plus ecological restoration\n    And capital allocation becomes ecological stewardship tool\n    And bioregional_elohim provides environmental impact measurement and reporting\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

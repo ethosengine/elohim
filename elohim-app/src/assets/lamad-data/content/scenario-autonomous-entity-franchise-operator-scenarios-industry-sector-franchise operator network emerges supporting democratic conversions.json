@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator network emerges supporting democratic conversions",
+  "contentType": "scenario",
+  "title": "Franchise operator network emerges supporting democratic conversions",
+  "description": "Franchise operator network emerges supporting democratic conversions",
+  "content": "Scenario: Franchise operator network emerges supporting democratic conversions\n    Given franchise operators are typically isolated competing for corporate favor\n    And isolation prevents collective action against corporate extraction\n    When James connects with other operators considering conversion\n    Then franchise operator solidarity network forms\n    And operators share conversion strategies, legal resources, and emotional support\n    And coordinated multi-operator conversions increase leverage in corporate negotiations\n    And operator-to-operator mentoring spreads democratic conversion knowledge\n    And industry_sector_elohim facilitates operator network development and coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

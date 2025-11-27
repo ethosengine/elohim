@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-household transportation logistics for care provision",
+  "contentType": "scenario",
+  "title": "Household transportation logistics for care provision",
+  "description": "Household transportation logistics for care provision",
+  "content": "Scenario: Household transportation logistics for care provision\n    Given Margaret transports grandchildren to activities and appointments\n    And this uses household vehicle and resources\n    When the household_elohim tracks transportation\n    Then it should recognize transportation as care work\n    And it should track vehicle use, gas costs, wear and tear\n    And it should coordinate transportation between partners\n    And it should help determine when family should reimburse costs\n    And household transportation resources should be managed fairly\n    And both partners should share transportation care labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

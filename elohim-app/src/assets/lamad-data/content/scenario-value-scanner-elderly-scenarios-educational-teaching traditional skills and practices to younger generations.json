@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-teaching traditional skills and practices to younger generations",
+  "contentType": "scenario",
+  "title": "Teaching traditional skills and practices to younger generations",
+  "description": "Teaching traditional skills and practices to younger generations",
+  "content": "Scenario: Teaching traditional skills and practices to younger generations\n    Given Helen knows traditional household management, cooking, and crafts\n    And younger generations often lack these practical skills\n    When Helen teaches traditional knowledge\n    Then her expertise should be recognized and valued\n    And teaching opportunities should be coordinated\n    And her knowledge should be preserved through transmission\n    And care tokens should reflect her educational contributions\n    And the protocol should facilitate skills transfer from elders\n    And traditional knowledge should be valued in educational systems\n    And Helen should experience being needed for what she knows\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

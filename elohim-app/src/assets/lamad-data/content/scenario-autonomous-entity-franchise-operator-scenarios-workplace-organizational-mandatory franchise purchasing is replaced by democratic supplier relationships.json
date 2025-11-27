@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-mandatory franchise purchasing is replaced by democratic supplier relationships",
+  "contentType": "scenario",
+  "title": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
+  "description": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
+  "content": "Scenario: Mandatory franchise purchasing is replaced by democratic supplier relationships\n    Given franchise agreement required purchasing from corporate-approved vendors at markup\n    And local suppliers offering better quality and prices were prohibited\n    When purchasing autonomy is restored through franchise termination\n    Then workers establish direct relationships with Johnson Farm and local distributors\n    And supply costs decrease 30% through eliminating corporate markup\n    And quality improves through local sourcing and worker choice\n    And supplier relationships become partnerships, not corporate-mandated transactions\n    And workplace_elohim coordinates supply chain across EAE network\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

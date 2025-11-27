@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-crafting enabling legislation protecting protocol sovereignty",
+  "contentType": "scenario",
+  "title": "Crafting enabling legislation protecting protocol sovereignty",
+  "description": "Crafting enabling legislation protecting protocol sovereignty",
+  "content": "Scenario: Crafting enabling legislation protecting protocol sovereignty\n    Given I want to support democratic AI governance\n    And I must integrate protocol with existing state law\n    When I draft AI governance legislation\n    Then I create: legal recognition of Constitutional Council authority\n    And I establish: state funding for community protocol infrastructure\n    And I mandate: interoperability between government systems and protocol\n    And I protect: communities from corporate capture attempts\n    And I ensure: equitable access for poor communities\n    And my legislation: enables rather than controls protocol\n    And I empower: community sovereignty within legal framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

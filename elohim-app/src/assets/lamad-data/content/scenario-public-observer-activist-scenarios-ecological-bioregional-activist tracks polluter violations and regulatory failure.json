@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-ecological-bioregional-activist tracks polluter violations and regulatory failure",
+  "contentType": "scenario",
+  "title": "Activist tracks polluter violations and regulatory failure",
+  "description": "Activist tracks polluter violations and regulatory failure",
+  "content": "Scenario: Activist tracks polluter violations and regulatory failure\n    Given a facility near the activist's community violates air quality standards\n    And regulatory response seems inadequate\n    When the Observer documents violation history\n    Then the activist sees 47 violations over three years\n    And learns penalties were minimal and ineffective\n    And identifies which regulators approved permits despite violations\n    And exposes revolving door between industry and enforcement\n    And regulatory capture becomes visible and challengeable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_organizer,citizen,scientist",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,ecological_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-ecological-bioregional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

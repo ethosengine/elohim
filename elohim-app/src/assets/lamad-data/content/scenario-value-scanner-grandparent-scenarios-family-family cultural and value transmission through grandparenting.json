@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-family cultural and value transmission through grandparenting",
+  "contentType": "scenario",
+  "title": "Family cultural and value transmission through grandparenting",
+  "description": "Family cultural and value transmission through grandparenting",
+  "content": "Scenario: Family cultural and value transmission through grandparenting\n    Given Margaret carries family history, traditions, and values\n    And she teaches these to grandchildren through care relationship\n    When the family_elohim tracks cultural transmission\n    Then it should recognize this as valuable family work\n    And it should support Margaret's role as family culture keeper\n    And it should value intergenerational wisdom sharing\n    And cultural education should be recognized as care labor\n    And family identity should be strengthened across generations\n    And Margaret's teaching should be appreciated and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

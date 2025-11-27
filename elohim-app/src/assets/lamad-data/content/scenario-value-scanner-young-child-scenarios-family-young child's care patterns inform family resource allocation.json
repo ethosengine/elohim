@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-young child's care patterns inform family resource allocation",
+  "contentType": "scenario",
+  "title": "Young child's care patterns inform family resource allocation",
+  "description": "Young child's care patterns inform family resource allocation",
+  "content": "Scenario: Young child's care patterns inform family resource allocation\n    Given Tommy has established care contribution patterns\n    And the family makes resource allocation decisions\n    When the family_elohim analyzes care economy data\n    Then Tommy's care patterns should inform family planning\n    And his demonstrated care for Emma should be considered\n    And resource decisions should reflect all family members' contributions\n    And Tommy should experience being valued in family economics\n    And his care work should give him legitimate standing in family decisions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

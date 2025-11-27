@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-participating in neighborhood mutual aid networks",
+  "contentType": "scenario",
+  "title": "Participating in neighborhood mutual aid networks",
+  "description": "Participating in neighborhood mutual aid networks",
+  "content": "Scenario: Participating in neighborhood mutual aid networks\n    Given Margaret has time, skills, and motivation to help neighbors\n    And she also has needs that neighbors can help with\n    When the neighborhood_elohim coordinates mutual aid\n    Then Margaret should be connected to reciprocal care networks\n    And her contributions (childcare help, elder checking, skills) should be tracked\n    And support she receives (technology help, heavy lifting, transportation) should be tracked\n    And the framing should be mutual aid, not charity in either direction\n    And Margaret both gives and receives in neighborhood care economy\n    And dignity should be preserved through reciprocity framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

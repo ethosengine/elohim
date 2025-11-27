@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-national precedent creates appellant bill of rights",
+  "contentType": "scenario",
+  "title": "National precedent creates appellant bill of rights",
+  "description": "National precedent creates appellant bill of rights",
+  "content": "Scenario: National precedent creates appellant bill of rights\n    Given my case and similar appeals reveal patterns of dignity violations\n    And National Constitutional Council recognizes systemic gaps\n    When they craft comprehensive precedent from accumulated appeals\n    Then they establish detailed appellant rights framework\n    And They enumerate: right to explanation, right to be heard, right to escalation\n    And They specify: timelines, accessibility requirements, protection from retaliation\n    And They create: precedent search tools, representation rights, dignity guarantees\n    And The framework becomes national standard for all appeal processes\n    And My appeal contributes to constitutional articulation of procedural justice\n    And Future appellants benefit from clearer rights and stronger protections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-remote work essential for caregiver employment viability",
+  "contentType": "scenario",
+  "title": "Remote work essential for caregiver employment viability",
+  "description": "Remote work essential for caregiver employment viability",
+  "content": "Scenario: Remote work essential for caregiver employment viability\n    Given James cannot leave David alone for commuting and full workdays\n    And remote work makes part-time employment possible\n    When employment arrangements are structured\n    Then the workplace_elohim should advocate for remote work access\n    And remote work should be recognized as caregiving accommodation\n    And employers should understand caregivers depend on remote options\n    And workplace should support remote work for caregiving employees\n    And location flexibility should be caregiving accessibility issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,middle_aged,employee,contractor",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

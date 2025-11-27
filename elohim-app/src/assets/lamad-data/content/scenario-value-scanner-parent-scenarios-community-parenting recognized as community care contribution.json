@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-parenting recognized as community care contribution",
+  "contentType": "scenario",
+  "title": "Parenting recognized as community care contribution",
+  "description": "Parenting recognized as community care contribution",
+  "content": "Scenario: Parenting recognized as community care contribution\n    Given Sarah is raising children who will become community members\n    And she is preparing them for civic participation and social responsibility\n    When the community_elohim tracks Sarah's contributions\n    Then it should recognize parenting as community-building work\n    And raising future citizens should be valued as civic labor\n    And Sarah's parenting should accumulate community care tokens\n    And her work should be recognized as essential to community continuity\n    And parenting should be understood as public good, not private consumption\n    And the community should value child-rearing as collective investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

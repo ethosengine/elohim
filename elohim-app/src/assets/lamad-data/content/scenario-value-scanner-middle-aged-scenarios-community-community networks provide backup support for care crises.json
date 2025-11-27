@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-community-community networks provide backup support for care crises",
+  "contentType": "scenario",
+  "title": "Community networks provide backup support for care crises",
+  "description": "Community networks provide backup support for care crises",
+  "content": "Scenario: Community networks provide backup support for care crises\n    Given Robert manages complex care demands that could face crisis\n    And care crises happen: parent hospitalization, child emergency, personal illness\n    And community networks could provide emergency support\n    When community_elohim builds crisis resilience\n    Then it should connect Robert to community members who could help in crisis\n    And identify backup support for his various care responsibilities\n    And ensure he's not isolated when crisis hits\n    And recognize that his care contributions create reciprocal crisis support\n    And build community resilience through mutual aid networks\n    And demonstrate that care economy participation provides safety net\n    And prevent care crisis from becoming catastrophic\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:community",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,municipality,workplace_organizational,family",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-extreme budget management with $42k for four people",
+  "contentType": "scenario",
+  "title": "Extreme budget management with $42k for four people",
+  "description": "Extreme budget management with $42k for four people",
+  "content": "Scenario: Extreme budget management with $42k for four people\n    Given Maria supports four people on $42k annual income\n    And this requires maximizing every dollar\n    When Maria makes purchasing decisions\n    Then the household_elohim should track spending against severe constraints\n    And it should help her find the efficiency frontier for every category\n    And it should identify savings opportunities across housing, food, utilities, necessities\n    And it should help her make informed trade-offs between competing needs\n    And Maria should have sophisticated support for household economics under constraint\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm democratic conversion attracts younger generation to agriculture",
+  "contentType": "scenario",
+  "title": "Farm democratic conversion attracts younger generation to agriculture",
+  "description": "Farm democratic conversion attracts younger generation to agriculture",
+  "content": "Scenario: Farm democratic conversion attracts younger generation to agriculture\n    Given young people avoid agriculture due to low pay and lack of ownership pathway\n    And aging farmer population threatens agricultural knowledge and capacity loss\n    When democratic farm offers ownership, dignity, and fair compensation\n    Then young people consider agricultural careers with ownership potential\n    And generational knowledge transfer occurs through young farmworkers learning from elders\n    And sustainable agriculture future is secured through attracting next generation\n    And democratic model makes farming viable and attractive livelihood\n    And workplace_elohim documents youth engagement in democratic agriculture\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

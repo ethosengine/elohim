@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood food cooperative formation includes preteen family",
+  "contentType": "scenario",
+  "title": "Neighborhood food cooperative formation includes preteen family",
+  "description": "Neighborhood food cooperative formation includes preteen family",
+  "content": "Scenario: Neighborhood food cooperative formation includes preteen family\n    Given a food cooperative is forming in Marcus's neighborhood\n    And cooperative buying could reduce his family's grocery costs\n    When the neighborhood_elohim identifies the opportunity\n    Then Marcus's family should be informed about the cooperative\n    And the notification should say \"A food cooperative is forming\u2014your participation would strengthen it\"\n    And Marcus's care contributions should qualify family for membership\n    And cooperative participation should reduce his budget constraints\n    And neighborhood coordination should reduce individual family burden\n    And Marcus should learn that collective action creates better outcomes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

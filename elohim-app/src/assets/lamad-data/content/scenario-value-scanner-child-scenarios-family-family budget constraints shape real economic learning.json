@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-family budget constraints shape real economic learning",
+  "contentType": "scenario",
+  "title": "Family budget constraints shape real economic learning",
+  "description": "Family budget constraints shape real economic learning",
+  "content": "Scenario: Family budget constraints shape real economic learning\n    Given the family income is $40,000/year\n    And Emma is learning genuine resource constraint\n    When Emma makes purchasing decisions\n    Then her personal_agent should provide real budget information\n    And the agent should say \"We have $30 left for groceries this week\"\n    And Emma should experience actual financial limits\n    And her choices should have real impact on family resources\n    And she should learn stewardship through authentic constraint\n    And economic education should reflect family's actual circumstances\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

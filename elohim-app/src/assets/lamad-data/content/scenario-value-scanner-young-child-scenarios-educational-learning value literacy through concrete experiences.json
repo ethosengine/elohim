@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-learning value literacy through concrete experiences",
+  "contentType": "scenario",
+  "title": "Learning value literacy through concrete experiences",
+  "description": "Learning value literacy through concrete experiences",
+  "content": "Scenario: Learning value literacy through concrete experiences\n    Given Tommy is at the concrete operational stage of development\n    And abstract economic thinking has not yet developed\n    When Tommy uses the Value Scanner to make care decisions\n    Then learning should occur through direct, concrete experiences\n    And the personal_agent should present choices in tangible terms\n    And abstract concepts like \"opportunity cost\" should not be introduced\n    And Tommy should learn by doing: \"Strawberries for Emma\"\n    And value literacy should be built through action, not explanation\n    And neural pathways around care-based decision making should form\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

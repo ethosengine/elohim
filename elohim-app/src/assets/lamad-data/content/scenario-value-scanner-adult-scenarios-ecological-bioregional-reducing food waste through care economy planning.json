@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-reducing food waste through care economy planning",
+  "contentType": "scenario",
+  "title": "Reducing food waste through care economy planning",
+  "description": "Reducing food waste through care economy planning",
+  "content": "Scenario: Reducing food waste through care economy planning\n    Given household food waste has environmental and economic costs\n    And Sarah wants to minimize waste\n    When Sarah plans shopping and meals\n    Then the bioregional_elohim should help prevent overbuying\n    And it should track household consumption patterns\n    And it should suggest portions appropriate to family size\n    And food waste should be minimized through better planning\n    And care for food should include using what is purchased\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

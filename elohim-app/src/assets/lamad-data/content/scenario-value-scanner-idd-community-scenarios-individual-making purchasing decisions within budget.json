@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-making purchasing decisions within budget",
+  "contentType": "scenario",
+  "title": "Making purchasing decisions within budget",
+  "description": "Making purchasing decisions within budget",
+  "content": "Scenario: Making purchasing decisions within budget\n    Given Jordan receives a weekly personal allowance\n    And Jordan wants to buy something they enjoy\n    When Jordan uses the shopping feature at the store\n    Then the personal_agent shows Jordan's available money visually\n    And the interface helps Jordan compare item prices to their budget\n    And Jordan can choose what to buy within their means\n    And the system celebrates Jordan's smart money choices\n    And Jordan experiences genuine financial autonomy\n    And Jordan learns from their purchasing decisions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

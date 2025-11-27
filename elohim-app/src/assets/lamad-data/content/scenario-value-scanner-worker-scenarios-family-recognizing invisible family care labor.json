@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-recognizing invisible family care labor",
+  "contentType": "scenario",
+  "title": "Recognizing invisible family care labor",
+  "description": "Recognizing invisible family care labor",
+  "content": "Scenario: Recognizing invisible family care labor\n    Given I provide emotional support, communication, and coordination\n    Even when I cannot provide hands-on care\n    When family members track care contributions\n    Then the protocol should recognize all forms of care work\n    And make visible my emotional labor and communication work\n    And validate that staying connected is valuable care contribution\n    And ensure I am not invisibilized due to employment constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

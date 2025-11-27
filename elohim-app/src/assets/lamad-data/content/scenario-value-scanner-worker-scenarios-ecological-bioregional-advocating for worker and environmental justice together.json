@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for worker and environmental justice together",
+  "contentType": "scenario",
+  "title": "Advocating for worker and environmental justice together",
+  "description": "Advocating for worker and environmental justice together",
+  "content": "Scenario: Advocating for worker and environmental justice together\n    Given worker exploitation and environmental exploitation are connected\n    When I organize for worker dignity and fair compensation\n    Then the protocol should help me connect labor justice to ecological justice\n    And recognize that care economy serves both human and ecological flourishing\n    And support advocacy that addresses both worker conditions and environmental sustainability\n    And build movements connecting labor rights and environmental protection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

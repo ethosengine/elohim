@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-community-activist creates community organizing space",
+  "contentType": "scenario",
+  "title": "Activist creates community organizing space",
+  "description": "Activist creates community organizing space",
+  "content": "Scenario: Activist creates community organizing space\n    Given the activist wants to address local housing affordability\n    When they create a housing justice organizing space\n    And they invite community members through trusted connections\n    And they establish space charter emphasizing transparency and consensus\n    Then the organizing space is created at community layer\n    And invitations travel through web of trust\n    And the space has tools for decision-making and coordination\n    And community members can contribute safely within the space\n    And the moderation agent helps maintain healthy dialogue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_moderator,content_creator,elder,child",
+    "related_layers:individual,neighborhood,district",
+    "elohim_agents:moderation_agent,coordination_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

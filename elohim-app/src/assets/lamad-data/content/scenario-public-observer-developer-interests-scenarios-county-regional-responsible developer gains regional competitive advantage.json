@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer gains regional competitive advantage",
+  "contentType": "scenario",
+  "title": "Responsible developer gains regional competitive advantage",
+  "description": "Responsible developer gains regional competitive advantage",
+  "content": "Scenario: Responsible developer gains regional competitive advantage\n    Given a responsible developer consistently delivers promised benefits\n    And has positive track record across multiple jurisdictions\n    When the Observer makes regional reputation visible\n    Then the developer shows: projects in four counties all met commitments\n    And community feedback is consistently positive\n    And environmental standards were exceeded not just met\n    And regional reputation creates access to better opportunities\n    And integrity pays dividends across jurisdictional boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

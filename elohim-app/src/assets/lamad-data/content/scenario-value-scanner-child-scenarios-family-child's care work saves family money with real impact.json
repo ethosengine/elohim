@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-child's care work saves family money with real impact",
+  "contentType": "scenario",
+  "title": "Child's care work saves family money with real impact",
+  "description": "Child's care work saves family money with real impact",
+  "content": "Scenario: Child's care work saves family money with real impact\n    Given the family has tight budget constraints\n    And Emma chooses cost-effective options consistently\n    When Emma's choices accumulate over time\n    Then actual savings should be calculated and visible\n    And Emma should see concrete impact: \"Your choices saved $47 this month\"\n    And the family should be able to allocate savings to other needs\n    And Emma's stewardship should have measurable benefit\n    And economic contribution should be recognized as genuine help\n    And she should understand her agency affects family flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-informal elder checking and support network",
+  "contentType": "scenario",
+  "title": "Informal elder checking and support network",
+  "description": "Informal elder checking and support network",
+  "content": "Scenario: Informal elder checking and support network\n    Given multiple seniors live in the neighborhood\n    And Margaret is in the \"younger\" senior cohort\n    When the neighborhood_elohim coordinates elder support\n    Then Margaret should help check on older neighbors\n    And she should receive checking from younger neighbors\n    And gradual transitions in care needs should be supported\n    And no senior should be isolated or unseen\n    And neighborhood should notice if something is wrong\n    And informal care networks should prevent crisis\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional governance includes care economy participants",
+  "contentType": "scenario",
+  "title": "Bioregional governance includes care economy participants",
+  "description": "Bioregional governance includes care economy participants",
+  "content": "Scenario: Bioregional governance includes care economy participants\n    Given Sarah participates actively in bioregional care economy\n    And bioregional governance affects ecological health\n    When bioregional policy decisions are made\n    Then Sarah's care contributions should give her voice\n    And those who practice ecological care should influence ecological policy\n    And bioregional governance should be informed by care economy data\n    And care for land should create standing in land governance\n    And ecological democracy should include care economy participants\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-household-household care economy supplements for financial strain",
+  "contentType": "scenario",
+  "title": "Household care economy supplements for financial strain",
+  "description": "Household care economy supplements for financial strain",
+  "content": "Scenario: Household care economy supplements for financial strain\n    Given household income is severely reduced by caregiving\n    And care expenses are high and increasing\n    When household economic status is assessed\n    Then care token supplements should be available\n    And household should receive care economy financial support\n    And access should be dignified and non-stigmatizing\n    And care economy should function as household safety net\n    And financial support should recognize caregiving economic impact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:household",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

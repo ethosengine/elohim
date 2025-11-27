@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-balancing learning work with survival work",
+  "contentType": "scenario",
+  "title": "Balancing learning work with survival work",
+  "description": "Balancing learning work with survival work",
+  "content": "Scenario: Balancing learning work with survival work\n    Given Kenji must work 15 hours/week to afford basic expenses\n    And work hours compete with study time\n    When the educational_elohim helps Kenji balance competing demands\n    Then it should recognize the impossible tension between learning and survival\n    And it should help him optimize limited time across demands\n    And it should validate that he cannot do everything perfectly\n    And it should advocate for better institutional support for working students\n    And the system should recognize structural unfairness in student economics\n    And Kenji should not be blamed for constraints created by inadequate support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

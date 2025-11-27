@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-right to reduce or discontinue care provision with dignity",
+  "contentType": "scenario",
+  "title": "Right to reduce or discontinue care provision with dignity",
+  "description": "Right to reduce or discontinue care provision with dignity",
+  "content": "Scenario: Right to reduce or discontinue care provision with dignity\n    Given Margaret's care contributions are substantial but voluntary\n    And her capacity may change with health or life circumstances\n    When Margaret needs to reduce or stop grandparenting\n    Then the system should support this decision without stigma\n    And accumulated care tokens should remain hers regardless\n    And the family should have data showing her past contributions\n    And Margaret should be able to transition care with dignity\n    And she should not feel guilty for setting boundaries\n    And the protocol should enable graceful changes in care arrangements\n    And her autonomy over care provision must be absolute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

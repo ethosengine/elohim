@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal working parent policies informed by care economy data",
+  "contentType": "scenario",
+  "title": "Municipal working parent policies informed by care economy data",
+  "description": "Municipal working parent policies informed by care economy data",
+  "content": "Scenario: Municipal working parent policies informed by care economy data\n    Given Sarah balances full-time work with parenting\n    And municipal policy affects working parents' capacity to care\n    When municipal employment policies are considered\n    Then care economy data should show working parents' time constraints\n    And policy should recognize workers' care responsibilities\n    And municipal employers should adopt family-friendly policies\n    And Sarah's advocacy should be strengthened by care economy evidence\n    And municipal policy should support work-life integration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

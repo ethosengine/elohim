@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-studying global inequality in protocol access and benefits",
+  "contentType": "scenario",
+  "title": "Studying global inequality in protocol access and benefits",
+  "description": "Studying global inequality in protocol access and benefits",
+  "content": "Scenario: Studying global inequality in protocol access and benefits\n    Given I hypothesize protocol might exacerbate global inequality\n    And wealthy nations can afford infrastructure poor nations cannot\n    When I analyze distributional effects at global scale\n    Then I examine: adoption rates by national income and infrastructure\n    And I assess: whether benefits flow primarily to Global North\n    And I measure: whether protocol reduces or increases global inequality\n    And I explore: mechanisms of digital colonialism or democratic leveling\n    And I identify: barriers preventing equitable global adoption\n    And I advocate: for international funding and technology transfer\n    And My research serves: global justice by revealing inequities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

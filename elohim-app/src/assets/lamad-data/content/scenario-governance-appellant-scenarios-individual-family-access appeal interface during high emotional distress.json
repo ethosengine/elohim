@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-access appeal interface during high emotional distress",
+  "contentType": "scenario",
+  "title": "Access appeal interface during high emotional distress",
+  "description": "Access appeal interface during high emotional distress",
+  "content": "Scenario: Access appeal interface during high emotional distress\n    Given Marcus is experiencing mental health crisis\n    And Marcus wants to appeal the agent's intervention\n    When Marcus accesses the appeal interface\n    Then the interface uses simple language requiring no legal expertise\n    And the interface requires only: complaint description and desired outcome\n    And the interface supports voice input for those unable to type\n    And the interface provides language translation automatically\n    And the interface works on any device Marcus has available\n    And the interface saves progress if Marcus needs to step away\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

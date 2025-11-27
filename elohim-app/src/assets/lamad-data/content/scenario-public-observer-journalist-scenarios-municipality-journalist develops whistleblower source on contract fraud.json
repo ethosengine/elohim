@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist develops whistleblower source on contract fraud",
+  "contentType": "scenario",
+  "title": "Journalist develops whistleblower source on contract fraud",
+  "description": "Journalist develops whistleblower source on contract fraud",
+  "content": "Scenario: Journalist develops whistleblower source on contract fraud\n    Given a city employee witnesses fraudulent contracting\n    And fears retaliation for speaking to press\n    When the Observer provides secure anonymous channel\n    Then the whistleblower shares documents through protected system\n    And journalist receives evidence of no-bid contracts to connected firms\n    And investigates without exposing source identity\n    And publishes investigation based on documents and additional reporting\n    And source protection enables accountability journalism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

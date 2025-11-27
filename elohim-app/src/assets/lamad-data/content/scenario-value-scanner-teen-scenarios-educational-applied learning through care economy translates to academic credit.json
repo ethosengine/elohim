@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-applied learning through care economy translates to academic credit",
+  "contentType": "scenario",
+  "title": "Applied learning through care economy translates to academic credit",
+  "description": "Applied learning through care economy translates to academic credit",
+  "content": "Scenario: Applied learning through care economy translates to academic credit\n    Given Jasmine manages household budget and coordinates care work\n    And these activities involve mathematical reasoning, planning, and analysis\n    When educational_elohim analyzes her care economy participation\n    Then it should identify applicable learning in her care work\n    And surface opportunities for academic recognition\n    And connect to teachers: \"Jasmine's budget management demonstrates applied math skills\"\n    And support translation of care contributions into academic credit where appropriate\n    And recognize that learning happens across contexts, not just in classrooms\n    And validate that care work develops genuine capabilities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

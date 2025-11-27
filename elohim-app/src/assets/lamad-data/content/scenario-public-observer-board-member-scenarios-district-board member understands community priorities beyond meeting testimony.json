@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-district-board member understands community priorities beyond meeting testimony",
+  "contentType": "scenario",
+  "title": "Board member understands community priorities beyond meeting testimony",
+  "description": "Board member understands community priorities beyond meeting testimony",
+  "content": "Scenario: Board member understands community priorities beyond meeting testimony\n    Given board considers policy change to school calendar\n    And testimony at meeting is dominated by teachers union advocating position\n    And only 15 community members attended to testify\n    When the board member seeks community accountability data from Observer\n    Then they see survey data from thousands of district families on calendar preferences\n    And discover working families have different priorities than those who testified\n    And access childcare impact analysis showing consequences for different populations\n    And understand community needs beyond who has time to attend meetings\n    And community accountability helps board serve diverse constituent interests\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:district",
+    "related_users:citizen,parent,teacher,politician,activist",
+    "related_layers:municipality,community,educational",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

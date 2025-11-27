@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood resource sharing reduces individual household costs",
+  "contentType": "scenario",
+  "title": "Neighborhood resource sharing reduces individual household costs",
+  "description": "Neighborhood resource sharing reduces individual household costs",
+  "content": "Scenario: Neighborhood resource sharing reduces individual household costs\n    Given Sarah's household operates on limited budget\n    And neighbors have complementary resources and needs\n    When Sarah participates in neighborhood resource sharing\n    Then the neighborhood_elohim should coordinate bulk buying\n    And it should facilitate tool lending among neighbors\n    And it should enable childcare exchanges\n    And it should reduce costs through collective purchasing\n    And neighborhood cooperation should improve household economics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

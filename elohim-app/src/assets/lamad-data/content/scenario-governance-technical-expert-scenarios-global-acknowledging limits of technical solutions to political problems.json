@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-acknowledging limits of technical solutions to political problems",
+  "contentType": "scenario",
+  "title": "Acknowledging limits of technical solutions to political problems",
+  "description": "Acknowledging limits of technical solutions to political problems",
+  "content": "Scenario: Acknowledging limits of technical solutions to political problems\n    Given some delegates hope technology will solve governance challenges\n    And I must clarify what technology can and cannot do\n    When I testify about technical limits\n    Then I explain: technology enables but doesn't replace democratic choice\n    And I clarify: that AI cannot resolve fundamental values conflicts\n    And I acknowledge: many governance problems are political not technical\n    And I resist: techno-solutionism and engineering hubris\n    And I honor: that democracy is about human judgment not optimization\n    And I demonstrate: epistemic humility about technology's role\n    And I serve: realistic understanding of technical possibilities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

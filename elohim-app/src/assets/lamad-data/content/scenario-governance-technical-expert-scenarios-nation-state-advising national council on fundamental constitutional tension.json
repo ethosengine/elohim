@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-advising national council on fundamental constitutional tension",
+  "contentType": "scenario",
+  "title": "Advising National Council on fundamental constitutional tension",
+  "description": "Advising National Council on fundamental constitutional tension",
+  "content": "Scenario: Advising National Council on fundamental constitutional tension\n    Given National Council deliberates care vs privacy at constitutional level\n    And technical capabilities shape what's constitutionally possible\n    When I testify about technical constraints and possibilities\n    Then I explain: what surveillance capabilities would enable better care\n    And I clarify: technical limits on achieving privacy while providing protection\n    And I present: tradeoff between optimization and dignity\n    And I stop: before dictating which values should prevail\n    And I inform: constitutional interpretation with technical reality\n    And I respect: that council must choose values not just optimize outcomes\n    And I demonstrate: expertise serving democratic judgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

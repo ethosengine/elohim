@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-maintaining neighborhood relationships across class differences",
+  "contentType": "scenario",
+  "title": "Maintaining neighborhood relationships across class differences",
+  "description": "Maintaining neighborhood relationships across class differences",
+  "content": "Scenario: Maintaining neighborhood relationships across class differences\n    Given Margaret has limited income but middle-class background\n    And the neighborhood may have economic diversity\n    When the neighborhood_elohim facilitates connections\n    Then Margaret should be connected across economic boundaries\n    And her value should not depend on financial resources\n    And care contributions should create cross-class solidarity\n    And the neighborhood should value all members' contributions\n    And economic diversity should strengthen rather than divide\n    And Margaret's care economy participation should bridge differences\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

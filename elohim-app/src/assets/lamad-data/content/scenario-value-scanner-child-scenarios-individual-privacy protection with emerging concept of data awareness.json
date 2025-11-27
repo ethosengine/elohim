@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-privacy protection with emerging concept of data awareness",
+  "contentType": "scenario",
+  "title": "Privacy protection with emerging concept of data awareness",
+  "description": "Privacy protection with emerging concept of data awareness",
+  "content": "Scenario: Privacy protection with emerging concept of data awareness\n    Given Emma's choices and decision patterns are being tracked\n    And she is beginning to understand privacy concepts\n    When Emma's data is collected\n    Then all data must stay encrypted on family devices\n    And no commercial exploitation should occur\n    And Emma should receive age-appropriate education about privacy\n    And she should learn why data protection matters\n    And the agent should explain \"Your information is private and protected\"\n    And Emma should begin understanding data as something to steward\n    And consent education should begin at this developmental stage\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

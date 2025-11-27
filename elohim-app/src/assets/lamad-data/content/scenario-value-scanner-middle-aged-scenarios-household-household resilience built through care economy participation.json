@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-household-household resilience built through care economy participation",
+  "contentType": "scenario",
+  "title": "Household resilience built through care economy participation",
+  "description": "Household resilience built through care economy participation",
+  "content": "Scenario: Household resilience built through care economy participation\n    Given Robert and Jennifer manage enormous complexity\n    And they face potential crises: parent health emergencies, child crises, financial shocks\n    When household_elohim builds resilience\n    Then it should help them build emergency preparedness\n    And connect them to community resources that can provide backup support\n    And ensure they have networks to lean on in crisis\n    And recognize that care economy participation builds reciprocal support\n    And surface their accumulated social capital\n    And help them understand that their care contributions create household resilience\n    And support sustainable household functioning amid unpredictable demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:household",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

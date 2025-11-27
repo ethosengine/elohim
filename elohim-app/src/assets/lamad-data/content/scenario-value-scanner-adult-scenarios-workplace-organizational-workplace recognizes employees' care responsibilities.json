@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace recognizes employees' care responsibilities",
+  "contentType": "scenario",
+  "title": "Workplace recognizes employees' care responsibilities",
+  "description": "Workplace recognizes employees' care responsibilities",
+  "content": "Scenario: Workplace recognizes employees' care responsibilities\n    Given Sarah balances full-time teaching with intensive parenting\n    And her care responsibilities affect her work capacity\n    When workplace policies are designed\n    Then the workplace_elohim should make employees' care work visible\n    And Sarah's care responsibilities should be recognized, not ignored\n    And workplace should acknowledge that workers have lives beyond employment\n    And policies should support work-care integration, not create conflict\n    And care economy should inform workplace culture\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

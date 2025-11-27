@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-transition steward compensation reflects expertise without recreating extraction",
+  "contentType": "scenario",
+  "title": "Transition steward compensation reflects expertise without recreating extraction",
+  "description": "Transition steward compensation reflects expertise without recreating extraction",
+  "content": "Scenario: Transition steward compensation reflects expertise without recreating extraction\n    Given Rosa receives $55K annually for coordination and knowledge transfer\n    And this must be fair without enabling exploitation\n    When steward compensation is evaluated democratically\n    Then workers verify Rosa's salary is justified by coordination value\n    And compensation is transparent and subject to democratic approval\n    And Rosa cannot use steward role to reclaim ownership control\n    And after two years, role ends with clear transition to worker autonomy\n    And workplace_elohim monitors to prevent steward role from becoming new hierarchy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

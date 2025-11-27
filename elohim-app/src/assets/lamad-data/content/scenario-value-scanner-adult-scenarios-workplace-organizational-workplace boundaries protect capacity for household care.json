@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace boundaries protect capacity for household care",
+  "contentType": "scenario",
+  "title": "Workplace boundaries protect capacity for household care",
+  "description": "Workplace boundaries protect capacity for household care",
+  "content": "Scenario: Workplace boundaries protect capacity for household care\n    Given Sarah's care responsibilities require substantial time and energy\n    And work can expand to consume all available capacity\n    When workplace demands are placed on Sarah\n    Then the workplace_elohim should monitor total demands\n    And it should alert Sarah when work threatens care capacity\n    And it should help her maintain boundaries\n    And workplace should respect that Sarah has legitimate care obligations\n    And boundaries should protect Sarah's sustainability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-alex mentors other disabled neighbors in advocacy",
+  "contentType": "scenario",
+  "title": "Alex mentors other disabled neighbors in advocacy",
+  "description": "Alex mentors other disabled neighbors in advocacy",
+  "content": "Scenario: Alex mentors other disabled neighbors in advocacy\n    Given other disabled people live in the neighborhood\n    And many lack confidence in self-advocacy\n    When Alex supports other disabled neighbors\n    Then this peer mentoring should be recognized as care work\n    And the neighborhood_elohim should track Alex's support to disabled community\n    And Alex's disability expertise benefits other residents significantly\n    And peer support should accumulate care tokens appropriately\n    And Alex's leadership in disability community should be valued\n    And mentoring should be seen as sophisticated care labor\n    And the protocol should recognize Alex's role building disability solidarity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:neighborhood",
+    "related_users:adult,elderly,parent,child,caregiver",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

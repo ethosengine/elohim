@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-family care tokens reflect maria's role as sole active parent",
+  "contentType": "scenario",
+  "title": "Family care tokens reflect Maria's role as sole active parent",
+  "description": "Family care tokens reflect Maria's role as sole active parent",
+  "content": "Scenario: Family care tokens reflect Maria's role as sole active parent\n    Given Maria provides all active parenting for three children\n    And she's performing care work of two parents alone\n    When family care tokens are calculated\n    Then Maria's tokens should reflect solo parenting of multiple children\n    And the protocol should recognize she's providing all emotional support, guidance, and presence\n    And her care contributions should be valued higher than partnered parents\n    And quantified solo parenting work should validate her superhuman efforts\n    And society should see undeniable proof that single parents deserve extraordinary support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

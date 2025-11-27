@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-managing sibling conflicts with no co-parent to tag team",
+  "contentType": "scenario",
+  "title": "Managing sibling conflicts with no co-parent to tag team",
+  "description": "Managing sibling conflicts with no co-parent to tag team",
+  "content": "Scenario: Managing sibling conflicts with no co-parent to tag team\n    Given children will conflict with each other\n    And Maria handles all conflict resolution alone with no one to tag in\n    When sibling conflicts arise\n    Then the family_elohim should provide conflict resolution guidance\n    And it should help Maria address conflicts fairly and age-appropriately\n    And it should remind her to stay calm when she's the only adult managing chaos\n    And it should prevent her exhaustion from leading to ineffective responses\n    And Maria should successfully navigate sibling dynamics without co-parent backup\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

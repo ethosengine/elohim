@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-workplace-organizational-understanding labor rights as student worker",
+  "contentType": "scenario",
+  "title": "Understanding labor rights as student worker",
+  "description": "Understanding labor rights as student worker",
+  "content": "Scenario: Understanding labor rights as student worker\n    Given Kenji has same labor rights as any employee\n    And many students don't know their workplace rights\n    When the workplace_elohim educates Kenji about labor law\n    Then it should teach him about breaks, overtime, workplace safety\n    And it should inform him of right to organize and unionize\n    And it should help him recognize illegal employer practices\n    And it should empower him to advocate for fair treatment\n    And the system should build Kenji's labor rights literacy\n    And student workers should know and exercise their rights\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employee,young_adult,manager",
+    "related_layers:individual,educational,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

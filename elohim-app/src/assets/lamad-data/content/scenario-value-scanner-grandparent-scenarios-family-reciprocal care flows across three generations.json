@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-reciprocal care flows across three generations",
+  "contentType": "scenario",
+  "title": "Reciprocal care flows across three generations",
+  "description": "Reciprocal care flows across three generations",
+  "content": "Scenario: Reciprocal care flows across three generations\n    Given Margaret receives some support from Sarah as she ages\n    And Margaret provides childcare for Sarah's children\n    And Margaret provides elder care for her own mother\n    When the family_elohim analyzes multigenerational care patterns\n    Then it should show care flowing in multiple directions\n    And it should ensure care is not unidirectionally extractive\n    And it should recognize reciprocity across time and generations\n    And family relationships should be based on mutual support\n    And care economy should be sustainable across generations\n    And the system should enable healthy multigenerational care patterns\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

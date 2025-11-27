@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-workplace-organizational-activist connects workplace justice to municipal budget",
+  "contentType": "scenario",
+  "title": "Activist connects workplace justice to municipal budget",
+  "description": "Activist connects workplace justice to municipal budget",
+  "content": "Scenario: Activist connects workplace justice to municipal budget\n    Given city approved $5M tax break for developer\n    But refused to fund $500K worker center\n    When the Observer makes budget trade-offs visible\n    Then the activist exposes value priorities (corporate welfare vs worker support)\n    And shows developer already profitable without subsidy\n    And demonstrates worker center's community economic impact\n    And organizes campaign to redirect public resources\n    And municipal priorities become labor justice battleground\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,community_organizer,politician",
+    "related_layers:municipality,industry_sector,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-managing neighborhood privacy while building community connections",
+  "contentType": "scenario",
+  "title": "Managing neighborhood privacy while building community connections",
+  "description": "Managing neighborhood privacy while building community connections",
+  "content": "Scenario: Managing neighborhood privacy while building community connections\n    Given I need privacy about my location and circumstances for safety\n    And I also need genuine community connections\n    When I balance privacy protection with community participation\n    Then the Value Scanner helps me maintain appropriate boundaries\n    And guides what's safe to disclose in neighborhood context\n    And validates that selective disclosure is appropriate\n    And helps me build authentic connections without oversharing\n    And tracks who knows what about my situation\n    And my personal_agent alerts me to privacy risks\n    And recognizes boundary management as constant cognitive work\n    And supports both safety and genuine belonging\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

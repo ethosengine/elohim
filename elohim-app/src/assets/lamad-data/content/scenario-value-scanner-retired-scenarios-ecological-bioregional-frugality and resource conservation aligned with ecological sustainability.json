@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-frugality and resource conservation aligned with ecological sustainability",
+  "contentType": "scenario",
+  "title": "Frugality and resource conservation aligned with ecological sustainability",
+  "description": "Frugality and resource conservation aligned with ecological sustainability",
+  "content": "Scenario: Frugality and resource conservation aligned with ecological sustainability\n    Given Frank lives on fixed income requiring careful resource management\n    And resource conservation serves both budget and ecological goals\n    When the bioregional_elohim tracks resource use\n    Then it should recognize Frank's frugality as ecological practice\n    And resource optimization should be framed as stewardship, not just scarcity\n    And his careful consumption should be valued as ecological wisdom\n    And practices like reducing waste and buying quality should be celebrated\n    And economic constraint should be understood as ecological virtue\n    And Frank's lifestyle should model sustainable consumption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

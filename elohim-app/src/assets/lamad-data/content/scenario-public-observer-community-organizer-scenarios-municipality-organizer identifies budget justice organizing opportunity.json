@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer identifies budget justice organizing opportunity",
+  "contentType": "scenario",
+  "title": "Organizer identifies budget justice organizing opportunity",
+  "description": "Organizer identifies budget justice organizing opportunity",
+  "content": "Scenario: Organizer identifies budget justice organizing opportunity\n    Given city council will vote on annual budget in three weeks\n    And proposed cuts affect services in low-income neighborhoods\n    When the Observer surfaces the organizing opportunity\n    Then the organizer receives early alert with enough time to organize\n    And sees which communities are most affected by cuts\n    And gets analysis of budget trade-offs and alternatives\n    And identifies decision points where testimony will have impact\n    And three weeks allows for education, coalition building, and mobilization\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,politician,journalist",
+    "related_layers:community,district,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-advocating for community support of workers",
+  "contentType": "scenario",
+  "title": "Advocating for community support of workers",
+  "description": "Advocating for community support of workers",
+  "content": "Scenario: Advocating for community support of workers\n    Given workers are systematically underpaid and overworked\n    When I want to advocate for community support of workers\n    Then the protocol should help me organize advocacy\n    And connect me with other workers for collective action\n    And support pushing for living wage campaigns and worker protections\n    And build community culture that values worker dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

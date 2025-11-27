@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-community support for parent mental health and well-being",
+  "contentType": "scenario",
+  "title": "Community support for parent mental health and well-being",
+  "description": "Community support for parent mental health and well-being",
+  "content": "Scenario: Community support for parent mental health and well-being\n    Given parenting is intense work with high burnout risk\n    And Sarah needs community support to sustain care work\n    When the community_elohim assesses parent well-being\n    Then it should connect Sarah to mental health resources\n    And it should provide respite care and support services\n    And the community should invest in parent sustainability\n    And parent well-being should be recognized as community priority\n    And the system should prevent parent burnout through community care\n    And supporting parents should be understood as supporting children\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

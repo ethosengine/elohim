@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-palliative care integration as disease progresses",
+  "contentType": "scenario",
+  "title": "Palliative care integration as disease progresses",
+  "description": "Palliative care integration as disease progresses",
+  "content": "Scenario: Palliative care integration as disease progresses\n    Given Alzheimer's is progressive and eventually terminal\n    And palliative care improves quality of life before end stage\n    When the healthcare_elohim considers palliative care\n    Then it should introduce palliative care discussions early\n    And it should coordinate palliative services with disease management\n    And it should ensure David's comfort and dignity are prioritized\n    And James should have support for progressive care needs\n    And healthcare should include palliative approach throughout disease\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-community-community mutual aid network provides support during crisis",
+  "contentType": "scenario",
+  "title": "Community mutual aid network provides support during crisis",
+  "description": "Community mutual aid network provides support during crisis",
+  "content": "Scenario: Community mutual aid network provides support during crisis\n    Given Sarah or community members may face crises\n    And traditional systems often fail to provide adequate support\n    When Sarah experiences job loss, health emergency, or family crisis\n    Then the community_elohim should connect her to mutual aid network\n    And support should be immediate, dignified, and effective\n    And community should function as safety net\n    And Sarah's previous contributions should enable access to help\n    And mutual aid should be reciprocal and community-based\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:community",
+    "related_users:parent,worker,educator,caregiver,community_member",
+    "related_layers:neighborhood,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

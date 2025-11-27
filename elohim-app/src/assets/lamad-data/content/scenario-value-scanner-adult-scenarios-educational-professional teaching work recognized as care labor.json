@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-professional teaching work recognized as care labor",
+  "contentType": "scenario",
+  "title": "Professional teaching work recognized as care labor",
+  "description": "Professional teaching work recognized as care labor",
+  "content": "Scenario: Professional teaching work recognized as care labor\n    Given Sarah works full-time as a teacher\n    And education is one of society's most important care functions\n    When Sarah's professional work is tracked in care economy\n    Then teaching should be recognized as care labor\n    And the educational_elohim should quantify Sarah's care contributions to students\n    And professional education should be valued alongside household care\n    And Sarah should see her career as care work, not separate from care economy\n    And teaching should be explicitly valued as caring for next generation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

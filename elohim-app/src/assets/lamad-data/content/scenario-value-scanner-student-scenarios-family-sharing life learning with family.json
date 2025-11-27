@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-sharing life learning with family",
+  "contentType": "scenario",
+  "title": "Sharing life learning with family",
+  "description": "Sharing life learning with family",
+  "content": "Scenario: Sharing life learning with family\n    Given Kenji is developing new knowledge and capabilities\n    And his learning could benefit family members\n    When Kenji shares environmental science knowledge with family\n    Then the family_elohim should recognize teaching family as care contribution\n    And it should value knowledge transfer from student to parents\n    And it should recognize reverse mentoring (young teaching old) as valid\n    And Kenji's education should benefit whole family, not just himself\n    And the system should value educational contributions to family\n    And students should be recognized as bringing new knowledge to family\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

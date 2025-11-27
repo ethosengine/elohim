@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-individual-activist establishes protected digital identity",
+  "contentType": "scenario",
+  "title": "Activist establishes protected digital identity",
+  "description": "Activist establishes protected digital identity",
+  "content": "Scenario: Activist establishes protected digital identity\n    Given the activist is setting up their personal node\n    When they configure their activist identity with privacy controls\n    And they designate trusted sanctuary institutions for backup\n    And they enable multi-factor authentication with biometric verification\n    Then their identity is cryptographically secured on their personal node\n    And their data is encrypted end-to-end\n    And sanctuary protocols are established with designated institutions\n    And the system confirms digital sovereignty is established\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:individual",
+    "related_users:community_moderator,content_creator",
+    "related_layers:community,affinity_network",
+    "elohim_agents:protection_agent,sanctuary_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-individual",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-individual",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-household waste reduction on limited budget",
+  "contentType": "scenario",
+  "title": "Household waste reduction on limited budget",
+  "description": "Household waste reduction on limited budget",
+  "content": "Scenario: Household waste reduction on limited budget\n    Given Aisha wants to reduce waste\n    And she has limited resources to invest in sustainability\n    When the personal_agent analyzes household waste patterns\n    Then it should identify specific reduction opportunities\n    And it should suggest affordable waste reduction strategies\n    And it should track improvement over time\n    And recommendations should balance sustainability and budget constraints\n    And Aisha should build sustainable household practices within her means\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

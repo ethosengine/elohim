@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood care tokens reflect accumulated contributions",
+  "contentType": "scenario",
+  "title": "Neighborhood care tokens reflect accumulated contributions",
+  "description": "Neighborhood care tokens reflect accumulated contributions",
+  "content": "Scenario: Neighborhood care tokens reflect accumulated contributions\n    Given Frank contributes through council service, repairs, and relationship-building\n    And he's invested decades in neighborhood relationships\n    When the neighborhood_elohim calculates care tokens\n    Then tokens should accumulate from all Frank's neighborhood contributions\n    And governance participation, skilled labor, and social cohesion work should be valued\n    And accumulated tokens should represent neighborhood standing and resources\n    And Frank's contributions should create claims on neighborhood support\n    And the care economy should recognize long-term neighborhood investment\n    And his participation should be visible and celebrated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

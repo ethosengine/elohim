@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-adult children supported in independence while teaching care economy",
+  "contentType": "scenario",
+  "title": "Adult children supported in independence while teaching care economy",
+  "description": "Adult children supported in independence while teaching care economy",
+  "content": "Scenario: Adult children supported in independence while teaching care economy\n    Given Robert's children ages 19 and 22 are establishing independence\n    And Robert provides financial support, guidance, and care economy education\n    When family_elohim tracks the parent-adult child relationship\n    Then it should recognize Robert's support contributions\n    And help him teach care economy principles to his children\n    And surface opportunities: \"Jordan could help coordinate grandmother's birthday celebration\"\n    And model multigenerational care reciprocity for the next generation\n    And support the transition from parenting to adult partnership\n    And help his children learn that care flows in multiple directions\n    And prepare them to eventually care for him\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

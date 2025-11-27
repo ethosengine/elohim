@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-personal agent preserves margaret's identity beyond grandparenting",
+  "contentType": "scenario",
+  "title": "Personal agent preserves Margaret's identity beyond grandparenting",
+  "description": "Personal agent preserves Margaret's identity beyond grandparenting",
+  "content": "Scenario: Personal agent preserves Margaret's identity beyond grandparenting\n    Given Margaret has her own interests, friendships, and development goals\n    And she is not defined solely by caregiving roles\n    When Margaret's personal_agent tracks her activities\n    Then it should recognize time spent on her own hobbies and interests\n    And it should encourage balance between caregiving and personal growth\n    And it should protect space for Margaret's continued development\n    And it should affirm that her value extends beyond utility\n    And Margaret should experience herself as a whole person\n    And the system should prevent her identity collapse into \"just grandma\"\n    And her autonomy and personhood should be continuously affirmed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

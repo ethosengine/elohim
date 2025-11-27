@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-frugality as environmental practice recognized and valued",
+  "contentType": "scenario",
+  "title": "Frugality as environmental practice recognized and valued",
+  "description": "Frugality as environmental practice recognized and valued",
+  "content": "Scenario: Frugality as environmental practice recognized and valued\n    Given Helen's resource constraint requires careful consumption\n    And frugality reduces environmental impact\n    When Helen makes resource-conscious decisions\n    Then her frugality should be recognized as environmental stewardship\n    And poverty should not be stigmatized when it reduces consumption\n    And her low-impact lifestyle should be valued, not pitied\n    And care tokens should reflect environmental benefit of reduced consumption\n    And the protocol should challenge assumption that consumption equals flourishing\n    And Helen's economic constraint should be reframed as ecological wisdom\n    And environmental movement should learn from those who live with less by necessity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_member,environmental_steward,young_adult",
+    "related_layers:community,educational,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

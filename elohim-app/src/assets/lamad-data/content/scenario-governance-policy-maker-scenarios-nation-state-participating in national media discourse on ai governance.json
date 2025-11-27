@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-participating in national media discourse on ai governance",
+  "contentType": "scenario",
+  "title": "Participating in national media discourse on AI governance",
+  "description": "Participating in national media discourse on AI governance",
+  "content": "Scenario: Participating in national media discourse on AI governance\n    Given public understanding shapes political will\n    And my voice carries weight as committee chair\n    When I engage in public education\n    Then I explain: why democratic AI governance matters\n    And I describe: how protocol works and what's at stake\n    And I acknowledge: uncertainties and limitations\n    And I present: alternatives honestly (corporate control, heavy regulation, protocol)\n    And I make: case for democratic choice\n    And I avoid: partisan framing or ideological advocacy\n    And I serve: informed democratic deliberation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

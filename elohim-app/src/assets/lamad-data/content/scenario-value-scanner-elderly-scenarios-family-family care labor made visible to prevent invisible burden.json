@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-family care labor made visible to prevent invisible burden",
+  "contentType": "scenario",
+  "title": "Family care labor made visible to prevent invisible burden",
+  "description": "Family care labor made visible to prevent invisible burden",
+  "content": "Scenario: Family care labor made visible to prevent invisible burden\n    Given Helen's daughter Sarah provides substantial weekly care\n    And Sarah also works and has her own children\n    When Sarah assists Helen with shopping, appointments, and household tasks\n    Then the family_elohim should make this care work visible\n    And Sarah's care labor should be recognized with care tokens\n    And the family should see Sarah's contribution quantified\n    And Sarah should not feel guilty about needing recognition\n    And Helen should understand the care Sarah provides\n    And the protocol should prevent invisible exploitation of family caregivers\n    And care work should be valued, not taken for granted\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

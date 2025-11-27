@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-connecting classroom learning to lived experience",
+  "contentType": "scenario",
+  "title": "Connecting classroom learning to lived experience",
+  "description": "Connecting classroom learning to lived experience",
+  "content": "Scenario: Connecting classroom learning to lived experience\n    Given Kenji learns economic theory in classes\n    And he lives care economy reality daily in his household\n    When the educational_elohim bridges theory and practice\n    Then it should help Kenji see connections between academic concepts and daily life\n    And it should validate his experiential knowledge as real learning\n    And it should show how his household management applies economic principles\n    And lived experience should be recognized as legitimate knowledge source\n    And the system should integrate academic and experiential learning\n    And Kenji's practical care economy work should inform his academic understanding\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

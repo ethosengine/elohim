@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood social cohesion work valued as care contribution",
+  "contentType": "scenario",
+  "title": "Neighborhood social cohesion work valued as care contribution",
+  "description": "Neighborhood social cohesion work valued as care contribution",
+  "content": "Scenario: Neighborhood social cohesion work valued as care contribution\n    Given Frank builds relationships across the neighborhood\n    And he organizes informal gatherings and supports connections\n    And social cohesion is essential neighborhood infrastructure\n    When the neighborhood_elohim tracks relationship-building work\n    Then Frank's social cohesion labor should be recognized\n    And organizing gatherings, welcoming newcomers, maintaining connections should be valued\n    And the invisible work of community-building should be quantified\n    And Frank should experience his relationship work as valuable contribution\n    And neighborhood resilience should be understood as built through care labor\n    And his decades of relationship investment should be visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

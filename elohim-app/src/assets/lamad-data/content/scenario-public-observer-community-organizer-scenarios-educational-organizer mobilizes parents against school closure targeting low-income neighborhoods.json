@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
+  "contentType": "scenario",
+  "title": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
+  "description": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
+  "content": "Scenario: Organizer mobilizes parents against school closure targeting low-income neighborhoods\n    Given district proposes closing three schools in working-class areas\n    And claims it's necessary for \"efficiency\"\n    When the organizer uses Observer to analyze closure impacts\n    Then they show closures increase commute times for low-income families\n    And demonstrate stable enrollment contradicting district claims\n    And calculate cost of closure to affected communities\n    And organize parents to demand community-based solutions\n    And education organizing prevents harm to vulnerable students\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:educational",
+    "related_users:parent,activist,citizen,board_member",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

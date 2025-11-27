@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-provincial-state-journalist collaborates with local reporters on state policy impacts",
+  "contentType": "scenario",
+  "title": "Journalist collaborates with local reporters on state policy impacts",
+  "description": "Journalist collaborates with local reporters on state policy impacts",
+  "content": "Scenario: Journalist collaborates with local reporters on state policy impacts\n    Given state budget cuts affect services across all communities\n    And the journalist coordinates with local reporters statewide\n    When the Observer provides shared state surveillance infrastructure\n    Then all journalists access same comprehensive state policy data\n    And local reporters show impacts in their specific communities\n    And state reporter synthesizes statewide pattern\n    And collaborative investigation publishes simultaneously across outlets\n    And state policy accountability serves whole state not just capital\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:provincial_state",
+    "related_users:journalist,politician,activist,citizen,teacher",
+    "related_layers:municipality,county_regional,national",
+    "elohim_agents:public_observer,state_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-community-creator collaborates with activists on community campaign",
+  "contentType": "scenario",
+  "title": "Creator collaborates with activists on community campaign",
+  "description": "Creator collaborates with activists on community campaign",
+  "content": "Scenario: Creator collaborates with activists on community campaign\n    Given Riverside is organizing for better public transportation\n    When Sam creates content documenting the transit challenges\n    And activists provide data and community testimonials\n    Then evidence-based storytelling supports the campaign\n    And content earns reach through verified community impact\n    And the campaign builds support through quality documentation\n    And Sam's work serves community organizing without manipulation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:community",
+    "related_users:community_moderator,elder,child",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:verification_agent,community_value_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

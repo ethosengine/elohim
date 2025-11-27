@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-multigenerational teaching about ecological care responsibility",
+  "contentType": "scenario",
+  "title": "Multigenerational teaching about ecological care responsibility",
+  "description": "Multigenerational teaching about ecological care responsibility",
+  "content": "Scenario: Multigenerational teaching about ecological care responsibility\n    Given Robert teaches values to children and grandchildren through practice\n    And ecological sustainability requires intergenerational commitment\n    And his generation must prepare next generation for ecological challenges\n    When bioregional_elohim supports ecological education\n    Then it should help Robert model ecological care practices for younger generations\n    And surface teaching opportunities through everyday choices\n    And recognize: \"Your composting practice teaches grandchildren about waste reduction\"\n    And support him in explaining ecological choices to family\n    And build intergenerational ecological literacy through practice\n    And demonstrate that ecological care is care economy responsibility\n    And prepare next generation for ecological stewardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

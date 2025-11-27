@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-continuing education about rights and entitlements",
+  "contentType": "scenario",
+  "title": "Continuing education about rights and entitlements",
+  "description": "Continuing education about rights and entitlements",
+  "content": "Scenario: Continuing education about rights and entitlements\n    Given Jordan has rights as a person with disabilities\n    And knowing rights supports self-advocacy\n    When Jordan participates in rights education\n    Then Jordan learns about ADA, employment rights, housing rights\n    And information is provided in highly accessible format\n    And Jordan understands what protections they have\n    And Jordan can advocate for their rights when violations occur\n    And rights education empowers Jordan's full citizenship\n    And Jordan experiences being a person with protected rights and dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

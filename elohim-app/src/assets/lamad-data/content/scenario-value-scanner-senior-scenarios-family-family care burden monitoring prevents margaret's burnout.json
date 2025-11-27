@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-family care burden monitoring prevents margaret's burnout",
+  "contentType": "scenario",
+  "title": "Family care burden monitoring prevents Margaret's burnout",
+  "description": "Family care burden monitoring prevents Margaret's burnout",
+  "content": "Scenario: Family care burden monitoring prevents Margaret's burnout\n    Given Margaret provides care across three generations\n    And she has limited time and energy\n    When the family_elohim monitors total care burden\n    Then it should track cumulative care hours across all relationships\n    And it should flag when burden becomes unsustainable\n    And it should surface need for family conversation about distribution\n    And Margaret's own needs should be protected\n    And the system should prevent exploitation disguised as family care\n    And burnout prevention should be built into family coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-accessing neighborhood resource sharing networks",
+  "contentType": "scenario",
+  "title": "Accessing neighborhood resource sharing networks",
+  "description": "Accessing neighborhood resource sharing networks",
+  "content": "Scenario: Accessing neighborhood resource sharing networks\n    Given neighbors share tools and resources\n    And Aisha occasionally needs items she doesn't own\n    When Aisha needs to borrow something\n    Then the neighborhood_elohim should connect her to resource sharing\n    And it should facilitate tool libraries and sharing arrangements\n    And it should track care tokens for borrowing and lending\n    And the system should build neighborhood mutual aid\n    And resource sharing should reduce individual costs\n    And neighborhood cooperation should meet practical needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

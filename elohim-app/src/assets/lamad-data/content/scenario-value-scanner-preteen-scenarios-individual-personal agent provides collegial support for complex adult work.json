@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-personal agent provides collegial support for complex adult work",
+  "contentType": "scenario",
+  "title": "Personal agent provides collegial support for complex adult work",
+  "description": "Personal agent provides collegial support for complex adult work",
+  "content": "Scenario: Personal agent provides collegial support for complex adult work\n    Given Marcus is performing work that adults get paid to do\n    And he needs sophisticated planning and analysis tools\n    When Marcus's personal_agent interacts with him\n    Then the relationship should be almost collegial\n    And the agent should provide information, analysis, and planning support\n    And the agent should say \"You've kept nutrition above 90% for three weeks\u2014excellent stewardship\"\n    And emotional encouragement should acknowledge real difficulty of his work\n    And the agent should serve as genuine tool for real work\n    And the tone should respect his capability while supporting his needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

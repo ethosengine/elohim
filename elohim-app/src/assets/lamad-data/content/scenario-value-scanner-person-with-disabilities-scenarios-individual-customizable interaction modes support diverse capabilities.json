@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-customizable interaction modes support diverse capabilities",
+  "contentType": "scenario",
+  "title": "Customizable interaction modes support diverse capabilities",
+  "description": "Customizable interaction modes support diverse capabilities",
+  "content": "Scenario: Customizable interaction modes support diverse capabilities\n    Given Alex's capabilities vary day to day\n    And fatigue, pain, or other factors affect what's accessible\n    When Alex uses the Value Scanner on different days\n    Then Alex should be able to switch between interaction modes easily\n    And voice, touch, keyboard, and switch access should all be available\n    And the system should remember Alex's preferences per context\n    And Alex should not have to repeatedly explain needs\n    And flexible modes should accommodate fluctuating capabilities\n    And the interface should adapt to Alex, not force Alex to adapt\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

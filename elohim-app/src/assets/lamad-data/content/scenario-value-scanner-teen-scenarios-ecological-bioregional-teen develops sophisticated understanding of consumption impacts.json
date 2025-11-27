@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-teen develops sophisticated understanding of consumption impacts",
+  "contentType": "scenario",
+  "title": "Teen develops sophisticated understanding of consumption impacts",
+  "description": "Teen develops sophisticated understanding of consumption impacts",
+  "content": "Scenario: Teen develops sophisticated understanding of consumption impacts\n    Given Jasmine makes daily purchasing decisions\n    And each choice has ecological consequences\n    When she uses the Value Scanner to evaluate options\n    Then her personal_agent should surface ecological information\n    And explain water usage, carbon footprint, and ecosystem impacts\n    And connect choices to bioregional effects: \"This produce is local and seasonal\"\n    And help her understand that consumption is participation in ecological systems\n    And build sophisticated ecological literacy through daily practice\n    And develop her capability to make environmentally informed decisions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

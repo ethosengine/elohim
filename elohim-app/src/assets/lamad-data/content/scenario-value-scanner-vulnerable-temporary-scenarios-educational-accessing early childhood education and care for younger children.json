@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-accessing early childhood education and care for younger children",
+  "contentType": "scenario",
+  "title": "Accessing early childhood education and care for younger children",
+  "description": "Accessing early childhood education and care for younger children",
+  "content": "Scenario: Accessing early childhood education and care for younger children\n    Given my younger child (age 4) needs early childhood education\n    And quality early childhood programs have long waitlists and costs\n    When I seek early childhood education for my young child\n    Then the Value Scanner identifies early childhood programs accepting subsidies\n    And helps me access Head Start, pre-K, or subsidized childcare\n    And navigates enrollment processes and waitlists\n    And ensures young child has educational engagement despite constraints\n    And tracks early childhood education options and applications\n    And my personal_agent manages early childhood enrollment deadlines\n    And recognizes early childhood education coordination as parenting work\n    And validates that young children deserve educational opportunities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

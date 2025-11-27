@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-family consumption patterns aligned with ecological values",
+  "contentType": "scenario",
+  "title": "Family consumption patterns aligned with ecological values",
+  "description": "Family consumption patterns aligned with ecological values",
+  "content": "Scenario: Family consumption patterns aligned with ecological values\n    Given Sarah manages household purchasing decisions\n    And she wants to minimize environmental harm\n    When the Value Scanner tracks family consumption\n    Then it should provide ecological impact information\n    And it should help Sarah make environmentally responsible choices\n    And it should recognize trade-offs between budget and sustainability\n    And the system should support ecological decision-making\n    And family care economy should include environmental care\n    And Sarah's work to reduce harm should be valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

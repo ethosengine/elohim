@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-providing local context to constitutional council deliberations",
+  "contentType": "scenario",
+  "title": "Providing local context to Constitutional Council deliberations",
+  "description": "Providing local context to Constitutional Council deliberations",
+  "content": "Scenario: Providing local context to Constitutional Council deliberations\n    Given community council is reviewing appeal requiring local knowledge\n    And I have information about Riverside history and circumstances\n    When I testify to provide community context\n    Then I explain: relevant history, cultural factors, relationships\n    And I clarify: why something might seem unusual to outsiders\n    And I don't advocate: for particular outcome in appeal\n    And I inform: council's judgment with local wisdom\n    And I respect: council's independence and authority\n    And I enable: constitutional interpretation grounded in reality\n    And community knowledge: enriches democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

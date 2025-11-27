@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-nutrition and cooking education for changing health needs",
+  "contentType": "scenario",
+  "title": "Nutrition and cooking education for changing health needs",
+  "description": "Nutrition and cooking education for changing health needs",
+  "content": "Scenario: Nutrition and cooking education for changing health needs\n    Given Margaret's dietary needs are changing with age\n    And cooking knowledge supports health and budget\n    When the educational_elohim provides nutrition education\n    Then senior-specific nutrition information should be accessible\n    And cooking for health conditions should be taught\n    And Margaret's existing knowledge should be built upon\n    And education should support health management through diet\n    And practical cooking skills should address budget constraints\n    And nutrition education should empower health agency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

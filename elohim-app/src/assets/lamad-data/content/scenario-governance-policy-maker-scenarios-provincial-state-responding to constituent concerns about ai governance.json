@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-responding to constituent concerns about ai governance",
+  "contentType": "scenario",
+  "title": "Responding to constituent concerns about AI governance",
+  "description": "Responding to constituent concerns about AI governance",
+  "content": "Scenario: Responding to constituent concerns about AI governance\n    Given residents contact me about protocol experiences\n    And I am accountable through elections\n    When I maintain constituent engagement on AI governance\n    Then I hold: town halls in communities like Riverside\n    And I offer: office hours for people like Marcus to share experiences\n    And I conduct: surveys gathering feedback on legislation\n    And I respond: to concerns showing I'm listening\n    And I maintain: constituent services for protocol-related issues\n    And I remain: democratically accountable for policy choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

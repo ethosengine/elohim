@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher coordinates statewide advocacy against testing mandate",
+  "contentType": "scenario",
+  "title": "Teacher coordinates statewide advocacy against testing mandate",
+  "description": "Teacher coordinates statewide advocacy against testing mandate",
+  "content": "Scenario: Teacher coordinates statewide advocacy against testing mandate\n    Given state proposes expanding standardized testing requirements\n    And testing already narrows curriculum and stresses students\n    When teachers coordinate through Observer across districts statewide\n    Then 3,200 teachers sign onto collective advocacy campaign\n    And provide testimony on how testing burdens harm learning\n    And build coalition with parents experiencing test stress\n    And present evidence from states that reduced testing\n    And collective professional voice creates political pressure\n    And state testing policy becomes contested not inevitable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-participating in idd self-advocacy group",
+  "contentType": "scenario",
+  "title": "Participating in IDD self-advocacy group",
+  "description": "Participating in IDD self-advocacy group",
+  "content": "Scenario: Participating in IDD self-advocacy group\n    Given there's a local IDD self-advocacy organization\n    And Jordan wants to participate in advocacy work\n    When Jordan attends a self-advocacy meeting\n    Then the personal_agent provides accessible meeting information\n    And the meeting uses IDD-accessible facilitation practices\n    And Jordan can share experiences and voice concerns\n    And Jordan's advocacy contribution is valued by peers\n    And the group works on issues Jordan cares about\n    And Jordan accumulates care tokens for community advocacy work\n    And Jordan experiences political agency and community power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

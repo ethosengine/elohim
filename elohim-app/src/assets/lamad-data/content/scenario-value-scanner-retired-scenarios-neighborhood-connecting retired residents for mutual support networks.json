@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-connecting retired residents for mutual support networks",
+  "contentType": "scenario",
+  "title": "Connecting retired residents for mutual support networks",
+  "description": "Connecting retired residents for mutual support networks",
+  "content": "Scenario: Connecting retired residents for mutual support networks\n    Given Frank is one of several retired residents in the neighborhood\n    And retired people have time to build mutual support systems\n    When the neighborhood_elohim coordinates among retired residents\n    Then it should help Frank connect with other retired neighbors\n    And facilitate mutual aid networks among those with time availability\n    And coordinate skill sharing across retired residents\n    And support check-in systems for isolated or vulnerable neighbors\n    And build neighborhood resilience through retired resident networks\n    And enable Frank to both give and receive neighborhood support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

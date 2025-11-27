@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-building professional network and references despite isolation and crisis",
+  "contentType": "scenario",
+  "title": "Building professional network and references despite isolation and crisis",
+  "description": "Building professional network and references despite isolation and crisis",
+  "content": "Scenario: Building professional network and references despite isolation and crisis\n    Given professional networking requires time, energy, and social capital I lack\n    And I need professional connections for employment opportunities\n    When I work to build professional network\n    Then the workplace_elohim helps me identify low-barrier networking opportunities\n    And suggests strategies for building professional connections despite constraints\n    And helps me leverage existing relationships for professional support\n    And validates that networking is harder during crisis and that's not my fault\n    And connects me to professional networks for people in similar situations\n    And my personal_agent identifies networking opportunities matching my capacity\n    And recognizes networking efforts as valuable professional development\n    And celebrates each professional connection built\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

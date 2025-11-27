@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-environmental impacts improve through community-accountable governance",
+  "contentType": "scenario",
+  "title": "Environmental impacts improve through community-accountable governance",
+  "description": "Environmental impacts improve through community-accountable governance",
+  "content": "Scenario: Environmental impacts improve through community-accountable governance\n    Given franchise corporate externalized environmental costs for profit maximization\n    And community bore environmental impacts (waste, pollution, resource depletion)\n    When democratic governance includes environmental stewardship accountability\n    Then waste reduction and recycling programs are implemented\n    And sustainable sourcing (local, organic, regenerative) is prioritized\n    And environmental practices are transparent to community\n    And community can hold democratic businesses accountable for environmental impacts\n    And community_elohim tracks environmental improvements from democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

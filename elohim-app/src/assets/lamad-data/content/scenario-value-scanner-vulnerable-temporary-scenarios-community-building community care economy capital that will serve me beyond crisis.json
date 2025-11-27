@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-building community care economy capital that will serve me beyond crisis",
+  "contentType": "scenario",
+  "title": "Building community care economy capital that will serve me beyond crisis",
+  "description": "Building community care economy capital that will serve me beyond crisis",
+  "content": "Scenario: Building community care economy capital that will serve me beyond crisis\n    Given my care contributions during crisis are tracked and recognized\n    And care economy capital could support me after crisis resolves\n    When I accumulate care tokens through ongoing care contributions\n    Then the Value Scanner tracks my comprehensive care economy participation\n    And recognizes parenting, peer support, mutual aid, knowledge sharing, and other contributions\n    And builds care economy standing that will endure beyond temporary vulnerability\n    And validates that my crisis period contributions are valuable\n    And creates basis for future community support if needed\n    And my personal_agent helps me understand my care economy capital\n    And documents that vulnerability doesn't erase contribution\n    And ensures my care work is recognized long-term\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

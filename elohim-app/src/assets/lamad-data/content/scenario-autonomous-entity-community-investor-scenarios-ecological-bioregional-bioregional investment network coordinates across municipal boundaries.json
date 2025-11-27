@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment network coordinates across municipal boundaries",
+  "contentType": "scenario",
+  "title": "Bioregional investment network coordinates across municipal boundaries",
+  "description": "Bioregional investment network coordinates across municipal boundaries",
+  "content": "Scenario: Bioregional investment network coordinates across municipal boundaries\n    Given ecological systems transcend political boundaries\n    And Patricia's investments operate within watershed and foodshed, not just municipality\n    When community investment coordinates bioregionally across municipalities\n    Then capital flows to support bioregional food system (farms across multiple counties)\n    And watershed protection is coordinated across jurisdictions\n    And bioregional economic development transcends municipal fragmentation\n    And ecological coordination enables systemic sustainability\n    And bioregional_elohim facilitates cross-jurisdictional investment coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

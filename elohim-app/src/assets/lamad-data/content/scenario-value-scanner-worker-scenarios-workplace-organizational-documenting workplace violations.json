@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-documenting workplace violations",
+  "contentType": "scenario",
+  "title": "Documenting workplace violations",
+  "description": "Documenting workplace violations",
+  "content": "Scenario: Documenting workplace violations\n    Given my workplace may violate labor laws or regulations\n    Including wage theft, unsafe conditions, or scheduling violations\n    When I experience potential violations\n    Then the workplace_elohim should help me document incidents\n    And track patterns of violations over time\n    And provide guidance on reporting mechanisms\n    And preserve evidence for potential enforcement or advocacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-parent's care work visible across extended family",
+  "contentType": "scenario",
+  "title": "Parent's care work visible across extended family",
+  "description": "Parent's care work visible across extended family",
+  "content": "Scenario: Parent's care work visible across extended family\n    Given Sarah provides care to her children and aging parents\n    And she coordinates between generations\n    When the family_elohim tracks Sarah's care contributions\n    Then her work should be visible to entire extended family\n    And grandparents should see Sarah's parenting labor\n    And siblings should see her coordination work\n    And the full family should recognize her care contributions\n    And visibility should enable family-wide appreciation\n    And Sarah's labor should be valued across all family relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

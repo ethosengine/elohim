@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-making aggregate senior contributions visible at community scale",
+  "contentType": "scenario",
+  "title": "Making aggregate senior contributions visible at community scale",
+  "description": "Making aggregate senior contributions visible at community scale",
+  "content": "Scenario: Making aggregate senior contributions visible at community scale\n    Given thousands of seniors make similar contributions\n    And their collective labor is massive but invisible\n    When the community_elohim aggregates senior care contributions\n    Then the community should see total senior care economy value\n    And data should show seniors as highly productive population\n    And cultural narratives about retirement should be challenged\n    And policy should reflect actual senior contributions\n    And community should recognize dependence on senior labor\n    And visibility could transform attitudes about aging and retirement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

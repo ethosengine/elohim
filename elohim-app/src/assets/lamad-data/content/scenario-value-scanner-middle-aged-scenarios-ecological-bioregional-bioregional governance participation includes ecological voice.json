@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional governance participation includes ecological voice",
+  "contentType": "scenario",
+  "title": "Bioregional governance participation includes ecological voice",
+  "description": "Bioregional governance participation includes ecological voice",
+  "content": "Scenario: Bioregional governance participation includes ecological voice\n    Given bioregional health requires governance that includes ecological considerations\n    And Robert participates in community and municipal governance\n    And his voice can advocate for bioregional ecological health\n    When bioregional_elohim supports ecological governance\n    Then it should help Robert bring ecological perspective to governance participation\n    And support advocacy for bioregional ecological protection\n    And connect him to watershed councils, land use planning, and environmental policy\n    And recognize his care economy participation as qualifying him for ecological governance\n    And build governance that integrates human and ecological flourishing\n    And advance bioregional policy that serves care economy and ecology\n    And demonstrate that care economy includes bioregional stewardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

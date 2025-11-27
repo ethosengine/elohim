@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-elder preserves bioregional knowledge across displacement",
+  "contentType": "scenario",
+  "title": "Elder preserves bioregional knowledge across displacement",
+  "description": "Elder preserves bioregional knowledge across displacement",
+  "content": "Scenario: Elder preserves bioregional knowledge across displacement\n    Given community elders hold traditional knowledge of coastal ecology\n    And this knowledge is being lost as the community displaces\n    When elders document traditional knowledge through the network\n    And younger displaced community members learn and preserve it\n    Then bioregional ecological knowledge is preserved\n    And the knowledge can inform restoration efforts\n    And future generations maintain connection to ancestral place\n    And cultural-ecological wisdom survives displacement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:displaced_person",
+    "governance_layer:ecological_bioregional",
+    "related_users:activist,elder,community_moderator",
+    "related_layers:community,district,nation_state",
+    "elohim_agents:pattern_recognition_agent,coordination_agent,resource_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/displaced_person/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

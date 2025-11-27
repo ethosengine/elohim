@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-teaching values, ethics, and character development",
+  "contentType": "scenario",
+  "title": "Teaching values, ethics, and character development",
+  "description": "Teaching values, ethics, and character development",
+  "content": "Scenario: Teaching values, ethics, and character development\n    Given Margaret models and teaches values through her behavior\n    And grandchildren learn ethics through relationship with her\n    When the educational_elohim tracks character education\n    Then it should recognize values teaching as educational work\n    And it should value ethical guidance and moral development\n    And it should track Margaret's role in character formation\n    And values education should accumulate care tokens\n    And moral guidance should be recognized as sophisticated teaching\n    And character development should be valued educational outcome\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

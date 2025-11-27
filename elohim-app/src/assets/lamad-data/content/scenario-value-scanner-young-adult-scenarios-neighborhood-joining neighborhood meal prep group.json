@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-joining neighborhood meal prep group",
+  "contentType": "scenario",
+  "title": "Joining neighborhood meal prep group",
+  "description": "Joining neighborhood meal prep group",
+  "content": "Scenario: Joining neighborhood meal prep group\n    Given a meal prep group is forming in Aisha's neighborhood\n    And joining would reduce her time pressure and build community\n    When the neighborhood_elohim surfaces the opportunity\n    Then it should highlight the practical benefits\n    And it should show how it fits her budget and time constraints\n    And it should explain the care economy dimension\n    And the system should facilitate her joining process\n    And neighborhood participation should provide tangible value\n    And community building should solve real problems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

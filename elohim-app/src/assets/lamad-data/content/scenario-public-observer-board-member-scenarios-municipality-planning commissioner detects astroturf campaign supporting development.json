@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-municipality-planning commissioner detects astroturf campaign supporting development",
+  "contentType": "scenario",
+  "title": "Planning commissioner detects astroturf campaign supporting development",
+  "description": "Planning commissioner detects astroturf campaign supporting development",
+  "content": "Scenario: Planning commissioner detects astroturf campaign supporting development\n    Given commission faces decision on controversial mall redevelopment\n    And receives hundreds of emails and petition signatures supporting project\n    And commission wants to understand if support is authentic community sentiment\n    When the commissioner uses Observer to analyze advocacy campaign\n    Then they discover emails use identical language suggesting coordinated campaign\n    And find petition signatures include many from outside the municipality\n    And see analysis showing campaign funded and organized by developer\n    And access authentic community sentiment data showing more mixed views\n    And capture protection helps commissioner distinguish grassroots from astroturf\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:municipality",
+    "related_users:citizen,developer_interests,politician,activist,community_organizer",
+    "related_layers:district,community,ecological",
+    "elohim_agents:public_observer,domain_elohim,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

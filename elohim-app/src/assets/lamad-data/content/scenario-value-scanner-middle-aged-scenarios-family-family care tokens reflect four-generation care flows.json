@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-family care tokens reflect four-generation care flows",
+  "contentType": "scenario",
+  "title": "Family care tokens reflect four-generation care flows",
+  "description": "Family care tokens reflect four-generation care flows",
+  "content": "Scenario: Family care tokens reflect four-generation care flows\n    Given care flows in multiple directions across the family\n    And Robert receives support from siblings and provides support to parents and children\n    And care contributions need to be recognized across all flows\n    When family_elohim calculates family care tokens\n    Then it should track care across all four generations\n    And recognize Robert's care for parents and support for children\n    And value siblings' parent care contributions\n    And recognize adult children's emerging care contributions\n    And track grandparent care across the family\n    And make visible the complex web of family care reciprocity\n    And demonstrate that family functions through mutual care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

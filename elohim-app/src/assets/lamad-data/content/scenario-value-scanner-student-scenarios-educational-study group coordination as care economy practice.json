@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-study group coordination as care economy practice",
+  "contentType": "scenario",
+  "title": "Study group coordination as care economy practice",
+  "description": "Study group coordination as care economy practice",
+  "content": "Scenario: Study group coordination as care economy practice\n    Given Kenji participates in study groups with peers\n    And study groups require coordination, hosting, and emotional labor\n    When the educational_elohim tracks study group participation\n    Then it should recognize hosting study group as care contribution\n    And it should value coordinating schedules and managing group dynamics\n    And it should accumulate care tokens for creating learning spaces\n    And study group labor should be visible and valued\n    And the system should recognize collective learning as care economy\n    And academic collaboration should be understood as mutual care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

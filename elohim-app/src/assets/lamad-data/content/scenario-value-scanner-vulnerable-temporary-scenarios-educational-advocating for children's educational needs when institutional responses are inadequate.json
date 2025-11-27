@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-advocating for children's educational needs when institutional responses are inadequate",
+  "contentType": "scenario",
+  "title": "Advocating for children's educational needs when institutional responses are inadequate",
+  "description": "Advocating for children's educational needs when institutional responses are inadequate",
+  "content": "Scenario: Advocating for children's educational needs when institutional responses are inadequate\n    Given school is not providing appropriate support for my children\n    And I need to advocate more forcefully for services\n    When school fails to meet children's educational needs\n    Then the Value Scanner helps me understand escalation options\n    And provides resources on children's educational rights\n    And connects me to educational advocacy organizations\n    And helps me document inadequate services for advocacy purposes\n    And my personal_agent drafts advocacy communications\n    And recognizes forceful advocacy as necessary parenting work\n    And validates that schools should serve all children appropriately\n    And supports me in demanding what my children deserve\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

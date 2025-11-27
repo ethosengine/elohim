@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-my service inspires future generations' democratic participation",
+  "contentType": "scenario",
+  "title": "My service inspires future generations' democratic participation",
+  "description": "My service inspires future generations' democratic participation",
+  "content": "Scenario: My service inspires future generations' democratic participation\n    Given my children watched my constitutional council journey\n    And they see democracy as participation not just voting\n    When they grow up understanding governance as shared responsibility\n    Then they develop: civic capacities through my example\n    And they believe: they too can shape their world\n    And they practice: deliberation, constitutional thinking, humble judgment\n    And they inherit: democracy as living practice not dead tradition\n    And next generation: is prepared for governance challenges ahead\n    And my service: ripples through time beyond my individual contribution\n    And I know: this is how democracy perpetuates itself\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

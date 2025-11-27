@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-crafting legislation enabling global constitutional amendments",
+  "contentType": "scenario",
+  "title": "Crafting legislation enabling global constitutional amendments",
+  "description": "Crafting legislation enabling global constitutional amendments",
+  "content": "Scenario: Crafting legislation enabling global constitutional amendments\n    Given Global Convention passed ecological standing amendment\n    And national law must operationalize this\n    When I translate constitutional evolution into legislation\n    Then I grant: legal personhood to ecosystems as constitution requires\n    And I update: property law to reflect ecological rights\n    And I modify: administrative procedure for ecosystem representation\n    And I ensure: national law aligns with global constitutional principle\n    And I demonstrate: how global and national governance coordinate\n    And I serve: democratic constitutional evolution\n    And I show: policy making as implementing citizen wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

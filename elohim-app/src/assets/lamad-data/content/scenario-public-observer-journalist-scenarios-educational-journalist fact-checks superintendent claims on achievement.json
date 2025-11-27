@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist fact-checks superintendent claims on achievement",
+  "contentType": "scenario",
+  "title": "Journalist fact-checks superintendent claims on achievement",
+  "description": "Journalist fact-checks superintendent claims on achievement",
+  "content": "Scenario: Journalist fact-checks superintendent claims on achievement\n    Given the superintendent presents glowing achievement data\n    And the journalist provides accountability coverage\n    When the Observer analyzes district outcome data\n    Then the journalist verifies overall test score increase (true)\n    And finds achievement gap between white and Black students widened\n    And shows gains concentrated in already-high-performing schools\n    And identifies selective data presentation masking inequity\n    And publishes fact-check revealing hidden disparities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

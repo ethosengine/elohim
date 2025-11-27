@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal care token supplements support low-income families",
+  "contentType": "scenario",
+  "title": "Municipal care token supplements support low-income families",
+  "description": "Municipal care token supplements support low-income families",
+  "content": "Scenario: Municipal care token supplements support low-income families\n    Given Sarah's household income is $65k/year\n    And many families have less economic resources\n    When municipal care economy operates\n    Then care token supplements should be available based on income\n    And the Value Scanner should be accessible regardless of ability to pay\n    And municipal subsidies should ensure universal access\n    And care economy should function as economic support system\n    And access should be dignified and universal\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

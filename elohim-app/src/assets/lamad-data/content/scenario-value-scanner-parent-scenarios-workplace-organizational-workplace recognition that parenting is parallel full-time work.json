@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-workplace recognition that parenting is parallel full-time work",
+  "contentType": "scenario",
+  "title": "Workplace recognition that parenting is parallel full-time work",
+  "description": "Workplace recognition that parenting is parallel full-time work",
+  "content": "Scenario: Workplace recognition that parenting is parallel full-time work\n    Given Sarah works 40 hours weekly as teacher\n    And she also performs 60+ hours weekly of parenting labor\n    When the workplace_elohim analyzes Sarah's total work\n    Then it should recognize she's working two full-time jobs\n    And it should make visible the dual burden she carries\n    And workplace should understand why flexibility is essential\n    And the system should demonstrate that working parents need support\n    And professional expectations should account for parenting responsibilities\n    And Sarah's full workload should be undeniably visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

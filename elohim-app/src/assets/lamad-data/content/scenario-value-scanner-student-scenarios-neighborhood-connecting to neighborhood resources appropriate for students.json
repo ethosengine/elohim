@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-connecting to neighborhood resources appropriate for students",
+  "contentType": "scenario",
+  "title": "Connecting to neighborhood resources appropriate for students",
+  "description": "Connecting to neighborhood resources appropriate for students",
+  "content": "Scenario: Connecting to neighborhood resources appropriate for students\n    Given Kenji has limited budget and might face emergencies\n    And neighborhoods often have resources (food banks, tool libraries, mutual aid)\n    When the neighborhood_elohim connects Kenji to resources\n    Then it should inform him of neighborhood food bank access\n    And it should show shared resources: \"Neighborhood tool library 3 blocks away\"\n    And it should reduce barriers to accessing community support\n    And it should normalize resource sharing as care economy\n    And the system should connect students to neighborhood safety nets\n    And resource access should be dignified and easy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

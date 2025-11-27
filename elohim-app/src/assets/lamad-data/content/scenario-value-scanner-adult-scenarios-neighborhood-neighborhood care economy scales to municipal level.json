@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood care economy scales to municipal level",
+  "contentType": "scenario",
+  "title": "Neighborhood care economy scales to municipal level",
+  "description": "Neighborhood care economy scales to municipal level",
+  "content": "Scenario: Neighborhood care economy scales to municipal level\n    Given Sarah's neighborhood successfully implements care economy\n    And multiple neighborhoods could coordinate similarly\n    When neighborhood care patterns are established\n    Then the neighborhood_elohim should connect to municipal systems\n    And it should enable scaling of successful practices\n    And neighborhood should serve as building block for municipal care economy\n    And local success should inform broader policy\n    And care economy should grow from neighborhood up, not top-down\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

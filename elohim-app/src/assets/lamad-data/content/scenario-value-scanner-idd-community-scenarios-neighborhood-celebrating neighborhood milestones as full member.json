@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-celebrating neighborhood milestones as full member",
+  "contentType": "scenario",
+  "title": "Celebrating neighborhood milestones as full member",
+  "description": "Celebrating neighborhood milestones as full member",
+  "content": "Scenario: Celebrating neighborhood milestones as full member\n    Given the neighborhood is celebrating its 50th anniversary\n    And there's a celebration planning committee\n    When Jordan expresses interest in helping plan\n    Then the neighborhood_elohim facilitates Jordan's participation\n    And Jordan contributes ideas at their capability level\n    And committee members include Jordan as a peer planner\n    And Jordan's suggestions are considered alongside others'\n    And Jordan helps create celebration that includes everyone\n    And Jordan experiences being an active neighborhood citizen\n    And Jordan's community membership is fully honored\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-learning local shopping patterns from neighborhood data",
+  "contentType": "scenario",
+  "title": "Learning local shopping patterns from neighborhood data",
+  "description": "Learning local shopping patterns from neighborhood data",
+  "content": "Scenario: Learning local shopping patterns from neighborhood data\n    Given Aisha doesn't know the best local stores yet\n    And neighborhood residents have collective knowledge\n    When Aisha plans shopping trips\n    Then the neighborhood_elohim should share aggregated local knowledge\n    And it should identify best value stores for different items\n    And it should suggest efficient shopping routes\n    And it should reflect collective neighborhood wisdom\n    And newcomers should benefit from community knowledge\n    And local expertise should be shared through the system\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

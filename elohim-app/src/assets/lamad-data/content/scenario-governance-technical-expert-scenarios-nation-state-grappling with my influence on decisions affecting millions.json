@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-grappling with my influence on decisions affecting millions",
+  "contentType": "scenario",
+  "title": "Grappling with my influence on decisions affecting millions",
+  "description": "Grappling with my influence on decisions affecting millions",
+  "content": "Scenario: Grappling with my influence on decisions affecting millions\n    Given my testimony shapes National Council decisions\n    And those decisions affect millions of people\n    When I reflect on the weight of my responsibility\n    Then I feel: burden of expertise influencing democratic governance\n    And I worry: about errors in my analysis causing harm\n    And I accept: that I must act under uncertainty\n    And I commit: to honesty about my limitations\n    And I trust: democratic process to weigh my input appropriately\n    And I practice: epistemic humility while still providing expertise\n    And I demonstrate: expertise serving democracy despite uncertainty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

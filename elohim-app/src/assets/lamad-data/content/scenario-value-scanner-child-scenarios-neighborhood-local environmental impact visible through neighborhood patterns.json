@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-neighborhood-local environmental impact visible through neighborhood patterns",
+  "contentType": "scenario",
+  "title": "Local environmental impact visible through neighborhood patterns",
+  "description": "Local environmental impact visible through neighborhood patterns",
+  "content": "Scenario: Local environmental impact visible through neighborhood patterns\n    Given Emma is learning ecological care concepts\n    And neighborhood aggregate data shows environmental impact\n    When Emma makes choices with environmental dimensions\n    Then her personal_agent should share community environmental patterns\n    And the agent should say \"Your neighborhood has reduced plastic waste by choosing reusable bags\"\n    And she should see how individual choices aggregate to ecological impact\n    And environmental stewardship should be connected to care economy\n    And she should learn community can collectively care for local environment\n    And ecological literacy should develop at appropriate scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

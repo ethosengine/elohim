@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-building community care relationships that will endure beyond crisis",
+  "contentType": "scenario",
+  "title": "Building community care relationships that will endure beyond crisis",
+  "description": "Building community care relationships that will endure beyond crisis",
+  "content": "Scenario: Building community care relationships that will endure beyond crisis\n    Given I am building relationships during crisis period\n    And some relationships could become long-term community connections\n    When I invest in community relationships\n    Then the Value Scanner helps me identify relationships with potential for depth\n    And supports genuine connection beyond transactional support\n    And facilitates relationship development over time\n    And tracks meaningful community relationships\n    And validates that vulnerable people build valuable friendships\n    And my personal_agent nurtures relationships that provide belonging\n    And recognizes community-building as important social infrastructure\n    And celebrates friendships that survive crisis transition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

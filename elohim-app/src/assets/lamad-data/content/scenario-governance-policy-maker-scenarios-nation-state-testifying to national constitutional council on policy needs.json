@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-testifying to national constitutional council on policy needs",
+  "contentType": "scenario",
+  "title": "Testifying to National Constitutional Council on policy needs",
+  "description": "Testifying to National Constitutional Council on policy needs",
+  "content": "Scenario: Testifying to National Constitutional Council on policy needs\n    Given National Council reviewing case with policy implications\n    And they request my perspective as policy maker\n    When I testify about legislative context\n    Then I explain: existing law and its limitations\n    And I describe: policy challenges protocol helps address\n    And I clarify: how council precedent would affect legislation\n    And I don't advocate: for particular constitutional interpretation\n    And I inform: their deliberation with policy expertise\n    And I demonstrate: collaboration between sortition and representative democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

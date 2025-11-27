@@ -1,0 +1,43 @@
+{
+  "id": "social-medium-elder-readme",
+  "contentType": "concept",
+  "title": "Elder - Social Medium",
+  "description": "An elder user represents older adults (typically 65+) who seek meaningful connection, wish to share accumulated wisdom, and desire to remain engaged with family and community. In the Social Medium context, elders maintain dignity and autonomy while being protected from exploitation. The system adapts to their needs without infantilizing them, ensuring bad actors can't exploit cognitive changes while preserving full agency and participation.",
+  "content": "---\nepic: social_medium\nuser_type: elder\narchetype_name: \"Elder\"\nepic_domain: \"Digital Communication - Relationship-centered social media\"\ngovernance_scope: [individual, family, neighborhood, community, affinity_network, cultural_linguistic]\nrelated_users: [child, content_creator, community_moderator]\n---\n\n# Elder - Social Medium\n\n## Archetype\n\nAn elder user represents older adults (typically 65+) who seek meaningful connection, wish to share accumulated wisdom, and desire to remain engaged with family and community. In the Social Medium context, elders maintain dignity and autonomy while being protected from exploitation. The system adapts to their needs without infantilizing them, ensuring bad actors can't exploit cognitive changes while preserving full agency and participation.\n\nKey characteristics:\n- Age range: Typically 65+ years old, though wisdom-keeper role can begin earlier\n- Rich life experience and accumulated knowledge to share\n- May face isolation due to distance from family, mobility limitations, or life transitions\n- Needs protection from financial scams, romance cons, and health fraud\n- Values genuine connection over superficial interaction\n- Often has traditional skills, cultural knowledge, or historical memory to contribute\n- Maintains full autonomy while receiving appropriate protection\n\n## Core Needs\n\n- **Dignity-Preserving Protection**: Safety from scammers and fraudsters without feeling controlled or infantilized\n- **Meaningful Intergenerational Connection**: Real relationships with children, grandchildren, and younger community members\n- **Wisdom Sharing**: Opportunities to contribute knowledge, mentor others, and be valued for experience\n- **Accessible Interface**: Design that accommodates changing abilities without condescension\n- **Community Participation**: Engagement in neighborhood and civic life at their own pace and comfort level\n\n## Key Relationships\n\n- **child**: Provides wisdom, mentorship, and intergenerational connection; learns from and delights in younger generations\n- **content_creator**: Shares life stories, traditional skills, cultural memory; may create content documenting wisdom\n- **community_moderator**: Serves as elder wisdom in community spaces; receives support from moderators\n- **Family members**: Maintains connection across distances; shares in family life despite geographic separation\n- **Elohim Guardian Agent**: Protected by agents that block exploitation while preserving autonomy and genuine relationships\n\n## Relevant Governance Layers\n\n### Geographic/Political\n\n- **individual**: Personal autonomy, dignity, privacy, and protection from exploitation\n- **family**: Connection with children, grandchildren, extended family across distances\n- **neighborhood**: Local community participation, mutual aid, elder wisdom sharing\n- **community**: Civic engagement, community decision-making, preservation of institutional memory\n\n### Functional\n\n- **affinity_network**: Hobby groups, support communities, interest-based connection\n- **cultural_linguistic**: Cultural preservation, language maintenance, traditional knowledge sharing\n\n## Implementation Notes\n\n- **Scam Prevention**: Fraudulent messages never reach elders; prevented through web of trust verification\n- **Genuine Connection Preserved**: All real relationships work normally; only bad actors are blocked\n- **Adaptive Interface**: Font sizes, contrast, voice options adjust to needs without requiring technical skill\n- **No Ageism**: System doesn't assume incompetence; provides protection while respecting agency\n- **Wisdom Surfacing**: Elders' knowledge and experience are actively valued and surfaced to those who need it\n- **Loneliness Prevention**: System gently suggests connection opportunities without being pushy\n- **Health Integration**: Connection with healthcare providers, medication reminders, but always respecting privacy\n- **Legacy Preservation**: Tools to document life stories, family history, traditional skills for future generations\n- **Cognitive Support**: If cognitive changes occur, protection increases without removing autonomy\n- **Community Value**: Elders recognized as assets, not burdens; contributions earn respect and reach\n- **Emergency Support**: Quick access to family and emergency services when needed\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "epic:social_medium",
+    "concept",
+    "user:elder",
+    "social-medium"
+  ],
+  "sourcePath": "social_medium/elder/README.md",
+  "relatedNodeIds": [
+    "user-type-child",
+    "user-type-content-creator",
+    "user-type-community-moderator",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "user_type": "elder",
+    "archetype_name": "Elder",
+    "epic_domain": "Digital Communication - Relationship-centered social media",
+    "governance_scope": [
+      "individual",
+      "family",
+      "neighborhood",
+      "community",
+      "affinity_network",
+      "cultural_linguistic"
+    ],
+    "related_users": [
+      "child",
+      "content_creator",
+      "community_moderator"
+    ]
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-community mental health support for young adult",
+  "contentType": "scenario",
+  "title": "Community mental health support for young adult",
+  "description": "Community mental health support for young adult",
+  "content": "Scenario: Community mental health support for young adult\n    Given young adulthood is stressful\n    And Aisha sometimes struggles with anxiety\n    When Aisha accesses community mental health resources\n    Then the community_elohim should connect her to support\n    And mental health care should be part of community care economy\n    And accessing help should be destigmatized\n    And community care should include emotional and psychological support\n    And the system should recognize mental health as community concern\n    And mutual care should extend to psychological flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

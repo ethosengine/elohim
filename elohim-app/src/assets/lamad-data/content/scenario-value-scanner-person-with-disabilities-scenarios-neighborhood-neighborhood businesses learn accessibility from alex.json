@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-neighborhood businesses learn accessibility from alex",
+  "contentType": "scenario",
+  "title": "Neighborhood businesses learn accessibility from Alex",
+  "description": "Neighborhood businesses learn accessibility from Alex",
+  "content": "Scenario: Neighborhood businesses learn accessibility from Alex\n    Given local businesses often lack accessibility awareness\n    And Alex's feedback could improve business accessibility\n    When Alex interacts with neighborhood businesses\n    Then the neighborhood_elohim should facilitate Alex providing accessibility feedback\n    And businesses should receive Alex's expertise as valuable service\n    And improvements should be tracked and celebrated\n    And Alex should be compensated for consultation when appropriate\n    And accessible businesses benefit from disability community patronage\n    And the neighborhood should become more accessible through Alex's guidance\n    And Alex's care work includes making local economy accessible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:neighborhood",
+    "related_users:adult,elderly,parent,child,caregiver",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

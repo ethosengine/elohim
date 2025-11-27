@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-voice guidance ensures accessibility for pre-readers",
+  "contentType": "scenario",
+  "title": "Voice guidance ensures accessibility for pre-readers",
+  "description": "Voice guidance ensures accessibility for pre-readers",
+  "content": "Scenario: Voice guidance ensures accessibility for pre-readers\n    Given Tommy is 5 and may have limited reading ability\n    And accessibility is required for equitable education\n    When Tommy uses the educational features of the scanner\n    Then voice guidance should be available throughout\n    And visual feedback should be primary\n    And no reading ability should be required for core functionality\n    And audio should be warm, encouraging, and developmentally appropriate\n    And the system should be accessible to all children regardless of reading level\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

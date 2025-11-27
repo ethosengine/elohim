@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher exposes state curriculum standards implementation gap",
+  "contentType": "scenario",
+  "title": "Teacher exposes state curriculum standards implementation gap",
+  "description": "Teacher exposes state curriculum standards implementation gap",
+  "content": "Scenario: Teacher exposes state curriculum standards implementation gap\n    Given state adopted new curriculum standards three years ago\n    But provided no implementation funding or professional development\n    When teachers document implementation reality through Observer\n    Then statewide data shows 68% of teachers lack standards-aligned materials\n    And 71% received no professional development on new standards\n    And student assessment results reflect implementation failure\n    And teachers coordinate testimony to state education committee\n    And policy implementation accountability emerges from teacher evidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

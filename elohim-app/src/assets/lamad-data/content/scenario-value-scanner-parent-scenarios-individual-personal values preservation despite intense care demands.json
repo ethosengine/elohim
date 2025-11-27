@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-individual-personal values preservation despite intense care demands",
+  "contentType": "scenario",
+  "title": "Personal values preservation despite intense care demands",
+  "description": "Personal values preservation despite intense care demands",
+  "content": "Scenario: Personal values preservation despite intense care demands\n    Given Sarah has core values beyond efficient caregiving\n    And she wants to raise children aligned with those values\n    When Sarah makes care decisions under pressure\n    Then the personal_agent should help her honor her values\n    And it should flag when expedience conflicts with principles\n    And it should support value-aligned decision making even when harder\n    And Sarah's integrity should be preserved despite overwhelming demands\n    And the system should help her be the parent she wants to be\n    And values should not be sacrificed to mere survival\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:individual",
+    "related_users:adult,worker,child,partner",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

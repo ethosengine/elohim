@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-community cultural events and intergenerational connection",
+  "contentType": "scenario",
+  "title": "Community cultural events and intergenerational connection",
+  "description": "Community cultural events and intergenerational connection",
+  "content": "Scenario: Community cultural events and intergenerational connection\n    Given communities thrive on cultural connection and celebration\n    And Sarah wants children integrated into community life\n    When the community_elohim coordinates cultural events\n    Then it should facilitate family participation in community culture\n    And it should recognize Sarah's work bringing children to events\n    And cultural transmission should be valued as care labor\n    And intergenerational community events should be prioritized\n    And the system should build community bonds across generations\n    And family participation should strengthen community cohesion\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

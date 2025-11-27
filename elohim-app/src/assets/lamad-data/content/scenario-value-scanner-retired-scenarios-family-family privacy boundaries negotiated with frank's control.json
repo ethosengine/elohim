@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-family privacy boundaries negotiated with frank's control",
+  "contentType": "scenario",
+  "title": "Family privacy boundaries negotiated with Frank's control",
+  "description": "Family privacy boundaries negotiated with Frank's control",
+  "content": "Scenario: Family privacy boundaries negotiated with Frank's control\n    Given family coordination requires some information sharing\n    And Frank has legitimate need for privacy\n    When family_elohim manages privacy\n    Then Frank must control what information he shares about himself\n    And he should determine what family knows about his health\n    And he should decide what adult children know about his finances\n    And care coordination should not violate his privacy\n    And family should respect his boundaries\n    And privacy should balance coordination needs with autonomy\n    And Frank's dignity requires control over personal information\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-individual-manager chooses to exit gracefully with dignity and support",
+  "contentType": "scenario",
+  "title": "Manager chooses to exit gracefully with dignity and support",
+  "description": "Manager chooses to exit gracefully with dignity and support",
+  "content": "Scenario: Manager chooses to exit gracefully with dignity and support\n    Given Marcus decides democratic coordination isn't the right fit for him\n    And corporate would have fired him or demanded resignation\n    When he communicates his intention to exit\n    Then workers appreciate his honest self-assessment\n    And he receives six months severance with glowing reference\n    And workplace_elohim facilitates transition support and knowledge transfer\n    And he leaves with dignity and community gratitude for attempting transition\n    And exit support demonstrates democratic values in practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:individual",
+    "related_users:[worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

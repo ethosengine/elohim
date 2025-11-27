@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-regional food security through care economy participation",
+  "contentType": "scenario",
+  "title": "Regional food security through care economy participation",
+  "description": "Regional food security through care economy participation",
+  "content": "Scenario: Regional food security through care economy participation\n    Given Maria participates in food cooperatives and bulk buying networks\n    And these networks build local food security and resilience\n    When bioregional food systems are assessed\n    Then the bioregional_elohim should recognize her contribution to food security\n    And it should value community food cooperation as regional resilience\n    And her participation should be seen as strengthening local food systems\n    And food economy cooperation should be honored as bioregional stewardship\n    And Maria should see herself as contributing to regional food sovereignty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,household,community_member,environmental_advocate",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-municipality-citizen participates in zoning decision with real-time context",
+  "contentType": "scenario",
+  "title": "Citizen participates in zoning decision with real-time context",
+  "description": "Citizen participates in zoning decision with real-time context",
+  "content": "Scenario: Citizen participates in zoning decision with real-time context\n    Given a city council meeting is discussing zoning changes\n    And the citizen is following virtually during dinner\n    When officials and developers make claims\n    Then the Observer provides real-time fact-checking\n    And shows what \"efficient development\" actually means for residents\n    And calculates community costs hidden in presentations\n    And surfaces conflicts of interest (donations, relationships)\n    And informed participation happens in real-time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:municipality",
+    "related_users:activist,politician,board_member,journalist",
+    "related_layers:community,district,county_regional",
+    "elohim_agents:public_observer,municipal_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

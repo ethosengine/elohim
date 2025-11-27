@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-fair distribution of household labor among roommates",
+  "contentType": "scenario",
+  "title": "Fair distribution of household labor among roommates",
+  "description": "Fair distribution of household labor among roommates",
+  "content": "Scenario: Fair distribution of household labor among roommates\n    Given Kenji does most cooking but little cleaning\n    And roommates have different strengths and available time\n    When the household_elohim tracks all household labor\n    Then it should measure cooking, cleaning, shopping, maintenance, and organizing\n    And it should show each roommate's contribution: \"Kenji: 18hrs, Maya: 6hrs, Sam: 8hrs, Jordan: 4hrs\"\n    And it should surface imbalances explicitly\n    And it should facilitate conversation about fair redistribution\n    And the system should prevent exploitation through visibility\n    And household equity should be measurable and adjustable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

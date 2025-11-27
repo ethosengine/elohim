@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-neighbors checking on elderly without surveillance feeling",
+  "contentType": "scenario",
+  "title": "Neighbors checking on elderly without surveillance feeling",
+  "description": "Neighbors checking on elderly without surveillance feeling",
+  "content": "Scenario: Neighbors checking on elderly without surveillance feeling\n    Given Helen lives alone and neighbors are concerned\n    And informal neighborhood care networks exist\n    When neighbors check on Helen's wellbeing\n    Then the neighborhood_elohim should coordinate wellness checks\n    And neighbors should be guided to check naturally: \"Saw you haven't been out\"\n    And Helen should experience concern, not surveillance\n    And her privacy should be respected\n    And neighborhood care should feel organic, not institutional\n    And connection should preserve dignity\n    And the protocol should facilitate genuine community care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-coordinating sustainable practices with family consumption",
+  "contentType": "scenario",
+  "title": "Coordinating sustainable practices with family consumption",
+  "description": "Coordinating sustainable practices with family consumption",
+  "content": "Scenario: Coordinating sustainable practices with family consumption\n    Given Margaret influences family's consumption and waste patterns\n    And she can teach sustainable shopping and resource use\n    When the bioregional_elohim coordinates family sustainability\n    Then it should help Margaret guide family toward sustainable practices\n    And it should recognize her role in shaping family ecological impact\n    And it should track family's movement toward sustainability\n    And Margaret's influence should reduce family's environmental footprint\n    And intergenerational sustainability should be recognized and valued\n    And family care economy should include ecological care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-property tax relief and housing support for fixed-income seniors",
+  "contentType": "scenario",
+  "title": "Property tax relief and housing support for fixed-income seniors",
+  "description": "Property tax relief and housing support for fixed-income seniors",
+  "content": "Scenario: Property tax relief and housing support for fixed-income seniors\n    Given Margaret lives on fixed income\n    And property taxes or rent can threaten housing stability\n    When the municipality_elohim identifies housing assistance\n    Then senior property tax relief programs should be communicated\n    And rental assistance should be accessible if applicable\n    And Margaret should be able to age in place affordably\n    And housing stability should be protected for seniors\n    And municipal housing policy should recognize fixed-income constraints\n    And aging in community should be economically feasible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

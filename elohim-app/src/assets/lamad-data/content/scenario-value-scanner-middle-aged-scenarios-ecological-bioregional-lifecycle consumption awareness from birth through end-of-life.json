@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-lifecycle consumption awareness from birth through end-of-life",
+  "contentType": "scenario",
+  "title": "Lifecycle consumption awareness from birth through end-of-life",
+  "description": "Lifecycle consumption awareness from birth through end-of-life",
+  "content": "Scenario: Lifecycle consumption awareness from birth through end-of-life\n    Given Robert has observed full lifecycle from grandchildren to aging parents\n    And he recognizes consumption patterns across lifespan\n    And lifecycle awareness can inform sustainable choices\n    When bioregional_elohim supports lifecycle consumption awareness\n    Then it should help Robert understand consumption across full lifecycle\n    And surface how current choices affect future generations' ecological inheritance\n    And recognize: \"Reducing consumption now preserves resources for grandchildren's future\"\n    And connect present choices to long-term bioregional health\n    And support sustainable consumption motivated by intergenerational care\n    And demonstrate that ecological stewardship is care for future generations\n    And build consumption patterns that serve lifecycle sustainability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

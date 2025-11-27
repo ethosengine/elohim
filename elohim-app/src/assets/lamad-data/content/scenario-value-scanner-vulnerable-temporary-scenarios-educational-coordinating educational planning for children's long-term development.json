@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational planning for children's long-term development",
+  "contentType": "scenario",
+  "title": "Coordinating educational planning for children's long-term development",
+  "description": "Coordinating educational planning for children's long-term development",
+  "content": "Scenario: Coordinating educational planning for children's long-term development\n    Given crisis is temporary but children's educational trajectory is long-term\n    And current educational decisions affect future opportunities\n    When I make educational choices considering children's futures\n    Then the Value Scanner helps me consider long-term educational implications\n    And balances immediate stability needs with future development\n    And tracks children's educational progress and trajectory\n    And ensures crisis doesn't permanently derail educational opportunities\n    And validates that my educational planning serves children's futures\n    And my personal_agent surfaces educational opportunities supporting development\n    And recognizes long-term educational planning as sophisticated parenting\n    And celebrates my investment in children's educational futures despite crisis\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

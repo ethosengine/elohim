@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-managing family expectations about my crisis recovery timeline",
+  "contentType": "scenario",
+  "title": "Managing family expectations about my crisis recovery timeline",
+  "description": "Managing family expectations about my crisis recovery timeline",
+  "content": "Scenario: Managing family expectations about my crisis recovery timeline\n    Given family members have opinions about how quickly I should \"get back on my feet\"\n    And my actual recovery is proceeding at appropriate pace for trauma\n    When family pressure conflicts with my needs\n    Then the family_elohim helps me resist family timeline pressure\n    And provides language for explaining that recovery takes time\n    And validates that my pace is appropriate for my circumstances\n    And helps me set boundaries with family members who push too hard\n    And connects me to information about normal trauma recovery\n    And my personal_agent reminds me that my timeline is right for me\n    And recognizes boundary-setting with family as emotional labor\n    And supports my right to recover at my own pace\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace privacy protects alex's medical information",
+  "contentType": "scenario",
+  "title": "Workplace privacy protects Alex's medical information",
+  "description": "Workplace privacy protects Alex's medical information",
+  "content": "Scenario: Workplace privacy protects Alex's medical information\n    Given employers should not have access to private medical information\n    And disability disclosure is often required but should be limited\n    When workplace requests disability documentation\n    Then the workplace_elohim should help Alex share minimum necessary information\n    And it should protect Alex's medical privacy rigorously\n    And detailed medical information should never be shared with managers or coworkers\n    And only accommodation needs should be disclosed, not diagnoses\n    And Alex's privacy should be protected even while requesting accommodations\n    And the protocol should guide appropriate disclosure boundaries\n    And medical information should remain confidential\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,young_adult,caregiver",
+    "related_layers:individual,household,community,healthcare_medical",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

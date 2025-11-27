@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm labor practices improve through worker democratic control",
+  "contentType": "scenario",
+  "title": "Farm labor practices improve through worker democratic control",
+  "description": "Farm labor practices improve through worker democratic control",
+  "content": "Scenario: Farm labor practices improve through worker democratic control\n    Given Tom paid farmworkers as well as possible but margins were thin\n    And workers lacked voice in schedule, breaks, safety, or working conditions\n    When farmworkers gain democratic ownership and governance\n    Then wages increase to $18/hour minimum from increased farm revenue (direct sales, fair pricing)\n    And work schedules accommodate workers' family and health needs\n    And safety equipment and protocols improve through worker input\n    And agricultural labor transforms from exploited work to dignified livelihood\n    And workplace_elohim ensures democratic governance protects farmworker dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

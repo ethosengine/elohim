@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-accessing community services with dignity",
+  "contentType": "scenario",
+  "title": "Accessing community services with dignity",
+  "description": "Accessing community services with dignity",
+  "content": "Scenario: Accessing community services with dignity\n    Given Jordan needs to use public transportation\n    And the bus system has accessibility features\n    When Jordan rides the bus to community destinations\n    Then the personal_agent provides route navigation support\n    And the interface shows visual bus schedules and stops\n    And bus drivers treat Jordan with respect as a regular passenger\n    And Jordan can travel increasingly independently with support\n    And Jordan's community mobility contributes to social participation\n    And Jordan experiences freedom and autonomy through accessible transit\n    And Jordan's right to community access is honored\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

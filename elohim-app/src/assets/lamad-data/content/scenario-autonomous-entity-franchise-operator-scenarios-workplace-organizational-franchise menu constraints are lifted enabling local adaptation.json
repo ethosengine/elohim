@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-franchise menu constraints are lifted enabling local adaptation",
+  "contentType": "scenario",
+  "title": "Franchise menu constraints are lifted enabling local adaptation",
+  "description": "Franchise menu constraints are lifted enabling local adaptation",
+  "content": "Scenario: Franchise menu constraints are lifted enabling local adaptation\n    Given corporate mandated standardized menu prohibiting innovation\n    And community requested options (vegan, healthier choices) were impossible to offer\n    When menu control transfers to democratic worker governance\n    Then workers add menu items responding to neighborhood preferences\n    And seasonal offerings use Johnson Farm's available produce\n    And cultural preferences of diverse community are reflected in menu\n    And innovation serves local needs rather than distant corporate standardization\n    And workplace_elohim tracks customer satisfaction with democratized menu\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

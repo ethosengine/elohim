@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-building care relationships that will support margaret's aging",
+  "contentType": "scenario",
+  "title": "Building care relationships that will support Margaret's aging",
+  "description": "Building care relationships that will support Margaret's aging",
+  "content": "Scenario: Building care relationships that will support Margaret's aging\n    Given Margaret is building neighborhood relationships now\n    And she will need neighborhood support as she ages\n    When the neighborhood_elohim tracks care relationship development\n    Then it should recognize Margaret is building care economy capital\n    And her current contributions should create future reciprocity\n    And neighbors she helps now will help her later\n    And neighborhood care networks should support aging in place\n    And Margaret's care work should enable her own aging in community\n    And neighborhood relationships should provide long-term security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

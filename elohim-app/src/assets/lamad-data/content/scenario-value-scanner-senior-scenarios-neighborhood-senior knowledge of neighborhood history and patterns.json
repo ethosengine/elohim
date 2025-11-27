@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-senior knowledge of neighborhood history and patterns",
+  "contentType": "scenario",
+  "title": "Senior knowledge of neighborhood history and patterns",
+  "description": "Senior knowledge of neighborhood history and patterns",
+  "content": "Scenario: Senior knowledge of neighborhood history and patterns\n    Given Margaret has lived in the neighborhood for years/decades\n    And she has institutional knowledge about local patterns\n    When neighborhood decisions are being made\n    Then Margaret's knowledge should inform decision-making\n    And her historical perspective should be valued\n    And she should have standing in neighborhood governance\n    And long-term residents' wisdom should shape neighborhood future\n    And Margaret's experience should be treated as valuable resource\n    And neighborhood planning should benefit from senior knowledge\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

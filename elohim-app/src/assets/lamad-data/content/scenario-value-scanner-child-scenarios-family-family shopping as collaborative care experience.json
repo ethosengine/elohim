@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-family shopping as collaborative care experience",
+  "contentType": "scenario",
+  "title": "Family shopping as collaborative care experience",
+  "description": "Family shopping as collaborative care experience",
+  "content": "Scenario: Family shopping as collaborative care experience\n    Given Emma and Sarah shop together\n    And they both use the Value Scanner\n    When they coordinate on family purchasing decisions\n    Then Emma should be learning from Sarah's modeling\n    And Sarah should be teaching through real decision-making\n    And the family_elohim should coordinate their different roles\n    And Emma's contributions should be recognized alongside Sarah's\n    And shopping should be experienced as family care work\n    And collaborative decision-making should strengthen relationship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

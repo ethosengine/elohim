@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager mediates conflict without imposing judgment",
+  "contentType": "scenario",
+  "title": "Manager mediates conflict without imposing judgment",
+  "description": "Manager mediates conflict without imposing judgment",
+  "content": "Scenario: Manager mediates conflict without imposing judgment\n    Given two workers have disagreement about task allocation\n    And corporate model had Marcus impose solution or discipline both\n    When workers bring conflict to Marcus for mediation\n    Then Marcus facilitates structured conversation between parties\n    And Marcus helps each worker express their perspective and needs\n    And Marcus proposes potential compromise solutions\n    And workers, not Marcus, decide on resolution\n    And workplace_elohim documents process ensuring fairness\n    And conflict resolves through dialogue, not managerial authority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

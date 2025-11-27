@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-coordinating volunteer participation with other life commitments",
+  "contentType": "scenario",
+  "title": "Coordinating volunteer participation with other life commitments",
+  "description": "Coordinating volunteer participation with other life commitments",
+  "content": "Scenario: Coordinating volunteer participation with other life commitments\n    Given Frank volunteers 20 hours/week\n    And he also provides family care and participates in neighborhood governance\n    When the community_elohim coordinates his participation\n    Then it should integrate volunteer work with other commitments\n    And help Frank maintain sustainable participation level\n    And prevent volunteer burnout through overcommitment\n    And coordinate scheduling across community, family, and neighborhood\n    And support Frank in balancing diverse care contributions\n    And enable long-term sustainable volunteer engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

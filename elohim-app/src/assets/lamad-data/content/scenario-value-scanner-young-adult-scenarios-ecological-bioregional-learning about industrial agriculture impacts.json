@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-learning about industrial agriculture impacts",
+  "contentType": "scenario",
+  "title": "Learning about industrial agriculture impacts",
+  "description": "Learning about industrial agriculture impacts",
+  "content": "Scenario: Learning about industrial agriculture impacts\n    Given industrial agriculture has severe environmental costs\n    And Aisha consumes products of agricultural systems\n    When the personal_agent teaches about food systems\n    Then it should explain industrial agriculture's impacts\n    And it should highlight alternatives like regenerative agriculture\n    And it should help her support better food systems\n    And agricultural literacy should inform purchasing\n    And she should understand systemic environmental issues\n    And food system education should enable values-aligned choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

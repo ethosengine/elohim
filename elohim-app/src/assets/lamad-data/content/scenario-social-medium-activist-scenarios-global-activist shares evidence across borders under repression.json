@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+  "contentType": "scenario",
+  "title": "Activist shares evidence across borders under repression",
+  "description": "Activist shares evidence across borders under repression",
+  "content": "Scenario: Activist shares evidence across borders under repression\n    Given an activist documents human rights violations in their country\n    And sharing this evidence locally would endanger them and their community\n    When they contribute documentation to international human rights network\n    And the evidence is verified through multiple independent sources\n    Then the evidence reaches international solidarity organizations\n    And it bypasses national censorship through distributed architecture\n    And the activist's identity is protected through cryptographic anonymity\n    And international pressure can be mobilized while protecting sources\n    And the network coordinates advocacy at UN and regional bodies\n    And documentation is preserved for future accountability processes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:global",
+    "related_users:refugee,displaced_person,activist,content_creator",
+    "related_layers:nation_state,continental,affinity_network,cultural_linguistic",
+    "elohim_agents:translation_agent,verification_agent,pattern_recognition_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-global",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

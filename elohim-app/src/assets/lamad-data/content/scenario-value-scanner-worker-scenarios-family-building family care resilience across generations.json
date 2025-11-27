@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-building family care resilience across generations",
+  "contentType": "scenario",
+  "title": "Building family care resilience across generations",
+  "description": "Building family care resilience across generations",
+  "content": "Scenario: Building family care resilience across generations\n    Given family care needs span generations\n    When family members support each other across life stages\n    Then the protocol should coordinate intergenerational care\n    And recognize contributions from all generations\n    And facilitate sustainable care distribution\n    And support family care economy across time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

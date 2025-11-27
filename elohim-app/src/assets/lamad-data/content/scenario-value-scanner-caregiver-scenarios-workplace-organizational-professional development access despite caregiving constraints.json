@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-professional development access despite caregiving constraints",
+  "contentType": "scenario",
+  "title": "Professional development access despite caregiving constraints",
+  "description": "Professional development access despite caregiving constraints",
+  "content": "Scenario: Professional development access despite caregiving constraints\n    Given James wants to maintain professional skills\n    And caregiving prevents traditional professional development\n    When professional development is offered\n    Then the workplace_elohim should advocate for accessible formats\n    And training should be available remotely and asynchronously\n    And caregivers should not be excluded from advancement opportunities\n    And professional growth should be possible during caregiving years\n    And workplace should provide flexible development paths\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,middle_aged,employee,contractor",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

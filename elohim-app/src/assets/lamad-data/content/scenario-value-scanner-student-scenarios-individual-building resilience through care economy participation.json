@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-individual-building resilience through care economy participation",
+  "contentType": "scenario",
+  "title": "Building resilience through care economy participation",
+  "description": "Building resilience through care economy participation",
+  "content": "Scenario: Building resilience through care economy participation\n    Given Kenji faces significant stress and uncertainty\n    And he is geographically separated from family support networks\n    When the personal_agent supports Kenji's resilience development\n    Then it should recognize his participation in care economy as building connection\n    And it should show how his care contributions create community\n    And it should validate that resilience comes from reciprocal relationships\n    And the agent should help him build care networks in temporary community\n    And the system should teach that care economy creates security\n    And Kenji should learn that giving and receiving care builds resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

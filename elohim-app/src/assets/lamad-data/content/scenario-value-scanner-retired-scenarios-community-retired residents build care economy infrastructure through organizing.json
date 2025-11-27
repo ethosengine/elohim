@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-retired residents build care economy infrastructure through organizing",
+  "contentType": "scenario",
+  "title": "Retired residents build care economy infrastructure through organizing",
+  "description": "Retired residents build care economy infrastructure through organizing",
+  "content": "Scenario: Retired residents build care economy infrastructure through organizing\n    Given Frank and other retired residents have time for organizing\n    And care economy requires coordination and infrastructure\n    When the community_elohim supports infrastructure building\n    Then it should enable retired residents to organize care economy systems\n    And coordinate tool libraries, skill shares, mutual aid networks\n    And facilitate care coordination that benefits all community members\n    And recognize organizing labor as valuable care contribution\n    And retired residents should be understood as infrastructure builders\n    And Frank should help establish care economy as normal community practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

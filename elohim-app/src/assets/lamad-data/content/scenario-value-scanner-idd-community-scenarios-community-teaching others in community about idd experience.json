@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-teaching others in community about idd experience",
+  "contentType": "scenario",
+  "title": "Teaching others in community about IDD experience",
+  "description": "Teaching others in community about IDD experience",
+  "content": "Scenario: Teaching others in community about IDD experience\n    Given a local school wants to teach students about inclusion\n    And Jordan is willing to share their experience\n    When Jordan participates in educational presentation\n    Then the personal_agent helps Jordan prepare accessible talking points\n    And Jordan shares their story in their own words with support\n    And students learn from Jordan directly, not just about IDD in abstract\n    And Jordan accumulates care tokens for educational contribution\n    And Jordan's teaching shapes community understanding\n    And Jordan experiences being an educator and advocate\n    And the community learns to see IDD people as full humans\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

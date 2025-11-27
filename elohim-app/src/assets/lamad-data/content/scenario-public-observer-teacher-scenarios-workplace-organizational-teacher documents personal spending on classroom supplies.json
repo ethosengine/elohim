@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher documents personal spending on classroom supplies",
+  "contentType": "scenario",
+  "title": "Teacher documents personal spending on classroom supplies",
+  "description": "Teacher documents personal spending on classroom supplies",
+  "content": "Scenario: Teacher documents personal spending on classroom supplies\n    Given teachers spend personal money on student supplies\n    And administration doesn't acknowledge this burden\n    When teachers track personal spending through Observer\n    Then district-wide data shows teachers spend average $600 annually\n    And spending patterns reveal systematic resource inadequacy\n    And teachers document impact on lower-income teachers\n    And advocate for adequate classroom budgets as equity issue\n    And working conditions transparency exposes hidden subsidies teachers provide\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

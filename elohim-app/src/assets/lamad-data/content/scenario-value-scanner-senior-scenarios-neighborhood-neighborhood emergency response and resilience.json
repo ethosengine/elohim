@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-neighborhood emergency response and resilience",
+  "contentType": "scenario",
+  "title": "Neighborhood emergency response and resilience",
+  "description": "Neighborhood emergency response and resilience",
+  "content": "Scenario: Neighborhood emergency response and resilience\n    Given Margaret is often home during the day\n    And she has nursing background and crisis response experience\n    When neighborhood emergencies occur\n    Then Margaret should be part of emergency response network\n    And her skills and availability should be known to neighbors\n    And the neighborhood should be more resilient due to her presence\n    And her contributions to collective safety should be tracked\n    And emergency preparedness should be enhanced by retiree participation\n    And Margaret's professional background should serve neighborhood\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

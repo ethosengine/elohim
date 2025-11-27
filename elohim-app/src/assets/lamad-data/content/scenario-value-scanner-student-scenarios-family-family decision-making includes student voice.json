@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-family decision-making includes student voice",
+  "contentType": "scenario",
+  "title": "Family decision-making includes student voice",
+  "description": "Family decision-making includes student voice",
+  "content": "Scenario: Family decision-making includes student voice\n    Given Kenji is becoming adult family member\n    And family makes decisions that affect him\n    When family discusses major decisions (moving, finances, elder care)\n    Then the family_elohim should ensure Kenji's voice is included\n    And it should recognize his emerging adult perspective as valuable\n    And it should facilitate his participation despite distance\n    And family governance should include student members as participants\n    And the system should support transition from child to adult family voice\n    And Kenji should participate in family decisions appropriately\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

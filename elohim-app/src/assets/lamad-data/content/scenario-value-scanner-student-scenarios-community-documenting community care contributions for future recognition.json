@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-documenting community care contributions for future recognition",
+  "contentType": "scenario",
+  "title": "Documenting community care contributions for future recognition",
+  "description": "Documenting community care contributions for future recognition",
+  "content": "Scenario: Documenting community care contributions for future recognition\n    Given Kenji's community care work is currently invisible to traditional economy\n    And his care tokens accumulate throughout college\n    When Kenji graduates and enters workforce\n    Then his care token history should document community leadership and care skills\n    And it should translate community organizing to \"proven leadership capability\"\n    And it should show mutual aid coordination as \"project management expertise\"\n    And community care work should be valuable on employment terms\n    And the system should help Kenji articulate care economy participation professionally\n    And student community work should be recognized as career-relevant experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

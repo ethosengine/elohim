@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-neighborhood watch supports elderly safety with dignity",
+  "contentType": "scenario",
+  "title": "Neighborhood watch supports elderly safety with dignity",
+  "description": "Neighborhood watch supports elderly safety with dignity",
+  "content": "Scenario: Neighborhood watch supports elderly safety with dignity\n    Given Helen is vulnerable to scams and exploitation\n    And neighborhood watch includes elder protection\n    When potential threats are identified\n    Then the neighborhood_elohim should alert Helen and support network\n    And protection should be provided without infantilizing\n    And Helen should be informed: \"Neighbors are seeing scam calls in the area\"\n    And her autonomy should be preserved while providing protection\n    And neighborhood should look out for vulnerable members\n    And safety should be communal responsibility\n    And the protocol should enable neighborhood care without surveillance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-accessing neighborhood services while managing transportation barriers",
+  "contentType": "scenario",
+  "title": "Accessing neighborhood services while managing transportation barriers",
+  "description": "Accessing neighborhood services while managing transportation barriers",
+  "content": "Scenario: Accessing neighborhood services while managing transportation barriers\n    Given I don't have reliable transportation\n    And many neighborhood resources require travel\n    When I need to access services across the neighborhood\n    Then the Value Scanner optimizes my travel for efficiency\n    And identifies services accessible by walking or public transit\n    And helps me batch errands to minimize trips\n    And surfaces transportation assistance programs\n    And coordinates with neighbors for ride-sharing when appropriate\n    And my personal_agent plans routes considering my constraints\n    And recognizes transportation navigation as significant invisible labor\n    And validates that lack of transportation makes everything harder\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

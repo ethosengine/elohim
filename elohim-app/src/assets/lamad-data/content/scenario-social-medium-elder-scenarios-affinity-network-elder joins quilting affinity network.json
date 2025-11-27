@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-affinity-network-elder joins quilting affinity network",
+  "contentType": "scenario",
+  "title": "Elder joins quilting affinity network",
+  "description": "Elder joins quilting affinity network",
+  "content": "Scenario: Elder joins quilting affinity network\n    Given Rose is a quilter interested in connecting with other quilters\n    When she discovers a regional quilting network on Elohim\n    And the network includes elders and younger crafters\n    Then she can join and share her quilting patterns\n    And she connects with others who appreciate traditional techniques\n    And she mentors younger quilters learning the craft\n    And her patterns are valued and spread through the network\n    And she finds meaningful community around her lifelong passion\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,child",
+    "related_layers:neighborhood,community,cultural_linguistic",
+    "elohim_agents:guardian_agent,matching_agent,wisdom_preservation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.188597",
+  "updatedAt": "2025-11-21T18:54:29.188597"
+}

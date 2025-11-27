@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator confronts honest accounting of value creation",
+  "contentType": "scenario",
+  "title": "Operator confronts honest accounting of value creation",
+  "description": "Operator confronts honest accounting of value creation",
+  "content": "Scenario: Operator confronts honest accounting of value creation\n    Given James believed he \"built\" the business through risk and management\n    And honest accounting reveals distributed value creation\n    When conversion process makes contributions visible through REA documentation\n    Then James sees workers created operational value through daily labor (Maria's training, Emma's optimization)\n    And corporate created systems value but extracted far more than systems were worth\n    And his coordination and risk-bearing were real but not sole value creation\n    And humbling recognition enables fair distribution replacing mythologized ownership\n    And workplace_elohim provides transparent value creation documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

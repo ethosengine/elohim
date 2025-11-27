@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-educational-parent recognized as child's primary educator",
+  "contentType": "scenario",
+  "title": "Parent recognized as child's primary educator",
+  "description": "Parent recognized as child's primary educator",
+  "content": "Scenario: Parent recognized as child's primary educator\n    Given Sarah teaches Tommy and Emma continuously at home\n    And she is their first and most influential teacher\n    When the educational_elohim tracks educational contributions\n    Then it should recognize Sarah's parenting as educational work\n    And it should value home education alongside school education\n    And Sarah's teaching labor should accumulate care tokens\n    And parents should be understood as primary educators\n    And schools should be partners in education, not replacements for parents\n    And the system should make parent educational labor visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

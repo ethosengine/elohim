@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-learning through socratic questioning not direct instruction",
+  "contentType": "scenario",
+  "title": "Learning through Socratic questioning not direct instruction",
+  "description": "Learning through Socratic questioning not direct instruction",
+  "content": "Scenario: Learning through Socratic questioning not direct instruction\n    Given Emma is comparing two products\n    And her personal_agent serves as teacher-guide\n    When Emma seeks guidance on which to choose\n    Then the agent should ask \"What do you notice about these two options?\"\n    And the agent should follow up based on Emma's observations\n    And the agent should ask \"Which one do you think would work better for your family?\"\n    And direct instruction should be avoided\n    And Emma should develop her own reasoning through inquiry\n    And critical thinking should be built through question-based pedagogy\n    And teaching should treat Emma as thinker, not rule-follower\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

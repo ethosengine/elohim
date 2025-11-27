@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-mutual aid practices from disability community inform ecological resilience",
+  "contentType": "scenario",
+  "title": "Mutual aid practices from disability community inform ecological resilience",
+  "description": "Mutual aid practices from disability community inform ecological resilience",
+  "content": "Scenario: Mutual aid practices from disability community inform ecological resilience\n    Given disabled people have deep expertise in mutual aid\n    And ecological resilience requires community cooperation\n    When the bioregional_elohim models community resilience\n    Then it should learn from disability community mutual aid practices\n    And Alex's experience with peer support should inform ecological organizing\n    And disability community's interdependence should model ecological relationships\n    And the protocol should recognize disability community as resilience experts\n    And mutual aid frameworks should be applied to ecological challenges\n    And Alex's knowledge should strengthen bioregional resilience\n    And disability justice practices should inform ecological care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

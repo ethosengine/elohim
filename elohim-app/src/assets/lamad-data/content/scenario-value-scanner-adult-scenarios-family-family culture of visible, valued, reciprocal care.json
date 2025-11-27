@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-family culture of visible, valued, reciprocal care",
+  "contentType": "scenario",
+  "title": "Family culture of visible, valued, reciprocal care",
+  "description": "Family culture of visible, valued, reciprocal care",
+  "content": "Scenario: Family culture of visible, valued, reciprocal care\n    Given Sarah is building family culture around care economy\n    And she wants care to be visible and valued by all members\n    When family care patterns develop over time\n    Then the family_elohim should make all contributions visible\n    And recognition should flow in all directions\n    And family culture should value care labor explicitly\n    And reciprocity should be practiced, not just preached\n    And family should become care economy demonstration site\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

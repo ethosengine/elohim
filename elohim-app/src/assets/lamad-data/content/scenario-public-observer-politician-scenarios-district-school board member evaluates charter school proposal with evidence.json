@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-school board member evaluates charter school proposal with evidence",
+  "contentType": "scenario",
+  "title": "School board member evaluates charter school proposal with evidence",
+  "description": "School board member evaluates charter school proposal with evidence",
+  "content": "Scenario: School board member evaluates charter school proposal with evidence\n    Given charter organization proposes new school in district\n    And presents compelling student achievement promises\n    When the Observer analyzes charter track record\n    Then they see organization's student outcomes in other cities\n    And learn whether achievement gains account for selective enrollment\n    And understand fiscal impact on district schools\n    And review discipline and expulsion rates for vulnerable students\n    And make informed decision on charter authorization\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

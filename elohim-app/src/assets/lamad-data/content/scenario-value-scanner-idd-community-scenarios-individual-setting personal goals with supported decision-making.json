@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-setting personal goals with supported decision-making",
+  "contentType": "scenario",
+  "title": "Setting personal goals with supported decision-making",
+  "description": "Setting personal goals with supported decision-making",
+  "content": "Scenario: Setting personal goals with supported decision-making\n    Given Jordan wants to learn a new skill\n    And Jordan's support worker is available to help\n    When Jordan explores the goal-setting feature\n    Then the interface shows potential goals as visual options\n    And the support worker helps Jordan understand each option\n    But Jordan makes the final choice of which goal to pursue\n    And the system breaks the goal into simple, achievable steps\n    And Jordan's personal_agent provides encouragement and progress tracking\n    And Jordan experiences ownership of their own growth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher coordinates with parents on class sizes",
+  "contentType": "scenario",
+  "title": "Teacher coordinates with parents on class sizes",
+  "description": "Teacher coordinates with parents on class sizes",
+  "content": "Scenario: Teacher coordinates with parents on class sizes\n    Given increasing class sizes harm individualized attention\n    And parents don't realize it's a policy choice not teacher preference\n    When the Observer connects teacher insights with parent concerns\n    Then parents learn class sizes increased from 22 to 28 this year\n    And teachers provide evidence on learning impacts\n    And teacher-parent coalition advocates to principal and district\n    And shared understanding replaces parent-teacher tension\n    And cross-stakeholder coalition creates accountability pressure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

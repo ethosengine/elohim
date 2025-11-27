@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-family care coordination prevents caregiver burnout",
+  "contentType": "scenario",
+  "title": "Family care coordination prevents caregiver burnout",
+  "description": "Family care coordination prevents caregiver burnout",
+  "content": "Scenario: Family care coordination prevents caregiver burnout\n    Given Sarah provides most of Helen's family care\n    And unsustainable care burden causes burnout\n    When the family_elohim analyzes care patterns\n    Then it should identify when Sarah's burden is too heavy\n    And it should suggest care distribution across family members\n    And it should surface when professional support is needed\n    And it should intervene before crisis occurs\n    And Sarah should not have to advocate for her own limits\n    And the system should protect both Helen and Sarah\n    And sustainable multigenerational care should be built proactively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

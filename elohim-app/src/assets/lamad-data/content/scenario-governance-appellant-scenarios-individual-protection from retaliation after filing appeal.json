@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-protection from retaliation after filing appeal",
+  "contentType": "scenario",
+  "title": "Protection from retaliation after filing appeal",
+  "description": "Protection from retaliation after filing appeal",
+  "content": "Scenario: Protection from retaliation after filing appeal\n    Given I filed an appeal that challenged an agent's authority\n    And I was concerned about potential retaliation in future decisions\n    When I continue interacting with Elohim agents after my appeal\n    Then the appeal cannot be used against me in future decisions\n    And Agents do not punish me for exercising my right to appeal\n    And The system monitors for retaliatory patterns\n    And I have recourse if I detect bias based on my appeal history\n    And My right to dissent is protected as fundamental to the protocol\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual",
+    "related_users:constitutional_council_member,technical_expert,community_leader",
+    "related_layers:family,community",
+    "elohim_agents:family_elohim,individual_support_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

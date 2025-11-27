@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+  "contentType": "scenario",
+  "title": "Child's creative work spreads through earned reach",
+  "description": "Child's creative work spreads through earned reach",
+  "content": "Scenario: Child's creative work spreads through earned reach\n    Given Emma creates a manga story about environmental conservation\n    And she shares it in her manga artists community\n    When other young artists appreciate and share her work\n    And the story demonstrates both artistic skill and positive values\n    Then the work travels through network based on genuine appreciation\n    And it reaches other youth environmental and art communities\n    And Emma experiences validation for quality contribution\n    And she learns that good work naturally finds its audience\n    And no algorithmic manipulation or viral exploitation occurs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,community_moderator,child",
+    "related_layers:educational,neighborhood,family",
+    "elohim_agents:guardian_agent,matching_agent,moderation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

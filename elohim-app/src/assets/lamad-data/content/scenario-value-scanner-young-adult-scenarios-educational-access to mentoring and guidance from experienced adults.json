@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-access to mentoring and guidance from experienced adults",
+  "contentType": "scenario",
+  "title": "Access to mentoring and guidance from experienced adults",
+  "description": "Access to mentoring and guidance from experienced adults",
+  "content": "Scenario: Access to mentoring and guidance from experienced adults\n    Given Aisha can benefit from elder wisdom\n    And mentoring relationships support development\n    When Aisha seeks guidance\n    Then the system should connect her to mentors\n    And it should facilitate intergenerational knowledge transfer\n    And experienced adults should share practical wisdom\n    And mentoring should be valued as care work\n    And the educational layer should include relationship-based learning\n    And she should have access to guidance beyond peer knowledge\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

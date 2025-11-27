@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-responding to household maintenance needs",
+  "contentType": "scenario",
+  "title": "Responding to household maintenance needs",
+  "description": "Responding to household maintenance needs",
+  "content": "Scenario: Responding to household maintenance needs\n    Given Jordan notices the bathroom sink is leaking\n    And household members should report maintenance issues\n    When Jordan uses the maintenance request feature\n    Then the interface allows simple issue reporting with pictures\n    And Jordan can photograph the problem or select from issue pictures\n    And the household_elohim routes the request appropriately\n    And Jordan receives confirmation and updates in accessible format\n    And Jordan's observant contribution is celebrated\n    And Jordan learns responsibility for shared home care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

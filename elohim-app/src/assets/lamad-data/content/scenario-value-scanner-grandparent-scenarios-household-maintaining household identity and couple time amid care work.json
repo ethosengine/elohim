@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-maintaining household identity and couple time amid care work",
+  "contentType": "scenario",
+  "title": "Maintaining household identity and couple time amid care work",
+  "description": "Maintaining household identity and couple time amid care work",
+  "content": "Scenario: Maintaining household identity and couple time amid care work\n    Given Margaret and Robert are navigating retirement together\n    And they have their own relationship and household life\n    When Margaret provides substantial grandchild care\n    Then the household_elohim should protect couple time\n    And it should ensure grandparenting doesn't consume all household capacity\n    And it should help maintain balance between care and relationship\n    And Margaret and Robert should have time as a couple\n    And household identity should extend beyond grandparenting\n    And the system should support healthy household boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

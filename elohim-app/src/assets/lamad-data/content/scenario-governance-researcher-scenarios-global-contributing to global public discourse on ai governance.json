@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-contributing to global public discourse on ai governance",
+  "contentType": "scenario",
+  "title": "Contributing to global public discourse on AI governance",
+  "description": "Contributing to global public discourse on AI governance",
+  "content": "Scenario: Contributing to global public discourse on AI governance\n    Given public understanding shapes political will for democratic AI\n    And I have findings that matter for global deliberation\n    When I engage in global public education and discourse\n    Then I write: accessible articles for general audiences\n    And I give: public lectures explaining research findings\n    And I participate: in media discussions with honesty about uncertainties\n    And I contribute: to democratic deliberation about governance alternatives\n    And I explain: what's at stake, what options exist, what evidence shows\n    And I avoid: false certainty or ideological advocacy\n    And My public engagement serves: informed democratic choice about AI governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

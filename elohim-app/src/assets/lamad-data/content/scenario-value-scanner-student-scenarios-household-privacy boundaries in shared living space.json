@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-privacy boundaries in shared living space",
+  "contentType": "scenario",
+  "title": "Privacy boundaries in shared living space",
+  "description": "Privacy boundaries in shared living space",
+  "content": "Scenario: Privacy boundaries in shared living space\n    Given Kenji shares space but deserves privacy\n    And household coordination requires some information sharing\n    When the household_elohim manages household data\n    Then it should share only household-relevant information with roommates\n    And Kenji's personal data should remain private\n    And roommates should see his cooking contributions, not his financial struggles\n    And privacy boundaries should be clear and respected\n    And the system should balance coordination needs with personal privacy\n    And Kenji should control what household information is shared\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

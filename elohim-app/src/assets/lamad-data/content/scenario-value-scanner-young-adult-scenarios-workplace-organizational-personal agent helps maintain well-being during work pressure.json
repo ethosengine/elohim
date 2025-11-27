@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-personal agent helps maintain well-being during work pressure",
+  "contentType": "scenario",
+  "title": "Personal agent helps maintain well-being during work pressure",
+  "description": "Personal agent helps maintain well-being during work pressure",
+  "content": "Scenario: Personal agent helps maintain well-being during work pressure\n    Given Aisha's job is demanding\n    And professional pressures are intense\n    When work stress affects her health\n    Then the personal_agent should prioritize her well-being\n    And it should flag declining self-care patterns\n    And it should remind her that personal health enables professional contribution\n    And the system should validate self-care as essential, not optional\n    And she should learn that sustainable work requires personal stewardship\n    And wholeness should be preserved despite workplace demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

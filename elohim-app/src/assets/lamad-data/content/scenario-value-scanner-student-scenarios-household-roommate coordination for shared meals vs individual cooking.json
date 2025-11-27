@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-roommate coordination for shared meals vs individual cooking",
+  "contentType": "scenario",
+  "title": "Roommate coordination for shared meals vs individual cooking",
+  "description": "Roommate coordination for shared meals vs individual cooking",
+  "content": "Scenario: Roommate coordination for shared meals vs individual cooking\n    Given some meals are shared and some are individual\n    And coordination requires planning around different schedules\n    When the household_elohim manages meal coordination\n    Then it should track who's eating shared meals vs cooking separately\n    And it should help schedule shared dinners when roommates are available\n    And it should recognize Kenji's labor preparing shared meals\n    And it should calculate fair cost sharing for shared food\n    And the system should make coordination easy rather than burdensome\n    And shared meals should build household community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

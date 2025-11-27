@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-global data infrastructure with privacy and sovereignty protection",
+  "contentType": "scenario",
+  "title": "Global data infrastructure with privacy and sovereignty protection",
+  "description": "Global data infrastructure with privacy and sovereignty protection",
+  "content": "Scenario: Global data infrastructure with privacy and sovereignty protection\n    Given I need access to data across nations for research\n    And I must respect privacy, sovereignty, and data justice\n    When global research infrastructure is designed\n    Then I work with: federated data systems respecting national sovereignty\n    And I use: differential privacy protecting individual anonymity\n    And I ensure: community data ownership and benefit sharing\n    And I implement: ethical review and consent protocols\n    And I advocate: for open access to research findings\n    And I practice: data justice not data colonialism\n    And My methodology demonstrates: how to study globally while respecting locally\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

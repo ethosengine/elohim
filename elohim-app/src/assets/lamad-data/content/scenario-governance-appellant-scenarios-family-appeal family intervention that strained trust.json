@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-appeal family intervention that strained trust",
+  "contentType": "scenario",
+  "title": "Appeal family intervention that strained trust",
+  "description": "Appeal family intervention that strained trust",
+  "content": "Scenario: Appeal family intervention that strained trust\n    Given Family Elohim alerted my partner about my behavioral changes\n    And this intervention strained trust in our relationship\n    And my partner now worries I'm being monitored\n    When I file an appeal about the family impact of the intervention\n    And I explain how \"care\" felt like \"control\" in our relationship\n    Then the appeal is reviewed with family dynamics in mind\n    And The Constitutional Council considers relationship impacts\n    And They evaluate whether the intervention balanced individual autonomy with family care\n    And They examine if less invasive options were considered\n    And The family is offered mediation support to rebuild trust\n    And Protocol recommendations address relationship preservation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

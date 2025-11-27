@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-neighborhood-child's care contributions visible at neighborhood scale",
+  "contentType": "scenario",
+  "title": "Child's care contributions visible at neighborhood scale",
+  "description": "Child's care contributions visible at neighborhood scale",
+  "content": "Scenario: Child's care contributions visible at neighborhood scale\n    Given Emma makes consistent stewardship choices\n    And neighborhood care economy tracks contributions\n    When Emma's patterns are recognized by neighborhood_elohim\n    Then her contributions should be visible at appropriate scale\n    And recognition should reflect community-level impact\n    And Emma should learn her care matters beyond just family\n    And she should understand she is contributing to neighborhood flourishing\n    And care visibility should extend across governance layers\n    And identity as community member should be forming\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-individual-individual care token accumulation reflects care work value",
+  "contentType": "scenario",
+  "title": "Individual care token accumulation reflects care work value",
+  "description": "Individual care token accumulation reflects care work value",
+  "content": "Scenario: Individual care token accumulation reflects care work value\n    Given James provides care worth $50k+/year professionally\n    And his work is invisible because he cares for his spouse\n    When care tokens are calculated for James\n    Then tokens should reflect professional-grade care value\n    And his care work should accumulate significant tokens\n    And tokens should give him standing in care economy\n    And invisible spousal care should become economically visible\n    And care economy should recognize family caregiving at professional value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:individual",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

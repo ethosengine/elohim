@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-offering specialized knowledge or skills to community despite crisis circumstances",
+  "contentType": "scenario",
+  "title": "Offering specialized knowledge or skills to community despite crisis circumstances",
+  "description": "Offering specialized knowledge or skills to community despite crisis circumstances",
+  "content": "Scenario: Offering specialized knowledge or skills to community despite crisis circumstances\n    Given I have professional skills, knowledge, or experience that could help others\n    And crisis circumstances don't erase my capabilities\n    When community members could benefit from my expertise\n    Then the Value Scanner surfaces opportunities to share my knowledge\n    And facilitates skill-sharing and mentorship relationships\n    And recognizes my expertise contributions with care tokens\n    And validates that crisis doesn't eliminate my competence\n    And helps me contribute in ways that match my current capacity\n    And my personal_agent identifies good matches for my skills\n    And tracks my knowledge contributions to community\n    And celebrates that I am valuable community resource\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

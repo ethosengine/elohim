@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-responsible developer demonstrates quality job creation",
+  "contentType": "scenario",
+  "title": "Responsible developer demonstrates quality job creation",
+  "description": "Responsible developer demonstrates quality job creation",
+  "content": "Scenario: Responsible developer demonstrates quality job creation\n    Given a responsible developer prioritizes workforce development\n    And creates genuine employment opportunities for local residents\n    When the Observer documents employment track record\n    Then analysis shows: 85% of jobs went to local residents\n    And median wage is $24/hour with benefits\n    And developer provides apprenticeship programs for construction trades\n    And permanent jobs offer career advancement opportunities\n    And quality employment becomes competitive advantage for approvals\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,activist,community_organizer,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

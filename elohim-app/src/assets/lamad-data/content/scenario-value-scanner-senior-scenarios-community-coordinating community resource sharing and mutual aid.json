@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-coordinating community resource sharing and mutual aid",
+  "contentType": "scenario",
+  "title": "Coordinating community resource sharing and mutual aid",
+  "description": "Coordinating community resource sharing and mutual aid",
+  "content": "Scenario: Coordinating community resource sharing and mutual aid\n    Given Margaret has organizational skills and available time\n    And community needs coordination of sharing networks\n    When the community_elohim facilitates resource coordination\n    Then Margaret should be identified as potential coordinator\n    And her labor in coordinating should be recognized and valued\n    And community resource sharing should reduce individual scarcity\n    And Margaret's organizational contributions should strengthen community\n    And her time availability should serve collective benefit\n    And coordination labor should be visible and appreciated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

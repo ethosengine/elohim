@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-peer learning networks facilitated through care economy",
+  "contentType": "scenario",
+  "title": "Peer learning networks facilitated through care economy",
+  "description": "Peer learning networks facilitated through care economy",
+  "content": "Scenario: Peer learning networks facilitated through care economy\n    Given young adults learn effectively from peers\n    And Aisha's peers face similar challenges\n    When Aisha connects with peers through the system\n    Then the personal_agent should facilitate peer learning\n    And it should enable knowledge exchange among young adults\n    And it should coordinate peer teaching and support\n    And collective learning should be more effective than isolated struggle\n    And peer networks should be educational resources\n    And mutual learning should strengthen community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

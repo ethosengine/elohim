@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-advocating for worker-friendly neighborhood policies",
+  "contentType": "scenario",
+  "title": "Advocating for worker-friendly neighborhood policies",
+  "description": "Advocating for worker-friendly neighborhood policies",
+  "content": "Scenario: Advocating for worker-friendly neighborhood policies\n    Given neighborhood governance makes decisions affecting workers\n    When policies could support workers' care needs and participation\n    Then the protocol should help me participate in neighborhood advocacy\n    And connect me with other workers for collective voice\n    And support advocacy for worker-supportive policies\n    And build neighborhood culture that values workers' care needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

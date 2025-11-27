@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-tracking mental load separately from physical tasks",
+  "contentType": "scenario",
+  "title": "Tracking mental load separately from physical tasks",
+  "description": "Tracking mental load separately from physical tasks",
+  "content": "Scenario: Tracking mental load separately from physical tasks\n    Given Sarah manages meal planning, scheduling, inventory, coordination\n    And mental labor is typically invisible to partners\n    When the household_elohim tracks cognitive labor\n    Then it should distinguish planning from execution\n    And it should show \"Sarah performed 89% of household planning labor this week\"\n    And mental load should be valued as heavily as physical work\n    And the partner should see that \"helping with dishes\" doesn't equal Sarah's total coordination\n    And cognitive labor should become visible and valued\n    And the full scope of Sarah's work should be undeniable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

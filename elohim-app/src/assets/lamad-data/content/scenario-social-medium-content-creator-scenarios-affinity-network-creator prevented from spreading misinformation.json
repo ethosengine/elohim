@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-affinity-network-creator prevented from spreading misinformation",
+  "contentType": "scenario",
+  "title": "Creator prevented from spreading misinformation",
+  "description": "Creator prevented from spreading misinformation",
+  "content": "Scenario: Creator prevented from spreading misinformation\n    Given Jordan creates content making unsupported health claims\n    And the claims contradict scientific consensus\n    When Jordan attempts to contribute the content\n    Then the verification agent surfaces counter-evidence\n    And Jordan sees the evidence gaps before distribution\n    And Jordan can revise with better sources or accept limited reach\n    And if posted without revision, reach is limited to personal connections\n    And communities are protected from health misinformation\n    And Jordan learns that evidence standards enable trust and reach\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:affinity_network",
+    "related_users:child,elder,activist,community_moderator",
+    "related_layers:community,global,educational",
+    "elohim_agents:verification_agent,value_recognition_agent,distribution_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

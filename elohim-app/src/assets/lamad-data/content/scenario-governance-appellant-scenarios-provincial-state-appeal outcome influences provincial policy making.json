@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-provincial-state-appeal outcome influences provincial policy making",
+  "contentType": "scenario",
+  "title": "Appeal outcome influences provincial policy making",
+  "description": "Appeal outcome influences provincial policy making",
+  "content": "Scenario: Appeal outcome influences provincial policy making\n    Given my appeal revealed gap between agent governance and state law\n    And Constitutional Council recommendations identify needed legal changes\n    When Senator Ruiz reviews appeal precedents for policy insights\n    Then she uses my case as evidence in legislative hearings\n    And She crafts legislation addressing the constitutional gap\n    And She cites the council's reasoning in justifying policy changes\n    And My individual appeal contributes to democratic policy improvement\n    And Constitutional governance and representative democracy work together\n    And Policy makers learn from Constitutional Council wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,technical_expert,policy_maker,researcher",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-connecting with workers across food service industry",
+  "contentType": "scenario",
+  "title": "Connecting with workers across food service industry",
+  "description": "Connecting with workers across food service industry",
+  "content": "Scenario: Connecting with workers across food service industry\n    Given food service workers face similar exploitation patterns\n    And collective action requires cross-workplace organization\n    When I want to connect with other food service workers\n    Then the protocol should facilitate industry-wide worker networks\n    And help me find worker organizing groups and unions\n    And support building solidarity across restaurants and food businesses\n    And enable coordination for industry-level advocacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

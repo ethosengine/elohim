@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-supporting other idd community members as peer",
+  "contentType": "scenario",
+  "title": "Supporting other IDD community members as peer",
+  "description": "Supporting other IDD community members as peer",
+  "content": "Scenario: Supporting other IDD community members as peer\n    Given Jordan has learned strategies for various daily challenges\n    And a newer group home resident is struggling with similar issues\n    When Jordan offers peer support\n    Then Jordan shares what has helped them\n    And the new resident benefits from Jordan's lived experience wisdom\n    And Jordan's peer support is recognized as valuable care work\n    And Jordan accumulates care tokens for peer support contribution\n    And Jordan experiences being a care provider and mentor\n    And IDD peer support is recognized as essential care infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

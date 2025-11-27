@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-care contributions qualify family for community resources",
+  "contentType": "scenario",
+  "title": "Care contributions qualify family for community resources",
+  "description": "Care contributions qualify family for community resources",
+  "content": "Scenario: Care contributions qualify family for community resources\n    Given Marcus performs substantial household labor\n    And his care contributions are tracked and valued\n    When community resource allocation is determined\n    Then Marcus's demonstrated stewardship should qualify his family\n    And his care tokens should provide access to community support programs\n    And access should be based on care contributions, not means testing\n    And the framework should be reciprocity: he gives care, community gives care\n    And his household labor should be recognized as community contribution\n    And resource access should preserve dignity through reciprocity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

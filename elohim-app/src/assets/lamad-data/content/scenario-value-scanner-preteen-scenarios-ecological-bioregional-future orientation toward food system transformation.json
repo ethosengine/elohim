@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-future orientation toward food system transformation",
+  "contentType": "scenario",
+  "title": "Future orientation toward food system transformation",
+  "description": "Future orientation toward food system transformation",
+  "content": "Scenario: Future orientation toward food system transformation\n    Given Marcus experiences food system failures personally\n    And he is developing values and political consciousness\n    When Marcus reflects on food systems\n    Then he should envision better alternatives\n    And the personal_agent should present possibilities for transformation\n    And it should explain food sovereignty and community agriculture\n    And his generation should expect fundamental food system change\n    And care economy should provide framework for reimagining food systems\n    And his current struggles should fuel commitment to creating just alternatives\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

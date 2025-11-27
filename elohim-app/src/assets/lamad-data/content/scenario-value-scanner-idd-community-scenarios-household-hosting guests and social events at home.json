@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-hosting guests and social events at home",
+  "contentType": "scenario",
+  "title": "Hosting guests and social events at home",
+  "description": "Hosting guests and social events at home",
+  "content": "Scenario: Hosting guests and social events at home\n    Given Jordan wants to invite friends to the group home\n    And the household has policies about guests\n    When Jordan plans a small gathering\n    Then the personal_agent helps Jordan coordinate with housemates\n    And the interface shows the guest policy in simple language\n    And Jordan can request guest approval using the household system\n    And housemates discuss and approve Jordan's gathering\n    And Jordan experiences autonomy in their home social life\n    And the household supports Jordan's social connections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-lifetime contributions create legitimate claims on community support",
+  "contentType": "scenario",
+  "title": "Lifetime contributions create legitimate claims on community support",
+  "description": "Lifetime contributions create legitimate claims on community support",
+  "content": "Scenario: Lifetime contributions create legitimate claims on community support\n    Given Helen has contributed to community for 60+ years of adult life\n    And she now requires substantial assistance\n    When Helen accesses community care resources\n    Then her care tokens should reflect decades of contribution\n    And community support should be framed as reciprocity\n    And she should not experience shame about needing help\n    And assistance should flow as legitimate return on lifetime of giving\n    And the community_elohim should make her contribution history visible\n    And the protocol should demonstrate that care economy honors lifetime reciprocity\n    And Helen should experience dignity, not charity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

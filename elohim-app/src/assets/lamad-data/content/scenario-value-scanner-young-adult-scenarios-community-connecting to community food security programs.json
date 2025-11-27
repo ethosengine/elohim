@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-connecting to community food security programs",
+  "contentType": "scenario",
+  "title": "Connecting to community food security programs",
+  "description": "Connecting to community food security programs",
+  "content": "Scenario: Connecting to community food security programs\n    Given Aisha's budget is tight\n    And community food programs could help\n    When Aisha explores community food resources\n    Then the community_elohim should surface available programs\n    And it should explain how care economy participation enables access\n    And it should connect her to community gardens, food banks, or cooperatives\n    And the system should reduce stigma through care economy framing\n    And community food security should be presented as mutual support\n    And accessing help should be dignified when contributing care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

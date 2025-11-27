@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent tracks afterschool program changes",
+  "contentType": "scenario",
+  "title": "Parent tracks afterschool program changes",
+  "description": "Parent tracks afterschool program changes",
+  "content": "Scenario: Parent tracks afterschool program changes\n    Given the parent relies on community afterschool program for childcare\n    And works until 6 PM making program essential for family functioning\n    When the community discusses cutting program hours or funding\n    Then the parent receives immediate alert about the threat\n    And sees which council members support vs oppose the cuts\n    And connects with other parents dependent on the program\n    And submits testimony explaining family economic impacts\n    And childcare infrastructure doesn't disappear without parent input\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

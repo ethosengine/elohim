@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-community elohim identifies clear error in family elohim decision",
+  "contentType": "scenario",
+  "title": "Community Elohim identifies clear error in Family Elohim decision",
+  "description": "Community Elohim identifies clear error in Family Elohim decision",
+  "content": "Scenario: Community Elohim identifies clear error in Family Elohim decision\n    Given my Family Elohim made a decision based on incorrect data\n    And I appealed pointing out the factual error\n    When Community Elohim reviews the appeal\n    Then they quickly identify the error in the original decision\n    And The decision is immediately corrected\n    And My preferences or outcomes are restored to proper state\n    And Family Elohim updates its reasoning based on correct information\n    And The error pattern is flagged for protocol improvement\n    And I receive apology and explanation of what went wrong\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

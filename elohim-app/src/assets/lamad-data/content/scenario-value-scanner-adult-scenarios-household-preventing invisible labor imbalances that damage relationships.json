@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-preventing invisible labor imbalances that damage relationships",
+  "contentType": "scenario",
+  "title": "Preventing invisible labor imbalances that damage relationships",
+  "description": "Preventing invisible labor imbalances that damage relationships",
+  "content": "Scenario: Preventing invisible labor imbalances that damage relationships\n    Given household labor often falls unfairly on women\n    And invisible imbalances breed resentment\n    When the household_elohim monitors labor distribution\n    Then it should identify unfair distributions early\n    And it should surface imbalances before they cause conflict\n    And both partners should receive prompts about equity\n    And adjustments should be negotiated from data, not resentment\n    And the protocol should protect relationship health through fairness\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

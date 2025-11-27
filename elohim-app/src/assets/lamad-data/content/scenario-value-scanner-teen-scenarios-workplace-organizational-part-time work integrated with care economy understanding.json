@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-part-time work integrated with care economy understanding",
+  "contentType": "scenario",
+  "title": "Part-time work integrated with care economy understanding",
+  "description": "Part-time work integrated with care economy understanding",
+  "content": "Scenario: Part-time work integrated with care economy understanding\n    Given Jasmine's income from work is part of her broader economic participation\n    And she also contributes unpaid household labor and community volunteering\n    When her personal_agent aggregates her economic activity\n    Then it should integrate paid work with other care contributions\n    And show that her economic life includes market and non-market work\n    And help her understand comprehensive view of her economic participation\n    And recognize that unpaid care work is as valuable as paid work\n    And build sophisticated understanding that economy is broader than paid employment\n    And internalize care economy framework as normal economic thinking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

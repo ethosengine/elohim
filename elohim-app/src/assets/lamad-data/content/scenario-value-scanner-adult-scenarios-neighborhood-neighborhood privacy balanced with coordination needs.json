@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood privacy balanced with coordination needs",
+  "contentType": "scenario",
+  "title": "Neighborhood privacy balanced with coordination needs",
+  "description": "Neighborhood privacy balanced with coordination needs",
+  "content": "Scenario: Neighborhood privacy balanced with coordination needs\n    Given neighborhood care economy requires some data sharing\n    And Sarah values her household privacy\n    When Sarah participates in neighborhood coordination\n    Then she should control what information neighbors see\n    And household details should remain private unless shared\n    And the neighborhood_elohim should only share aggregated patterns\n    And Sarah's privacy should be protected while enabling coordination\n    And participation should not require sacrificing privacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

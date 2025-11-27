@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-community-organizer creates accessible education materials for community meeting",
+  "contentType": "scenario",
+  "title": "Organizer creates accessible education materials for community meeting",
+  "description": "Organizer creates accessible education materials for community meeting",
+  "content": "Scenario: Organizer creates accessible education materials for community meeting\n    Given the organizer is holding meeting about proposed zoning changes\n    And community members have limited policy literacy and speak multiple languages\n    When the organizer requests education materials from Observer\n    Then they receive one-page summary in plain language\n    And get versions in Spanish, Mandarin, and Vietnamese\n    And see visual infographics showing community impact\n    And access deeper detail for residents who want more information\n    And 47-page staff report becomes accessible to whole community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,board_member",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

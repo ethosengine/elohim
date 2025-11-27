@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-reviewing my first appeal case with fellow council members",
+  "contentType": "scenario",
+  "title": "Reviewing my first appeal case with fellow council members",
+  "description": "Reviewing my first appeal case with fellow council members",
+  "content": "Scenario: Reviewing my first appeal case with fellow council members\n    Given Marcus appealed his Family Elohim's mental health intervention decision\n    And I am reviewing this case with my diverse council\n    When we deliberate on whether the agent followed constitutional bounds\n    Then I bring: my nurse perspective on mental health and care\n    And retired teacher brings: education and developmental insights\n    And construction worker brings: working-class resource constraint understanding\n    And grad student brings: research and analytical skills\n    And business owner brings: economic and practical judgment\n    And together we form: collective wisdom greater than any individual\n    And we ask: \"Did this demonstrate love as committed action?\"\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

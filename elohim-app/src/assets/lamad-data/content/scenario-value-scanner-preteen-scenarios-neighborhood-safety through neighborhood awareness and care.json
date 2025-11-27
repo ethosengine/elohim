@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-safety through neighborhood awareness and care",
+  "contentType": "scenario",
+  "title": "Safety through neighborhood awareness and care",
+  "description": "Safety through neighborhood awareness and care",
+  "content": "Scenario: Safety through neighborhood awareness and care\n    Given Marcus is a 12-year-old shopping independently\n    And neighborhood safety is important for his autonomy\n    When Marcus moves through his neighborhood\n    Then the neighborhood_elohim should facilitate informal care networks\n    And local adults should be aware of children shopping independently\n    And community care should provide informal oversight\n    And Marcus should be safer through neighborhood relationships\n    And his independence should be supported by community awareness\n    And the protocol should build village-scale child protection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

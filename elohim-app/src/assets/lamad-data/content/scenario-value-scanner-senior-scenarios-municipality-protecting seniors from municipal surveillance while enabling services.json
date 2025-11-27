@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-protecting seniors from municipal surveillance while enabling services",
+  "contentType": "scenario",
+  "title": "Protecting seniors from municipal surveillance while enabling services",
+  "description": "Protecting seniors from municipal surveillance while enabling services",
+  "content": "Scenario: Protecting seniors from municipal surveillance while enabling services\n    Given Margaret participates in municipal programs\n    And municipal systems collect data\n    When the municipality_elohim manages Margaret's municipal data\n    Then her privacy must be protected from surveillance\n    And service access should not require surrendering privacy\n    And data collection should be minimal and purposeful\n    And Margaret should control what municipal government knows\n    And elder surveillance should be prevented\n    And dignity should be preserved in all municipal interactions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

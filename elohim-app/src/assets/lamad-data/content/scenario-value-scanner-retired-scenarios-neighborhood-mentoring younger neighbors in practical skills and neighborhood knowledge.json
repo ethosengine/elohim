@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-mentoring younger neighbors in practical skills and neighborhood knowledge",
+  "contentType": "scenario",
+  "title": "Mentoring younger neighbors in practical skills and neighborhood knowledge",
+  "description": "Mentoring younger neighbors in practical skills and neighborhood knowledge",
+  "content": "Scenario: Mentoring younger neighbors in practical skills and neighborhood knowledge\n    Given Frank has construction expertise and decades of neighborhood knowledge\n    And younger neighbors are establishing themselves in the community\n    When the neighborhood_elohim facilitates mentoring\n    Then it should connect Frank to younger neighbors seeking skills\n    And coordinate skill-sharing for home repairs and maintenance\n    And facilitate neighborhood history and culture transmission\n    And recognize teaching and mentoring as care contributions\n    And build intergenerational neighborhood relationships\n    And value Frank's role in acculturating new residents\n    And strengthen neighborhood cohesion through knowledge sharing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

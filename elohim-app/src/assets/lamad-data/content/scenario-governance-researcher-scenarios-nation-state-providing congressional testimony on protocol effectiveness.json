@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-providing congressional testimony on protocol effectiveness",
+  "contentType": "scenario",
+  "title": "Providing congressional testimony on protocol effectiveness",
+  "description": "Providing congressional testimony on protocol effectiveness",
+  "content": "Scenario: Providing congressional testimony on protocol effectiveness\n    Given Congress is considering national AI governance legislation\n    And Senator Ruiz invites me to testify as independent expert\n    When I present research findings to legislative committee\n    Then I summarize: rigorous evaluation of protocol outcomes\n    And I present: evidence about effectiveness, limitations, and unknowns\n    And I explain: what factors predict success and failure\n    And I testify: honestly about uncertainties and contested findings\n    And I respond: to questions from supportive and skeptical legislators\n    And I maintain: scientific independence over political pressure\n    And My testimony provides: evidence base for democratic policy choice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

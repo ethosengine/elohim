@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal aging infrastructure influenced by sandwich generation",
+  "contentType": "scenario",
+  "title": "Municipal aging infrastructure influenced by sandwich generation",
+  "description": "Municipal aging infrastructure influenced by sandwich generation",
+  "content": "Scenario: Municipal aging infrastructure influenced by sandwich generation\n    Given Robert manages care for both aging parents and adult children\n    And he understands infrastructure needs across lifecycle\n    And municipal aging infrastructure often inadequate\n    When municipal_elohim supports aging infrastructure advocacy\n    Then it should connect Robert to municipal aging policy development\n    And help him advocate for adult day care, senior centers, home health support, and transportation\n    And surface gaps in current municipal aging infrastructure\n    And support him in testifying about infrastructure needs\n    And build municipal systems that support aging with dignity\n    And demonstrate that aging infrastructure benefits entire community\n    And create municipalities where aging is supported, not hidden\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

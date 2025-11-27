@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-provincial-state-journalist investigates state criminal justice disparities",
+  "contentType": "scenario",
+  "title": "Journalist investigates state criminal justice disparities",
+  "description": "Journalist investigates state criminal justice disparities",
+  "content": "Scenario: Journalist investigates state criminal justice disparities\n    Given the journalist covers criminal justice policy\n    And data suggests racial disparities in enforcement\n    When the Observer analyzes statewide criminal justice data\n    Then the journalist sees Black residents arrested at 4x rate for same offenses\n    And documents sentencing disparities for similar crimes\n    And tracks outcomes showing selective enforcement patterns\n    And identifies counties with extreme disparities\n    And publishes investigation exposing systemic racism\n    And pattern recognition reveals injustice at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:provincial_state",
+    "related_users:journalist,politician,activist,citizen,teacher",
+    "related_layers:municipality,county_regional,national",
+    "elohim_agents:public_observer,state_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

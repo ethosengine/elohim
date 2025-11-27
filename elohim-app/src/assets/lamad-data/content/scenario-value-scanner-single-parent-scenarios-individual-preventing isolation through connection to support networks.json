@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-individual-preventing isolation through connection to support networks",
+  "contentType": "scenario",
+  "title": "Preventing isolation through connection to support networks",
+  "description": "Preventing isolation through connection to support networks",
+  "content": "Scenario: Preventing isolation through connection to support networks\n    Given solo parenting is profoundly isolating\n    And Maria has no co-parent for adult connection and support\n    When the personal_agent monitors Maria's social connections\n    Then it should detect isolation and loneliness\n    And it should help her connect to other single parents\n    And it should facilitate community support without requiring more labor from her\n    And it should treat social connection as essential, not optional\n    And Maria should have pathways out of isolation despite time constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:individual",
+    "related_users:parent,adult,worker,caregiver",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

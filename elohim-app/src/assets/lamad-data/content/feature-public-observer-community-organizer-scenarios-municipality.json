@@ -1,0 +1,34 @@
+{
+  "id": "feature-public-observer-community-organizer-scenarios-municipality",
+  "contentType": "feature",
+  "title": "Municipal Coalition Building for Community Organizer",
+  "description": "As a community organizer in the public_observer system Operating at the municipality governance layer I want to mobilize multi-community coalitions for citywide policy campaigns So that collective power holds municipal government accountable to residents",
+  "content": "@epic:public_observer\n@user_type:community_organizer\n@governance_layer:municipality\n@related_users:citizen,activist,politician,journalist\n@related_layers:community,district,provincial_state\n@elohim_agents:public_observer,municipal_elohim,coalition_elohim\n\nFeature: Municipal Coalition Building for Community Organizer\n  As a community organizer in the public_observer system\n  Operating at the municipality governance layer\n  I want to mobilize multi-community coalitions for citywide policy campaigns\n  So that collective power holds municipal government accountable to residents\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_organizer user is registered in the system\n    And the municipality governance context is active\n\n  Scenario: Organizer identifies budget justice organizing opportunity\n    Given city council will vote on annual budget in three weeks\n    And proposed cuts affect services in low-income neighborhoods\n    When the Observer surfaces the organizing opportunity\n    Then the organizer receives early alert with enough time to organize\n    And sees which communities are most affected by cuts\n    And gets analysis of budget trade-offs and alternatives\n    And identifies decision points where testimony will have impact\n    And three weeks allows for education, coalition building, and mobilization\n\n  Scenario: Organizer builds cross-neighborhood budget justice coalition\n    Given parents care about after-school programs being cut\n    And seniors need meal delivery services maintained\n    And workers depend on subsidized transit\n    When the organizer uses Observer to identify alignment\n    Then they see all three groups affected by same budget priorities\n    And facilitate coordination across five neighborhoods\n    And maintain shared information base on budget impacts\n    And coordinate 100 residents for budget hearing testimony\n    And diverse communities unite around shared municipal interests\n\n  Scenario: Organizer generates accessible materials for citywide campaign\n    Given the coalition is campaigning against developer tax breaks\n    And needs to explain complex tax increment financing to residents\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of TIF mechanics\n    And see actual dollar flows (who benefits, who pays)\n    And get talking points for testimony and media\n    And access fact-checking data to counter developer claims\n    And technical policy becomes accessible community education\n\n  Scenario: Organizer holds city council accountable for campaign promises\n    Given council member promised affordable housing support during campaign\n    And the organizer's coalition delivered volunteer support and votes\n    When the council member votes on housing policy\n    Then the Observer tracks their votes against commitments\n    And shows the organizer their complete voting record\n    And provides evidence for accountability conversations\n    And makes politician's record visible to organized constituents\n    And electoral support creates ongoing accountability relationship\n\n  Scenario: Organizer coordinates testimony from diverse coalition members\n    Given coalition spans four languages and six neighborhoods\n    And members work different shifts limiting meeting availability\n    When the organizer uses Observer for testimony coordination\n    Then members access testimony guidelines in their languages\n    And sign up for speaking slots that work with their schedules\n    And share testimony drafts for peer feedback asynchronously\n    And arrive at city council with coordinated powerful messages\n    And coalition shows municipal government the breadth and depth of community power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,politician,journalist",
+    "related_layers:community,district,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,coalition_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-community-organizer-scenarios-municipality-organizer identifies budget justice organizing opportunity",
+    "scenario-public-observer-community-organizer-scenarios-municipality-organizer builds cross-neighborhood budget justice coalition",
+    "scenario-public-observer-community-organizer-scenarios-municipality-organizer generates accessible materials for citywide campaign",
+    "scenario-public-observer-community-organizer-scenarios-municipality-organizer holds city council accountable for campaign promises",
+    "scenario-public-observer-community-organizer-scenarios-municipality-organizer coordinates testimony from diverse coalition members",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

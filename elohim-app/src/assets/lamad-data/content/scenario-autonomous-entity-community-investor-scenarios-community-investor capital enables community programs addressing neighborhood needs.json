@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor capital enables community programs addressing neighborhood needs",
+  "contentType": "scenario",
+  "title": "Investor capital enables community programs addressing neighborhood needs",
+  "description": "Investor capital enables community programs addressing neighborhood needs",
+  "content": "Scenario: Investor capital enables community programs addressing neighborhood needs\n    Given traditional investment extracts value from communities\n    And Patricia wanted investment supporting community benefit, not extraction\n    When democratic business allocates revenue to community programs\n    Then her investment enables senior meal programs, youth employment, community space\n    And investment returns include social dividends: stronger community, less isolation, economic opportunity\n    And capital builds community infrastructure, not just individual wealth\n    And social returns are documented and valued alongside financial returns\n    And community_elohim manages community program funding from democratic business revenue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:community",
+    "related_users:[worker,small_business_owner,franchise_operator,customer]",
+    "related_layers:[municipality,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

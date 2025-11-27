@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-care for sibling recognized without enabling parentification",
+  "contentType": "scenario",
+  "title": "Care for sibling recognized without enabling parentification",
+  "description": "Care for sibling recognized without enabling parentification",
+  "content": "Scenario: Care for sibling recognized without enabling parentification\n    Given Marcus cares for Keisha age 7\n    And he manages her meals and nutritional needs\n    When Marcus makes care decisions for Keisha\n    Then his care work should be tracked by family_elohim\n    And the system should recognize legitimate care contributions\n    And it should also watch for parentification damage\n    And Keisha should be prompted to appreciate Marcus's work\n    And the protocol should prevent Keisha from taking Marcus for granted\n    And family_elohim should help maintain sibling dynamics alongside care reality\n    And Marcus should be supported, not exploited\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

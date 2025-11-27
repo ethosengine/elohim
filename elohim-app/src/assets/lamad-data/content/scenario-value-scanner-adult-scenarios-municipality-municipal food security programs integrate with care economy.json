@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal food security programs integrate with care economy",
+  "contentType": "scenario",
+  "title": "Municipal food security programs integrate with care economy",
+  "description": "Municipal food security programs integrate with care economy",
+  "content": "Scenario: Municipal food security programs integrate with care economy\n    Given municipal food assistance programs exist\n    And many residents participate in care economy food cooperatives\n    When municipal food security is addressed\n    Then the municipal_elohim should coordinate with existing programs\n    And care economy food cooperatives should receive municipal support\n    And care tokens should integrate with food assistance\n    And municipal food policy should recognize cooperative models\n    And care economy should enhance, not replace, public food security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

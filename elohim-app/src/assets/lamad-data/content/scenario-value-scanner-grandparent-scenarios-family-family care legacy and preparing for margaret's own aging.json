@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-family care legacy and preparing for margaret's own aging",
+  "contentType": "scenario",
+  "title": "Family care legacy and preparing for Margaret's own aging",
+  "description": "Family care legacy and preparing for Margaret's own aging",
+  "content": "Scenario: Family care legacy and preparing for Margaret's own aging\n    Given Margaret is building care economy capital through current contributions\n    And she will need increasing care as she ages\n    When the family_elohim tracks care patterns across time\n    Then it should show Margaret's accumulated care contributions\n    And it should recognize she is building reciprocal relationships\n    And it should help family understand care flows across life stages\n    And grandchildren learning now will be caregivers later\n    And Sarah will reciprocate care as Margaret ages\n    And family care economy should be sustainable across time\n    And Margaret's current care should create future care security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

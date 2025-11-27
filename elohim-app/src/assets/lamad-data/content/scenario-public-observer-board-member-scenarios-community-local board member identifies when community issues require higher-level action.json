@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-community-local board member identifies when community issues require higher-level action",
+  "contentType": "scenario",
+  "title": "Local board member identifies when community issues require higher-level action",
+  "description": "Local board member identifies when community issues require higher-level action",
+  "content": "Scenario: Local board member identifies when community issues require higher-level action\n    Given neighborhood board addresses various community concerns\n    And some issues are within board authority while others require city or district action\n    And board wants to be effective by focusing advocacy appropriately\n    When the board member uses Observer governance layer analysis\n    Then they see which issues are addressable at community level\n    And identify which concerns require municipality or district decisions\n    And access guidance on advocacy strategies for different governance levels\n    And connect to relevant board members at higher governance layers\n    And clear governance mapping makes advocacy more strategic and effective\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,community_organizer,politician",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

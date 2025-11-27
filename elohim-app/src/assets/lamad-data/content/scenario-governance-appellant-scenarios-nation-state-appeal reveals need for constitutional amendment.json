@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-appeal reveals need for constitutional amendment",
+  "contentType": "scenario",
+  "title": "Appeal reveals need for constitutional amendment",
+  "description": "Appeal reveals need for constitutional amendment",
+  "content": "Scenario: Appeal reveals need for constitutional amendment\n    Given my case reveals fundamental gap in existing constitutional framework\n    And no amount of interpretation can adequately address the issue\n    When National Constitutional Council deliberates my case\n    Then they identify that constitutional amendment is needed\n    And They document the gap and propose amendment language\n    And My case becomes key example in amendment proposal\n    And The proposal goes to next 7-year Global Constitutional Convention\n    And My individual suffering contributes to constitutional evolution\n    And Future humanity benefits from my struggle for justice\n    And Constitution remains living document responsive to lived experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

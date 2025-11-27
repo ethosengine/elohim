@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-young child's care work made visible to family",
+  "contentType": "scenario",
+  "title": "Young child's care work made visible to family",
+  "description": "Young child's care work made visible to family",
+  "content": "Scenario: Young child's care work made visible to family\n    Given Tommy has chosen strawberries for his sister Emma\n    And the care contribution has been recorded by personal_agent\n    When the family_elohim processes the contribution\n    Then Tommy's care work should be visible on the family dashboard\n    And parent Sarah should receive specific prompts\n    And the prompt should say \"Tommy chose strawberries for Emma\"\n    And the care contribution should be attributed to Tommy by name\n    And family care tokens should reflect his contribution\n    And the visibility should enable parental recognition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

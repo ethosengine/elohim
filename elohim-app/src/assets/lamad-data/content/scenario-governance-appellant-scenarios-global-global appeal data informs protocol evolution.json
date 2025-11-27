@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-global appeal data informs protocol evolution",
+  "contentType": "scenario",
+  "title": "Global appeal data informs protocol evolution",
+  "description": "Global appeal data informs protocol evolution",
+  "content": "Scenario: Global appeal data informs protocol evolution\n    Given millions of appeals have been filed globally over 7 years\n    And researchers have analyzed patterns across cultures and contexts\n    When Constitutional Convention reviews protocol effectiveness\n    Then appeal success rates are examined (40% overturned or modified)\n    And most common appeal types are identified (adolescent autonomy)\n    And systematic biases are investigated\n    And marginalized community outcomes are assessed\n    And appellants' aggregate experience shapes constitutional amendments\n    And protocol improvements are guided by lived experience at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

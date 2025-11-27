@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-creating precedent for global crisis coordination",
+  "contentType": "scenario",
+  "title": "Creating precedent for global crisis coordination",
+  "description": "Creating precedent for global crisis coordination",
+  "content": "Scenario: Creating precedent for global crisis coordination\n    Given convention addresses how protocol handles planetary emergencies\n    And we must balance speed with democratic legitimacy\n    When we deliberate crisis governance framework\n    Then we establish: emergency protocols maintaining accountability\n    And we specify: what constitutes legitimate crisis triggering special powers\n    And we create: rapid review processes for crisis decisions\n    And we ensure: democratic oversight even under urgency\n    And we prevent: crisis from becoming excuse for authoritarian drift\n    And we establish: how humanity governs together under existential threat\n    And we demonstrate: democracy can be both deliberative and responsive\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

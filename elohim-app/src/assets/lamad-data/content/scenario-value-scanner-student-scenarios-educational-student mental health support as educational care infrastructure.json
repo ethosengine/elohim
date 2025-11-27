@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-student mental health support as educational care infrastructure",
+  "contentType": "scenario",
+  "title": "Student mental health support as educational care infrastructure",
+  "description": "Student mental health support as educational care infrastructure",
+  "content": "Scenario: Student mental health support as educational care infrastructure\n    Given academic pressure threatens student mental health\n    And learning requires emotional and psychological well-being\n    When educational institutions provide mental health support\n    Then the educational_elohim should recognize counseling as educational care\n    And it should value mental health services as essential to learning\n    And it should accumulate care tokens for peer emotional support\n    And mental health work should be understood as educational infrastructure\n    And the system should recognize that learning requires whole-person care\n    And educational care economy includes psychological and emotional support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

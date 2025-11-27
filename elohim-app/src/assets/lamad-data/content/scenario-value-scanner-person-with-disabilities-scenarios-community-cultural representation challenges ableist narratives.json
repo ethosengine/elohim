@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-cultural representation challenges ableist narratives",
+  "contentType": "scenario",
+  "title": "Cultural representation challenges ableist narratives",
+  "description": "Cultural representation challenges ableist narratives",
+  "content": "Scenario: Cultural representation challenges ableist narratives\n    Given media representation of disability is often harmful\n    And Alex works to improve disability representation\n    When Alex engages in cultural advocacy (media, arts, education)\n    Then representation work should be recognized as care labor\n    And the community_elohim should value cultural transformation efforts\n    And challenging ableist narratives benefits entire disabled community\n    And Alex's cultural work should accumulate care tokens\n    And the protocol should recognize that culture shapes material conditions\n    And representation advocacy is sophisticated intellectual labor\n    And Alex's contributions shift what community believes about disability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

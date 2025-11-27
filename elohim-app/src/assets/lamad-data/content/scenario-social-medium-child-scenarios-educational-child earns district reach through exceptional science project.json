@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-educational-child earns district reach through exceptional science project",
+  "contentType": "scenario",
+  "title": "Child earns district reach through exceptional science project",
+  "description": "Child earns district reach through exceptional science project",
+  "content": "Scenario: Child earns district reach through exceptional science project\n    Given Emma's ecology project demonstrates unusual depth and quality\n    And her teacher nominates it for district-wide educational showcase\n    When the nomination is evaluated by educational moderators\n    Then Emma's project is featured in district educational space\n    And other students across the district can learn from her work\n    And Emma experiences recognition for quality contribution\n    And she connects with other young scientists in the district\n    And this exceptional contribution earns her expanded educational reach\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:elder,content_creator,community_moderator",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:guardian_agent,learning_agent,moderation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-educational",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-educational",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace privacy protects care economy data from employer access",
+  "contentType": "scenario",
+  "title": "Workplace privacy protects care economy data from employer access",
+  "description": "Workplace privacy protects care economy data from employer access",
+  "content": "Scenario: Workplace privacy protects care economy data from employer access\n    Given Sarah participates in care economy\n    And this generates data about her personal life\n    When workplace wants information about employees\n    Then Sarah's personal care economy data must be completely private\n    And employers should never access household care patterns\n    And the workplace_elohim should only see work-relevant information\n    And Sarah's privacy should be absolute in personal care matters\n    And workplace participation should not require personal data sacrifice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

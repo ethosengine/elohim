@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-family-teen learns family economic realities through transparency",
+  "contentType": "scenario",
+  "title": "Teen learns family economic realities through transparency",
+  "description": "Teen learns family economic realities through transparency",
+  "content": "Scenario: Teen learns family economic realities through transparency\n    Given Jasmine is preparing for adult independence\n    And understanding family economics is essential preparation\n    When the family_elohim provides family economic information\n    Then Jasmine should have age-appropriate access to family financial realities\n    And understand household income, expenses, and budget constraints\n    And learn how the family makes financial tradeoffs\n    And develop realistic expectations about adult economic life\n    And understand the economic value of household labor\n    And learn that all families engage in care economy, whether they use that language or not\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:family",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-community-documenting community-specific calibration process",
+  "contentType": "scenario",
+  "title": "Documenting community-specific calibration process",
+  "description": "Documenting community-specific calibration process",
+  "content": "Scenario: Documenting community-specific calibration process\n    Given Riverside calibrated privacy thresholds higher than protocol default\n    And this reflected community values and history\n    When I document how community calibration happened\n    Then I capture: deliberation process that led to calibration decision\n    And I analyze: how community exercised sovereignty within constitutional bounds\n    And I examine: role of community leader in facilitating values discussion\n    And I track: whether calibration actually served community better\n    And I study: how local diversity strengthens rather than fragments protocol\n    And My research demonstrates: subsidiarity in practice\n    And Findings support: community autonomy as democratic AI principle\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,appellant,technical_expert",
+    "related_layers:provincial_state,nation_state",
+    "elohim_agents:community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

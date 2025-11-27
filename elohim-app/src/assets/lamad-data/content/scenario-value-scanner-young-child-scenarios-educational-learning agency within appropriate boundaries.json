@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-learning agency within appropriate boundaries",
+  "contentType": "scenario",
+  "title": "Learning agency within appropriate boundaries",
+  "description": "Learning agency within appropriate boundaries",
+  "content": "Scenario: Learning agency within appropriate boundaries\n    Given Tommy needs to develop healthy sense of agency\n    And he also needs safety and guidance\n    When Tommy makes choices in the Value Scanner\n    Then he should experience genuine decision-making power\n    And he should learn that his choices have real consequences\n    And he should discover natural limits through experience\n    And boundaries should teach safety, not powerlessness\n    And he should learn both capability and humility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

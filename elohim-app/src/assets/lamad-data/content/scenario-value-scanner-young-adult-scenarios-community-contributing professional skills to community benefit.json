@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-contributing professional skills to community benefit",
+  "contentType": "scenario",
+  "title": "Contributing professional skills to community benefit",
+  "description": "Contributing professional skills to community benefit",
+  "content": "Scenario: Contributing professional skills to community benefit\n    Given Aisha has professional capabilities from her work\n    And the community could benefit from her skills\n    When Aisha offers professional expertise to community projects\n    Then the community_elohim should recognize the contribution\n    And professional skills shared with community should be valued\n    And care tokens should reflect the expertise provided\n    And the system should facilitate skill sharing for community benefit\n    And Aisha's professional growth should serve community flourishing\n    And mutual benefit should flow from skill exchange\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-teen recognized as full community participant, not future member",
+  "contentType": "scenario",
+  "title": "Teen recognized as full community participant, not future member",
+  "description": "Teen recognized as full community participant, not future member",
+  "content": "Scenario: Teen recognized as full community participant, not future member\n    Given Jasmine has substantial care contributions across multiple contexts\n    And she volunteers 4 hours per week at community center\n    When the community_elohim processes her participation\n    Then she should be recognized as a current contributor, not a youth in training\n    And her care work should be valued at the same care economy rate as adults\n    And community resources should be accessible based on her demonstrated contribution\n    And she should have standing in community care economy discussions\n    And the system should reflect that she is already a productive member of society\n    And her generation's contributions should be made visible at community scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

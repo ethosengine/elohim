@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-bioregional construction material knowledge and sourcing",
+  "contentType": "scenario",
+  "title": "Bioregional construction material knowledge and sourcing",
+  "description": "Bioregional construction material knowledge and sourcing",
+  "content": "Scenario: Bioregional construction material knowledge and sourcing\n    Given Frank knows regional building materials and their properties\n    And bioregional materials reduce transportation and support local economy\n    When the bioregional_elohim coordinates material knowledge\n    Then it should help Frank teach about regional construction materials\n    And facilitate use of bioregionally-appropriate building techniques\n    And recognize his knowledge of local material properties\n    And strengthen bioregional building culture and economy\n    And connect construction practices to place-based sustainability\n    And Frank's experience should inform bioregional building standards\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

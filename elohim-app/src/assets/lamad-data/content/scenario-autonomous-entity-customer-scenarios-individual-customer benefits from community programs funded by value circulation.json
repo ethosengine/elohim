@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer benefits from community programs funded by value circulation",
+  "contentType": "scenario",
+  "title": "Customer benefits from community programs funded by value circulation",
+  "description": "Customer benefits from community programs funded by value circulation",
+  "content": "Scenario: Customer benefits from community programs funded by value circulation\n    Given corporate extraction left minimal resources for community benefit\n    And Ms. Johnson and neighbors needed community support but lacked access\n    When democratic value distribution funds community programs\n    Then senior meal program provides affordable nutritious food and social connection\n    And subsidized pricing (sliding scale) ensures access across income levels\n    And community space is available for neighborhood organizing\n    And her patronage directly supports programs benefiting her and neighbors\n    And community_elohim manages community programs funded by democratic business\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

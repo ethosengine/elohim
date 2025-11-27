@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-identifying emerging issues through annual evaluation cycles",
+  "contentType": "scenario",
+  "title": "Identifying emerging issues through annual evaluation cycles",
+  "description": "Identifying emerging issues through annual evaluation cycles",
+  "content": "Scenario: Identifying emerging issues through annual evaluation cycles\n    Given I analyze regional data annually to track trends\n    And I want to identify problems before they become crises\n    When I examine this year's patterns compared to previous years\n    Then I notice: appeal rates trending up (good\u2014people know recourse exists)\n    And I identify: recurring adolescent autonomy conflicts emerging\n    And I detect: systematic issue with business loan evaluation criteria\n    And I recognize: elderly accessibility remaining challenging\n    And I flag: potential issues for community leaders and policymakers\n    And My timely analysis enables: proactive response to emerging challenges\n    And Research provides: early warning system for governance problems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

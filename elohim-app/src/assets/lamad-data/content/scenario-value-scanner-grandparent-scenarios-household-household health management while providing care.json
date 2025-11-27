@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-household health management while providing care",
+  "contentType": "scenario",
+  "title": "Household health management while providing care",
+  "description": "Household health management while providing care",
+  "content": "Scenario: Household health management while providing care\n    Given both Margaret and Robert have health considerations\n    And Margaret's care work requires physical and mental energy\n    When the household_elohim monitors health impacts\n    Then it should track whether care work affects Margaret's health\n    And it should ensure both partners maintain health appointments and self-care\n    And it should alert if care burden is compromising well-being\n    And household health should be prioritized alongside care provision\n    And both partners should support each other's health management\n    And the system should enable sustainable care without health sacrifice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

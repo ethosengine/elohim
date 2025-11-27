@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-teaching children family care economy principles",
+  "contentType": "scenario",
+  "title": "Teaching children family care economy principles",
+  "description": "Teaching children family care economy principles",
+  "content": "Scenario: Teaching children family care economy principles\n    Given Sarah is raising Tommy and Emma in care economy framework\n    And she wants them to understand family care relationships\n    When Sarah teaches children about family care\n    Then the family_elohim should support value literacy education\n    And children should learn that grandparents' help is valuable work\n    And they should understand that Sarah cares for her parents too\n    And they should see care as reciprocal across generations\n    And the next generation should internalize care economy principles\n    And family culture should be transformed through children's education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,42 @@
+{
+  "lastUpdated": "2025-11-26T12:00:00.000Z",
+  "totalCount": 3,
+  "maps": [
+    {
+      "id": "map-domain-elohim-protocol",
+      "mapType": "domain",
+      "title": "My Elohim Protocol Journey",
+      "subjectName": "The Elohim Protocol",
+      "ownerId": "demo-learner",
+      "ownerName": "Demo Learner",
+      "visibility": "private",
+      "overallAffinity": 0.7,
+      "nodeCount": 2,
+      "updatedAt": "2025-11-26T12:00:00.000Z"
+    },
+    {
+      "id": "map-collective-learners",
+      "mapType": "collective",
+      "title": "Collective Learning Insights",
+      "subjectName": "Elohim Protocol Learners",
+      "ownerId": "steward-curriculum",
+      "ownerName": "Curriculum Steward",
+      "visibility": "shared",
+      "overallAffinity": 0.85,
+      "nodeCount": 1,
+      "updatedAt": "2025-11-26T12:00:00.000Z"
+    },
+    {
+      "id": "map-domain-governance",
+      "mapType": "domain",
+      "title": "Governance Deep Dive",
+      "subjectName": "Governance Epic",
+      "ownerId": "steward-governance",
+      "ownerName": "Governance Steward",
+      "visibility": "public",
+      "overallAffinity": 0.9,
+      "nodeCount": 5,
+      "updatedAt": "2025-11-26T12:00:00.000Z"
+    }
+  ]
+}

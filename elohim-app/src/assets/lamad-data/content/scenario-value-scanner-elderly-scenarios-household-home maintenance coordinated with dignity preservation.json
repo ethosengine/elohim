@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-household-home maintenance coordinated with dignity preservation",
+  "contentType": "scenario",
+  "title": "Home maintenance coordinated with dignity preservation",
+  "description": "Home maintenance coordinated with dignity preservation",
+  "content": "Scenario: Home maintenance coordinated with dignity preservation\n    Given Helen can no longer manage all household tasks independently\n    And she needs help with cleaning, repairs, and maintenance\n    When the household_elohim coordinates support services\n    Then Helen should remain the authority in her own home\n    And support workers should be coordinated around her preferences\n    And the household should feel like hers, not an institution\n    And her choices about how things are done should be respected\n    And assistance should enhance her ability to stay home\n    And she should not feel like a guest in her own space\n    And the protocol should preserve the dignity of \"this is my home\"\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:household",
+    "related_users:caregiver,family_member,home_health_aide",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

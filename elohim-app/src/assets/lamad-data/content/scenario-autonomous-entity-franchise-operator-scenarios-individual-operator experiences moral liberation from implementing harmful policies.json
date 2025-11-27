@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator experiences moral liberation from implementing harmful policies",
+  "contentType": "scenario",
+  "title": "Operator experiences moral liberation from implementing harmful policies",
+  "description": "Operator experiences moral liberation from implementing harmful policies",
+  "content": "Scenario: Operator experiences moral liberation from implementing harmful policies\n    Given franchise agreement required implementing corporate policies James knew harmed workers\n    And moral injury from enforcing extraction while knowing it's wrong caused deep stress\n    When conversion frees him from corporate mandates\n    Then James no longer implements surveillance monitoring workers like criminals\n    And he stops enforcing poverty wages and impossible productivity demands\n    And stress from moral contradiction (knowing exploitation is wrong but implementing it) dissipates\n    And his health improves measurably (lower blood pressure, better sleep, reduced anxiety)\n    And workplace_elohim documents health benefits of liberation from moral injury\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

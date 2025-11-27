@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-coordinating neighborhood childcare exchange",
+  "contentType": "scenario",
+  "title": "Coordinating neighborhood childcare exchange",
+  "description": "Coordinating neighborhood childcare exchange",
+  "content": "Scenario: Coordinating neighborhood childcare exchange\n    Given Sarah needs occasional childcare coverage\n    And she can provide childcare for others in exchange\n    When the neighborhood_elohim coordinates childcare sharing\n    Then it should match parents for reciprocal childcare\n    And it should track care provided and received\n    And it should ensure exchanges are equitable over time\n    And childcare cooperation should be visible and valued\n    And parents should support each other sustainably\n    And neighborhood care economy should reduce childcare costs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

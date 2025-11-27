@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-neighborhood-neighborhood care economy connects families across community",
+  "contentType": "scenario",
+  "title": "Neighborhood care economy connects families across community",
+  "description": "Neighborhood care economy connects families across community",
+  "content": "Scenario: Neighborhood care economy connects families across community\n    Given multiple families in neighborhood participate in Value Scanner\n    And Emma's family is part of neighborhood network\n    When Emma makes care contributions through shopping\n    Then her contributions should feed into neighborhood care economy\n    And the neighborhood_elohim should track community care patterns\n    And Emma should learn care extends beyond her household\n    And she should see her family as part of larger community\n    And neighborhood-level recognition should be age-appropriate\n    And community belonging should be built through care visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

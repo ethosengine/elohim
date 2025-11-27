@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates workplace safety violations",
+  "contentType": "scenario",
+  "title": "Journalist investigates workplace safety violations",
+  "description": "Journalist investigates workplace safety violations",
+  "content": "Scenario: Journalist investigates workplace safety violations\n    Given workers report unsafe conditions at warehouse\n    And the journalist covers workplace safety\n    When the Observer analyzes employer's safety violation history\n    Then the journalist finds company has 47 OSHA violations in 5 years\n    And sees pattern of violations detected but minimally fined\n    And documents worker injuries and company's inadequate response\n    And shows same company violates safety rules at facilities in other states\n    And publishes investigation forcing regulatory accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,union_organizer,activist,politician",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,labor_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

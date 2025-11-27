@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-workplace emotional labor while managing parenting stress",
+  "contentType": "scenario",
+  "title": "Workplace emotional labor while managing parenting stress",
+  "description": "Workplace emotional labor while managing parenting stress",
+  "content": "Scenario: Workplace emotional labor while managing parenting stress\n    Given Sarah performs emotional labor with students and colleagues\n    And she's also managing intense parenting emotional demands\n    When the workplace_elohim tracks total emotional labor\n    Then it should recognize dual emotional work burden\n    And it should flag when emotional demands are unsustainable\n    And it should recognize that parents carry compounded emotional labor\n    And the system should help Sarah manage total emotional load\n    And workplace should understand parents' emotional labor reality\n    And Sarah's complete emotional work should be visible and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

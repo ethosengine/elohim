@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for professional development that actually helps",
+  "contentType": "scenario",
+  "title": "Teacher advocates for professional development that actually helps",
+  "description": "Teacher advocates for professional development that actually helps",
+  "content": "Scenario: Teacher advocates for professional development that actually helps\n    Given district mandates professional development hours\n    But most PD is generic and doesn't improve teaching\n    When teachers evaluate professional development through Observer\n    Then teachers rate 75% of required PD as not useful for their teaching\n    And identify what actually helps (job-embedded coaching, subject-specific content)\n    And document time wasted on compliance PD vs productive professional learning\n    And negotiate for teacher voice in PD planning and evaluation\n    And professional development becomes professional not bureaucratic\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

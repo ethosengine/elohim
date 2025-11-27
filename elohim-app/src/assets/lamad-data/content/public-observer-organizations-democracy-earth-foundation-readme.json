@@ -1,0 +1,21 @@
+{
+  "id": "public-observer-organizations-democracy-earth-foundation-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Tools for a borderless democracy. For everyone, anywhere.",
+  "content": "---\nnode_type: organization\norg_id: democracy_earth_foundation\nname: \"Democracy Earth Foundation\"\nurl: \"https://democracy.earth\"\ngem_id: \"EiM1d9QbQvi6jhfErR6L\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: public_observer\nrelated_epics: []\n\nepic_relationships:\n  public_observer:\n    inspiration: \"[How Democracy Earth Foundation inspires the public_observer epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Democracy Earth Foundation\n\n## Description\n\nTools for a borderless democracy. For everyone, anywhere.\n\n**Publisher:** democracy.earth\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: public_observer\n\n[Detailed explanation of how Democracy Earth Foundation relates to and inspires the public_observer epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://democracy.earth\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `public_observer` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "public-observer"
+  ],
+  "sourcePath": "public_observer/organizations/democracy_earth_foundation/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "public-observer",
+    "related_epics": [],
+    "primary_epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood outdoor spaces and environmental care",
+  "contentType": "scenario",
+  "title": "Neighborhood outdoor spaces and environmental care",
+  "description": "Neighborhood outdoor spaces and environmental care",
+  "content": "Scenario: Neighborhood outdoor spaces and environmental care\n    Given children need access to nature and outdoor play\n    And Sarah wants to teach environmental stewardship\n    When the neighborhood_elohim coordinates environmental care\n    Then it should organize neighborhood green space maintenance\n    And it should coordinate children's environmental education\n    And it should track ecological care labor\n    And Sarah's environmental teaching should be recognized\n    And neighborhood sustainability should be collective project\n    And the system should connect child-rearing to ecological health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

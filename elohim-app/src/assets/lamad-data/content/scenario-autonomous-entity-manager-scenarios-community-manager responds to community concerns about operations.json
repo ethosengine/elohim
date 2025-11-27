@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-community-manager responds to community concerns about operations",
+  "contentType": "scenario",
+  "title": "Manager responds to community concerns about operations",
+  "description": "Manager responds to community concerns about operations",
+  "content": "Scenario: Manager responds to community concerns about operations\n    Given community member complains about noise from early morning deliveries\n    And legitimate community concern requires operational adjustment\n    When Marcus receives the complaint\n    Then Marcus investigates the noise issue objectively\n    And Marcus proposes delivery schedule modification to worker council\n    And workers deliberate balancing operational needs with community impact\n    And workers vote on delivery schedule change\n    And Marcus implements worker decision and communicates to community\n    And community_elohim facilitates community-worker dialogue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,worker]",
+    "related_layers:[workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

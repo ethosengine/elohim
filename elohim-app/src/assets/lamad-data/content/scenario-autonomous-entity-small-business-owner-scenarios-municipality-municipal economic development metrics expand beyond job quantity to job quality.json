@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal economic development metrics expand beyond job quantity to job quality",
+  "contentType": "scenario",
+  "title": "Municipal economic development metrics expand beyond job quantity to job quality",
+  "description": "Municipal economic development metrics expand beyond job quantity to job quality",
+  "content": "Scenario: Municipal economic development metrics expand beyond job quantity to job quality\n    Given cities typically measure economic development by jobs created\n    And job quality (wages, benefits, dignity, ownership) is often ignored\n    When Rosa's conversion demonstrates high-quality job creation\n    Then municipality tracks worker ownership, living wages, and benefits in economic development data\n    And democratic conversions score highly on job quality metrics\n    And city economic development strategy prioritizes quality over quantity\n    And officials recognize one living-wage worker-owner job exceeds three poverty-wage positions\n    And municipality_elohim provides quality-focused metrics and documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

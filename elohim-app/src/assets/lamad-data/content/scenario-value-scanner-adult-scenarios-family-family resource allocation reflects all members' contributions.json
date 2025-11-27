@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-family resource allocation reflects all members' contributions",
+  "contentType": "scenario",
+  "title": "Family resource allocation reflects all members' contributions",
+  "description": "Family resource allocation reflects all members' contributions",
+  "content": "Scenario: Family resource allocation reflects all members' contributions\n    Given family makes decisions about major resource allocation\n    And multiple members contribute in different ways\n    When family decisions are made\n    Then all members' care contributions should be considered\n    And Sarah's care work should give her legitimate standing\n    And children's contributions should be recognized appropriately\n    And resource decisions should reflect visible care patterns\n    And family economics should honor care creates value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-disability justice education transforms community culture",
+  "contentType": "scenario",
+  "title": "Disability justice education transforms community culture",
+  "description": "Disability justice education transforms community culture",
+  "content": "Scenario: Disability justice education transforms community culture\n    Given Alex teaches community about disability justice frameworks\n    And education shifts how community understands disability\n    When Alex provides training, workshops, or consultation\n    Then this educational labor should be valued as care work\n    And the community_elohim should track Alex's teaching contributions\n    And cultural transformation work should accumulate care tokens\n    And Alex's expertise should be compensated appropriately\n    And education that reduces ableism is high-value care work\n    And the protocol should recognize teaching as care labor\n    And Alex's intellectual contributions should be properly valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

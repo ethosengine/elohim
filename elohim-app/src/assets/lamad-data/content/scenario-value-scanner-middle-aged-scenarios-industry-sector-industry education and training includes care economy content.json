@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry education and training includes care economy content",
+  "contentType": "scenario",
+  "title": "Industry education and training includes care economy content",
+  "description": "Industry education and training includes care economy content",
+  "content": "Scenario: Industry education and training includes care economy content\n    Given professional development shapes industry practices\n    And care economy should be included in professional education\n    And Robert's experience qualifies him to contribute to education\n    When industry_elohim connects education and care economy\n    Then it should help Robert contribute to industry education development\n    And support inclusion of care economy in professional training\n    And help him develop case studies from lived experience\n    And build industry curriculum that includes care economy principles\n    And educate next generation of professionals in care economy thinking\n    And advance care economy through professional education\n    And demonstrate that industry knowledge should include care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:industry_sector",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:workplace_organizational,municipality,community,ecological_bioregional",
+    "elohim_agents:personal_agent,industry_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

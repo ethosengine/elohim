@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-multigenerational household coordination when elderly live with family",
+  "contentType": "scenario",
+  "title": "Multigenerational household coordination when elderly live with family",
+  "description": "Multigenerational household coordination when elderly live with family",
+  "content": "Scenario: Multigenerational household coordination when elderly live with family\n    Given some families have Helen living with adult children\n    And multigenerational households have complex dynamics\n    When household governance includes elderly family member\n    Then the family_elohim should mediate competing needs\n    And Helen's needs should be balanced with other household members\n    And her voice should be heard in household decisions\n    And privacy should be maintained for all generations\n    And care should be coordinated without overwhelming household\n    And the protocol should support healthy multigenerational living\n    And all family members' flourishing should be considered\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

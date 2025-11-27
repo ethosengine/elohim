@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher provides evidence on class size policy",
+  "contentType": "scenario",
+  "title": "Teacher provides evidence on class size policy",
+  "description": "Teacher provides evidence on class size policy",
+  "content": "Scenario: Teacher provides evidence on class size policy\n    Given the board is considering budget cuts increasing class sizes\n    And board claims research shows class size doesn't matter\n    When teachers coordinate evidence-based advocacy through Observer\n    Then they present district's own data showing outcomes decline as sizes increase\n    And cite research on class size effects by grade level\n    And show neighboring district has lower ratios and better results\n    And provide teacher professional judgment grounded in evidence\n    And board decision becomes informed by multiple evidence sources\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

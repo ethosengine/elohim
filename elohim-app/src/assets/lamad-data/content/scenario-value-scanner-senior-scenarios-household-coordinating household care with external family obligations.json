@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-coordinating household care with external family obligations",
+  "contentType": "scenario",
+  "title": "Coordinating household care with external family obligations",
+  "description": "Coordinating household care with external family obligations",
+  "content": "Scenario: Coordinating household care with external family obligations\n    Given Margaret provides care for grandchildren at her home sometimes\n    And her mother may visit or require household accommodation\n    When the household_elohim coordinates multi-generational care\n    Then it should help Margaret prepare household for care provision\n    And it should track supplies needed for grandchild visits\n    And it should plan for mother's accessibility needs\n    And household resources should flex for care obligations\n    And Margaret's home should support her care contributions\n    And the household should be center of care economy activity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-adult children caring for aging parents receive support",
+  "contentType": "scenario",
+  "title": "Adult children caring for aging parents receive support",
+  "description": "Adult children caring for aging parents receive support",
+  "content": "Scenario: Adult children caring for aging parents receive support\n    Given Sarah navigates complex dynamics of caring for her mother\n    And role reversal creates emotional challenges\n    When Sarah provides care for Helen\n    Then the family_elohim should provide guidance on healthy boundaries\n    And Sarah should receive recognition for care labor\n    And emotional complexity should be acknowledged\n    And Sarah should be connected to caregiver support resources\n    And Helen's dignity should be preserved through care relationship changes\n    And the protocol should support both caregiver and care recipient\n    And family care should be sustainable and healthy for all\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

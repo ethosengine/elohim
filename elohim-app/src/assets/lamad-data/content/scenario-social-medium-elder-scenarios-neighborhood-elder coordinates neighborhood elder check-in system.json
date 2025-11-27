@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-neighborhood-elder coordinates neighborhood elder check-in system",
+  "contentType": "scenario",
+  "title": "Elder coordinates neighborhood elder check-in system",
+  "description": "Elder coordinates neighborhood elder check-in system",
+  "content": "Scenario: Elder coordinates neighborhood elder check-in system\n    Given several elders in the neighborhood live alone\n    And Rose wants to ensure everyone has daily connection\n    When Rose proposes a daily elder check-in system\n    And volunteers agree to participate in rotation\n    Then the coordination agent helps organize the schedule\n    And each elder receives daily contact from neighbors\n    And any concerns are immediately surfaced to family and community\n    And Rose experiences agency in building community care\n    And isolation is prevented through systematic connection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:neighborhood",
+    "related_users:community_moderator,content_creator,child",
+    "related_layers:family,community",
+    "elohim_agents:guardian_agent,coordination_agent,wisdom_surfacing_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-neighborhood",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-neighborhood",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.188597",
+  "updatedAt": "2025-11-21T18:54:29.188597"
+}

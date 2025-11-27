@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-meal prepping efficiently with limited energy",
+  "contentType": "scenario",
+  "title": "Meal prepping efficiently with limited energy",
+  "description": "Meal prepping efficiently with limited energy",
+  "content": "Scenario: Meal prepping efficiently with limited energy\n    Given I have only 2 hours between shifts to prepare meals\n    And I am already exhausted from work\n    When I need to prep food for the next several days\n    Then the protocol should suggest maximum-efficiency meal prep strategies\n    And provide step-by-step guidance requiring minimal cognitive load\n    And optimize for nutritional value, cost, and preparation time\n    And recognize this household labor as valuable care work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

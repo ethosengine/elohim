@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-individual-decision fatigue support when every choice drains limited capacity",
+  "contentType": "scenario",
+  "title": "Decision fatigue support when every choice drains limited capacity",
+  "description": "Decision fatigue support when every choice drains limited capacity",
+  "content": "Scenario: Decision fatigue support when every choice drains limited capacity\n    Given Maria makes hundreds of decisions daily with no co-parent\n    And decision fatigue is real and debilitating\n    When the personal_agent detects decision fatigue\n    Then it should simplify choices where possible\n    And it should provide clear recommendations based on her values and constraints\n    And it should reduce decision burden without removing her autonomy\n    And it should help her conserve decision-making capacity for critical choices\n    And Maria should experience reduced cognitive drain from constant choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:individual",
+    "related_users:parent,adult,worker,caregiver",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

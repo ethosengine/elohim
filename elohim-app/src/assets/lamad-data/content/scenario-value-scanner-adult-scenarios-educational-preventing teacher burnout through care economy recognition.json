@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-preventing teacher burnout through care economy recognition",
+  "contentType": "scenario",
+  "title": "Preventing teacher burnout through care economy recognition",
+  "description": "Preventing teacher burnout through care economy recognition",
+  "content": "Scenario: Preventing teacher burnout through care economy recognition\n    Given Sarah faces high burnout risk as teacher\n    And teacher care work is undervalued and underpaid\n    When the educational_elohim tracks Sarah's teaching labor\n    Then her care contributions should be quantified and visible\n    And she should gain language to advocate for fair compensation\n    And recognition should support her professional sustainability\n    And care economy should help prevent teacher burnout\n    And visibility should enable Sarah to maintain teaching career\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

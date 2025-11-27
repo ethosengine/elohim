@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-training city staff to work alongside protocol agents",
+  "contentType": "scenario",
+  "title": "Training city staff to work alongside protocol agents",
+  "description": "Training city staff to work alongside protocol agents",
+  "content": "Scenario: Training city staff to work alongside protocol agents\n    Given city employees need to understand protocol to do their jobs\n    And they may feel threatened by AI systems\n    When I coordinate staff training and cultural adaptation\n    Then we explain: how protocol augments not replaces their work\n    And we provide: training on working with agent information\n    And we clarify: that professional judgment remains valued\n    And we ensure: staff see agents as tools not replacements\n    And we maintain: good jobs with dignity for city workers\n    And we demonstrate: that democratic AI can strengthen not undermine labor\n    And implementation respects: people doing the work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

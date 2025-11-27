@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-creating intergenerational connections in neighborhood",
+  "contentType": "scenario",
+  "title": "Creating intergenerational connections in neighborhood",
+  "description": "Creating intergenerational connections in neighborhood",
+  "content": "Scenario: Creating intergenerational connections in neighborhood\n    Given Margaret engages with neighbors of all ages\n    And she bridges generational divides through relationships\n    When the neighborhood_elohim tracks social connections\n    Then it should recognize Margaret's role in intergenerational connection\n    And it should value her relationships with children, parents, and elders\n    And she should help create all-ages neighborhood culture\n    And intergenerational mixing should strengthen neighborhood resilience\n    And Margaret's social bridging should be recognized as care work\n    And neighborhood should benefit from cross-generational relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

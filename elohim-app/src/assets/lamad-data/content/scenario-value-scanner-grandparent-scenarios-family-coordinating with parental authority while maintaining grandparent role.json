@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-coordinating with parental authority while maintaining grandparent role",
+  "contentType": "scenario",
+  "title": "Coordinating with parental authority while maintaining grandparent role",
+  "description": "Coordinating with parental authority while maintaining grandparent role",
+  "content": "Scenario: Coordinating with parental authority while maintaining grandparent role\n    Given Sarah is the parent with primary authority over children\n    And Margaret needs to honor Sarah's parenting choices\n    When the family_elohim coordinates care boundaries\n    Then it should help Margaret align with Sarah's values and rules\n    And it should preserve Margaret's unique grandparent identity\n    And it should navigate between parental authority and grandparent autonomy\n    And Margaret should not be subordinate (taking orders) or superior (overriding choices)\n    And family_elohim should help them work as partners in child-rearing\n    And relationship should be mutually respectful and collaborative\n    And complex multigenerational dynamics should be coordinated skillfully\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

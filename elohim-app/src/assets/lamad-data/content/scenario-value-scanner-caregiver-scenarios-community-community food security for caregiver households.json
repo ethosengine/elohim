@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community food security for caregiver households",
+  "contentType": "scenario",
+  "title": "Community food security for caregiver households",
+  "description": "Community food security for caregiver households",
+  "content": "Scenario: Community food security for caregiver households\n    Given James's household faces food insecurity on reduced income\n    And care demands make food shopping difficult\n    When the community_elohim assesses food security\n    Then food assistance should be available through care economy\n    And delivery should accommodate caregiver constraints\n    And food should meet David's specialized nutritional needs\n    And access should be dignified and based on care contributions\n    And community should ensure caregiver households have food security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

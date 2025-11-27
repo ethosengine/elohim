@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer receives genuine human connection instead of scripted service",
+  "contentType": "scenario",
+  "title": "Customer receives genuine human connection instead of scripted service",
+  "description": "Customer receives genuine human connection instead of scripted service",
+  "content": "Scenario: Customer receives genuine human connection instead of scripted service\n    Given corporate service is performed emotional labor monitored by surveillance\n    And Ms. Johnson wants authentic connection, not corporate performance\n    When democratic ownership frees workers to provide genuine care\n    Then DeShawn's smile is authentic because he's valued and treated with dignity\n    And conversations are unhurried because workers aren't timed on transactions\n    And workers remember Ms. Johnson's preferences through relationship, not data mining\n    And service becomes mutual care: workers provide food and connection, customer provides appreciation\n    And community_elohim supports relationship building without creating surveillance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

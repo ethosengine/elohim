@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-construction waste reduction and material reuse",
+  "contentType": "scenario",
+  "title": "Construction waste reduction and material reuse",
+  "description": "Construction waste reduction and material reuse",
+  "content": "Scenario: Construction waste reduction and material reuse\n    Given construction generates substantial waste\n    And Frank has knowledge of material reuse and salvage\n    When the bioregional_elohim tracks construction waste\n    Then it should help Frank minimize waste in Habitat projects\n    And facilitate salvaging and reusing materials\n    And recognize waste reduction as ecological care contribution\n    And teach construction waste minimization to others\n    And quantify environmental benefit of material reuse\n    And Frank's expertise should reduce construction environmental impact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

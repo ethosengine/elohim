@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-community-creator covers local civic issue with evidence-based reporting",
+  "contentType": "scenario",
+  "title": "Creator covers local civic issue with evidence-based reporting",
+  "description": "Creator covers local civic issue with evidence-based reporting",
+  "content": "Scenario: Creator covers local civic issue with evidence-based reporting\n    Given the city council is voting on a controversial development\n    When Sam creates content investigating the proposal's impacts\n    And includes verified facts, stakeholder interviews, and documentation\n    Then the verification agent validates factual claims\n    And the content reaches community members affected by the decision\n    And evidence-based reporting earns trust and wider reach\n    And community makes better-informed decision\n    And Sam builds reputation for quality local journalism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:community",
+    "related_users:community_moderator,elder,child",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:verification_agent,community_value_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

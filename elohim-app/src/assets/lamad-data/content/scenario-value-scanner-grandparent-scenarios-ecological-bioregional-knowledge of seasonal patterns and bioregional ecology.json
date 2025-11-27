@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-knowledge of seasonal patterns and bioregional ecology",
+  "contentType": "scenario",
+  "title": "Knowledge of seasonal patterns and bioregional ecology",
+  "description": "Knowledge of seasonal patterns and bioregional ecology",
+  "content": "Scenario: Knowledge of seasonal patterns and bioregional ecology\n    Given Margaret has observed local seasons, weather, and ecology for decades\n    And she knows when plants bloom, birds migrate, harvest happens\n    When the bioregional_elohim tracks ecological knowledge\n    Then it should recognize Margaret's bioregional expertise\n    And it should value her understanding of local seasonal patterns\n    And it should document traditional ecological knowledge\n    And seasonal wisdom should be shared with grandchildren and community\n    And Margaret's observation should contribute to bioregional understanding\n    And traditional knowledge should inform ecological care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

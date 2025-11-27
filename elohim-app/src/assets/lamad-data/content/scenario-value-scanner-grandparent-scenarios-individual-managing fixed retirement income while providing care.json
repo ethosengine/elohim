@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-managing fixed retirement income while providing care",
+  "contentType": "scenario",
+  "title": "Managing fixed retirement income while providing care",
+  "description": "Managing fixed retirement income while providing care",
+  "content": "Scenario: Managing fixed retirement income while providing care\n    Given Margaret lives on retirement income that cannot be increased\n    And grandparenting sometimes involves expenses (activities, treats, supplies)\n    When Margaret's personal_agent tracks spending related to grandchildren\n    Then it should help her budget for grandparenting costs\n    And it should identify when care provision creates financial burden\n    And it should suggest discussions with family about cost-sharing\n    And it should help Margaret maintain dignity while managing constraints\n    And the system should prevent financial exploitation of grandparents\n    And Margaret should be able to provide care without financial hardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

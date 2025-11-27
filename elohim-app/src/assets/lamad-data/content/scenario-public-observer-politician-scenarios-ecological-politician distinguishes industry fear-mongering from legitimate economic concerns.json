@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-ecological-politician distinguishes industry fear-mongering from legitimate economic concerns",
+  "contentType": "scenario",
+  "title": "Politician distinguishes industry fear-mongering from legitimate economic concerns",
+  "description": "Politician distinguishes industry fear-mongering from legitimate economic concerns",
+  "content": "Scenario: Politician distinguishes industry fear-mongering from legitimate economic concerns\n    Given industry lobbyists claim environmental regulation will destroy jobs\n    And present catastrophic economic projections\n    When the Observer fact-checks industry claims with evidence\n    Then they see similar regulations in comparable jurisdictions\n    And review actual employment impacts versus predicted job losses\n    And identify compliance costs versus health and environmental benefits\n    And understand which industries adapted successfully to regulations\n    And resist manipulation through evidence-based economic analysis\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

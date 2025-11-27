@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-family gatherings consider accessibility proactively",
+  "contentType": "scenario",
+  "title": "Family gatherings consider accessibility proactively",
+  "description": "Family gatherings consider accessibility proactively",
+  "content": "Scenario: Family gatherings consider accessibility proactively\n    Given family events often occur in inaccessible spaces\n    And accessibility is frequently an afterthought\n    When family gatherings are planned\n    Then the family_elohim should prompt organizers to consider accessibility\n    And it should provide Alex tools to communicate access needs\n    And venue accessibility should be verified before events\n    And Alex should not have to repeatedly advocate for basic inclusion\n    And family should understand that inaccessibility equals exclusion\n    And accessible planning should become family norm\n    And Alex should be able to participate fully in family life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

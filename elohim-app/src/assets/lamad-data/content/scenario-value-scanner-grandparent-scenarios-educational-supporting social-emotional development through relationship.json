@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-supporting social-emotional development through relationship",
+  "contentType": "scenario",
+  "title": "Supporting social-emotional development through relationship",
+  "description": "Supporting social-emotional development through relationship",
+  "content": "Scenario: Supporting social-emotional development through relationship\n    Given Margaret provides emotional support and relationship security\n    And grandchildren develop social-emotional skills through secure attachment\n    When the educational_elohim tracks developmental care\n    Then it should recognize social-emotional teaching as education\n    And it should value relationship as foundation for learning\n    And it should track emotional development and regulation skills\n    And social-emotional care should accumulate care tokens\n    And Margaret's emotional support should be recognized as developmental work\n    And relationship-based learning should be valued as essential education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

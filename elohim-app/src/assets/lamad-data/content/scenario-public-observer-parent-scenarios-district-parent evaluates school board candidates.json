@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent evaluates school board candidates",
+  "contentType": "scenario",
+  "title": "Parent evaluates school board candidates",
+  "description": "Parent evaluates school board candidates",
+  "content": "Scenario: Parent evaluates school board candidates\n    Given three candidates are running for school board seats\n    And the parent has limited time to research before the election\n    When the parent reviews Observer's candidate analysis\n    Then they see each candidate's voting record on key issues\n    And view candidates' positions on class sizes and program funding\n    And understand which candidates prioritize student needs vs politics\n    And can make informed voting decision in 15 minutes\n    And democracy extends to education governance elections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

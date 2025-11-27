@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-shopping patterns contribute to neighborhood food access insights",
+  "contentType": "scenario",
+  "title": "Shopping patterns contribute to neighborhood food access insights",
+  "description": "Shopping patterns contribute to neighborhood food access insights",
+  "content": "Scenario: Shopping patterns contribute to neighborhood food access insights\n    Given Marcus shops regularly at neighborhood stores\n    And he tracks prices and availability across locations\n    When Marcus's anonymized shopping data is aggregated\n    Then it should contribute to neighborhood food access mapping\n    And the neighborhood_elohim should identify food deserts\n    And pricing patterns should be visible at neighborhood scale\n    And Marcus's data should help others navigate local food systems\n    And collective knowledge should reduce individual burden\n    And his contributions should improve neighborhood food security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

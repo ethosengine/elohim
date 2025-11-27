@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager facilitates scheduling through negotiation, not command",
+  "contentType": "scenario",
+  "title": "Manager facilitates scheduling through negotiation, not command",
+  "description": "Manager facilitates scheduling through negotiation, not command",
+  "content": "Scenario: Manager facilitates scheduling through negotiation, not command\n    Given workers need coordinated schedule balancing operational and personal needs\n    And corporate model had Marcus impose schedule unilaterally\n    When scheduling conflicts arise\n    Then Marcus proposes schedule based on operational requirements\n    And Marcus facilitates negotiation between workers with competing needs\n    And workers modify proposal based on their life circumstances\n    And workers democratically approve final schedule\n    And Marcus cannot override worker decision\n    And workplace_elohim ensures process remains democratic\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

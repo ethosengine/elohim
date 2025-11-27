@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-community investment enables conversion while building local ownership stake",
+  "contentType": "scenario",
+  "title": "Community investment enables conversion while building local ownership stake",
+  "description": "Community investment enables conversion while building local ownership stake",
+  "content": "Scenario: Community investment enables conversion while building local ownership stake\n    Given conversion requires $750K acquisition capital for three locations\n    And community members want to support democratic ownership but lacked pathway\n    When community investment pools fund significant portion of acquisition\n    Then neighbors invest modest amounts ($2K-$20K each) in conversion\n    And investors receive fair return (5% annually) plus social benefit\n    And community gains financial stake in democratically-operated local institutions\n    And investment connects neighbors to democratic economy building in their community\n    And community_elohim manages community investment relationships transparently\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

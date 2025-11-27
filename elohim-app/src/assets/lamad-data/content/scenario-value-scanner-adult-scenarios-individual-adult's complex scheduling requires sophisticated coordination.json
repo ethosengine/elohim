@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-individual-adult's complex scheduling requires sophisticated coordination",
+  "contentType": "scenario",
+  "title": "Adult's complex scheduling requires sophisticated coordination",
+  "description": "Adult's complex scheduling requires sophisticated coordination",
+  "content": "Scenario: Adult's complex scheduling requires sophisticated coordination\n    Given Sarah manages professional schedule, children's schedules, household tasks, community commitments\n    And conflicts arise constantly\n    When Sarah plans her week\n    Then the personal_agent should integrate with calendars, school systems, work tools\n    And it should identify scheduling conflicts automatically\n    And it should suggest realistic solutions within constraints\n    And it should coordinate across family members' needs\n    And scheduling should support Sarah's effectiveness, not overwhelm her\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:individual",
+    "related_users:young_adult,middle_aged,parent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-building social capital through community contributions",
+  "contentType": "scenario",
+  "title": "Building social capital through community contributions",
+  "description": "Building social capital through community contributions",
+  "content": "Scenario: Building social capital through community contributions\n    Given Aisha is new to the community\n    And she wants to establish herself\n    When Aisha contributes to community initiatives\n    Then the community_elohim should track her contributions\n    And care tokens should accumulate at community level\n    And her care work should build social capital\n    And contributions should establish her community standing\n    And the system should recognize that social capital must be earned\n    And community position should reflect actual care provided\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

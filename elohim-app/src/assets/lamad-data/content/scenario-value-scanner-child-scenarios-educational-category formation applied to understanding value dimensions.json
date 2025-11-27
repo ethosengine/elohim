@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-category formation applied to understanding value dimensions",
+  "contentType": "scenario",
+  "title": "Category formation applied to understanding value dimensions",
+  "description": "Category formation applied to understanding value dimensions",
+  "content": "Scenario: Category formation applied to understanding value dimensions\n    Given Emma is developing ability to categorize and classify\n    And she can understand multiple attributes simultaneously\n    When Emma evaluates products\n    Then the personal_agent should help her categorize value types\n    And the agent should present: nutritional value, environmental impact, care labor, price\n    And Emma should learn to organize complexity through categories\n    And cognitive development should support multi-dimensional analysis\n    And value literacy should build on natural categorization abilities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

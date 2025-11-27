@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-responding to community emergency with supported capability",
+  "contentType": "scenario",
+  "title": "Responding to community emergency with supported capability",
+  "description": "Responding to community emergency with supported capability",
+  "content": "Scenario: Responding to community emergency with supported capability\n    Given there's a community crisis (natural disaster, emergency)\n    And everyone is mobilizing to help\n    When Jordan wants to contribute to emergency response\n    Then the personal_agent helps Jordan identify safe ways to help\n    And Jordan contributes at their capability (preparing supplies, making calls)\n    And Jordan's crisis contribution is recognized and valued\n    And the community includes Jordan in collective response\n    And Jordan accumulates care tokens for emergency care work\n    And Jordan experiences being part of community resilience\n    And Jordan's citizenship includes both receiving and providing care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

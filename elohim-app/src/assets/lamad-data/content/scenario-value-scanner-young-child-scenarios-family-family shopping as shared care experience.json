@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-family shopping as shared care experience",
+  "contentType": "scenario",
+  "title": "Family shopping as shared care experience",
+  "description": "Family shopping as shared care experience",
+  "content": "Scenario: Family shopping as shared care experience\n    Given Tommy is shopping with parent Sarah\n    And multiple family members have different needs\n    When they use the Value Scanner together\n    Then Tommy should be learning from Sarah's modeling\n    And Sarah should be teaching Tommy value literacy through action\n    And the family_elohim should coordinate their different roles\n    And Tommy's contributions should be recognized alongside Sarah's\n    And shopping should be experienced as family care work, not consumption\n    And care economy principles should be transmitted through relationship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

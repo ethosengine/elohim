@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-household-household care labor made visible despite reduced monetary income",
+  "contentType": "scenario",
+  "title": "Household care labor made visible despite reduced monetary income",
+  "description": "Household care labor made visible despite reduced monetary income",
+  "content": "Scenario: Household care labor made visible despite reduced monetary income\n    Given James's care work is worth $50k+/year professionally\n    And household monetary income is only $40k/year\n    When household economics are evaluated\n    Then the household_elohim should show total household value\n    And James's care labor should be valued alongside income\n    And household should be recognized as generating $90k+ total value\n    And care work should count as household economic contribution\n    And reduced monetary income should not mean reduced household value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:household",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

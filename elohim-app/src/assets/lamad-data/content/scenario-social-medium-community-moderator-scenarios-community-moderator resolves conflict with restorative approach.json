@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-community-moderator-scenarios-community-moderator resolves conflict with restorative approach",
+  "contentType": "scenario",
+  "title": "Moderator resolves conflict with restorative approach",
+  "description": "Moderator resolves conflict with restorative approach",
+  "content": "Scenario: Moderator resolves conflict with restorative approach\n    Given two community members have an escalating disagreement\n    And the moderation agent alerts Alex to rising tension\n    When Alex reviews the full context and conversation history\n    And sees both parties have history of positive contributions\n    Then Alex initiates restorative dialogue process\n    And both parties can express their concerns privately\n    And Alex helps them find common ground and mutual understanding\n    And the conflict is resolved without punitive action\n    And both parties remain active, valued community members\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:community_moderator",
+    "governance_layer:community",
+    "related_users:activist,content_creator,child,elder",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:moderation_agent,pattern_detection_agent,restorative_justice_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/community_moderator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-community-moderator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-community-moderator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-community-manager ensures operational transparency builds community trust",
+  "contentType": "scenario",
+  "title": "Manager ensures operational transparency builds community trust",
+  "description": "Manager ensures operational transparency builds community trust",
+  "content": "Scenario: Manager ensures operational transparency builds community trust\n    Given community wants to understand how democratic business actually functions\n    And operational transparency is key to community confidence\n    When Marcus prepares quarterly community report\n    Then Marcus provides honest data on operations, challenges, and successes\n    And Marcus doesn't hide operational difficulties or failures\n    And Marcus celebrates worker governance achievements transparently\n    And Marcus's operational honesty builds community trust in democratic model\n    And community_elohim ensures reporting is accurate and accessible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,worker]",
+    "related_layers:[workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

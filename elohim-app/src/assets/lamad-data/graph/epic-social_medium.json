@@ -1,0 +1,330 @@
+{
+  "lastUpdated": "2025-11-27T06:01:59.236535",
+  "zoomLevel": 1,
+  "parentId": "social-medium-epic",
+  "epicKey": "social_medium",
+  "nodes": [
+    {
+      "id": "social-medium-epic",
+      "title": "Social Medium",
+      "contentType": "epic",
+      "description": "Building healthier digital communication spaces",
+      "hasChildren": true,
+      "childCount": 16,
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "level": 1,
+      "isParent": true
+    },
+    {
+      "id": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+      "title": "Climate Displacement and Bioregional Coordination",
+      "contentType": "feature",
+      "description": "As a displaced_person in the social_medium system Operating at the ecological_bioregional governance layer I want to maintain community cohesion despite climate displacement So that my community can s",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 150.0,
+        "y": 0.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-displaced-person-scenarios-community",
+      "title": "Community Connection Across Displacement",
+      "contentType": "feature",
+      "description": "As a displaced_person in the social_medium system Operating at the community governance layer I want to maintain connections to my origin community while building new ones So that I can preserve relat",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 138.581929876693,
+        "y": 57.40251485476347
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-community-moderator-scenarios-community",
+      "title": "Community Space Moderation with Restorative Approach",
+      "contentType": "feature",
+      "description": "As a community_moderator in the social_medium system Operating at the community governance layer I want to maintain healthy spaces where human flourishing is possible So that communities can coordinat",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 106.06601717798213,
+        "y": 106.06601717798212
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-activist-scenarios-affinity-network",
+      "title": "Movement Building Through Affinity Networks for Activist",
+      "contentType": "feature",
+      "description": "As an activist in the social_medium system Operating at the affinity_network governance layer I want to build solidarity and coordinate action across geographies So that movements can grow while respe",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 57.402514854763474,
+        "y": 138.581929876693
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-activist-scenarios-individual",
+      "title": "Individual Digital Sovereignty for Activist",
+      "contentType": "feature",
+      "description": "As an activist in the social_medium system Operating at the individual governance layer I want to maintain my digital sovereignty and personal security So that I can organize for change without fear o",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 9.184850993605149e-15,
+        "y": 150.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-activist-scenarios-global",
+      "title": "International Solidarity and Global Coordination for Activist",
+      "contentType": "feature",
+      "description": "As an activist in the social_medium system Operating at the global governance layer I want to coordinate across borders and build international movements So that humanity can address planetary-scale c",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -57.40251485476346,
+        "y": 138.581929876693
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-activist-scenarios-community",
+      "title": "Community Organizing for Activist",
+      "contentType": "feature",
+      "description": "As an activist in the social_medium system Operating at the community governance layer I want to organize local action and build community power So that communities can address local issues through co",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -106.06601717798212,
+        "y": 106.06601717798213
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-refugee-scenarios-global",
+      "title": "Cross-Border Connection and Protection for Refugee",
+      "contentType": "feature",
+      "description": "As a refugee in the social_medium system Operating at the global governance layer I want to maintain connection with family and culture across borders So that I can preserve relationships and identity",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -138.581929876693,
+        "y": 57.40251485476348
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-content-creator-scenarios-affinity-network",
+      "title": "Value-Driven Content Creation for Affinity Networks",
+      "contentType": "feature",
+      "description": "As a content_creator in the social_medium system Operating at the affinity_network governance layer I want to create quality content that earns reach through genuine value So that I can sustainably se",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -150.0,
+        "y": 1.8369701987210297e-14
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-content-creator-scenarios-community",
+      "title": "Community Storytelling and Local Documentation",
+      "contentType": "feature",
+      "description": "As a content_creator in the social_medium system Operating at the community governance layer I want to document and share local stories and knowledge So that community memory is preserved and local vo",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -138.58192987669304,
+        "y": -57.40251485476345
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-child-scenarios-educational",
+      "title": "Educational Participation for Child",
+      "contentType": "feature",
+      "description": "As a child in the social_medium system Operating at the educational governance layer I want to participate in learning communities safely So that I can grow intellectually while protected and supporte",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -106.06601717798215,
+        "y": -106.06601717798212
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-child-scenarios-affinity-network",
+      "title": "Age-Appropriate Interest Communities for Child",
+      "contentType": "feature",
+      "description": "As a child in the social_medium system Operating at the affinity_network governance layer I want to pursue my interests with others who share them So that I can develop skills, make friends, and explo",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -57.40251485476355,
+        "y": -138.58192987669298
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-child-scenarios-family",
+      "title": "Family Communication and Safety for Child",
+      "contentType": "feature",
+      "description": "As a child in the social_medium system Operating at the family governance layer I want to communicate safely with my family and learn digital wisdom So that I can build healthy relationships while pro",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": -2.7554552980815446e-14,
+        "y": -150.0
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-elder-scenarios-affinity-network",
+      "title": "Interest Communities and Peer Connection for Elder",
+      "contentType": "feature",
+      "description": "As an elder in the social_medium system Operating at the affinity_network governance layer I want to connect with others who share my interests and experiences So that I can pursue passions, build fri",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 57.4025148547635,
+        "y": -138.58192987669298
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-elder-scenarios-neighborhood",
+      "title": "Community Participation and Wisdom Sharing for Elder",
+      "contentType": "feature",
+      "description": "As an elder in the social_medium system Operating at the neighborhood governance layer I want to participate in community life and share my experience So that I remain engaged, valued, and connected w",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 106.0660171779821,
+        "y": -106.06601717798215
+      },
+      "level": 1,
+      "isParent": false
+    },
+    {
+      "id": "feature-social-medium-elder-scenarios-family",
+      "title": "Intergenerational Family Connection for Elder",
+      "contentType": "feature",
+      "description": "As an elder in the social_medium system Operating at the family governance layer I want to maintain meaningful relationships with my family across distances So that I remain connected with children an",
+      "hasChildren": true,
+      "childCount": 4,
+      "position": {
+        "x": 138.58192987669298,
+        "y": -57.40251485476356
+      },
+      "level": 1,
+      "isParent": false
+    }
+  ],
+  "edges": [
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-displaced-person-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-community-moderator-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-activist-scenarios-affinity-network",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-activist-scenarios-individual",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-activist-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-activist-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-refugee-scenarios-global",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-content-creator-scenarios-affinity-network",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-content-creator-scenarios-community",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-child-scenarios-educational",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-child-scenarios-affinity-network",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-child-scenarios-family",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-elder-scenarios-affinity-network",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-elder-scenarios-neighborhood",
+      "type": "CONTAINS"
+    },
+    {
+      "source": "social-medium-epic",
+      "target": "feature-social-medium-elder-scenarios-family",
+      "type": "CONTAINS"
+    }
+  ],
+  "totalNodes": 17,
+  "totalEdges": 16
+}

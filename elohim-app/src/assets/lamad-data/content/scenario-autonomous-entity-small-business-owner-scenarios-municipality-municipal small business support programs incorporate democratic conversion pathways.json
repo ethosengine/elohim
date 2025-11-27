@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal small business support programs incorporate democratic conversion pathways",
+  "contentType": "scenario",
+  "title": "Municipal small business support programs incorporate democratic conversion pathways",
+  "description": "Municipal small business support programs incorporate democratic conversion pathways",
+  "content": "Scenario: Municipal small business support programs incorporate democratic conversion pathways\n    Given city offers small business loans, technical assistance, and development support\n    And these programs could facilitate democratic conversions\n    When municipality recognizes conversion potential for struggling businesses\n    Then small business support programs add worker ownership conversion option\n    And struggling owners learn they can exit with dignity while protecting workers\n    And municipal economic development staff are trained in democratic transition support\n    And public resources help overcome conversion barriers (legal costs, financing, technical assistance)\n    And municipality_elohim provides conversion expertise to municipal programs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

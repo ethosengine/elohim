@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-individual-recognition of unpaid care labor builds self-worth",
+  "contentType": "scenario",
+  "title": "Recognition of unpaid care labor builds self-worth",
+  "description": "Recognition of unpaid care labor builds self-worth",
+  "content": "Scenario: Recognition of unpaid care labor builds self-worth\n    Given Margaret's care contributions are substantial but unpaid\n    And traditional economics labels her as \"not working\"\n    When Margaret reviews her care contribution data\n    Then she should see quantified value of her labor\n    And she should understand her economic contribution is significant\n    And she should experience herself as productive member of society\n    And the narrative of retirement as obsolescence should be countered\n    And Margaret should have data to assert her value\n    And her dignity and self-worth should be affirmed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:individual",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

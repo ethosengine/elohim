@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-individual-personal agent teaches value literacy as foundational life skill",
+  "contentType": "scenario",
+  "title": "Personal agent teaches value literacy as foundational life skill",
+  "description": "Personal agent teaches value literacy as foundational life skill",
+  "content": "Scenario: Personal agent teaches value literacy as foundational life skill\n    Given Kenji is shopping for groceries on his $50/week budget\n    And he struggles to identify best nutritional value per dollar\n    When Kenji's personal_agent analyzes his shopping choices\n    Then the agent should teach him to compare nutrition per cost\n    And it should explain \"Brown rice gives you 8 servings for $3, while instant rice gives 4 for $4\"\n    And it should help him identify efficient protein sources\n    And the agent should build Kenji's capability to make informed choices\n    And value literacy should be taught through practice, not lectures\n    And Kenji should develop skills that serve him throughout adult life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

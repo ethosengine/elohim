@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-alex's disability advocacy recognized as sophisticated care work",
+  "contentType": "scenario",
+  "title": "Alex's disability advocacy recognized as sophisticated care work",
+  "description": "Alex's disability advocacy recognized as sophisticated care work",
+  "content": "Scenario: Alex's disability advocacy recognized as sophisticated care work\n    Given Alex performs substantial disability rights organizing\n    And advocacy improves systems for entire disabled community\n    When the community_elohim tracks care contributions\n    Then Alex's advocacy work should accumulate significant care tokens\n    And organizing should be valued as skilled professional labor\n    And systems change work should be recognized as high-impact care\n    And Alex's contributions should create substantial care economy standing\n    And the protocol should make visible that advocacy is care work\n    And community should understand Alex is creating public goods\n    And care tokens should reflect the scale of Alex's community impact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

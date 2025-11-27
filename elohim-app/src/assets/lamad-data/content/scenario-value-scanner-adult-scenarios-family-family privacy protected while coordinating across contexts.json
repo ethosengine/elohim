@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-family privacy protected while coordinating across contexts",
+  "contentType": "scenario",
+  "title": "Family privacy protected while coordinating across contexts",
+  "description": "Family privacy protected while coordinating across contexts",
+  "content": "Scenario: Family privacy protected while coordinating across contexts\n    Given family care economy involves multiple family members\n    And privacy needs differ across individuals\n    When family data is managed\n    Then Sarah should control what's shared with extended family\n    And children's privacy should be protected by parental oversight\n    And partner's privacy should be respected\n    And extended family should only see what Sarah chooses to share\n    And family privacy should be complex, nuanced, and protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

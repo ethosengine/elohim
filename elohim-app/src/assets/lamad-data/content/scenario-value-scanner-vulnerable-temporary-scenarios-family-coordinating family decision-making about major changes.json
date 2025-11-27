@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-coordinating family decision-making about major changes",
+  "contentType": "scenario",
+  "title": "Coordinating family decision-making about major changes",
+  "description": "Coordinating family decision-making about major changes",
+  "content": "Scenario: Coordinating family decision-making about major changes\n    Given major decisions affect my children and our whole family\n    And I want children to have age-appropriate voice while I retain authority\n    When we face decisions about housing, location, schooling, or other major changes\n    Then the family_elohim facilitates age-appropriate family discussions\n    And helps children express their needs and preferences\n    And supports me in making final decisions considering everyone's input\n    And tracks family decision-making process\n    And validates children's participation without parentifying them\n    And my personal_agent ensures all voices are heard appropriately\n    And recognizes inclusive decision-making as sophisticated parenting\n    And celebrates family decisions made together\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

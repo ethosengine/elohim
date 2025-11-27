@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-follow sarah martinez's democratic development after council service",
+  "contentType": "scenario",
+  "title": "Follow Sarah Martinez's democratic development after council service",
+  "description": "Follow Sarah Martinez's democratic development after council service",
+  "content": "Scenario: Follow Sarah Martinez's democratic development after council service\n    Given Sarah served on Constitutional Council in Year 3\n    When James interviews Sarah annually for 7 years\n    Then he documents immediate effects on her constitutional literacy\n    And he tracks how she participates differently in community afterward\n    And he observes her selection for regional council in Year 5\n    And he examines her participation in Global Convention in Year 7\n    And he captures how sortition governance transforms citizens over time\n    And individual trajectory illustrates broader pattern\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

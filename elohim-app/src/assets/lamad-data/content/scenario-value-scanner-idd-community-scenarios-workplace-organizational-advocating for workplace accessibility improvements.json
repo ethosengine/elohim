@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-advocating for workplace accessibility improvements",
+  "contentType": "scenario",
+  "title": "Advocating for workplace accessibility improvements",
+  "description": "Advocating for workplace accessibility improvements",
+  "content": "Scenario: Advocating for workplace accessibility improvements\n    Given Jordan notices that new book cart is hard to maneuver\n    And workplace equipment should be accessible\n    When Jordan reports the accessibility issue\n    Then supervisors take Jordan's feedback seriously\n    And the workplace_elohim facilitates accommodation discussion\n    And the library adjusts equipment or provides alternative\n    And Jordan's advocacy improves workplace for everyone\n    And Jordan experiences being an active participant in workplace improvement\n    And Jordan's voice shapes workplace accessibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-appeal reveals need for community-specific calibration",
+  "contentType": "scenario",
+  "title": "Appeal reveals need for community-specific calibration",
+  "description": "Appeal reveals need for community-specific calibration",
+  "content": "Scenario: Appeal reveals need for community-specific calibration\n    Given I appeal a privacy threshold that feels too low for my community\n    And multiple community members have filed similar appeals\n    When Community Constitutional Council reviews the pattern\n    Then they recognize this as community-wide concern not individual complaint\n    And They recommend community-specific calibration of privacy thresholds\n    And Community leader facilitates deliberation on local preferences\n    And Community residents participate in calibrating the protocol\n    And My appeal contributes to community self-governance\n    And Local sovereignty is exercised within constitutional bounds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "governance-organizations-welcome-to-regeneration-project-regeneration-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Regeneration means putting life at the center of every action and decision. It is inclusive, engaging, and generous. And everyone can do it.",
+  "content": "---\nnode_type: organization\norg_id: welcome_to_regeneration_project_regeneration\nname: \"Welcome to Regeneration | Project Regeneration\"\nurl: \"https://regeneration.org/\"\ngem_id: \"aJh7Q8mVzo3AZvu3BcYO\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Welcome to Regeneration | Project Regeneration inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Welcome to Regeneration | Project Regeneration\n\n## Description\n\nRegeneration means putting life at the center of every action and decision. It is inclusive, engaging, and generous. And everyone can do it.\n\n**Publisher:** Regeneration.org\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Welcome to Regeneration | Project Regeneration relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://regeneration.org/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/welcome_to_regeneration_project_regeneration/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-anonymous franchise locations become known community institutions",
+  "contentType": "scenario",
+  "title": "Anonymous franchise locations become known community institutions",
+  "description": "Anonymous franchise locations become known community institutions",
+  "content": "Scenario: Anonymous franchise locations become known community institutions\n    Given ChickenMax #247, #248, #249 were corporate outposts without local identity\n    And community members saw them as extractive chains, not neighborhood businesses\n    When conversion makes locations democratically-governed community institutions\n    Then neighborhoods learn their franchise locations chose democratic ownership\n    And locations develop distinct community identities (possibly rebranding with local names)\n    And community members recognize workers as co-owners, not exploited employees\n    And institutions become sources of neighborhood pride instead of corporate extraction symbols\n    And community_elohim communicates conversion story building community ownership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

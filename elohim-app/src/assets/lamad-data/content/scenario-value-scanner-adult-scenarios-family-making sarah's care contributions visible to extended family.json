@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-making sarah's care contributions visible to extended family",
+  "contentType": "scenario",
+  "title": "Making Sarah's care contributions visible to extended family",
+  "description": "Making Sarah's care contributions visible to extended family",
+  "content": "Scenario: Making Sarah's care contributions visible to extended family\n    Given Sarah performs enormous care labor across family contexts\n    And extended family may not see the full scope\n    When family care contributions are tracked\n    Then Sarah's care for children should be quantified\n    And her care for aging parents should be visible\n    And her household coordination should be recognized\n    And extended family should see Sarah's contributions specifically\n    And visibility should enable fair family labor distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

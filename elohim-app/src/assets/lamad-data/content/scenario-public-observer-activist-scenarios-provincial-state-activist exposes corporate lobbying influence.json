@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-provincial-state-activist exposes corporate lobbying influence",
+  "contentType": "scenario",
+  "title": "Activist exposes corporate lobbying influence",
+  "description": "Activist exposes corporate lobbying influence",
+  "content": "Scenario: Activist exposes corporate lobbying influence\n    Given a harmful environmental bill is advancing\n    And the activist suspects industry capture\n    When the Observer tracks lobbying and donations\n    Then the activist sees which companies lobby for the bill\n    And views campaign contributions to bill sponsors\n    And identifies revolving door between industry and regulators\n    And corruption patterns become documented\n    And advocacy targets political vulnerabilities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:provincial_state",
+    "related_users:community_organizer,activist,politician,journalist",
+    "related_layers:municipality,nation_state,county_regional",
+    "elohim_agents:public_observer,regional_elohim,policy_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-municipal budget allocation informed by protocol data",
+  "contentType": "scenario",
+  "title": "Municipal budget allocation informed by protocol data",
+  "description": "Municipal budget allocation informed by protocol data",
+  "content": "Scenario: Municipal budget allocation informed by protocol data\n    Given city council determines annual budget\n    And we need evidence about neighborhood needs and priorities\n    When Municipal Elohim provides resource flow analysis\n    Then we see: which neighborhoods are underserved\n    And we identify: where investments would have most impact\n    And we understand: how different spending choices ripple across city\n    And city council: deliberates and decides using this information\n    And we maintain: political accountability for budget choices\n    And protocol transparency: enables better democratic decision-making\n    And agent information: serves elected governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

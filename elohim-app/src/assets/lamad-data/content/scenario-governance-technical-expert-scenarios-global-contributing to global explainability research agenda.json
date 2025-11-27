@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-contributing to global explainability research agenda",
+  "contentType": "scenario",
+  "title": "Contributing to global explainability research agenda",
+  "description": "Contributing to global explainability research agenda",
+  "content": "Scenario: Contributing to global explainability research agenda\n    Given delegates need better explainability for oversight\n    And current technical capabilities are insufficient\n    When I help shape global research priorities\n    Then I identify: key explainability challenges for governance\n    And I propose: research approaches worth global investment\n    And I coordinate: international research collaboration\n    And I avoid: promising solutions we cannot deliver\n    And I enable: informed global investment in governance technology\n    And I serve: long-term capability development for democratic AI\n    And I demonstrate: how expertise serves collective problem-solving\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-celebrating household milestones together",
+  "contentType": "scenario",
+  "title": "Celebrating household milestones together",
+  "description": "Celebrating household milestones together",
+  "content": "Scenario: Celebrating household milestones together\n    Given the household has lived together for one year\n    And housemates want to celebrate their community\n    When Jordan helps plan the anniversary celebration\n    Then Jordan contributes ideas using the visual planning interface\n    And Jordan's suggestions are valued equally with others\n    And Jordan helps with celebration preparations at their capability\n    And the Value Scanner records Jordan's party planning contributions\n    And Jordan experiences being part of a caring community\n    And the celebration honors everyone's contributions to household life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

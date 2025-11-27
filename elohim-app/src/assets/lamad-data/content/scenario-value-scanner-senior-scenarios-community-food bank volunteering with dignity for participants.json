@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-food bank volunteering with dignity for participants",
+  "contentType": "scenario",
+  "title": "Food bank volunteering with dignity for participants",
+  "description": "Food bank volunteering with dignity for participants",
+  "content": "Scenario: Food bank volunteering with dignity for participants\n    Given Margaret volunteers at community food bank\n    And she also uses food bank resources on her limited budget\n    When the community_elohim coordinates food access\n    Then Margaret should both contribute and receive without stigma\n    And the framing should be community resource sharing, not charity\n    And her volunteer labor should give her standing as member, not supplicant\n    And she should experience dignity in both giving and receiving\n    And community food access should operate on mutual aid principles\n    And Margaret should be valued contributor regardless of income\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

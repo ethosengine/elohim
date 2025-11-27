@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-meal planning for changing nutritional needs and budget",
+  "contentType": "scenario",
+  "title": "Meal planning for changing nutritional needs and budget",
+  "description": "Meal planning for changing nutritional needs and budget",
+  "content": "Scenario: Meal planning for changing nutritional needs and budget\n    Given Margaret has dietary requirements for diabetes management\n    And she needs to optimize nutrition within $150/week budget\n    When the household_elohim helps plan meals\n    Then it should balance health needs with budget constraints\n    And it should suggest affordable high-protein, high-calcium options\n    And it should plan for one or two people to minimize waste\n    And it should use Margaret's cooking knowledge and preferences\n    And meals should be nutritious, affordable, and satisfying\n    And food should support health without breaking budget\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

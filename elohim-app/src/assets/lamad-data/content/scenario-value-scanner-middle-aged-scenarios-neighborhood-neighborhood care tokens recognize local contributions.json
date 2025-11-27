@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care tokens recognize local contributions",
+  "contentType": "scenario",
+  "title": "Neighborhood care tokens recognize local contributions",
+  "description": "Neighborhood care tokens recognize local contributions",
+  "content": "Scenario: Neighborhood care tokens recognize local contributions\n    Given Robert contributes to neighborhood care economy\n    And his contributions strengthen neighborhood for everyone\n    When neighborhood_elohim tracks care tokens\n    Then it should recognize his neighborhood care contributions\n    And value his help for elderly neighbors, resource sharing, and leadership\n    And accumulate tokens that reflect his neighborhood care work\n    And connect tokens to neighborhood governance voice\n    And demonstrate that care contributions create social capital\n    And recognize that neighborhood care is genuine economic contribution\n    And build neighborhood through reciprocal care recognition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

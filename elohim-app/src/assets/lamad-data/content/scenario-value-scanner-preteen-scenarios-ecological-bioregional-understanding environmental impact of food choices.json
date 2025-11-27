@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-understanding environmental impact of food choices",
+  "contentType": "scenario",
+  "title": "Understanding environmental impact of food choices",
+  "description": "Understanding environmental impact of food choices",
+  "content": "Scenario: Understanding environmental impact of food choices\n    Given Marcus is developing capacity for abstract thinking\n    And environmental sustainability connects to care economy\n    When Marcus makes food choices\n    Then the personal_agent should provide age-appropriate environmental information\n    And it should explain ecological impact in concrete terms\n    And it should not overwhelm him with climate anxiety\n    And it should frame environmental care as extension of household care\n    And ecological literacy should develop alongside care economy principles\n    And stewardship should extend from family to bioregion\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

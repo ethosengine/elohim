@@ -1,294 +1,156 @@
-<div class="lamad-home-container">
+<div class="lamad-home">
+  <!-- View Mode Toggle Bar -->
+  <nav class="view-mode-bar">
+    <div class="view-tabs">
+      <button
+        class="view-tab"
+        [class.active]="viewMode === 'paths'"
+        (click)="setViewMode('paths')"
+      >
+        <span class="tab-icon">&#128218;</span>
+        Paths
+      </button>
+      <button
+        class="view-tab"
+        [class.active]="viewMode === 'explore'"
+        (click)="setViewMode('explore')"
+      >
+        <span class="tab-icon">&#127758;</span>
+        Explore
+      </button>
+    </div>
+    <div class="view-actions">
+      <button class="action-link" (click)="goToSearch()">
+        <span class="tab-icon">&#128269;</span>
+        Search
+      </button>
+      <button class="action-link" (click)="goToDashboard()">
+        <span class="tab-icon">&#128100;</span>
+        Me
+      </button>
+    </div>
+  </nav>
+
   <!-- Loading State -->
-  <div *ngIf="isLoading" class="loading-container">
-    <div class="loading-spinner"></div>
-    <p>Loading learning path...</p>
-  </div>
+  @if (isLoading) {
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading...</p>
+    </div>
+  }
 
-  <!-- Main Three-Panel Layout -->
-  <div *ngIf="!isLoading" class="three-panel-layout">
+  <!-- Error State -->
+  @if (error) {
+    <div class="error-state">
+      <h2>Something went wrong</h2>
+      <p>{{ error }}</p>
+    </div>
+  }
 
-    <!-- Mobile Sidebar Backdrop -->
-    <button class="sidebar-backdrop"
-         *ngIf="isSidebarOpen"
-         (click)="closeSidebar()"
-         (keydown.escape)="closeSidebar()"
-         type="button"
-         aria-label="Close sidebar">
-    </button>
-
-    <!-- LEFT SIDEBAR: Navigation Menu -->
-    <aside class="nav-sidebar" [class.open]="isSidebarOpen">
-      <div class="sidebar-header">
-        <h2 class="sidebar-title">Elohim</h2>
-        <button class="close-sidebar-btn" (click)="toggleSidebar()">✕</button>
+  <!-- Main Content -->
+  @if (!isLoading && !error) {
+    <!-- Hero Section -->
+    <header class="hero-section">
+      <div class="hero-content">
+        <h1 class="hero-title">Lamad</h1>
+        <p class="hero-subtitle">
+          Discover the vision for digital infrastructure that serves human flourishing
+        </p>
       </div>
+    </header>
 
-      <nav class="path-nav">
-        <!-- Overview / Home Link -->
-        <button class="path-item overview-item"
-                [class.selected]="!selectedNode && viewState === 'root'"
-                (click)="goHome()"
-                type="button">
-          <span class="path-icon">📊</span>
-          <span class="path-title">Overview</span>
-        </button>
+    <!-- Featured Path -->
+    @if (featuredPath) {
+      <section class="featured-section">
+        <div class="featured-card">
+          <div class="featured-badge">Featured Journey</div>
 
-        <div class="nav-divider"></div>
+          <h2 class="featured-title">{{ featuredPath.title }}</h2>
+          <p class="featured-description">{{ featuredPath.description }}</p>
 
-        <!-- Dynamic Section Label -->
-        <div class="nav-section-label">
-          <ng-container *ngIf="viewState === 'root'">Epics</ng-container>
-          <ng-container *ngIf="viewState === 'drilldown' && activeDrillDown">
-            {{ activeDrillDown.parent.title }} / {{ activeDrillDown.type }}
-          </ng-container>
-        </div>
-
-        <!-- Back Button for Drilldown -->
-        <button *ngIf="viewState === 'drilldown'"
-                class="path-item back-item"
-                (click)="goUp()"
-                type="button">
-          <span class="path-icon">←</span>
-          <span class="path-title">Back to Epics</span>
-        </button>
-
-        <button *ngFor="let pathNode of sidebarNodes; let i = index"
-                class="path-item"
-                [class.selected]="selectedNode?.id === pathNode.node.id"
-                (click)="selectNode(pathNode.node)"
-                (keydown.enter)="selectNode(pathNode.node)"
-                type="button">
-          <span class="path-icon">{{ getContentTypeIcon(pathNode.node.contentType) }}</span>
-          <span class="path-title">{{ pathNode.node.title }}</span>
-        </button>
-      </nav>
-    </aside>
-
-    <!-- RIGHT CONTENT AREA -->
-    <main class="content-area">
-
-      <!-- UNIFIED TOOLBAR -->
-      <header class="lamad-toolbar">
-        <!-- Left: Navigation Controls -->
-        <div class="toolbar-left">
-          <button class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Toggle Sidebar">
-            ☰
-          </button>
-
-          <!-- Breadcrumbs -->
-          <div class="toolbar-breadcrumbs">
-             <button class="breadcrumb-link" (click)="goHome()">Home</button>
-
-             <ng-container *ngIf="viewState === 'drilldown' && activeDrillDown">
-               <span class="separator">/</span>
-               <button class="breadcrumb-link" (click)="selectNode(activeDrillDown.parent)">{{ activeDrillDown.parent.title }}</button>
-               <span class="separator">/</span>
-               <span class="current-node">{{ activeDrillDown.type }}</span>
-             </ng-container>
-
-             <ng-container *ngIf="selectedNode">
-               <span class="separator">/</span>
-               <span class="current-node">{{ selectedNode.title }}</span>
-             </ng-container>
+          <div class="featured-meta">
+            <span class="meta-item difficulty" [class]="getDifficultyClass(featuredPath.difficulty)">
+              {{ formatDifficulty(featuredPath.difficulty) }}
+            </span>
+            @if (featuredPath.estimatedDuration) {
+              <span class="meta-item duration">{{ featuredPath.estimatedDuration }}</span>
+            }
+            @if (featuredPath.stepCount) {
+              <span class="meta-item steps">{{ featuredPath.stepCount }} steps</span>
+            }
           </div>
-        </div>
 
-        <!-- Right: Actions -->
-        <div class="toolbar-right">
-          <button class="icon-btn search-btn" (click)="toggleSearch()" [class.active]="isSearchOpen" aria-label="Search">
-            🔍
-          </button>
-        </div>
-      </header>
-
-      <!-- SEARCH OVERLAY -->
-      <div class="search-overlay" *ngIf="isSearchOpen">
-         <input type="text" placeholder="Search content..." class="search-input" autofocus>
-         <!-- Search results would go here -->
-      </div>
-
-      <!-- AT-A-GLANCE OVERVIEW (Collapsible Panel) -->
-      <section class="graph-section" [class.expanded]="isGraphExpanded">
-        <div class="graph-content" *ngIf="isGraphExpanded && affinityStats">
-          <div class="affinity-overview">
-            <!-- Learning Path Progress Circle -->
-            <div class="learning-progress-container">
-               <app-affinity-circle
-                 [affinity]="getPathProgress() / 100"
-                 [size]="100">
-               </app-affinity-circle>
-               <span class="progress-label">Mastery</span>
-            </div>
-
-            <!-- Hexagon Grid -->
-            <div class="hexagon-grid">
-              <button *ngFor="let node of allContentNodes"
-                   class="hexagon-chip"
-                   [class]="'affinity-' + node.affinityLevel"
-                   [title]="node.title + ' (' + getAffinityPercentage(node.affinity) + '%)'"
-                   (click)="selectNode(node)"
-                   type="button"
-                   [attr.aria-label]="node.title">
-              </button>
-            </div>
-          </div>
-          
-          <!-- Collapse Button -->
-          <div class="graph-footer">
-            <button class="collapse-btn" (click)="toggleGraph()" aria-label="Close Overview">
-              <span>▲</span> Close Overview
+          <div class="featured-actions">
+            <button class="btn btn-primary btn-large" (click)="startFeaturedPath()">
+              Begin Journey
+            </button>
+            <button class="btn btn-secondary" (click)="goToPath(featuredPath.id)">
+              View Details
             </button>
           </div>
         </div>
       </section>
+    }
 
-      <!-- CENTER: Content Viewer or Home Placeholder -->
-      <section class="content-viewer">
+    <!-- Quick Actions -->
+    <section class="quick-actions">
+      <button class="action-card" (click)="goToDashboard()">
+        <span class="action-icon">📚</span>
+        <span class="action-label">My Learning</span>
+        <span class="action-description">Track your progress</span>
+      </button>
 
-        <!-- Home Placeholder (Root View: Epic Panes) -->
-        <div *ngIf="!selectedNode && viewState === 'root'" class="home-placeholder">
-           <h1 class="home-title">The Elohim Protocol</h1>
-           <p class="home-subtitle">Explore the epics below to begin your journey.</p>
+      <button class="action-card" (click)="goToSearch()">
+        <span class="action-icon">🔍</span>
+        <span class="action-label">Search</span>
+        <span class="action-description">Find specific content</span>
+      </button>
 
-           <div class="epic-grid">
-             <div *ngFor="let item of sidebarNodes" class="epic-card">
-                <button class="epic-card-body" (click)="selectNode(item.node)" type="button">
-                  <div class="epic-card-header">
-                    <div class="epic-icon-container">
-                      <span class="epic-icon">{{ getContentTypeIcon(item.node.contentType) }}</span>
-                    </div>
-                    <h2 class="epic-title">{{ item.node.title }}</h2>
-                  </div>
-                  <p class="epic-desc">{{ item.node.description }}</p>
-                </button>
+      <button class="action-card" (click)="goToExplore()">
+        <span class="action-icon">🗺️</span>
+        <span class="action-label">Explore</span>
+        <span class="action-description">Browse the knowledge graph</span>
+      </button>
+    </section>
 
-                <div class="epic-footer">
-                   <span class="epic-category">{{ getCategoryDisplay(item.category) }}</span>
-                   <div class="hex-badge"
-                        [class]="'affinity-' + item.affinityLevel"
-                        [title]="'Affinity: ' + getAffinityPercentage(item.affinity) + '%'">
-                   </div>
+    <!-- All Paths -->
+    @if (paths.length > 1) {
+      <section class="paths-section">
+        <h2 class="section-title">All Learning Paths</h2>
+
+        <div class="paths-grid">
+          @for (path of paths; track path.id) {
+            <article class="path-card" (click)="goToPath(path.id)">
+              <h3 class="path-title">{{ path.title }}</h3>
+              <p class="path-description">{{ path.description }}</p>
+
+              <div class="path-meta">
+                <span class="meta-item difficulty" [class]="getDifficultyClass(path.difficulty)">
+                  {{ formatDifficulty(path.difficulty) }}
+                </span>
+                @if (path.stepCount) {
+                  <span class="meta-item">{{ path.stepCount }} steps</span>
+                }
+              </div>
+
+              @if (path.tags && path.tags.length > 0) {
+                <div class="path-tags">
+                  @for (tag of path.tags.slice(0, 3); track tag) {
+                    <span class="tag">{{ tag }}</span>
+                  }
                 </div>
-
-                <!-- Drill Down Links -->
-                <div class="epic-drilldown" *ngIf="getRelatedGrouping(item.node).length > 0">
-                   <div class="drilldown-label">Explore:</div>
-                   <div class="drilldown-chips">
-                     <button *ngFor="let group of getRelatedGrouping(item.node)"
-                             class="drilldown-chip"
-                             (click)="drillDown(item.node, group.type)"
-                             type="button">
-                       <span class="drilldown-icon">{{ getContentTypeIcon(group.type) }}</span>
-                       <span class="drilldown-count">{{ group.count }}</span>
-                       <span class="drilldown-type">{{ group.type | titlecase }}</span>
-                     </button>
-                   </div>
-                </div>
-             </div>
-           </div>
+              }
+            </article>
+          }
         </div>
-
-        <!-- Drill-Down View (Filtered List) -->
-        <div *ngIf="!selectedNode && viewState === 'drilldown' && activeDrillDown" class="home-placeholder drilldown-view">
-           <div class="drilldown-header">
-             <button class="back-btn" (click)="goUp()">← Back to Epics</button>
-             <h1 class="home-title">{{ activeDrillDown.parent.title }} <span class="separator">/</span> {{ activeDrillDown.type | titlecase }}</h1>
-             <p class="home-subtitle">Exploring {{ activeDrillDown.nodes.length }} items in {{ activeDrillDown.parent.title }}</p>
-           </div>
-
-           <div class="epic-grid">
-             <button *ngFor="let node of activeDrillDown.nodes"
-                  class="epic-card"
-                  (click)="selectNode(node)"
-                  type="button"
-                  [attr.aria-label]="node.title">
-                <div class="epic-card-body">
-                  <div class="epic-card-header">
-                    <div class="epic-icon-container">
-                      <span class="epic-icon">{{ getContentTypeIcon(node.contentType) }}</span>
-                    </div>
-                    <h2 class="epic-title">{{ node.title }}</h2>
-                  </div>
-                  <p class="epic-desc">{{ node.description }}</p>
-                </div>
-                <div class="epic-footer">
-                   <span class="epic-category">{{ getCategoryDisplay(node.metadata['category'] || 'General') }}</span>
-                   <div class="hex-badge"
-                        [class]="'affinity-' + node.affinityLevel"
-                        [title]="'Affinity: ' + getAffinityPercentage(node.affinity) + '%'">
-                   </div>
-                </div>
-             </button>
-           </div>
-        </div>
-
-        <!-- Selected Content -->
-        <ng-container *ngIf="selectedNode">
-          <!-- Content Header -->
-          <header class="content-header">
-            <div class="content-meta">
-              <span class="content-type-badge">
-                {{ getContentTypeIcon(selectedNode.contentType) }}
-                {{ selectedNode.contentType }}
-              </span>
-              <span class="content-category" *ngIf="selectedNode.metadata?.['category']">
-                {{ selectedNode.metadata['category'] }}
-              </span>
-            </div>
-
-            <h1 class="content-title">{{ selectedNode.title }}</h1>
-
-            <p class="content-description" *ngIf="selectedNode.description">
-              {{ selectedNode.description }}
-            </p>
-          </header>
-
-          <!-- Content Body -->
-          <article class="content-body">
-            <!-- Markdown Content -->
-            <div *ngIf="selectedNode.contentFormat === 'markdown'"
-                 class="markdown-content"
-                 [innerHTML]="renderMarkdown(selectedNode.content)">
-            </div>
-
-            <!-- Gherkin Content -->
-            <div *ngIf="selectedNode.contentFormat === 'gherkin'"
-                 class="gherkin-content"
-                 [innerHTML]="renderGherkin(selectedNode.content)">
-            </div>
-
-            <!-- Plain Text Content -->
-            <div *ngIf="selectedNode.contentFormat === 'plaintext'"
-                 class="plaintext-content">
-              {{ selectedNode.content }}
-            </div>
-          </article>
-
-          <!-- Content Footer: Navigation -->
-          <footer class="content-footer">
-            <button class="nav-btn prev"
-                    (click)="goToPrevious()"
-                    [disabled]="!hasPrevious()">
-              ← Previous
-            </button>
-
-            <div class="footer-info">
-              <span class="node-position">
-                {{ getCurrentPosition() }} of {{ pathNodes.length }}
-              </span>
-            </div>
-
-            <button class="nav-btn next"
-                    (click)="goToNext()"
-                    [disabled]="!hasNext()">
-              Next →
-            </button>
-          </footer>
-        </ng-container>
-
       </section>
+    }
 
-    </main>
-  </div>
+    <!-- Footer -->
+    <footer class="home-footer">
+      <p>
+        Lamad is part of the <strong>Elohim Protocol</strong> - digital infrastructure for human flourishing.
+      </p>
+    </footer>
+  }
 </div>

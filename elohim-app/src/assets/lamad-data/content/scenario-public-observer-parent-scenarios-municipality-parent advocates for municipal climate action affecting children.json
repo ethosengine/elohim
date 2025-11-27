@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent advocates for municipal climate action affecting children",
+  "contentType": "scenario",
+  "title": "Parent advocates for municipal climate action affecting children",
+  "description": "Parent advocates for municipal climate action affecting children",
+  "content": "Scenario: Parent advocates for municipal climate action affecting children\n    Given extreme heat days close schools and cancel outdoor activities\n    And the parent worries about children's future climate impacts\n    When the parent reviews municipal climate adaptation plans\n    Then they see schools lack air conditioning for heat waves\n    And learn city has no strategy for protecting children's health\n    And understand children are most vulnerable to climate impacts\n    And connect with other parents concerned about children's futures\n    And municipal climate policy centers children's wellbeing and safety\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

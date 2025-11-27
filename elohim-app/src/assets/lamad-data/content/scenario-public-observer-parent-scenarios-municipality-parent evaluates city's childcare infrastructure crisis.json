@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent evaluates city's childcare infrastructure crisis",
+  "contentType": "scenario",
+  "title": "Parent evaluates city's childcare infrastructure crisis",
+  "description": "Parent evaluates city's childcare infrastructure crisis",
+  "content": "Scenario: Parent evaluates city's childcare infrastructure crisis\n    Given the parent struggles to find affordable childcare\n    And municipal zoning rules restrict home-based childcare\n    When the parent reviews Observer's childcare access analysis\n    Then they see municipality has 1 childcare slot per 4 children\n    And understand zoning restrictions reduce supply\n    And learn neighboring cities changed zoning to expand access\n    And discover other parents facing same childcare crisis\n    And parent advocacy targets municipal policy barriers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

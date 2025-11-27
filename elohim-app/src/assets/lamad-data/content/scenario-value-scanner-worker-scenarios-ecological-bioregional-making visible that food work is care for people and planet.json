@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-making visible that food work is care for people and planet",
+  "contentType": "scenario",
+  "title": "Making visible that food work is care for people and planet",
+  "description": "Making visible that food work is care for people and planet",
+  "content": "Scenario: Making visible that food work is care for people and planet\n    Given all food work serves human nourishment and ecological cycles\n    And food workers are caring for people and participating in bioregional systems\n    When the broader culture treats food work as low-value service\n    Then the protocol should make visible that food work is essential care labor\n    And reframe food service as care work for human and ecological flourishing\n    And advocate that food workers deserve dignity, fair compensation, and care-aligned conditions\n    And build consciousness that care economy includes ecological care and all food work serves life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

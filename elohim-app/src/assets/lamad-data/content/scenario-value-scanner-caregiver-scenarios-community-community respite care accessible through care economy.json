@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community respite care accessible through care economy",
+  "contentType": "scenario",
+  "title": "Community respite care accessible through care economy",
+  "description": "Community respite care accessible through care economy",
+  "content": "Scenario: Community respite care accessible through care economy\n    Given James needs regular respite to prevent burnout\n    And formal respite care costs $20-30/hour he cannot afford\n    When James accesses community respite resources\n    Then his care token accumulation should subsidize respite costs\n    And community should provide respite care at accessible rates\n    And respite should be professional-quality and reliable\n    And care economy should ensure caregivers get necessary breaks\n    And community should invest in caregiver sustainability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

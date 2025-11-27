@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-recognition of substantial care labor as economically valuable",
+  "contentType": "scenario",
+  "title": "Recognition of substantial care labor as economically valuable",
+  "description": "Recognition of substantial care labor as economically valuable",
+  "content": "Scenario: Recognition of substantial care labor as economically valuable\n    Given Marcus performs household management work\n    And similar work by adults would be compensated\n    When Marcus completes weekly shopping and meal planning\n    Then his care contributions should be valued at realistic economic rates\n    And care tokens should reflect genuine value of his work\n    And the system should make explicit that his labor is valuable\n    And recognition should communicate that he's doing skilled work\n    And his contributions should qualify family for community resources\n    And his stewardship should be evidence of capability, not exploitation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

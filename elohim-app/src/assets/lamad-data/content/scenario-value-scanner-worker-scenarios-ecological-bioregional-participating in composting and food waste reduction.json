@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in composting and food waste reduction",
+  "contentType": "scenario",
+  "title": "Participating in composting and food waste reduction",
+  "description": "Participating in composting and food waste reduction",
+  "content": "Scenario: Participating in composting and food waste reduction\n    Given restaurants generate significant compostable waste\n    And composting returns nutrients to soil and supports local ecology\n    When I want to participate in composting initiatives\n    Then the protocol should connect me to composting programs\n    And recognize participation in waste reduction as care work\n    And support workplace implementation of composting\n    And contribute to bioregional nutrient cycling and soil health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

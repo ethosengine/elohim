@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer receives honest job creation analysis",
+  "contentType": "scenario",
+  "title": "Developer receives honest job creation analysis",
+  "description": "Developer receives honest job creation analysis",
+  "content": "Scenario: Developer receives honest job creation analysis\n    Given a developer claims project will \"create 200 jobs\"\n    And uses job creation to justify public subsidies\n    When the Observer provides independent employment impact analysis\n    Then the developer sees: 180 jobs are temporary construction jobs\n    And only 20 are permanent positions\n    And median permanent job wage is $15/hour in area with $22/hour living wage\n    And honest accounting distinguishes temporary versus permanent employment\n    And job quality matters as much as job quantity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,activist,community_organizer,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

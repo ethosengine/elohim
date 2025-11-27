@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-community-neighborhood council member understands displacement pressures in community",
+  "contentType": "scenario",
+  "title": "Neighborhood council member understands displacement pressures in community",
+  "description": "Neighborhood council member understands displacement pressures in community",
+  "content": "Scenario: Neighborhood council member understands displacement pressures in community\n    Given neighborhood experiencing rapid housing cost increases\n    And longtime residents express concerns about ability to stay\n    And council wants to understand scope of displacement threat\n    When the council member uses Observer community impact analysis\n    Then they receive data on rent increases and eviction rates over time\n    And see demographic changes showing displacement patterns\n    And access analysis of displacement risk for different household types\n    And discover specific buildings and blocks with highest vulnerability\n    And hyperlocal data informs advocacy for tenant protections and affordable housing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,community_organizer,politician",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

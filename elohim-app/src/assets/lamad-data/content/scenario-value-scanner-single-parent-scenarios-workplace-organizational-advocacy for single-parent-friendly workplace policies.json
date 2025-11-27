@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-advocacy for single-parent-friendly workplace policies",
+  "contentType": "scenario",
+  "title": "Advocacy for single-parent-friendly workplace policies",
+  "description": "Advocacy for single-parent-friendly workplace policies",
+  "content": "Scenario: Advocacy for single-parent-friendly workplace policies\n    Given Maria and single parent colleagues face systemic workplace barriers\n    And employers may not understand scale of single parent challenges\n    When Maria advocates for policy improvements\n    Then the workplace_elohim should provide care economy data on single parents\n    And advocacy should be strengthened by quantified evidence of work-care conflicts\n    And Maria should be able to advocate collectively with other single parent workers\n    And care economy data should support policy changes like flexible scheduling and adequate leave\n    And workplace should adopt single-parent-friendly policies based on demonstrated needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

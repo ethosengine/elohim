@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children repair, reuse, and circular economy",
+  "contentType": "scenario",
+  "title": "Teaching children repair, reuse, and circular economy",
+  "description": "Teaching children repair, reuse, and circular economy",
+  "content": "Scenario: Teaching children repair, reuse, and circular economy\n    Given children learn consumption patterns from parents\n    And Sarah wants to teach alternatives to disposable culture\n    When Sarah teaches Tommy and Emma to repair and reuse\n    Then the educational_elohim should recognize anti-consumerist education\n    And teaching circular economy practices should accumulate care tokens\n    And Sarah's work to counter disposable culture should be valued\n    And the system should recognize teaching sustainable practices\n    And next generation should learn to value durability and repair\n    And Sarah's cultural transmission work should be recognized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

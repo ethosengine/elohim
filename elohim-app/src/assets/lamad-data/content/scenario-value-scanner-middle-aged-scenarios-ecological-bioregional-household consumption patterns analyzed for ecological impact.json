@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-household consumption patterns analyzed for ecological impact",
+  "contentType": "scenario",
+  "title": "Household consumption patterns analyzed for ecological impact",
+  "description": "Household consumption patterns analyzed for ecological impact",
+  "content": "Scenario: Household consumption patterns analyzed for ecological impact\n    Given Robert's household consumes resources and generates waste\n    And consumption choices affect ecological systems\n    And middle-aged adults often have highest consumption footprint\n    When bioregional_elohim analyzes household ecological impact\n    Then it should track resource consumption, energy use, and waste generation\n    And surface patterns: \"Your household consumes 40% above bioregional sustainable average\"\n    And help Robert understand ecological impact of consumption choices\n    And connect consumption to bioregional carrying capacity\n    And support reduction strategies that maintain quality of life\n    And demonstrate that care economy includes ecological care\n    And build household practices that serve bioregional health\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

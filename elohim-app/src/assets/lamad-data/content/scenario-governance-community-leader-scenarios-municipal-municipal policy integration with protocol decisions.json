@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipal-municipal policy integration with protocol decisions",
+  "contentType": "scenario",
+  "title": "Municipal policy integration with protocol decisions",
+  "description": "Municipal policy integration with protocol decisions",
+  "content": "Scenario: Municipal policy integration with protocol decisions\n    Given city council passes new housing affordability ordinance\n    And Municipal Elohim flags potential conflict with property protocols\n    When conflict is identified\n    Then Constitutional Council reviews constitutional alignment\n    And council determines whether ordinance or protocol needs adjustment\n    And Jamal facilitates resolution through democratic deliberation\n    And city retains policy sovereignty within constitutional bounds\n    And agents and elected government work as partners\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipal",
+    "related_users:constitutional_council_member,policy_maker",
+    "related_layers:community,provincial_state",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipal.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipal",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipal",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

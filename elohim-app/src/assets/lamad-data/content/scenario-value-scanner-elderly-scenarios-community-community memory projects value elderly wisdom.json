@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-community memory projects value elderly wisdom",
+  "contentType": "scenario",
+  "title": "Community memory projects value elderly wisdom",
+  "description": "Community memory projects value elderly wisdom",
+  "content": "Scenario: Community memory projects value elderly wisdom\n    Given Helen holds decades of lived experience\n    And community memory has cultural value\n    When community memory projects are organized\n    Then Helen should be invited to participate as valued contributor\n    And her stories should be captured for community archive\n    And her participation should be recognized as contribution\n    And care tokens should reflect her memory-keeping work\n    And the community_elohim should facilitate intergenerational knowledge transfer\n    And the protocol should make visible that elders contribute to collective knowledge\n    And community should benefit from elder wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

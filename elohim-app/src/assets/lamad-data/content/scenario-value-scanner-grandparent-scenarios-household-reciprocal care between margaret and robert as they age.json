@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-reciprocal care between margaret and robert as they age",
+  "contentType": "scenario",
+  "title": "Reciprocal care between Margaret and Robert as they age",
+  "description": "Reciprocal care between Margaret and Robert as they age",
+  "content": "Scenario: Reciprocal care between Margaret and Robert as they age\n    Given Margaret and Robert are both aging\n    And they will increasingly need to care for each other\n    When the household_elohim tracks household care patterns\n    Then it should recognize reciprocal care between partners\n    And it should show how they support each other's well-being\n    And it should value care they provide to each other\n    And household care economy should include partner care\n    And both should accumulate care tokens for caring for each other\n    And the system should support their aging together with dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-community-activist prevents infiltration attempt",
+  "contentType": "scenario",
+  "title": "Activist prevents infiltration attempt",
+  "description": "Activist prevents infiltration attempt",
+  "content": "Scenario: Activist prevents infiltration attempt\n    Given the housing justice space has 50 active community members\n    When a new member joins and immediately tries to promote violent tactics\n    And they create multiple inflammatory contributions\n    Then the earned reach system prevents wide distribution\n    And the community_moderator is alerted to potential infiltration\n    And existing members see community trust analysis\n    And the space can collectively decide on appropriate response\n    And the protection agent documents the incident for pattern recognition\n    And organizing continues safely without disruption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_moderator,content_creator,elder,child",
+    "related_layers:individual,neighborhood,district",
+    "elohim_agents:moderation_agent,coordination_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

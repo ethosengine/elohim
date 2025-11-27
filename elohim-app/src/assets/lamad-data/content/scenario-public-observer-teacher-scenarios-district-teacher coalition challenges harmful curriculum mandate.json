@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher coalition challenges harmful curriculum mandate",
+  "contentType": "scenario",
+  "title": "Teacher coalition challenges harmful curriculum mandate",
+  "description": "Teacher coalition challenges harmful curriculum mandate",
+  "content": "Scenario: Teacher coalition challenges harmful curriculum mandate\n    Given district mandates scripted curriculum contradicting best practices\n    And individual teacher objections are dismissed as \"resistance\"\n    When 180 teachers coordinate through Observer platform\n    Then collective professional voice becomes undeniable\n    And teachers present research on curriculum approach\n    And document student engagement declining since mandate\n    And propose evidence-based alternative approaches\n    And collective expertise creates pressure for policy reconsideration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

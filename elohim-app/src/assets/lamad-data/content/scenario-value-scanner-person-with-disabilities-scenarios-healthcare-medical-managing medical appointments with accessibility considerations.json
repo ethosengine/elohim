@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-managing medical appointments with accessibility considerations",
+  "contentType": "scenario",
+  "title": "Managing medical appointments with accessibility considerations",
+  "description": "Managing medical appointments with accessibility considerations",
+  "content": "Scenario: Managing medical appointments with accessibility considerations\n    Given medical facilities are often inaccessible\n    And appointment logistics are complex with disability\n    When Alex schedules medical appointments\n    Then the personal_agent should help verify facility accessibility\n    And it should coordinate transportation and support services\n    And it should prepare accessibility information for providers in advance\n    And it should track appointment schedules across multiple providers\n    And logistics coordination should reduce Alex's burden\n    And the protocol should make medical access less stressful\n    And barriers should be identified and addressed proactively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -2,12 +2,20 @@
 
 **Lamad** (לָמַד - Hebrew: "to learn/teach") is the path-centric learning infrastructure for the Elohim Protocol.
 
-## ⚠️ Definitive Specification
+## Document Hierarchy
 
-**The Source of Truth for this module is:**  
-[**`LAMAD_API_SPECIFICATION_v1.0.md`**](./LAMAD_API_SPECIFICATION_v1.0.md)
+### Source of Truth
+1. [**`LAMAD_API_SPECIFICATION_v1.0.md`**](./LAMAD_API_SPECIFICATION_v1.0.md) - Authoritative interface contract
+2. [**`IMPLEMENTATION_PLAN.md`**](./IMPLEMENTATION_PLAN.md) - Detailed implementation guide
 
-All development, refactoring, and architectural decisions must align with this document.
+### Agentic Guidance (for AI Agents)
+- [`claude.md`](./claude.md) - Architecture overview & coordination
+- [`models/claude.md`](./models/claude.md) - Data model implementation TODOs
+- [`services/claude.md`](./services/claude.md) - Service layer implementation TODOs
+- [`components/claude.md`](./components/claude.md) - UI component implementation TODOs
+- [`renderers/claude.md`](./renderers/claude.md) - Rendering system implementation TODOs
+
+All development, refactoring, and architectural decisions must align with these documents.
 
 ## Core Philosophy
 

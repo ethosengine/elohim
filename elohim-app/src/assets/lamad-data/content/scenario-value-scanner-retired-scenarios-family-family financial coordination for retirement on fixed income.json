@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-family financial coordination for retirement on fixed income",
+  "contentType": "scenario",
+  "title": "Family financial coordination for retirement on fixed income",
+  "description": "Family financial coordination for retirement on fixed income",
+  "content": "Scenario: Family financial coordination for retirement on fixed income\n    Given Frank lives on fixed income of $28k/year\n    And he occasionally provides financial support to adult children\n    And he's managing his mother-in-law's care costs\n    When family_elohim coordinates financial flows\n    Then it should track Frank's financial contributions to family\n    And surface when financial support compromises his own security\n    And help family understand his economic constraints\n    And facilitate honest conversations about financial capacity\n    And protect Frank from unsustainable financial requests\n    And ensure his fixed income sustains his own household first\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

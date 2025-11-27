@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-ecological-journalist tracks climate commitments to accountability",
+  "contentType": "scenario",
+  "title": "Journalist tracks climate commitments to accountability",
+  "description": "Journalist tracks climate commitments to accountability",
+  "content": "Scenario: Journalist tracks climate commitments to accountability\n    Given city and state announced climate action plans\n    And the journalist covered initial announcements\n    When the Observer monitors climate policy implementation\n    Then the journalist finds emissions reduction targets are not being met\n    And sees policies that would reduce emissions remain unimplemented\n    And identifies budget cuts to climate programs despite commitments\n    And documents gap between climate rhetoric and action\n    And publishes accountability story on broken climate promises\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:ecological",
+    "related_users:activist,citizen,scientist,politician",
+    "related_layers:municipality,county_regional,provincial_state,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

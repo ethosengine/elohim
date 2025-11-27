@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-family-teen participates in family financial planning",
+  "contentType": "scenario",
+  "title": "Teen participates in family financial planning",
+  "description": "Teen participates in family financial planning",
+  "content": "Scenario: Teen participates in family financial planning\n    Given the family is planning for the coming year\n    And Jasmine has savings goals for college\n    And she contributes to household income through her part-time work\n    When the family_elohim facilitates financial planning\n    Then Jasmine should be included in the planning process\n    And her goals should be incorporated into family financial strategy\n    And she should learn how families make long-term financial decisions\n    And her contributions (both household labor and income) should be factored into planning\n    And she should practice the financial planning skills she'll need as an adult\n    And the family should model transparent, participatory financial governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:family",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

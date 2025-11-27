@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician understands education outcome patterns across demographics",
+  "contentType": "scenario",
+  "title": "Politician understands education outcome patterns across demographics",
+  "description": "Politician understands education outcome patterns across demographics",
+  "content": "Scenario: Politician understands education outcome patterns across demographics\n    Given the politician governs education policy at state or district level\n    And achievement gaps persist across racial and economic lines\n    When the Observer analyzes outcome patterns systemically\n    Then they see which student populations are underserved\n    And identify specific schools with equitable outcomes despite demographics\n    And learn what successful schools do differently\n    And understand resource and practice patterns that drive equity\n    And champion evidence-based policies for all students\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-supporting learning through curiosity and wonder preservation",
+  "contentType": "scenario",
+  "title": "Supporting learning through curiosity and wonder preservation",
+  "description": "Supporting learning through curiosity and wonder preservation",
+  "content": "Scenario: Supporting learning through curiosity and wonder preservation\n    Given Tommy is 5 and full of questions and wonder\n    And Margaret nurtures his curiosity through patient engagement\n    When the educational_elohim tracks wonder cultivation\n    Then it should recognize wonder preservation as sophisticated teaching\n    And it should value Margaret's role in maintaining curiosity\n    And it should track learning through exploration and questioning\n    And curiosity cultivation should accumulate care tokens\n    And Margaret's patient teaching should be recognized as developmental expertise\n    And wonder-based learning should be valued as essential education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

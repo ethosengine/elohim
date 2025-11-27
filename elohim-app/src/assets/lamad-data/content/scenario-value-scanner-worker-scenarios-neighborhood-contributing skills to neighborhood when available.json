@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-contributing skills to neighborhood when available",
+  "contentType": "scenario",
+  "title": "Contributing skills to neighborhood when available",
+  "description": "Contributing skills to neighborhood when available",
+  "content": "Scenario: Contributing skills to neighborhood when available\n    Given I have food preparation skills from my restaurant work\n    And neighbors might benefit from these skills\n    When I have rare free time\n    Then the protocol should help me share skills with neighborhood\n    And coordinate skill-sharing or teaching opportunities\n    And accumulate care tokens for skill contribution\n    And build neighborhood capacity through skill distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

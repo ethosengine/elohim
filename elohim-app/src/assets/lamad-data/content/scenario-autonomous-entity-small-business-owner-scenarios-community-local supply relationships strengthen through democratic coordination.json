@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-local supply relationships strengthen through democratic coordination",
+  "contentType": "scenario",
+  "title": "Local supply relationships strengthen through democratic coordination",
+  "description": "Local supply relationships strengthen through democratic coordination",
+  "content": "Scenario: Local supply relationships strengthen through democratic coordination\n    Given Rosa bought some supplies from neighborhood vendors\n    And democratic network can deepen local sourcing commitments\n    When workplace and community governance prioritize local procurement\n    Then auto shop sources more supplies from neighborhood businesses\n    And EAE network coordination provides volume purchasing to local vendors\n    And supplier relationships become mutual support, not just transactions\n    And supply chain transparency shows community members how money circulates locally\n    And community_elohim coordinates supply chain for maximum local benefit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

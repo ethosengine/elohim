@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-managing competing demands on personal resources",
+  "contentType": "scenario",
+  "title": "Managing competing demands on personal resources",
+  "description": "Managing competing demands on personal resources",
+  "content": "Scenario: Managing competing demands on personal resources\n    Given Aisha has limited time and energy\n    And she must balance work, self-care, and family obligations\n    When Aisha plans her week in the Value Scanner\n    Then the personal_agent should help her allocate care capacity\n    And it should flag when she's over-committed\n    And it should recognize self-care as legitimate care work\n    And recommendations should support sustainable work-life balance\n    And the system should help her set healthy boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

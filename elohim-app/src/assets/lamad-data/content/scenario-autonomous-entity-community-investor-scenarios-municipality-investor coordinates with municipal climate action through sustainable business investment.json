@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-investor coordinates with municipal climate action through sustainable business investment",
+  "contentType": "scenario",
+  "title": "Investor coordinates with municipal climate action through sustainable business investment",
+  "description": "Investor coordinates with municipal climate action through sustainable business investment",
+  "content": "Scenario: Investor coordinates with municipal climate action through sustainable business investment\n    Given municipal climate action requires reducing emissions and building resilience\n    And Patricia's investments support sustainable democratic businesses\n    When community investment aligns with municipal climate goals\n    Then democratic businesses achieve climate targets (local sourcing, renewable energy, waste reduction)\n    And community investment supports climate-positive enterprises\n    And municipal climate funding can support democratic business conversions\n    And climate action and economic democracy align through coordinated investment\n    And municipality_elohim coordinates climate-aligned democratic business investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}
