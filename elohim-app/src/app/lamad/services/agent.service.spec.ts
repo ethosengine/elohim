@@ -281,6 +281,10 @@ describe('AgentService', () => {
   });
 
   describe('updateAffinity', () => {
+    beforeEach(() => {
+      service.clearProgressCache();
+    });
+
     it('should update affinity for a step', (done) => {
       service.updateAffinity('test-path', 1, 0.3).subscribe(() => {
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
