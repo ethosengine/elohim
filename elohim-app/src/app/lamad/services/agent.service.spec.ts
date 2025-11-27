@@ -285,7 +285,11 @@ describe('AgentService', () => {
       service.clearProgressCache();
       dataLoaderSpy.getAgentProgress.calls.reset();
       dataLoaderSpy.saveAgentProgress.calls.reset();
-      dataLoaderSpy.getAgentProgress.and.returnValue(of(mockProgress));
+      // Return a fresh copy of mockProgress to avoid mutation between tests
+      dataLoaderSpy.getAgentProgress.and.returnValue(of({
+        ...mockProgress,
+        stepAffinity: {}
+      }));
     });
 
     it('should update affinity for a step', (done) => {
