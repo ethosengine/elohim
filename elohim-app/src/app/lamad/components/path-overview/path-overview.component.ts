@@ -105,8 +105,8 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   isCompleted(): boolean {
     if (!this.path || !this.progress) return false;
     const requiredSteps = this.path.steps.filter(s => !s.optional);
-    return requiredSteps.every((_, i) =>
-      this.progress!.completedStepIndices.includes(i)
+    return requiredSteps.every(step =>
+      this.progress!.completedStepIndices.includes(step.order)
     );
   }
 

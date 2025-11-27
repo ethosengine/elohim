@@ -17,6 +17,9 @@
  * and can expand to 'commons' through steward approval, community endorsement,
  * or governance ratification. See content-attestation.model.ts for details.
  */
+
+import type { GeographicContext, Place } from './place.model';
+
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
   id: string;
