@@ -32,10 +32,6 @@ describe('SessionUserService', () => {
       return keys[index] || null;
     });
 
-    Object.defineProperty(localStorage, 'length', {
-      get: () => Object.keys(localStorageMock).length,
-    });
-
     TestBed.configureTestingModule({});
     service = TestBed.inject(SessionUserService);
   });

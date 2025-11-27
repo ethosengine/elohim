@@ -330,7 +330,7 @@ describe('PathOverviewComponent', () => {
   it('should get step status class for accessible step', () => {
     fixture.detectChanges();
 
-    // Step 1 is completed, so let's modify progress to make it accessible but not completed
+    // Step 2 is accessible (not current, not completed, but available)
     component.progress = {
       agentId: 'test-agent',
       pathId: 'test-path',
@@ -344,7 +344,7 @@ describe('PathOverviewComponent', () => {
       attestationsEarned: []
     };
 
-    expect(component.getStepStatusClass(1)).toBe('accessible');
+    expect(component.getStepStatusClass(2)).toBe('accessible');
   });
 
   it('should cleanup on destroy', () => {

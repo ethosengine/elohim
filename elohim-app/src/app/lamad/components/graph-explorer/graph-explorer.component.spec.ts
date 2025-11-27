@@ -112,7 +112,7 @@ describe('GraphExplorerComponent', () => {
   it('should load epic detail', () => {
     component.loadEpicDetail('learning-platform-epic', 'Learning Platform');
 
-    const req = httpMock.expectOne('/assets/lamad-data/graph/epic-learning_platform_epic.json');
+    const req = httpMock.expectOne('/assets/lamad-data/graph/epic-learning_platform.json');
     expect(req.request.method).toBe('GET');
 
     const epicData = {
@@ -131,7 +131,7 @@ describe('GraphExplorerComponent', () => {
   it('should handle epic detail load error', () => {
     component.loadEpicDetail('test-epic', 'Test Epic');
 
-    const req = httpMock.expectOne('/assets/lamad-data/graph/epic-test_epic.json');
+    const req = httpMock.expectOne('/assets/lamad-data/graph/epic-test.json');
     req.error(new ProgressEvent('error'));
 
     expect(component.isLoading).toBe(false);
