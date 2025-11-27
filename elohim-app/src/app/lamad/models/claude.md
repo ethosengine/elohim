@@ -2,7 +2,30 @@
 
 *Data models for the Lamad learning platform. All models are complete and stable.*
 
-**Last updated:** 2025-11-27
+**Last updated:** 2025-11-27 (Phase 21: Cohesion Review)
+
+## Technical Conventions
+
+### Date Fields
+All timestamp fields use **ISO 8601 string format** (not Date objects):
+```typescript
+createdAt: string;  // "2025-11-27T14:30:00Z" - CORRECT
+createdAt: Date;    // Do not use - breaks JSON serialization
+```
+
+### Attestation Model Distinction
+Three distinct attestation models - do NOT confuse:
+
+| Model | File | Purpose |
+|-------|------|---------|
+| **Agent Attestations** | `attestations.model.ts` | Credentials earned BY humans |
+| **Content Attestations** | `content-attestation.model.ts` | Trust granted TO content |
+| **Content Access** | `content-access.model.ts` | Access tier requirements |
+
+- `AttestationAccessRequirement` (attestations.model.ts): What attestations unlock
+- `ContentAccessRequirement` (content-access.model.ts): What access level required
+
+---
 
 ## Model Architecture
 
@@ -23,7 +46,7 @@ Six-Layer Model:
 │
 ├── Discovery & Trust
 │   ├── exploration.model.ts       # Graph traversal queries
-│   ├── knowledge-map.model.ts     # Polymorphic maps
+│   ├── knowledge-map.model.ts     # Four-dimensional maps (domain, self, person, collective)
 │   ├── trust-badge.model.ts       # UI-ready trust indicators
 │   ├── search.model.ts            # Search with scoring/facets
 │   └── elohim-agent.model.ts      # Constitutional AI agents
@@ -35,10 +58,15 @@ Six-Layer Model:
 ├── Profile (Imago Dei)
 │   └── profile.model.ts           # HumanProfile, JourneyStats, TimelineEvent
 │
-└── REA Economic Coordination (hREA/Unyt)
-    ├── rea-bridge.model.ts            # ValueFlows ontology (Agent, Resource, Event, Process)
-    ├── contributor-presence.model.ts  # Stewardship lifecycle for absent contributors
-    └── economic-event.model.ts        # Immutable value flow audit trail
+├── REA Economic Coordination (hREA/Unyt)
+│   ├── rea-bridge.model.ts            # ValueFlows ontology (Agent, Resource, Event, Process)
+│   ├── contributor-presence.model.ts  # Stewardship lifecycle for absent contributors
+│   └── economic-event.model.ts        # Immutable value flow audit trail
+│
+└── Governance (Constitutional Moderation)
+    ├── governance-feedback.model.ts   # Challenges, appeals, precedent, SLA
+    ├── governance-deliberation.model.ts # Loomio/Polis/Wikipedia-inspired deliberation
+    └── feedback-profile.model.ts      # Virality as privilege, emotional reactions
 ```
 
 ---
@@ -55,7 +83,7 @@ Six-Layer Model:
 | `attestations.model.ts` | ✅ Complete | Agent attestation system |
 | `user-affinity.model.ts` | ✅ Complete | UserAffinity tracking |
 | `exploration.model.ts` | ✅ Complete | ExplorationQuery, ExplorationResult |
-| `knowledge-map.model.ts` | ✅ Complete | Polymorphic maps (domain, person, collective) |
+| `knowledge-map.model.ts` | ✅ Complete | Four-dimensional maps (domain, self, person, collective) |
 | `trust-badge.model.ts` | ✅ Complete | TrustBadge, TrustIndicator, unified display |
 | `search.model.ts` | ✅ Complete | SearchQuery, SearchResult, SearchFacets |
 | `elohim-agent.model.ts` | ✅ Complete | Constitutional AI guardian models |
@@ -65,6 +93,9 @@ Six-Layer Model:
 | `rea-bridge.model.ts` | ✅ Complete | ValueFlows ontology: REAAgent, EconomicResource, Process, Commitment |
 | `contributor-presence.model.ts` | ✅ Complete | ContributorPresence, PresenceStewardship, recognition accumulation |
 | `economic-event.model.ts` | ✅ Complete | EconomicEvent, LamadEventType, event streams |
+| `governance-feedback.model.ts` | ✅ Complete | Challenges, appeals, precedent, SLA guarantees |
+| `governance-deliberation.model.ts` | ✅ Complete | Loomio/Polis/Wikipedia-inspired deliberation |
+| `feedback-profile.model.ts` | ✅ Complete | Virality as privilege, emotional reactions |
 | `index.ts` | ✅ Complete | Barrel exports for all models |
 
 ---
@@ -219,6 +250,33 @@ interface TimelineEvent {
 }
 ```
 
+### SelfKnowledgeMap (Know Thyself)
+```typescript
+// The most intimate map: knowledge of oneself
+interface SelfKnowledgeMap extends KnowledgeMap {
+  mapType: 'self';
+  subject: {
+    type: 'agent';
+    subjectId: string;  // Same as ownerId - maps self
+    subjectName: string;
+  };
+
+  imagoDeiDimensions: ImagoDeiDimension[];  // core, experience, gifts, synthesis
+  valuesHierarchy: PersonalValue[];          // Priority-ranked values
+  lifeChapters: LifeChapter[];               // Narrative life structure
+  discoveredGifts: DiscoveredGift[];         // Strengths uncovered
+  shadowAreas: ShadowArea[];                 // Growth areas, blind spots
+  vocation?: VocationalClarity;              // Calling, purpose
+  domainReflections: DomainReflection[];     // How learning reveals self
+}
+
+// Types supporting self-knowledge
+type GiftCategory = 'intellectual' | 'relational' | 'practical' | 'artistic' | 'spiritual' | 'physical';
+type InsightSource = 'reflection' | 'learning-path' | 'relationship' | 'trial' | 'celebration' | 'feedback' | 'spiritual';
+```
+
+Theological grounding: "Love your neighbor as yourself" (Mark 12:31) implies three loves: God, neighbor, and self. Self-knowledge is prerequisite to loving others well.
+
 ### ContributorPresence (REA Stewardship)
 ```typescript
 // Lifecycle: unclaimed → stewarded → claimed
@@ -284,6 +342,56 @@ type ResourceClassification =
   | 'currency';    // Mutual credit (Unyt)
 ```
 
+### GovernanceState (Constitutional Moderation)
+```typescript
+interface GovernanceState {
+  entityId: string;
+  entityType: GovernableEntityType;  // content, path, human, elohim, etc.
+  status: GovernanceStatus;
+  labels: GovernanceLabel[];
+  reviewHistory: ReviewRecord[];
+  challenges: Challenge[];
+  appealHistory: Appeal[];
+}
+
+// Every decision can be challenged - constitutional right
+interface Challenge {
+  id: string;
+  challengerId: string;
+  grounds: ChallengeGrounds;  // factual-error, bias, inconsistency, etc.
+  state: ChallengeState;
+  slaDeadline: string;  // MUST respond within SLA
+}
+```
+
+### FeedbackProfile (Virality as Privilege)
+```typescript
+// Core insight: "Virality is a privilege, not an entitlement"
+// NO "LIKES" - replaced with approval voting
+
+interface FeedbackProfile {
+  id: string;
+  permittedMechanisms: FeedbackMechanism[];
+  emotionalConstraints?: EmotionalReactionConstraints;
+  currentLevel: FeedbackProfileLevel;
+  profileEvolution: ProfileEvolution[];  // Can upgrade AND downgrade
+}
+
+type FeedbackMechanism =
+  | 'approval-vote'         // Up/down (replaces "like")
+  | 'emotional-reaction'    // "I feel ___ about this"
+  | 'graduated-usefulness'  // Loomio-style scales
+  | 'discussion-only'       // No amplification
+  | 'view-only';            // No engagement permitted
+
+// Emotional reactions - guards against "tyranny of the laughing emoji"
+type EmotionalReactionType =
+  // Supportive (safe for personal content)
+  | 'moved' | 'grateful' | 'inspired' | 'hopeful' | 'grieving'
+  // Critical (require accountability)
+  | 'challenged' | 'concerned' | 'uncomfortable';
+```
+
 ---
 
 ## Import Pattern
@@ -317,7 +425,30 @@ import {
   ContributorPresence, PresenceState, AccumulatedRecognition,
   PresenceStewardship, PresenceInvitation,
   EconomicEvent, LamadEventType, EventQuery,
-  createEventFromRequest
+  createEventFromRequest,
+
+  // Relational Maps (Four Dimensions)
+  KnowledgeMapType,  // 'domain' | 'self' | 'person' | 'collective'
+  SelfKnowledgeMap, ImagoDeiDimension, PersonalValue, LifeChapter,
+  DiscoveredGift, ShadowArea, VocationalClarity, DomainReflection,
+  PersonKnowledgeMap, RelationshipType, SubjectConsent,
+  DomainKnowledgeMap, CollectiveKnowledgeMap,
+
+  // Governance (Constitutional Moderation)
+  GovernanceState, GovernanceStatus, GovernableEntityType,
+  Challenge, ChallengeGrounds, ChallengeState,
+  Appeal, AppealDecision, Precedent,
+  GovernanceSLA, GovernanceFeedbackMetrics,
+
+  // Governance Deliberation
+  DeliberationProposal, ProposalType, ProposalPhase,
+  GraduatedFeedbackSelector, FeedbackContext, FeedbackOption,
+  SensemakingVisualization, OpinionCluster, BridgingOpportunity,
+
+  // Feedback Profile
+  FeedbackProfile, FeedbackMechanism, FeedbackProfileLevel,
+  EmotionalReactionType, EmotionalReactionConstraints,
+  MediatedReaction, UserMediationPattern
 } from '../models';
 ```
 
@@ -329,10 +460,12 @@ import {
 
 ### Terminology
 - Use "human" not "user" in all new code
+- Use "contributor" not "creator" for content authors
 - Use "journey" not "consumption"
 - Use "meaningful encounters" not "views"
 - Use "presence" for external contributors not yet in the network
 - Use "recognition" not "reward" for value flows
+- Use "self-knowledge" for reflexive mapping (know thyself)
 
 ### Do NOT:
 - Add new model files without explicit instruction

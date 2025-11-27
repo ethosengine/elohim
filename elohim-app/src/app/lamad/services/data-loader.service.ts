@@ -461,7 +461,7 @@ export class DataLoaderService {
       metadata: {
         nodeCount: 0,
         relationshipCount: 0,
-        lastUpdated: new Date(),
+        lastUpdated: new Date().toISOString(),
         version: '1.0.0'
       }
     };

@@ -27,7 +27,7 @@ lamad/
 
 ### MVP Status (as of 2025-11-27)
 
-**The MVP service layer is feature-complete. REA economic interface contracts established.** All 15 phases implemented, 13 services active.
+**The MVP service layer is feature-complete. REA economic interface contracts established. Four-dimensional relational map architecture complete. Governance deliberation and feedback profile systems defined.** All 21 phases implemented, 14 services active.
 
 **Active Services:**
 | Service | Purpose |
@@ -38,13 +38,14 @@ lamad/
 | AgentService | Agent profiles and attestations |
 | AffinityTrackingService | Engagement tracking (session-integrated) |
 | ExplorationService | Graph traversal, pathfinding, rate limiting |
-| KnowledgeMapService | Polymorphic maps, synthesis |
+| KnowledgeMapService | Four-dimensional maps (domain, self, person, collective) |
 | PathExtensionService | Learner-owned path mutations |
 | TrustBadgeService | UI-ready trust badge computation |
 | SearchService | Enhanced search with scoring and facets |
 | SessionUserService | Temporary session identity for MVP |
 | ProfileService | Human-centered profile (Imago Dei aligned) |
 | ElohimAgentService | Autonomous constitutional guardians |
+| GovernanceService | Constitutional moderation, deliberation, feedback |
 
 **Active Components:**
 - LamadHome (path-centric with tabs)
@@ -59,7 +60,7 @@ lamad/
 
 ---
 
-## The Five-Layer Architecture
+## The Six-Layer Architecture
 
 ### Layer 1: Territory (Content Nodes)
 The immutable knowledge graph. Content exists independently of how it's navigated.
@@ -199,6 +200,40 @@ type LamadEventType =
   | 'recognition-transfer'; // Recognition transferred on claim
 ```
 
+### Layer 6: Governance (Constitutional Moderation)
+The protocol's immune system - deliberation, feedback profiles, and constitutional accountability.
+
+**Key Interfaces:** `GovernanceState`, `FeedbackProfile`, `DeliberationProposal`
+```typescript
+// Governance state for any entity
+interface GovernanceState {
+  entityId: string;
+  entityType: GovernableEntityType;
+  status: GovernanceStatus;
+  labels: GovernanceLabel[];
+  challenges: Challenge[];
+  appealHistory: Appeal[];
+}
+
+// Feedback Profile - virality as privilege, NOT entitlement
+interface FeedbackProfile {
+  id: string;
+  permittedMechanisms: FeedbackMechanism[];  // NO "LIKES"
+  emotionalConstraints?: EmotionalReactionConstraints;
+  currentLevel: FeedbackProfileLevel;
+  profileEvolution: ProfileEvolution[];
+}
+
+// Key principle: Facebook-style "likes" are fundamentally pernicious
+// Replaced with: approval-vote (up/down), emotional reactions with context
+type FeedbackMechanism =
+  | 'approval-vote'         // Up/down (replaces "like")
+  | 'emotional-reaction'    // "I feel ___ about this"
+  | 'graduated-usefulness'  // Loomio-style scales
+  | 'discussion-only'       // No amplification
+  | 'view-only';            // No engagement permitted
+```
+
 ---
 
 ## Service Layer Summary
@@ -211,12 +246,13 @@ type LamadEventType =
 | `AgentService` | Auth, progress, attestations | DataLoader, SessionUserService |
 | `AffinityTrackingService` | Engagement tracking | SessionUserService, localStorage |
 | `ExplorationService` | BFS traversal, pathfinding | DataLoader, AgentService |
-| `KnowledgeMapService` | Polymorphic maps (domain, person, collective) | DataLoader |
+| `KnowledgeMapService` | Four-dimensional maps (domain, self, person, collective) | DataLoader |
 | `PathExtensionService` | Learner path mutations | DataLoader |
 | `TrustBadgeService` | UI-ready trust badge computation | DataLoader, AgentService |
 | `SearchService` | Enhanced search with scoring, facets | DataLoader, TrustBadgeService |
 | `SessionUserService` | Temporary session identity, activity tracking | localStorage |
 | `ProfileService` | Human-centered profile (Imago Dei aligned) | SessionUser, Path, Affinity, Agent |
+| `GovernanceService` | Constitutional moderation, deliberation, feedback | DataLoader, AgentService |
 | `RendererRegistryService` | Content format → Component mapping | None |
 
 ---
@@ -277,6 +313,38 @@ Session humans see contextual prompts encouraging Holochain installation:
 
 ---
 
+## Relational Maps Architecture
+
+Learning is fundamentally about building relationship. Lamad supports four types of knowledge maps:
+
+| Map Type | Question | Inspiration |
+|----------|----------|-------------|
+| **Domain** | What do I know? | Khan Academy's "World of Math" |
+| **Self** | Who am I? | Delphic maxim "γνῶθι σεαυτόν" (know thyself) |
+| **Person** | Who do I know? | Gottman's Love Maps research |
+| **Collective** | What do we know? | Organizational knowledge management |
+
+### Self-Knowledge Maps
+
+The self-knowledge map is unique: the mapper and subject are the same person (reflexive). It integrates with the Imago Dei framework:
+
+```typescript
+interface SelfKnowledgeMap extends KnowledgeMap {
+  mapType: 'self';
+  imagoDeiDimensions: ImagoDeiDimension[];  // core, experience, gifts, synthesis
+  valuesHierarchy: PersonalValue[];          // What matters most, in priority order
+  lifeChapters: LifeChapter[];               // Narrative structure of one's journey
+  discoveredGifts: DiscoveredGift[];         // Strengths uncovered through self-examination
+  shadowAreas: ShadowArea[];                 // Growth areas and blind spots
+  vocation?: VocationalClarity;              // Calling, purpose, gift-to-need alignment
+  domainReflections: DomainReflection[];     // How domain learning reveals the self
+}
+```
+
+Theological grounding: "Love your neighbor as yourself" (Mark 12:31) implies you must first know yourself. Self-knowledge is prerequisite to loving others well.
+
+---
+
 ## Human Profile (Imago Dei Framework)
 
 The ProfileService provides a human-centered view of identity aligned with the Imago Dei framework:
@@ -293,6 +361,29 @@ The ProfileService provides a human-centered view of identity aligned with the I
 - Growth-oriented metrics (not consumption metrics)
 - Narrative view of journey (not activity logs)
 - Honor dignity and agency
+
+---
+
+## Technical Conventions
+
+### Date Fields
+All timestamp fields use **ISO 8601 string format** (not Date objects):
+```typescript
+createdAt: string;  // "2025-11-27T14:30:00Z" - CORRECT
+createdAt: Date;    // Do not use
+```
+
+### Attestation Model Distinction
+Three distinct attestation models exist - do NOT confuse them:
+
+| Model | Purpose |
+|-------|---------|
+| **Agent Attestations** (`attestations.model.ts`) | Credentials earned BY humans/agents |
+| **Content Attestations** (`content-attestation.model.ts`) | Trust credentials granted TO content |
+| **Content Access** (`content-access.model.ts`) | Access tier requirements (visitor/member/attested) |
+
+- `AttestationAccessRequirement`: What attestations unlock which content
+- `ContentAccessRequirement`: What access level is required for content
 
 ---
 
@@ -345,6 +436,12 @@ The ProfileService provides a human-centered view of identity aligned with the I
 | 13: Session Human | ✅ | Zero-friction identity, upgrade path |
 | 14: Human Profile | ✅ | Imago Dei-aligned profile service |
 | 15: REA Economic Models | ✅ | ValueFlows types, ContributorPresence, EconomicEvent |
+| 16: Relational Maps | ✅ | Self-knowledge maps, four-map architecture |
+| 17: Psychometric Assessments | ✅ | Validated instruments, pattern detection |
+| 18: Governance & Feedback | ✅ | Constitutional moderation, challenges, appeals |
+| 19: Governance Deliberation | ✅ | Loomio/Polis/Wikipedia-inspired deliberation |
+| 20: Feedback Profile | ✅ | Virality as privilege, emotional reaction constraints |
+| 21: Cohesion Review | ✅ | Model standardization, documentation alignment |
 
 See `IMPLEMENTATION_PLAN.md` for detailed phase summaries.
 
@@ -408,6 +505,10 @@ See `IMPLEMENTATION_PLAN.md` for detailed phase summaries.
 | **Attestation** | Earned credential/badge |
 | **Fog of War** | Content visibility earned through progression |
 | **Imago Dei** | Human-centered identity framework |
+| **Self Map** | Reflexive knowledge map ("know thyself") |
+| **Person Map** | Knowledge about another person (Gottman love maps) |
+| **Domain Map** | Knowledge about a subject area |
+| **Collective Map** | Shared knowledge within a community |
 | **Session Human** | Temporary visitor identity (localStorage) |
 | **Presence** | Placeholder identity for external contributors |
 | **Recognition** | Value acknowledgment flowing to contributors |

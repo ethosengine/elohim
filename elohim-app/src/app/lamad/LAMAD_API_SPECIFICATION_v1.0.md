@@ -1,8 +1,8 @@
 # Lamad API Specification v1.0
 ## Interface Control Document for Path-Centric Learning Infrastructure
 
-**Document Version:** 1.0  
-**Last Updated:** 2024-11-24  
+**Document Version:** 1.1
+**Last Updated:** 2025-11-27
 **Status:** Definitive Specification
 
 ---
@@ -86,6 +86,42 @@ This document defines the URL strategy, data models, and integration patterns fo
 **Intended Audience:** This specification is written for developers implementing Lamad features, AI assistants (Claude, Gemini) generating code based on project context, and technical stakeholders evaluating the architecture.
 
 **How to Use This Document:** When implementing any feature in Lamad, begin by consulting the relevant section of this specification. Treat the URL patterns, data models, and service interfaces as binding contracts. Any deviation from these patterns should be documented as a deliberate architectural decision with justification.
+
+---
+
+## Technical Conventions
+
+### Date Field Convention
+
+All timestamp fields in data models use **ISO 8601 string format** (not JavaScript Date objects):
+
+```typescript
+// CORRECT - ISO 8601 string
+createdAt: string;  // "2025-11-27T14:30:00Z"
+earnedAt: string;   // "2025-11-27T14:30:00Z"
+
+// INCORRECT - Date object
+createdAt: Date;    // Do not use
+```
+
+**Rationale:**
+- JSON serialization: Date objects don't serialize cleanly to JSON
+- Holochain compatibility: Entry types must be serializable
+- Timezone safety: ISO 8601 includes timezone information
+- REST API standard: ISO 8601 is the de facto standard for API date fields
+
+### Attestation Model Distinction
+
+The system has THREE distinct attestation-related models. Do not confuse them:
+
+| Model | File | Purpose | Example |
+|-------|------|---------|---------|
+| **Agent Attestations** | `attestations.model.ts` | Credentials earned BY humans/agents | "4th grade math mastery" |
+| **Content Attestations** | `content-attestation.model.ts` | Trust credentials granted TO content | "governance-ratified" |
+| **Content Access** | `content-access.model.ts` | Access tier requirements | "requires member status" |
+
+- **AttestationAccessRequirement** (attestations.model.ts): Defines what attestations unlock which content
+- **ContentAccessRequirement** (content-access.model.ts): Defines what access level (visitor/member/attested) is required
 
 ---
 
@@ -426,6 +462,225 @@ Shared extensions appear in the extension catalog for each path. Other learners 
 ```
 
 Collaborative paths have multiple authors with role-based permissions. Proposals go through review before being incorporated. This enables team-created training materials, community-curated paths, and mentor-mentee co-creation.
+
+---
+
+### 1.9 Governance Dimension - The Protocol's Immune System
+
+Every entity in the Lamad graph (content, path, human, Elohim, assessment, collective) has a governance dimension - an overlay that tracks its trust state, review history, active challenges, discussions, and audit trail. This section defines the routes for accessing this governance layer.
+
+**Design Philosophy:**
+
+This governance system is inspired by three key precedents:
+- **Loomio**: Structured proposal types (advice, consent, consensus, sense-check) with graduated feedback scales
+- **Polis**: AI-powered opinion clustering and bridging statement detection for sensemaking
+- **Wikipedia**: Talk pages, edit history, protection logs for full audit trails
+
+The governance dimension provides:
+1. **Context-aware graduated feedback** - Not simple up/down voting, but nuanced feedback appropriate to context (accuracy, usefulness, proposal-position, etc.)
+2. **Deliberation interfaces** - Structured proposals with defined phases (draft → discussion → voting → decided → implemented)
+3. **Sensemaking visualizations** - Opinion clusters, consensus statements, and bridging opportunities
+4. **Wikipedia-style audit trails** - Version history, discussions, governance events, engagement metrics
+5. **Constitutional challenge/appeal system** - Every decision can be challenged, every challenge gets an SLA-bound response
+
+**Core Route Pattern:**
+```
+/lamad/{entityType}:{entityId}/governance/{view}
+```
+
+Where `entityType` is one of: `content`, `path`, `assessment`, `contributor`, `human`, `elohim`, `collective`, or `governance-decision`.
+
+**Route Patterns:**
+
+```
+# Context Menu and Summary
+/lamad/{entityType}:{entityId}/governance                # Redirect to summary
+/lamad/{entityType}:{entityId}/governance/summary        # Quick overview dashboard
+
+# Full History View (Wikipedia-style)
+/lamad/{entityType}:{entityId}/governance/history        # Full audit trail
+/lamad/{entityType}:{entityId}/governance/versions       # Version/edit history
+/lamad/{entityType}:{entityId}/governance/engagement     # Views, affinity, citations
+
+# Discussions (Talk Pages)
+/lamad/{entityType}:{entityId}/governance/discussions              # All discussion threads
+/lamad/{entityType}:{entityId}/governance/discussions/new          # Start new thread
+/lamad/{entityType}:{entityId}/governance/discussions/thread:{id}  # Specific thread
+
+# Challenges and Appeals
+/lamad/{entityType}:{entityId}/governance/challenges        # Active challenges
+/lamad/{entityType}:{entityId}/governance/challenges/new    # File a challenge
+/lamad/{entityType}:{entityId}/governance/challenges/{id}   # View specific challenge
+/lamad/{entityType}:{entityId}/governance/appeals           # Appeals history
+
+# Deliberation (Loomio-style Proposals)
+/lamad/{entityType}:{entityId}/governance/proposals         # Active proposals
+/lamad/{entityType}:{entityId}/governance/proposals/new     # Create proposal
+/lamad/{entityType}:{entityId}/governance/proposals/{id}    # View/vote on proposal
+
+# Sensemaking (Polis-style Clustering)
+/lamad/{entityType}:{entityId}/governance/sensemaking       # Opinion clusters visualization
+/lamad/{entityType}:{entityId}/governance/sensemaking/contribute  # Add statements
+
+# Feedback
+/lamad/{entityType}:{entityId}/governance/feedback/{context}  # Submit graduated feedback
+```
+
+**Examples:**
+```
+/lamad/content:epic-social-medium/governance/summary
+/lamad/content:epic-social-medium/governance/discussions
+/lamad/content:epic-social-medium/governance/discussions/thread:accuracy-dispute-01
+/lamad/content:epic-social-medium/governance/challenges/new
+/lamad/content:epic-social-medium/governance/proposals
+/lamad/content:epic-social-medium/governance/sensemaking
+
+/lamad/human:agent-xyz/governance/summary
+/lamad/elohim:community-guardian/governance/summary
+/lamad/elohim:community-guardian/governance/challenges
+
+/lamad/path:love-map-intro/governance/discussions
+/lamad/assessment:big-five-personality/governance/summary
+```
+
+**Global Governance Routes:**
+```
+/lamad/governance/precedents                 # Browse constitutional precedents
+/lamad/governance/precedents/{id}            # View specific precedent
+/lamad/governance/sla-dashboard              # System-wide SLA monitoring
+/lamad/governance/elohim-oversight           # Elohim accountability dashboard
+```
+
+**Behavior Contract:**
+
+When accessing the governance summary for any entity, the system returns:
+- Current governance status (unreviewed, auto-approved, community-reviewed, verified, disputed, restricted, removed)
+- Active labels and their severity
+- Count of open discussions, active challenges, pending votes
+- Quick actions available based on user's permissions and attestations
+- Recent governance events (last 5-10)
+- Link to full governance history
+
+The governance dimension is always accessible. Even content that has been "removed" still has its governance dimension available for audit purposes. The content itself may be hidden, but the record of why it was removed, who challenged it, and what appeals were filed remains visible for constitutional accountability.
+
+**Context Menu UI Pattern:**
+
+Every entity in the Lamad UI should display a governance context menu (floating action button or menu item) showing:
+- Status badge (visual indicator of governance state)
+- Alert indicators (if votes pending, challenges filed, etc.)
+- Quick actions: Flag, Discuss, Challenge, View History
+- Link to full governance view
+
+This ensures that the governance dimension is never more than one click away from any piece of content.
+
+**Graduated Feedback Contexts:**
+
+Different entity types and situations call for different feedback scales:
+
+| Context | Used For | Scale Type |
+|---------|----------|------------|
+| `accuracy` | Content truth claims | Accurate → False |
+| `usefulness` | Learning value | Transformative → Not Useful |
+| `proposal-position` | Deliberation voting | Strongly Agree → Block |
+| `label-agreement` | Governance label validation | Agree → Disagree |
+| `elohim-fairness` | AI oversight | Fair → Unfair |
+| `trust-level` | Contributor evaluation | High Trust → No Trust |
+
+Each feedback response can optionally include reasoning, which is required for negative responses and visible to others (creating accountability).
+
+**SLA Guarantees:**
+
+The governance system operates under constitutional SLA guarantees:
+- Challenge acknowledgment: 1 hour
+- Challenge initial response: 3 days
+- Challenge final resolution: 14 days
+- Appeal response: 7 days
+- Emergency response: 4 hours
+
+SLA violations are themselves governable events that trigger automatic escalation.
+
+---
+
+### 1.10 Feedback Profile Dimension - Virality as Privilege
+
+Every piece of content has a FeedbackProfile that governs HOW it can be engaged with. This is orthogonal to ContentReach (which governs WHERE content can go).
+
+**Core Insight:**
+
+> "Virality is a privilege, not an entitlement."
+
+The feedback profile determines what amplification mechanisms are even *possible* for content. A community library announcement may permit low-friction engagement (approval voting), while a mugshot magazine should NEVER have access to viral mechanisms, regardless of its reach level.
+
+**Key Principles:**
+
+1. **NO "LIKES"** - The Facebook-style like is fundamentally pernicious. Replaced with:
+   - Approval voting (up/down) as minimum baseline
+   - Emotional reactions with context selection
+   - All mechanisms are Elohim-gated
+
+2. **EMOTIONAL REACTION CONSTRAINTS** - Guards against "tyranny of the laughing emoji":
+   - Personal content restricts critical reactions (only supportive reactions permitted)
+   - Attribution required (no anonymous mockery)
+   - Authors can hide harmful reactions
+   - Critical reactions require reasoning
+
+3. **INTELLECTUAL HUMILITY** (Micah 6:8 - "walk humbly"):
+   - Profiles can UPGRADE through trust-building
+   - Profiles can DOWNGRADE through new evidence (retractions, new research)
+   - The system acknowledges it could be wrong
+
+4. **PATH INHERITANCE: MOST RESTRICTIVE WINS**:
+   - When content appears in path context, use the more restrictive profile
+
+**Route Patterns:**
+
+```
+# Feedback Profile Management
+/lamad/{entityType}:{entityId}/feedback-profile              # View current profile
+/lamad/{entityType}:{entityId}/feedback-profile/mechanisms   # Available mechanisms
+/lamad/{entityType}:{entityId}/feedback-profile/history      # Profile change history
+/lamad/{entityType}:{entityId}/feedback-profile/upgrade      # Request profile upgrade
+
+# Emotional Reactions (when permitted)
+/lamad/{entityType}:{entityId}/reactions                     # View reactions
+/lamad/{entityType}:{entityId}/reactions/add                 # Add reaction
+/lamad/{entityType}:{entityId}/reactions/{id}/hide           # Author hides reaction
+
+# Engagement (based on permitted mechanisms)
+/lamad/{entityType}:{entityId}/approve                       # Approval vote
+/lamad/{entityType}:{entityId}/share                         # Share with context
+```
+
+**Feedback Mechanisms (Friction Hierarchy):**
+
+| Level | Mechanism | Description |
+|-------|-----------|-------------|
+| Low | `approval-vote` | Up/down voting (replaces "like") |
+| Low | `emotional-reaction` | "I feel ___ about this" with context |
+| Low | `affinity-mark` | Personal connection marker (private) |
+| Medium | `graduated-usefulness` | Loomio-style scale |
+| Medium | `graduated-accuracy` | Fact-checking scale |
+| Medium | `share-with-context` | Amplification requires context |
+| High | `proposal-vote` | Formal voting with reasoning |
+| High | `challenge` | Constitutional challenge |
+| High | `discussion-only` | No amplification |
+| High | `citation` | Academic reference |
+| High | `peer-review` | Formal review |
+| None | `view-only` | No engagement permitted |
+
+**Emotional Reaction Types:**
+
+Supportive (safe for personal content):
+- `moved` - This moved me emotionally
+- `grateful` - I am grateful for this
+- `inspired` - This inspires me
+- `hopeful` - This gives me hope
+- `grieving` - This connects to grief/loss
+
+Critical (require accountability, may be restricted):
+- `challenged` - This challenged my thinking
+- `concerned` - This concerns me
+- `uncomfortable` - This makes me uncomfortable
 
 ---
 
@@ -1430,6 +1685,581 @@ The metadata in the response makes the computational cost visible. The UI should
 The findPath method implements graph pathfinding algorithms. The "shortest" algorithm uses Dijkstra's to find minimum hops. The "semantic" algorithm considers relationship types and might prefer a longer path that follows pedagogically meaningful connections over a shorter path through arbitrary relationships. This method requires path-creator attestation because pathfinding can be very expensive on large graphs.
 
 The estimateCost method allows users to preview how expensive an operation will be before executing it. This is particularly important for pathfinding or deep explorations that might traverse thousands of nodes. The estimate includes how much of their rate limit quota the query will consume, allowing them to decide if they want to spend that quota now or save it.
+
+### 3.5 GovernanceService
+
+The governance service manages the constitutional feedback layer - the protocol's immune system. It handles graduated feedback, deliberation proposals, sensemaking, discussions, challenges, and appeals.
+
+```typescript
+interface GovernanceService {
+  // =========================================================================
+  // Context Menu & Summary
+  // =========================================================================
+
+  /**
+   * Get the governance context menu for any entity.
+   * Returns status summary, available actions, and active alerts.
+   * This is the "door" to the governance dimension.
+   *
+   * @param entityType - Type of entity (content, path, human, elohim, etc.)
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to context menu data
+   */
+  getContextMenu(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<GovernanceContextMenu>;
+
+  /**
+   * Get detailed governance summary for an entity.
+   * Includes status, labels, active items counts, and recent events.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to full governance state
+   */
+  getGovernanceState(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<GovernanceState>;
+
+  // =========================================================================
+  // Graduated Feedback (Loomio-inspired)
+  // =========================================================================
+
+  /**
+   * Get the feedback selector configuration for a specific context.
+   * Returns available options and any existing response from current user.
+   *
+   * @param entityType - Type of entity being evaluated
+   * @param entityId - The entity identifier
+   * @param context - What aspect is being evaluated (accuracy, usefulness, etc.)
+   * @returns Promise resolving to feedback selector with options
+   */
+  getFeedbackSelector(
+    entityType: GovernableEntityType,
+    entityId: string,
+    context: FeedbackContext
+  ): Promise<GraduatedFeedbackSelector>;
+
+  /**
+   * Submit graduated feedback on an entity.
+   * Optionally includes reasoning (required for negative feedback).
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param context - What aspect is being evaluated
+   * @param response - The feedback response with optional reasoning
+   * @returns Promise resolving when feedback is recorded
+   */
+  submitFeedback(
+    entityType: GovernableEntityType,
+    entityId: string,
+    context: FeedbackContext,
+    response: FeedbackResponse
+  ): Promise<void>;
+
+  /**
+   * Get aggregate feedback view for an entity.
+   * Shows distribution, consensus strength, and bridging opportunities.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param context - What aspect to aggregate
+   * @returns Promise resolving to aggregate view
+   */
+  getFeedbackAggregate(
+    entityType: GovernableEntityType,
+    entityId: string,
+    context: FeedbackContext
+  ): Promise<FeedbackAggregateView>;
+
+  // =========================================================================
+  // Deliberation (Loomio-style Proposals)
+  // =========================================================================
+
+  /**
+   * List proposals for an entity.
+   * Can filter by phase (draft, discussion, voting, decided).
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param filters - Optional phase filter
+   * @returns Promise resolving to array of proposals
+   */
+  getProposals(
+    entityType: GovernableEntityType,
+    entityId: string,
+    filters?: { phase?: ProposalPhase }
+  ): Promise<DeliberationProposal[]>;
+
+  /**
+   * Get a specific proposal by ID.
+   *
+   * @param proposalId - The proposal identifier
+   * @returns Promise resolving to the proposal
+   */
+  getProposal(proposalId: string): Promise<DeliberationProposal>;
+
+  /**
+   * Create a new deliberation proposal.
+   * Proposal types: advice, consent, consensus, sense-check, ranked-choice, etc.
+   *
+   * @param proposal - The proposal to create
+   * @returns Promise resolving to the created proposal
+   */
+  createProposal(
+    proposal: Omit<DeliberationProposal, 'id' | 'proposedAt' | 'phase' | 'results'>
+  ): Promise<DeliberationProposal>;
+
+  /**
+   * Cast a vote on a proposal.
+   * Vote format depends on proposal type (consent, ranked, scored, etc.)
+   *
+   * @param proposalId - The proposal to vote on
+   * @param vote - Vote data structure (type-specific)
+   * @returns Promise resolving when vote is recorded
+   */
+  voteOnProposal(proposalId: string, vote: ProposalVote): Promise<void>;
+
+  // =========================================================================
+  // Sensemaking (Polis-inspired)
+  // =========================================================================
+
+  /**
+   * Get sensemaking visualization for an entity.
+   * Shows opinion clusters, consensus statements, and divisive statements.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to sensemaking visualization
+   */
+  getSensemakingVisualization(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<SensemakingVisualization>;
+
+  /**
+   * Submit a statement for collective sensemaking.
+   * Statements become voting targets for the community.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param statement - The statement text
+   * @returns Promise resolving to the statement ID
+   */
+  submitStatement(
+    entityType: GovernableEntityType,
+    entityId: string,
+    statement: string
+  ): Promise<string>;
+
+  /**
+   * Vote on a sensemaking statement.
+   * Simple agree/disagree/pass voting (Polis-style).
+   *
+   * @param statementId - The statement to vote on
+   * @param vote - Agree, disagree, or pass
+   * @returns Promise resolving when vote is recorded
+   */
+  voteOnStatement(
+    statementId: string,
+    vote: 'agree' | 'disagree' | 'pass'
+  ): Promise<void>;
+
+  // =========================================================================
+  // History (Wikipedia-style Audit Trail)
+  // =========================================================================
+
+  /**
+   * Get governance history view for an entity.
+   * Supports multiple tabs: summary, versions, discussions, governance, engagement.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param tab - Which tab to load data for
+   * @param filters - Optional date range, event type, actor filters
+   * @returns Promise resolving to history view
+   */
+  getHistoryView(
+    entityType: GovernableEntityType,
+    entityId: string,
+    tab: HistoryTab,
+    filters?: HistoryFilters
+  ): Promise<GovernanceHistoryView>;
+
+  // =========================================================================
+  // Discussions (Talk Pages)
+  // =========================================================================
+
+  /**
+   * Get discussion threads for an entity.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to array of discussion threads
+   */
+  getDiscussions(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<DiscussionThread[]>;
+
+  /**
+   * Get a specific discussion thread by ID.
+   *
+   * @param threadId - The thread identifier
+   * @returns Promise resolving to the thread with messages
+   */
+  getDiscussionThread(threadId: string): Promise<DiscussionThread>;
+
+  /**
+   * Create a new discussion thread.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param category - Thread category (accuracy, neutrality, sources, etc.)
+   * @param topic - Thread topic/title
+   * @param initialMessage - First message in thread
+   * @returns Promise resolving to created thread
+   */
+  createDiscussionThread(
+    entityType: GovernableEntityType,
+    entityId: string,
+    category: DiscussionCategory,
+    topic: string,
+    initialMessage: string
+  ): Promise<DiscussionThread>;
+
+  /**
+   * Post a message to an existing thread.
+   *
+   * @param threadId - The thread to post to
+   * @param message - The message content
+   * @returns Promise resolving to the posted message
+   */
+  postMessage(
+    threadId: string,
+    message: Omit<DiscussionMessage, 'id' | 'timestamp' | 'reactions' | 'edited' | 'hidden'>
+  ): Promise<DiscussionMessage>;
+
+  // =========================================================================
+  // Challenges & Appeals (Constitutional Accountability)
+  // =========================================================================
+
+  /**
+   * File a constitutional challenge.
+   * Every decision in the system can be challenged.
+   *
+   * @param challenge - The challenge to file
+   * @returns Promise resolving to created challenge with SLA deadline
+   */
+  fileChallenge(
+    challenge: Omit<Challenge, 'id' | 'filedAt' | 'state'>
+  ): Promise<Challenge>;
+
+  /**
+   * Get active challenges for an entity.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to array of active challenges
+   */
+  getChallenges(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<Challenge[]>;
+
+  /**
+   * Respond to a challenge (for Elohim or authorized reviewers).
+   *
+   * @param challengeId - The challenge to respond to
+   * @param response - The response with reasoning
+   * @returns Promise resolving when response is recorded
+   */
+  respondToChallenge(
+    challengeId: string,
+    response: ChallengeResponse
+  ): Promise<void>;
+
+  /**
+   * File an appeal against a challenge resolution.
+   * Escalates to higher Elohim level.
+   *
+   * @param challengeId - The resolved challenge to appeal
+   * @param appeal - The appeal with grounds
+   * @returns Promise resolving to created appeal
+   */
+  fileAppeal(
+    challengeId: string,
+    appeal: Omit<Appeal, 'id' | 'filedAt'>
+  ): Promise<Appeal>;
+
+  // =========================================================================
+  // Subscriptions & Notifications
+  // =========================================================================
+
+  /**
+   * Subscribe to governance events on an entity.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param events - Which event types to subscribe to
+   * @returns Promise resolving when subscription is active
+   */
+  subscribeToEntity(
+    entityType: GovernableEntityType,
+    entityId: string,
+    events: AlertType[]
+  ): Promise<void>;
+
+  /**
+   * Unsubscribe from an entity.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving when unsubscribed
+   */
+  unsubscribeFromEntity(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<void>;
+
+  // =========================================================================
+  // Global Governance (Precedents & Oversight)
+  // =========================================================================
+
+  /**
+   * Browse constitutional precedents.
+   * Precedents form the evolving constitutional DNA.
+   *
+   * @param filters - Optional filters (category, date range, etc.)
+   * @param pagination - Pagination params
+   * @returns Promise resolving to precedent list
+   */
+  getPrecedents(
+    filters?: PrecedentFilters,
+    pagination?: PaginationParams
+  ): Promise<PrecedentListResult>;
+
+  /**
+   * Get a specific precedent by ID.
+   *
+   * @param precedentId - The precedent identifier
+   * @returns Promise resolving to the precedent
+   */
+  getPrecedent(precedentId: string): Promise<Precedent>;
+
+  /**
+   * Get SLA dashboard for system-wide governance health.
+   *
+   * @returns Promise resolving to SLA metrics
+   */
+  getSLADashboard(): Promise<SLADashboard>;
+
+  // =========================================================================
+  // Feedback Profile (Virality as Privilege)
+  // =========================================================================
+
+  /**
+   * Get the feedback profile for an entity.
+   * Returns permitted mechanisms, constraints, and evolution history.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to the feedback profile
+   */
+  getFeedbackProfile(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<FeedbackProfile>;
+
+  /**
+   * Request a feedback profile upgrade (more mechanisms).
+   * Requires meeting upgrade requirements (attestations, trust score, etc.)
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param requestedMechanisms - Which mechanisms to request
+   * @param justification - Why the upgrade is appropriate
+   * @returns Promise resolving to upgrade request
+   */
+  requestProfileUpgrade(
+    entityType: GovernableEntityType,
+    entityId: string,
+    requestedMechanisms: FeedbackMechanism[],
+    justification: string
+  ): Promise<ProfileUpgradeRequest>;
+
+  /**
+   * Get emotional reactions for an entity.
+   * Respects privacy settings and author-hidden reactions.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @returns Promise resolving to reactions
+   */
+  getEmotionalReactions(
+    entityType: GovernableEntityType,
+    entityId: string
+  ): Promise<EmotionalReactionSummary>;
+
+  /**
+   * Add an emotional reaction.
+   * Validates against profile constraints.
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param reaction - The reaction to add
+   * @returns Promise resolving when reaction is recorded
+   */
+  addEmotionalReaction(
+    entityType: GovernableEntityType,
+    entityId: string,
+    reaction: EmotionalReactionInput
+  ): Promise<void>;
+
+  /**
+   * Hide a reaction (for content authors when authorCanHide is true).
+   *
+   * @param entityType - Type of entity
+   * @param entityId - The entity identifier
+   * @param reactionId - The reaction to hide
+   * @returns Promise resolving when reaction is hidden
+   */
+  hideReaction(
+    entityType: GovernableEntityType,
+    entityId: string,
+    reactionId: string
+  ): Promise<void>;
+}
+
+/**
+ * Types for governance operations
+ */
+type GovernableEntityType =
+  | 'content' | 'path' | 'assessment' | 'contributor'
+  | 'human' | 'elohim' | 'collective' | 'governance-decision';
+
+type FeedbackContext =
+  | 'accuracy' | 'usefulness' | 'clarity' | 'depth' | 'timeliness'
+  | 'appropriateness' | 'sensitivity' | 'label-agreement'
+  | 'decision-agreement' | 'proposal-position' | 'contribution-value'
+  | 'trust-level' | 'elohim-helpfulness' | 'elohim-accuracy' | 'elohim-fairness';
+
+type ProposalPhase = 'draft' | 'discussion' | 'voting' | 'closed' | 'decided' | 'implemented';
+
+type HistoryTab = 'summary' | 'versions' | 'discussions' | 'governance' | 'engagement';
+
+type AlertType =
+  | 'vote-open' | 'challenge-pending' | 'discussion-active'
+  | 'label-applied' | 'review-requested' | 'sla-warning';
+
+interface ProposalVote {
+  // Structure depends on proposal type
+  optionId?: string;        // For single-choice
+  ranking?: string[];       // For ranked-choice
+  scores?: Record<string, number>;  // For score voting
+  reasoning?: string;       // Optional reasoning
+}
+
+interface ChallengeResponse {
+  decision: 'upheld' | 'rejected' | 'modified';
+  reasoning: string;
+  precedentCited?: string[];
+  modifiedAction?: string;
+}
+
+interface PrecedentFilters {
+  category?: string;
+  entityType?: GovernableEntityType;
+  dateRange?: { start: string; end: string };
+}
+
+interface PrecedentListResult {
+  precedents: Precedent[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+}
+
+interface SLADashboard {
+  // Current performance
+  challengesMeetingAcknowledgmentSLA: number;
+  challengesMeetingResolutionSLA: number;
+  appealsMeetingSLA: number;
+
+  // Active items by age
+  challengesByAge: Array<{
+    ageCategory: string;
+    count: number;
+    percentageOfSLA: number;
+  }>;
+
+  // Historical trends
+  slaComplianceHistory: Array<{
+    period: string;
+    complianceRate: number;
+  }>;
+
+  // Escalations
+  activeEscalations: number;
+  escalationsByLevel: Record<string, number>;
+}
+
+// Feedback Profile types (see feedback-profile.model.ts for full definitions)
+type FeedbackMechanism =
+  | 'approval-vote' | 'emotional-reaction' | 'affinity-mark'
+  | 'graduated-usefulness' | 'graduated-accuracy' | 'share-with-context'
+  | 'proposal-vote' | 'challenge' | 'discussion-only' | 'citation' | 'peer-review'
+  | 'view-only';
+
+type EmotionalReactionType =
+  | 'moved' | 'grateful' | 'inspired' | 'hopeful' | 'grieving'
+  | 'challenged' | 'concerned' | 'uncomfortable';
+
+interface ProfileUpgradeRequest {
+  id: string;
+  entityType: GovernableEntityType;
+  entityId: string;
+  requestedMechanisms: FeedbackMechanism[];
+  justification: string;
+  requestedAt: string;
+  requestedBy: string;
+  status: 'pending' | 'approved' | 'denied';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewReasoning?: string;
+}
+
+interface EmotionalReactionSummary {
+  totalReactions: number;
+  reactionsByType: Record<EmotionalReactionType, number>;
+  recentReactions: EmotionalReaction[];
+  hiddenCount?: number;  // Only visible to author
+}
+
+interface EmotionalReactionInput {
+  type: EmotionalReactionType;
+  context?: string;
+  private: boolean;
+}
+```
+
+**Implementation Guidance:**
+
+The governance service operates as an overlay on all other entities. Every content node, learning path, human agent, Elohim agent, and even governance decisions themselves have a governance dimension that can be accessed through this service.
+
+The `getContextMenu` method is the entry point. It should return quickly and provide just enough information for the UI to render a governance badge and quick action menu. Think of it as the "door" to the governance dimension - showing what's on the other side without requiring the user to fully enter.
+
+The feedback methods implement Loomio-inspired graduated feedback. Unlike simple up/down voting, feedback is context-specific. Evaluating accuracy uses a different scale than evaluating usefulness. Negative feedback requires reasoning to ensure accountability. The aggregate view shows not just totals but consensus strength and potential bridging opportunities (Polis-inspired).
+
+The deliberation methods handle formal proposals. Proposal types (advice, consent, consensus) have different voting rules and passage thresholds. The service must enforce these rules during vote tallying. Blocking votes (in consent-based proposals) require clear reasoning.
+
+The sensemaking methods implement Polis-style opinion clustering. The AI clustering runs asynchronously - when statements accumulate, the system recalculates clusters. Bridging statements (statements that clusters agree on despite disagreeing on most things) are surfaced as opportunities for finding common ground.
+
+The challenge and appeal methods implement constitutional accountability. Every challenge MUST get a response within the SLA. If the SLA is violated, the system automatically escalates. Appeals move up the Elohim hierarchy (individual → family → community → network → constitutional). Precedents created through challenge resolutions form the evolving constitutional DNA.
+
+The subscriptions allow users to stay informed about governance activity on entities they care about. This is essential for meaningful participation - you can't respond to a challenge if you don't know it was filed.
 
 ---
 

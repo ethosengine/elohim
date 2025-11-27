@@ -1,16 +1,38 @@
 /**
  * Barrel export for Lamad models
  *
- * Four-layer architecture:
+ * Six-layer architecture:
  * - Territory: ContentNode (the knowledge graph)
  * - Journey: LearningPath, PathStep (curated sequences)
  * - Traveler: Agent, AgentProgress (human state)
- * - Maps: KnowledgeMap (polymorphic: domain, person, collective)
+ * - Maps: KnowledgeMap (polymorphic: domain, self, person, collective)
+ * - Economic: REA value flows and contributor recognition
+ * - Governance: Constitutional moderation, deliberation, feedback profiles
  *
  * Trust Model (Bidirectional Attestations):
  * - Agent attestations: Earned credentials for accessing gated content
  * - Content attestations: Earned trust for reaching broader audiences
  * - Symmetric accountability: Both agents AND content need trust to participate
+ *
+ * IMPORTANT - Three distinct Attestation models:
+ * 1. Agent Attestations (attestations.model.ts):
+ *    - Credentials earned by humans/agents
+ *    - Granted after completing learning paths
+ *    - Example: "4th grade math mastery", "Trauma Support Capacity"
+ *
+ * 2. Content Attestations (content-attestation.model.ts):
+ *    - Trust credentials granted TO content
+ *    - Determines reach (private → commons)
+ *    - Example: "governance-ratified", "steward-approved"
+ *
+ * 3. Content Access (content-access.model.ts):
+ *    - Access tier requirements (visitor/member/attested)
+ *    - Determines WHO can view content
+ *    - Example: "requires member status", "requires CSAM training attestation"
+ *
+ * Date Field Convention:
+ * - All timestamp fields use ISO 8601 string format (not Date objects)
+ * - Ensures JSON serialization, Holochain compatibility, timezone safety
  *
  * Elohim Agents:
  * - Autonomous constitutional guardians (not controllable utilities)
@@ -22,6 +44,11 @@
  * - Contributor Presence: Stewardship lifecycle for absent contributors
  * - Economic Event: Immutable audit trail of value flows
  * - Recognition Economics: Value accumulates at presences until claimed
+ *
+ * Governance & Feedback:
+ * - Governance Feedback: Constitutional moderation, challenges, appeals, precedent
+ * - Governance Deliberation: Loomio/Polis/Wikipedia-inspired deliberation
+ * - Feedback Profile: Virality as privilege, emotional reaction constraints
  *
  * Extensions:
  * - PathExtension: Learner-owned mutations to paths
@@ -43,7 +70,8 @@ export type {
 } from './content-node.model';
 export { ContentRelationshipType } from './content-node.model';
 
-// Content Attestation models (Bidirectional Trust)
+// Content Attestation models (Trust credentials granted TO content)
+// Determines ContentReach: private → invited → local → community → federated → commons
 export * from './content-attestation.model';
 
 // Journey models (Learning Path)
@@ -52,7 +80,9 @@ export * from './learning-path.model';
 // Traveler models (Agent & Progress)
 export * from './agent.model';
 
-// Agent Attestation models (Earned credentials)
+// Agent Attestation models (Credentials earned BY humans/agents)
+// AttestationAccessRequirement: What attestations unlock which content
+// NOTE: Distinct from ContentAccessRequirement in content-access.model.ts
 export * from './attestations.model';
 
 // Elohim Agent models (Autonomous constitutional guardians)
@@ -76,7 +106,9 @@ export * from './search.model';
 // Session User models (MVP temporary identity)
 export * from './session-user.model';
 
-// Content Access models (access control for gated content)
+// Content Access models (visitor/member/attested tiers)
+// ContentAccessRequirement: What access level is required for content
+// NOTE: Distinct from AttestationAccessRequirement in attestations.model.ts
 export * from './content-access.model';
 
 // Profile models (human-centered identity, Imago Dei aligned)
@@ -90,3 +122,12 @@ export * from './contributor-presence.model';
 
 // Economic Event models (immutable value flow records)
 export * from './economic-event.model';
+
+// Governance & Feedback models (the protocol's immune system)
+export * from './governance-feedback.model';
+
+// Governance Deliberation models (context-aware feedback, deliberation, sensemaking)
+export * from './governance-deliberation.model';
+
+// Feedback Profile models (virality as privilege, emotional reaction constraints)
+export * from './feedback-profile.model';

@@ -30,6 +30,12 @@ This document tracks the implementation status of the Lamad learning platform MV
 | Phase 13: Session Human | ✅ Complete | Zero-friction identity, activity tracking, Holochain upgrade path |
 | Phase 14: Human Profile | ✅ Complete | Imago Dei-aligned profile service, journey narrative |
 | Phase 15: REA Economic Models | ✅ Complete | ValueFlows types, ContributorPresence, EconomicEvent |
+| Phase 16: Relational Maps | ✅ Complete | Self-knowledge maps, four-map architecture |
+| Phase 17: Psychometric Assessments | ✅ Complete | Validated instruments, pattern detection, research contribution |
+| Phase 18: Governance & Feedback | ✅ Complete | Constitutional moderation, challenges, appeals, precedent |
+| Phase 19: Governance Deliberation | ✅ Complete | Loomio/Polis/Wikipedia-inspired deliberation, sensemaking |
+| Phase 20: Feedback Profile | ✅ Complete | Virality as privilege, emotional reaction constraints, mediation |
+| Phase 21: Cohesion Review | ✅ Complete | Model standardization, documentation alignment |
 
 ### Quick Start
 
@@ -171,6 +177,283 @@ Human-centered identity view aligned with Imago Dei framework.
   - `getResumePoint()` - smart "continue here" suggestion
   - `getPathsOverview()` - in-progress, completed, suggested
 
+### Phase 16: Relational Maps ✅
+Four-dimensional knowledge map architecture for holistic growth.
+
+- **Knowledge Map model expanded** (`knowledge-map.model.ts`):
+  - `KnowledgeMapType` - Now four types: domain, self, person, collective
+  - `SelfKnowledgeMap` - "Know thyself" (γνῶθι σεαυτόν) reflexive map
+  - `ImagoDeiDimension` - Core/experience/gifts/synthesis facets
+  - `PersonalValue` - Values hierarchy with priority ranking
+  - `LifeChapter` - Narrative structure of personal history
+  - `DiscoveredGift` - Strengths uncovered through self-examination
+  - `ShadowArea` - Growth areas and blind spots (honest self-awareness)
+  - `VocationalClarity` - Calling, purpose, gift-to-need alignment
+  - `DomainReflection` - How domain learning reveals the self
+
+Theological grounding: "Love your neighbor as yourself" (Mark 12:31)
+implies three loves: God, neighbor, and self. Self-knowledge is prerequisite
+to loving others well.
+
+The four relational dimensions:
+1. **Domain** - What do I know? (relationship with ideas)
+2. **Self** - Who am I? (relationship with self)
+3. **Person** - Who do I know? (relationship with others - Gottman love maps)
+4. **Collective** - What do we know? (relationship with communities)
+
+### Phase 17: Psychometric Assessments ✅
+Scientifically validated self-knowledge with research contribution and Elohim guidance.
+
+- **Assessment Architecture** (`knowledge-map.model.ts`):
+  - `AssessmentInstrument` - Validated psychometric tools with reliability/validity data
+  - `AssessmentDomain` - 12 domains: personality, attachment, EQ, values, strengths, relationship, wellbeing, spiritual, vocational, cognitive, trauma, family-systems
+  - `AssessmentResult` - Completed assessments with raw scores, interpretation, quality metrics
+  - `AssessmentInterpretation` - Human-readable results with subscales, strengths, growth areas
+  - `LongitudinalChange` - Track changes over time for repeated assessments
+  - `SelfKnowledgeLink` - How assessments inform dimensions, values, gifts, shadows, vocation
+  - `ResponseQuality` - Detect rushed/inconsistent responses
+
+- **Assessments as Attributable Content**:
+  - `InstrumentContributor` - Contributors who developed/validated instruments (uses ContributorPresence)
+  - `ContributorRole` - original-author, validator, adapter, translator, normer, digitizer, curator, elohim-synthesizer
+  - `InstrumentDerivation` - Track when instruments derive from prior work
+  - `InstrumentRecognitionModel` - Recognition flows when instrument is used
+  - Contributors earn recognition for: completions, citations, validation work
+
+- **Assessments as Learning Paths**:
+  - `AssessmentPathStructure` - Pre-assessment → Instrument → Post-assessment
+  - `InstrumentSection` - Questions organized into meaningful sections
+  - `AssessmentQuestion` - Full question model with types (likert, multiple-choice, ranking, etc.)
+  - `AssessmentAttestation` - Attestations granted upon completion
+  - `AssessmentAttestationType` - self-knowledge, domain-exploration, pattern-awareness, growth-commitment, longitudinal, research-contributor, instrument-certified
+  - `AssessmentPrerequisite` - Prerequisites for sensitive assessments
+
+- **Pattern Detection** (Elohim guidance):
+  - `PatternAlert` - Detected patterns requiring attention (anxiety, distress, growth opportunity)
+  - `PatternType` - 9 types: anxiety-elevation, depression-indicators, relationship-distress, attachment-activation, burnout-risk, value-conflict, growth-opportunity, blind-spot-revealed, longitudinal-shift
+  - `SuggestedAction` - Recommended responses: learning paths, assessments, professional help
+  - `CrisisProtocol` - Safety net for serious concerns (NOT diagnosis, but resources)
+
+- **Research Contribution** (data sovereignty):
+  - `ResearchConsent` - Human-controlled contribution with scope options
+  - `ResearchConsentScope` - none, aggregate-only, anonymized, identifiable
+  - `ContributionRecognition` - REA recognition for research participation
+  - Privacy model: raw data on private source chain, anonymized contributions use differential privacy
+
+Three purposes of assessments:
+1. **Self-Knowledge** - Scientifically validated insights about oneself
+2. **Contribution** - Anonymized data for research (with consent) earns recognition
+3. **Elohim Guidance** - Pattern detection enables personalized growth paths
+
+Example flow: Human takes attachment assessment → Results reveal anxious attachment → Elohim gently suggests "Attachment Repair" learning path → Human's growth contributes to research (if consented) → Research advances understanding of attachment patterns in distributed communities.
+
+Attribution example: Dr. Kim Bartholomew (unclaimed ContributorPresence) developed the ECR-R → Community member adapts it for faith context → Both earn recognition when someone completes → If Dr. Bartholomew claims her presence, accumulated recognition transfers.
+
+### Phase 18: Governance & Feedback ✅
+Constitutional moderation system - the protocol's immune system.
+
+"In systems theory every system needs meaningful feedback or it goes chaotic." - Destin Sandlin
+
+- **Governance State** (`governance-feedback.model.ts`):
+  - `GovernableEntityType` - Everything is governable: content, paths, assessments, contributors, humans, even Elohim
+  - `GovernanceState` - Every entity has status, labels, reviews, challenges, restrictions
+  - `GovernanceStatus` - Lifecycle: unreviewed → reviewed → challenged → restricted/restored
+  - `StatusBasis` - Transparent reasoning for every status decision
+
+- **Labels (Taxonomy of Concerns)**:
+  - `LabelType` - 25 label types covering quality, safety, policy, positive markers
+  - `LabelSeverity` - Graduated: informational → advisory → warning → critical → emergency
+  - `LabelEvidence` - All labels must have evidence
+  - Labels are CHALLENGEABLE, not absolute
+
+- **Reviews**:
+  - `ReviewRecord` - Who reviewed, what type, outcome, recommendations
+  - `ReviewType` - initial, periodic, triggered, appeal, precedent, meta
+  - Reviews have quality scores (meta-review the reviewers)
+
+- **Challenges (The Right to Contest)**:
+  - `Challenge` - EVERY decision can be challenged (constitutional right)
+  - `ChallengeStanding` - content-owner, affected-party, community-member, public-interest
+  - `ChallengeGrounds` - 10 grounds: factual-error, misapplication, bias, inconsistency, etc.
+  - `ChallengeState` - Lifecycle with SLA guarantees
+  - System MUST respond within SLA - silence is not an option
+
+- **Appeals (Escalation Path)**:
+  - `Appeal` - Escalation to higher Elohim level
+  - `ElohimLevel` - individual → family → community → network → constitutional
+  - `AppealDecision` - Can affirm, reverse, modify, or remand
+  - Appeals create PRECEDENT (unlike Facebook's ad-hoc moderation)
+
+- **Precedent (Constitutional Evolution)**:
+  - `Precedent` - Decisions inform future decisions
+  - `PrecedentBinding` - persuasive, binding-local, binding-network, constitutional
+  - `PrecedentScope` - What does this precedent apply to?
+  - Creates predictable, fair governance over time
+
+- **Voting**:
+  - `GovernanceVote` - Collective decision-making
+  - `VotingMechanism` - simple-majority, supermajority, ranked-choice, quadratic, conviction, consent
+  - `QuorumRequirement` - Ensures legitimacy
+  - Democratic input into governance decisions
+
+- **Feedback Loop Metrics (System Health)**:
+  - `GovernanceFeedbackMetrics` - Track response times, outcomes, consistency
+  - `GovernanceRedFlag` - Detect system dysfunction early
+  - If metrics go bad, the system is going chaotic
+
+- **SLA Guarantees**:
+  - `GovernanceSLA` - Constitutional response time requirements
+  - Default: 1hr acknowledgment, 3 days initial response, 14 days resolution
+  - Breach consequences: auto-escalate, default-favor-challenger, public-report
+  - **No more "Help me get 16 years of my life back" with no response**
+
+Key difference from Facebook/Meta:
+- Every decision is challengeable
+- Every challenge gets a response (SLA-guaranteed)
+- Precedent builds predictable governance
+- Feedback metrics detect dysfunction
+- Power is distributed (Elohim hierarchy)
+- Constitutional rights, not discretionary policies
+
+### Phase 19: Governance Deliberation ✅
+Deliberation infrastructure extending the governance/feedback system.
+
+Inspired by:
+- **Loomio**: Structured proposals (advice, consent, consensus, sense-check) with graduated feedback
+- **Polis**: AI-powered opinion clustering, bridging statement detection
+- **Wikipedia**: Talk pages, edit history, protection logs for audit trails
+
+- **Governance Deliberation model** (`governance-deliberation.model.ts`):
+  - `GovernanceContextMenu` - Entry point to governance dimension for any entity
+  - `GovernanceQuickAction` - Quick actions: flag, discuss, challenge, vote, review
+  - `GovernanceAlert` - Notifications: vote-open, challenge-pending, sla-warning
+
+- **Graduated Feedback** (Loomio-inspired):
+  - `GraduatedFeedbackSelector` - Context-aware feedback component
+  - `FeedbackContext` - What's being evaluated: accuracy, usefulness, proposal-position, etc.
+  - `FeedbackOption` - Graduated options with optional reasoning requirements
+  - `FeedbackResponse` - User response with reasoning (required for negative feedback)
+  - `FeedbackAggregateView` - Distribution, consensus strength, bridging opportunities
+  - Pre-defined `FEEDBACK_SCALES` for different contexts
+
+- **Deliberation Proposals**:
+  - `DeliberationProposal` - Structured proposal for collective decision
+  - `ProposalType` - advice, consent, consensus, sense-check, ranked-choice, dot-vote, score-vote
+  - `ProposalPhase` - draft → discussion → voting → closed → decided → implemented
+  - `VotingConfiguration` - Mechanism, options, quorum, passage threshold
+  - `ProposalResults` - Tallied results with participation rate, blocks, recommendation
+  - `ProposalOutcome` - Final decision with reasoning and actions triggered
+
+- **Sensemaking** (Polis-inspired):
+  - `SensemakingVisualization` - Opinion clustering display
+  - `OpinionCluster` - Group with characteristic statements and centroid position
+  - `ConsensusStatement` - Statements with cross-cluster agreement (bridging)
+  - `DivisiveStatement` - High-variance statements showing disagreement
+  - `ClusterVisualizationData` - 2D projection (PCA/t-SNE/UMAP) for rendering
+  - `BridgingOpportunity` - Cross-group agreement worth surfacing
+
+- **Governance History** (Wikipedia-inspired):
+  - `GovernanceHistoryView` - Full audit trail with tabbed interface
+  - `HistoryTab` - summary, versions, discussions, governance, engagement
+  - `HistorySummaryTab` - Quick stats, health indicators, recent activity
+  - `HistoryVersionsTab` - Edit history with diff comparison
+  - `HistoryDiscussionsTab` - Talk page threads by category
+  - `HistoryGovernanceTab` - Labels, challenges, appeals, precedents
+  - `HistoryEngagementTab` - Views, affinity, citations over time
+
+- **Route Patterns** (API Specification 1.9):
+  - `/lamad/{entityType}:{entityId}/governance/{view}` - Core pattern
+  - Summary, history, versions, engagement views
+  - Discussion threads (Wikipedia Talk pages)
+  - Challenges and appeals filing
+  - Proposal creation and voting
+  - Sensemaking visualization
+
+- **GovernanceService** (API Specification 3.5):
+  - Context menu and state retrieval
+  - Graduated feedback submission and aggregation
+  - Proposal CRUD and voting
+  - Sensemaking statement submission and voting
+  - Discussion thread management
+  - Challenge/appeal filing and response
+  - Subscription management
+  - Global precedent browsing and SLA dashboard
+
+### Phase 20: Feedback Profile - Virality as Privilege ✅
+Feedback mechanisms as gated privileges - orthogonal to ContentReach.
+
+Core insight: **"Virality is a privilege, not an entitlement."**
+
+- **Feedback Profile model** (`feedback-profile.model.ts`):
+  - `FeedbackMechanism` - Types of engagement (NO "LIKES"):
+    - Low friction: `approval-vote`, `emotional-reaction`, `affinity-mark`
+    - Medium friction: `graduated-usefulness`, `graduated-accuracy`, `share-with-context`
+    - High friction: `proposal-vote`, `challenge`, `discussion-only`, `citation`, `peer-review`
+    - None: `view-only`
+  - `FeedbackProfile` - Governs what mechanisms are permitted for content
+  - `ProfileEvolution` - Upgrade AND downgrade (intellectual humility, Micah 6:8)
+  - `ProfileChangeTrigger` - What causes changes (attestation, peer-review, new-research, author-retraction)
+
+- **Emotional Reactions (NOT Facebook reactions)**:
+  - `EmotionalReactionType` - Contextual responses:
+    - Supportive: `moved`, `grateful`, `inspired`, `hopeful`, `grieving`
+    - Critical: `challenged`, `concerned`, `uncomfortable`
+  - `EmotionalReactionConstraints` - Guards against "tyranny of the laughing emoji"
+  - `MediatedReaction` - Elohim intercepts harmful reactions with teaching rather than blocking
+  - `MediatedReactionBehavior` - What happens if user proceeds (not visible to author, logged for monitoring)
+
+- **Key Design Decisions**:
+  - **No "likes"** - Replaced with approval voting (up/down) minimum
+  - **Path inheritance** - Most restrictive profile wins
+  - **Dynamic profiles** - Upgrade through trust-building, downgrade through new evidence
+  - **Mediated reactions** - Teach rather than block; user can proceed but author won't see
+
+- **ContentNode enhancement**:
+  - Added `feedbackProfileId` and `permittedFeedbackMechanisms` fields
+
+- **Elohim capabilities**:
+  - `feedback-profile-negotiation`, `feedback-profile-enforcement`
+  - `feedback-profile-upgrade`, `feedback-profile-downgrade`
+
+- **API routes** (Specification 1.10):
+  - `/lamad/{entityType}:{entityId}/feedback-profile` - View/manage profile
+  - `/lamad/{entityType}:{entityId}/reactions` - Emotional reactions
+  - Profile upgrade requests with justification
+
+### Phase 21: Cohesion Review ✅
+Model standardization and documentation alignment.
+
+**Issues Addressed:**
+
+1. **Duplicate Type Names Resolved**:
+   - `ContentAccessRequirement` in `attestations.model.ts` → renamed to `AttestationAccessRequirement`
+   - Now clearly distinguished from `ContentAccessRequirement` in `content-access.model.ts`
+   - `AttestationAccessRequirement`: What ATTESTATIONS unlock (earned credentials → content)
+   - `ContentAccessRequirement`: What ACCESS LEVEL is required (visitor/member/attested)
+
+2. **Date Field Standardization**:
+   - All timestamp fields now use ISO 8601 string format (not Date objects)
+   - Files updated: `attestations.model.ts`, `user-affinity.model.ts`, `content-node.model.ts`
+   - Rationale: JSON serialization, Holochain compatibility, timezone safety
+
+3. **Index.ts Documentation**:
+   - Enhanced barrel export with six-layer architecture summary
+   - Clear distinction between three attestation models documented
+   - Date field convention noted
+   - Governance layer added to architecture summary
+
+4. **API Specification Updated** (v1.1):
+   - Added "Technical Conventions" section
+   - Date field convention documented
+   - Attestation model distinction table added
+
+**Files Modified:**
+- `attestations.model.ts` - Renamed type, fixed date fields
+- `user-affinity.model.ts` - Fixed date fields
+- `content-node.model.ts` - Fixed date fields
+- `models/index.ts` - Enhanced documentation
+- `LAMAD_API_SPECIFICATION_v1.0.md` - Added technical conventions
+
 ### Phase 15: REA Economic Models ✅
 Interface contracts for hREA/Unyt economic coordination.
 
@@ -206,7 +489,7 @@ Interface contracts for hREA/Unyt economic coordination.
 
 ## Current State
 
-**The MVP service layer is feature-complete. REA economic interface contracts established.**
+**The MVP service layer is feature-complete. REA economic interface contracts established. Four-dimensional relational map architecture complete. Psychometric assessment framework ready for validated self-knowledge. Governance deliberation infrastructure defined with Loomio/Polis/Wikipedia-inspired patterns. Feedback profile system establishes virality as a privilege with Elohim-mediated emotional reactions. All models standardized with ISO 8601 date fields and clear attestation model distinctions.**
 
 The MVP walking skeleton is complete with:
 - Path-based learning journeys with step navigation
@@ -220,6 +503,13 @@ The MVP walking skeleton is complete with:
 - **REA/ValueFlows interface contracts for hREA integration**
 - **Contributor Presence stewardship lifecycle models**
 - **Economic event stream models for value flow tracking**
+- **Four-dimensional relational maps (domain, self, person, collective)**
+- **Self-knowledge architecture ("know thyself") with Imago Dei integration**
+- **Psychometric assessment framework with pattern detection and research contribution**
+- **Governance dimension routes and service interface (API Spec 1.9, 3.5)**
+- **Governance deliberation models: graduated feedback, proposals, sensemaking**
+- **Feedback profile: virality as privilege, no "likes", Elohim-mediated reactions**
+- **Emotional reaction constraints: guards against "tyranny of the laughing emoji"**
 
 ### Active Services
 
@@ -237,6 +527,7 @@ The MVP walking skeleton is complete with:
 | SearchService | ✅ | search, suggest, getTagCloud |
 | SessionUserService | ✅ | getSession, recordActivity, checkContentAccess, triggerUpgradePrompt, prepareMigration |
 | ProfileService | ✅ | getProfile, getTimeline, getCurrentFocus, getPathsOverview, getResumePoint |
+| GovernanceService | ✅ | getContextMenu, getGovernanceState, getFeedbackSelector, submitFeedback, getProposals, createProposal, getSensemakingVisualization, fileChallenge |
 
 ---
 
@@ -298,7 +589,7 @@ src/app/lamad/
 │   ├── content-attestation.model.ts # Attestation model with types
 │   ├── trust-badge.model.ts        # UI-ready trust indicators (badges + flags)
 │   ├── search.model.ts             # Enhanced search with scoring and facets
-│   ├── knowledge-map.model.ts      # Polymorphic knowledge maps
+│   ├── knowledge-map.model.ts      # Four-dimensional maps (domain, self, person, collective)
 │   ├── path-extension.model.ts     # Learner path extensions
 │   ├── exploration.model.ts        # Graph exploration queries
 │   ├── session-user.model.ts       # Session human identity
@@ -415,6 +706,68 @@ attested (credentialed member)
 
 ---
 
+## Relational Map Architecture
+
+### The Four Maps ("Know Thyself" + "Love Thy Neighbor")
+
+Learning is fundamentally about building relationship. Lamad supports four types of knowledge maps, each representing a different relational dimension:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     DOMAIN MAPS                                  │
+│           "What do I know?" (relationship with ideas)           │
+│    Khan Academy style: World of Math, Elohim Protocol          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       SELF MAPS                                  │
+│          "Who am I?" (γνῶθι σεαυτόν - know thyself)             │
+│    Imago Dei dimensions: core, experience, gifts, synthesis     │
+│    Values hierarchy, life chapters, discovered gifts            │
+│    Shadow areas (honest growth), vocational clarity             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      PERSON MAPS                                 │
+│       "Who do I know?" (relationship with others)               │
+│    Gottman Love Maps: spouse, family, friends, mentors          │
+│    Categories: life history, values, dreams, love language      │
+│    Consent-based access, reciprocal mapping                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    COLLECTIVE MAPS                               │
+│       "What do we know?" (relationship with communities)        │
+│    Organizational knowledge, team intelligence                   │
+│    Governance: steward-only, consensus, open                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Self-Knowledge Integration
+
+Self-knowledge maps integrate with the HumanProfile (Imago Dei framework):
+
+| Imago Dei Dimension | Self-Map Integration |
+|---------------------|---------------------|
+| imagodei-core | Stable identity, "I am" statements |
+| imagodei-experience | Life chapters, formative events |
+| imagodei-gifts | Discovered gifts, strengths |
+| imagodei-synthesis | Meaning-making, growth narrative |
+
+### Domain Reflections
+
+When learning from domain maps, self-discovery happens naturally:
+- What topics energize me? (points to gifts)
+- What do I resist learning? (points to shadow areas)
+- How does this connect to my calling? (vocational clarity)
+
+This creates a feedback loop between domain learning and self-understanding.
+
+---
+
 ## Economic Architecture (REA)
 
 ### Contributor Presence Lifecycle
@@ -455,4 +808,4 @@ From the Economic Epic (De Beers' Cybersyn on P2P):
 
 ---
 
-*Last updated: 2025-11-27*
+*Last updated: 2025-11-27 (Phase 21: Cohesion Review)*
