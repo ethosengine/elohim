@@ -9,6 +9,7 @@ describe('AffinityTrackingService', () => {
   let sessionUserServiceSpy: jasmine.SpyObj<SessionUserService>;
   let localStorageMock: { [key: string]: string };
   let mockStorage: Storage;
+  let sessionSubject: BehaviorSubject<any>;
 
   beforeEach(() => {
     localStorageMock = {};
@@ -31,7 +32,7 @@ describe('AffinityTrackingService', () => {
       'recordAffinityChange'
     ]);
 
-    const sessionSubject = new BehaviorSubject<any>(null);
+    sessionSubject = new BehaviorSubject<any>(null);
     Object.defineProperty(sessionUserServiceSpy, 'session$', {
       get: () => sessionSubject.asObservable()
     });
@@ -281,7 +282,7 @@ describe('AffinityTrackingService', () => {
       expect(parsed.affinity['node-1']).toBe(0.5);
     });
 
-    it('should load existing affinity from localStorage', () => {
+    it('should load existing affinity from localStorage on session change', () => {
       const existingData = {
         userId: 'test-user',
         affinity: { 'existing-node': 0.9 },
@@ -289,9 +290,10 @@ describe('AffinityTrackingService', () => {
       };
       localStorageMock['affinity-test-session'] = JSON.stringify(existingData);
 
-      // Create new service instance to trigger load
-      const newService = new AffinityTrackingService(sessionUserServiceSpy);
-      expect(newService.getAffinity('existing-node')).toBe(0.9);
+      // Trigger session change to reload from storage
+      sessionSubject.next({ id: 'new-session' });
+
+      expect(service.getAffinity('existing-node')).toBe(0.9);
     });
   });
 });
