@@ -17,25 +17,25 @@ describe('LamadHomeComponent', () => {
       id: 'elohim-protocol',
       title: 'Elohim Protocol',
       description: 'Learn the Elohim Protocol',
-      contentType: 'path',
       difficulty: 'beginner',
       estimatedDuration: '2 hours',
       stepCount: 5,
-      featured: true
+      tags: ['protocol', 'intro']
     },
     {
       id: 'learning-platform',
       title: 'Learning Platform',
       description: 'Understanding Lamad',
-      contentType: 'path',
       difficulty: 'intermediate',
       estimatedDuration: '1 hour',
       stepCount: 3,
-      featured: false
+      tags: ['learning', 'platform']
     }
   ];
 
   const mockPathIndex: PathIndex = {
+    lastUpdated: '2025-01-01T00:00:00.000Z',
+    totalCount: 2,
     paths: mockPaths
   };
 
@@ -89,6 +89,8 @@ describe('LamadHomeComponent', () => {
 
   it('should set featured path to first path if elohim-protocol not found', () => {
     const pathsWithoutElohim: PathIndex = {
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+      totalCount: 1,
       paths: [mockPaths[1]]
     };
     pathService.listPaths.and.returnValue(of(pathsWithoutElohim));
@@ -99,7 +101,11 @@ describe('LamadHomeComponent', () => {
   });
 
   it('should handle empty paths array', () => {
-    pathService.listPaths.and.returnValue(of({ paths: [] }));
+    pathService.listPaths.and.returnValue(of({
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+      totalCount: 0,
+      paths: []
+    }));
 
     fixture.detectChanges();
 

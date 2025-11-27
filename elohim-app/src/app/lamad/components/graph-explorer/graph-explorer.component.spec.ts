@@ -66,13 +66,13 @@ describe('GraphExplorerComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
     router = TestBed.inject(Router);
 
-    // Mock the graphContainer
+    // Mock the graphContainer with proper read-only properties
+    const mockDiv = document.createElement('div');
+    Object.defineProperty(mockDiv, 'clientWidth', { value: 800, writable: false });
+    Object.defineProperty(mockDiv, 'clientHeight', { value: 600, writable: false });
     component.graphContainer = {
-      nativeElement: document.createElement('div')
+      nativeElement: mockDiv
     } as ElementRef<HTMLDivElement>;
-
-    component.graphContainer.nativeElement.clientWidth = 800;
-    component.graphContainer.nativeElement.clientHeight = 600;
   });
 
   afterEach(() => {

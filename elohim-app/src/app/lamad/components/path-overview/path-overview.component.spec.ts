@@ -17,24 +17,69 @@ describe('PathOverviewComponent', () => {
 
   const mockPath: LearningPath = {
     id: 'test-path',
+    version: '1.0.0',
     title: 'Test Learning Path',
     description: 'A comprehensive learning path',
-    contentType: 'path',
+    purpose: 'Testing',
+    createdBy: 'test-user',
+    contributors: [],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
     difficulty: 'intermediate',
     estimatedDuration: '2 hours',
+    tags: ['test'],
+    visibility: 'public',
     steps: [
-      { stepIndex: 0, title: 'Step 1', narrative: 'First step', contentNodeId: 'node-1', optional: false },
-      { stepIndex: 1, title: 'Step 2', narrative: 'Second step', contentNodeId: 'node-2', optional: false },
-      { stepIndex: 2, title: 'Step 3', narrative: 'Third step', contentNodeId: 'node-3', optional: true },
-      { stepIndex: 3, title: 'Step 4', narrative: 'Fourth step', contentNodeId: 'node-4', optional: false }
+      {
+        order: 0,
+        resourceId: 'node-1',
+        stepTitle: 'Step 1',
+        stepNarrative: 'First step',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      },
+      {
+        order: 1,
+        resourceId: 'node-2',
+        stepTitle: 'Step 2',
+        stepNarrative: 'Second step',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      },
+      {
+        order: 2,
+        resourceId: 'node-3',
+        stepTitle: 'Step 3',
+        stepNarrative: 'Third step',
+        learningObjectives: [],
+        optional: true,
+        completionCriteria: []
+      },
+      {
+        order: 3,
+        resourceId: 'node-4',
+        stepTitle: 'Step 4',
+        stepNarrative: 'Fourth step',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      }
     ]
   };
 
   const mockProgress: AgentProgress = {
+    agentId: 'test-agent',
     pathId: 'test-path',
+    currentStepIndex: 1,
     completedStepIndices: [0, 1],
-    lastAccessedStepIndex: 1,
-    lastAccessedAt: '2025-01-01T00:00:00.000Z'
+    startedAt: '2025-01-01T00:00:00.000Z',
+    lastActivityAt: '2025-01-01T00:00:00.000Z',
+    stepAffinity: {},
+    stepNotes: {},
+    reflectionResponses: {},
+    attestationsEarned: []
   };
 
   const mockAccessibleSteps = [0, 1, 2];
@@ -111,10 +156,16 @@ describe('PathOverviewComponent', () => {
 
   it('should not exceed total steps when calculating current step', () => {
     const progressAllComplete: AgentProgress = {
+      agentId: 'test-agent',
       pathId: 'test-path',
+      currentStepIndex: 3,
       completedStepIndices: [0, 1, 2, 3],
-      lastAccessedStepIndex: 3,
-      lastAccessedAt: '2025-01-01T00:00:00.000Z'
+      startedAt: '2025-01-01T00:00:00.000Z',
+      lastActivityAt: '2025-01-01T00:00:00.000Z',
+      stepAffinity: {},
+      stepNotes: {},
+      reflectionResponses: {},
+      attestationsEarned: []
     };
     agentService.getProgressForPath.and.returnValue(of(progressAllComplete));
     fixture.detectChanges();
@@ -134,20 +185,32 @@ describe('PathOverviewComponent', () => {
 
   it('should return false for hasStarted if no completed steps', () => {
     component.progress = {
+      agentId: 'test-agent',
       pathId: 'test-path',
+      currentStepIndex: 0,
       completedStepIndices: [],
-      lastAccessedStepIndex: 0,
-      lastAccessedAt: '2025-01-01T00:00:00.000Z'
+      startedAt: '2025-01-01T00:00:00.000Z',
+      lastActivityAt: '2025-01-01T00:00:00.000Z',
+      stepAffinity: {},
+      stepNotes: {},
+      reflectionResponses: {},
+      attestationsEarned: []
     };
     expect(component.hasStarted()).toBe(false);
   });
 
   it('should check if path is completed (only required steps)', () => {
     const progressAllRequired: AgentProgress = {
+      agentId: 'test-agent',
       pathId: 'test-path',
+      currentStepIndex: 3,
       completedStepIndices: [0, 1, 3], // Missing optional step 2
-      lastAccessedStepIndex: 3,
-      lastAccessedAt: '2025-01-01T00:00:00.000Z'
+      startedAt: '2025-01-01T00:00:00.000Z',
+      lastActivityAt: '2025-01-01T00:00:00.000Z',
+      stepAffinity: {},
+      stepNotes: {},
+      reflectionResponses: {},
+      attestationsEarned: []
     };
     agentService.getProgressForPath.and.returnValue(of(progressAllRequired));
     fixture.detectChanges();
@@ -235,15 +298,15 @@ describe('PathOverviewComponent', () => {
     expect(component.getDifficultyDisplay()).toBe('Intermediate');
   });
 
-  it('should handle unknown difficulty', () => {
-    const unknownPath: LearningPath = {
+  it('should display advanced difficulty', () => {
+    const advancedPath: LearningPath = {
       ...mockPath,
-      difficulty: 'expert'
+      difficulty: 'advanced'
     };
-    pathService.getPath.and.returnValue(of(unknownPath));
+    pathService.getPath.and.returnValue(of(advancedPath));
     fixture.detectChanges();
 
-    expect(component.getDifficultyDisplay()).toBe('expert');
+    expect(component.getDifficultyDisplay()).toBe('Advanced');
   });
 
   it('should get step status class for completed step', () => {
@@ -269,10 +332,16 @@ describe('PathOverviewComponent', () => {
 
     // Step 1 is completed, so let's modify progress to make it accessible but not completed
     component.progress = {
+      agentId: 'test-agent',
       pathId: 'test-path',
+      currentStepIndex: 0,
       completedStepIndices: [0],
-      lastAccessedStepIndex: 0,
-      lastAccessedAt: '2025-01-01T00:00:00.000Z'
+      startedAt: '2025-01-01T00:00:00.000Z',
+      lastActivityAt: '2025-01-01T00:00:00.000Z',
+      stepAffinity: {},
+      stepNotes: {},
+      reflectionResponses: {},
+      attestationsEarned: []
     };
 
     expect(component.getStepStatusClass(1)).toBe('accessible');

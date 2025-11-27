@@ -205,9 +205,11 @@ describe('SessionUserService', () => {
       const progress: SessionPathProgress = {
         pathId: 'path-1',
         currentStepIndex: 2,
-        completedSteps: [0, 1],
+        completedStepIndices: [0, 1],
+        stepAffinity: {},
+        stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastAccessedAt: '2025-01-02T00:00:00.000Z',
+        lastActivityAt: '2025-01-02T00:00:00.000Z'
       };
 
       service.savePathProgress(progress);
@@ -216,7 +218,7 @@ describe('SessionUserService', () => {
       expect(retrieved).toBeTruthy();
       expect(retrieved?.pathId).toBe('path-1');
       expect(retrieved?.currentStepIndex).toBe(2);
-      expect(retrieved?.completedSteps).toEqual([0, 1]);
+      expect(retrieved?.completedStepIndices).toEqual([0, 1]);
     });
 
     it('should return null if no progress exists', () => {
@@ -228,17 +230,21 @@ describe('SessionUserService', () => {
       const progress1: SessionPathProgress = {
         pathId: 'path-1',
         currentStepIndex: 2,
-        completedSteps: [0, 1],
+        completedStepIndices: [0, 1],
+        stepAffinity: {},
+        stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastAccessedAt: '2025-01-02T00:00:00.000Z',
+        lastActivityAt: '2025-01-02T00:00:00.000Z'
       };
 
       const progress2: SessionPathProgress = {
         pathId: 'path-2',
         currentStepIndex: 1,
-        completedSteps: [0],
+        completedStepIndices: [0],
+        stepAffinity: {},
+        stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastAccessedAt: '2025-01-02T00:00:00.000Z',
+        lastActivityAt: '2025-01-02T00:00:00.000Z'
       };
 
       service.savePathProgress(progress1);
@@ -358,6 +364,9 @@ describe('SessionUserService', () => {
       const result = service.checkContentAccess({
         accessLevel: 'gated',
         restrictionReason: 'Test restriction',
+        requirements: {
+          minLevel: 'member'
+        }
       });
       expect(result.canAccess).toBe(false);
       expect(result.reason).toBe('not-authenticated');
@@ -368,9 +377,10 @@ describe('SessionUserService', () => {
       const result = service.checkContentAccess({
         accessLevel: 'protected',
         requirements: {
+          minLevel: 'attested',
           requiredAttestations: ['att-1'],
-          requiredPaths: ['path-1'],
-        },
+          requiredPaths: ['path-1']
+        }
       });
       expect(result.canAccess).toBe(false);
       expect(result.missingAttestations).toEqual(['att-1']);
@@ -379,7 +389,10 @@ describe('SessionUserService', () => {
 
     it('should check if content is accessible', () => {
       expect(service.canAccessContent({ accessLevel: 'open' })).toBe(true);
-      expect(service.canAccessContent({ accessLevel: 'gated' })).toBe(false);
+      expect(service.canAccessContent({
+        accessLevel: 'gated',
+        requirements: { minLevel: 'member' }
+      })).toBe(false);
     });
 
     it('should trigger upgrade prompt on gated content access', () => {

@@ -16,26 +16,58 @@ describe('PathNavigatorComponent', () => {
 
   const mockPath: LearningPath = {
     id: 'test-path',
+    version: '1.0.0',
     title: 'Test Path',
     description: 'A test learning path',
-    contentType: 'path',
+    purpose: 'Testing purposes',
+    createdBy: 'test-user',
+    contributors: [],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
     difficulty: 'beginner',
     estimatedDuration: '1 hour',
+    tags: ['test'],
+    visibility: 'public',
     steps: [
-      { stepIndex: 0, title: 'Step 1', narrative: 'Narrative 1', contentNodeId: 'node-1' },
-      { stepIndex: 1, title: 'Step 2', narrative: 'Narrative 2', contentNodeId: 'node-2' },
-      { stepIndex: 2, title: 'Step 3', narrative: 'Narrative 3', contentNodeId: 'node-3' }
+      {
+        order: 0,
+        resourceId: 'node-1',
+        stepTitle: 'Step 1',
+        stepNarrative: 'Narrative 1',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      },
+      {
+        order: 1,
+        resourceId: 'node-2',
+        stepTitle: 'Step 2',
+        stepNarrative: 'Narrative 2',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      },
+      {
+        order: 2,
+        resourceId: 'node-3',
+        stepTitle: 'Step 3',
+        stepNarrative: 'Narrative 3',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      }
     ]
   };
 
   const mockStepView: PathStepView = {
-    pathId: 'test-path',
-    stepIndex: 1,
     step: {
-      stepIndex: 1,
-      title: 'Step 2',
-      narrative: 'This is step 2',
-      contentNodeId: 'node-2'
+      order: 1,
+      resourceId: 'node-2',
+      stepTitle: 'Step 2',
+      stepNarrative: 'This is step 2',
+      learningObjectives: [],
+      optional: false,
+      completionCriteria: []
     },
     content: {
       id: 'node-2',
@@ -51,8 +83,7 @@ describe('PathNavigatorComponent', () => {
     hasNext: true,
     hasPrevious: true,
     nextStepIndex: 2,
-    previousStepIndex: 0,
-    totalSteps: 3
+    previousStepIndex: 0
   };
 
   beforeEach(async () => {
