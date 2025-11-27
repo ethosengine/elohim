@@ -1,15 +1,17 @@
 /**
- * Agent - A traveler in the system (human, org, or AI).
+ * Agent - A traveler in the system (human, org, AI, or Elohim).
  *
  * Holochain mapping:
  * - Entry type: "agent_profile"
  * - id becomes AgentPubKey
  * - Profile data published to DHT if visibility allows
+ *
+ * For Elohim agents, additional properties are available.
  */
 export interface Agent {
   id: string;  // AgentPubKey in Holochain
   displayName: string;
-  type: 'human' | 'organization' | 'ai-agent';
+  type: 'human' | 'organization' | 'ai-agent' | 'elohim';
 
   bio?: string;
   avatar?: string;
@@ -20,6 +22,12 @@ export interface Agent {
   // Timestamps
   createdAt: string;
   updatedAt: string;
+
+  // Elohim-specific properties (optional, only present for type: 'elohim')
+  layer?: string;
+  capabilities?: string[];
+  attestations?: string[];
+  familyId?: string;
 }
 
 /**
@@ -69,13 +77,13 @@ export type AttestationCategory =
 
 /**
  * MasteryLevel - For Phase 6 mastery system
+ * Values track learning progression from initial exposure to mastery.
  */
 export type MasteryLevel =
-  | 'none'
-  | 'impression'
-  | 'practiced'
-  | 'level-1'
-  | 'level-2'
+  | 'not-started'
+  | 'struggling'
+  | 'learning'
+  | 'practicing'
   | 'mastered';
 
 /**

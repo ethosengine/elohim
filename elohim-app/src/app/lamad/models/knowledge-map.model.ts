@@ -722,7 +722,7 @@ export interface AssessmentAttestation {
   description: string;
 
   /** Requirements for granting */
-  requirements: AttestationRequirement[];
+  requirements: AssessmentAttestationRequirement[];
 
   /** Can be displayed publicly? */
   publiclyDisplayable: boolean;
@@ -740,7 +740,7 @@ export type AssessmentAttestationType =
   | 'research-contributor' // "I've contributed to research"
   | 'instrument-certified'; // "I'm certified to administer this instrument"
 
-export interface AttestationRequirement {
+export interface AssessmentAttestationRequirement {
   type: 'completion' | 'score-threshold' | 'quality-threshold' | 'repeat-count' | 'time-span';
   value: number | string;
   description: string;

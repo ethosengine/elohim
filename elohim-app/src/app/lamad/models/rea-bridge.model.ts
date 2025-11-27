@@ -148,9 +148,19 @@ export interface Unit {
 }
 
 /**
+ * Standard unit names for type safety.
+ */
+export type LamadUnitName =
+  | 'view' | 'minute' | 'session'       // Attention units
+  | 'affinity' | 'endorsement' | 'attestation'  // Recognition units
+  | 'node' | 'step' | 'path'            // Content units
+  | 'token' | 'cycle'                   // Compute units
+  | 'each' | 'one';                     // Generic
+
+/**
  * Standard units for Lamad resources.
  */
-export const LAMAD_UNITS: Record<string, Unit> = {
+export const LAMAD_UNITS: Record<LamadUnitName, Unit> = {
   // Attention units
   view: { id: 'unit-view', label: 'View', symbol: 'view' },
   minute: { id: 'unit-minute', label: 'Minute', symbol: 'min' },
