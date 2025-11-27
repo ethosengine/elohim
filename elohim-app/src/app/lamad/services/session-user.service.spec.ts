@@ -32,6 +32,10 @@ describe('SessionUserService', () => {
       return keys[index] || null;
     });
 
+    spyOnProperty(localStorage, 'length', 'get').and.callFake(() => {
+      return Object.keys(localStorageMock).length;
+    });
+
     TestBed.configureTestingModule({});
     service = TestBed.inject(SessionUserService);
   });

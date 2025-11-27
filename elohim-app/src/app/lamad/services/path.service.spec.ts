@@ -201,10 +201,10 @@ describe('PathService', () => {
     });
 
     it('should handle last step navigation', (done) => {
-      service.getPathStep('test-path', 3).subscribe(stepView => {
+      service.getPathStep('test-path', 4).subscribe(stepView => {
         expect(stepView.hasPrevious).toBe(true);
         expect(stepView.hasNext).toBe(false);
-        expect(stepView.previousStepIndex).toBe(2);
+        expect(stepView.previousStepIndex).toBe(3);
         expect(stepView.nextStepIndex).toBeUndefined();
         done();
       });
@@ -449,8 +449,8 @@ describe('PathService', () => {
       agentServiceSpy.getProgressForPath.and.returnValue(of(partialProgress));
 
       service.getCompletionPercentage('test-path').subscribe(percentage => {
-        // 1 required completed out of 3 required total = 33%
-        expect(percentage).toBe(33);
+        // 1 required completed out of 4 required total = 25%
+        expect(percentage).toBe(25);
         done();
       });
     });
