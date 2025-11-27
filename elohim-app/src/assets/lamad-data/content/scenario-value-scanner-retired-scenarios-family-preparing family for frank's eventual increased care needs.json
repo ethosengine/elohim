@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-preparing family for frank's eventual increased care needs",
+  "contentType": "scenario",
+  "title": "Preparing family for Frank's eventual increased care needs",
+  "description": "Preparing family for Frank's eventual increased care needs",
+  "content": "Scenario: Preparing family for Frank's eventual increased care needs\n    Given Frank is currently more provider than receiver\n    And his care needs will likely increase in next 10-20 years\n    When family_elohim supports care planning\n    Then it should help Frank discuss future care needs with family\n    And prepare adult children for eventual role reversal\n    And surface: \"Frank's contributions now create legitimate claims later\"\n    And facilitate planning conversations that preserve Frank's dignity\n    And help family anticipate and prepare for increasing needs\n    And ensure Frank experiences agency in planning his aging\n    And care reciprocity across time should be made explicit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

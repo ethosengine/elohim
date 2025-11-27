@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager proposes operational changes requiring democratic approval",
+  "contentType": "scenario",
+  "title": "Manager proposes operational changes requiring democratic approval",
+  "description": "Manager proposes operational changes requiring democratic approval",
+  "content": "Scenario: Manager proposes operational changes requiring democratic approval\n    Given Marcus identifies efficiency improvement opportunity\n    And corporate model would have him implement changes by fiat\n    When Marcus wants to implement the operational change\n    Then Marcus presents proposal to worker council with clear rationale\n    And workers deliberate on benefits and potential downsides\n    And workers ask clarifying questions Marcus answers transparently\n    And workers vote on whether to adopt the change\n    And if approved, Marcus coordinates implementation\n    And if rejected, Marcus accepts decision and proposes alternatives\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-medical privacy protects alex from unauthorized disclosure",
+  "contentType": "scenario",
+  "title": "Medical privacy protects Alex from unauthorized disclosure",
+  "description": "Medical privacy protects Alex from unauthorized disclosure",
+  "content": "Scenario: Medical privacy protects Alex from unauthorized disclosure\n    Given medical information is highly sensitive\n    And disability status can lead to discrimination if disclosed\n    When Alex's medical information is collected\n    Then the personal_agent should ensure strict medical privacy\n    And it should control what medical information is shared with whom\n    And workplace should never receive medical details\n    And family should only access what Alex permits\n    And insurance should receive minimum necessary information\n    And Alex's medical privacy should be maximally protected\n    And the protocol should prevent unauthorized medical disclosure systematically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

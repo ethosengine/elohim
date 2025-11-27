@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-local economic cooperation for service cost reduction",
+  "contentType": "scenario",
+  "title": "Local economic cooperation for service cost reduction",
+  "description": "Local economic cooperation for service cost reduction",
+  "content": "Scenario: Local economic cooperation for service cost reduction\n    Given Maria struggles to afford household services on limited income\n    And neighbors might coordinate for collective cost reduction\n    When neighborhood members need similar services\n    Then the neighborhood_elohim should coordinate group contracting\n    And collective service hiring should reduce costs for all participants\n    And Maria should access affordable household services through cooperation\n    And neighborhood economic coordination should address resource constraints\n    And single parents should benefit from collective bargaining power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

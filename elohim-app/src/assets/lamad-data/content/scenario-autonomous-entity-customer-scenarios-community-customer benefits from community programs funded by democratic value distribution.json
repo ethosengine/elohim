@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer benefits from community programs funded by democratic value distribution",
+  "contentType": "scenario",
+  "title": "Customer benefits from community programs funded by democratic value distribution",
+  "description": "Customer benefits from community programs funded by democratic value distribution",
+  "content": "Scenario: Customer benefits from community programs funded by democratic value distribution\n    Given corporate extraction left minimal resources for community benefit\n    And neighborhood needed senior support, youth employment, community space\n    When democratic businesses allocate 30% of revenue to community programs\n    Then Ms. Johnson accesses subsidized senior meals (sliding scale pricing)\n    And neighbors' youth gain employment with dignity and ownership pathway\n    And community space is available for organizing and mutual aid\n    And her patronage funds programs benefiting entire neighborhood\n    And community_elohim manages community benefit distribution ensuring equity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

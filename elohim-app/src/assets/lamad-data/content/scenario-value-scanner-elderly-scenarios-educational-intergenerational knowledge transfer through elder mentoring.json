@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-intergenerational knowledge transfer through elder mentoring",
+  "contentType": "scenario",
+  "title": "Intergenerational knowledge transfer through elder mentoring",
+  "description": "Intergenerational knowledge transfer through elder mentoring",
+  "content": "Scenario: Intergenerational knowledge transfer through elder mentoring\n    Given younger generations lack knowledge Helen possesses\n    And intergenerational learning benefits all participants\n    When Helen mentors grandchildren or community youth\n    Then her teaching should be facilitated by educational systems\n    And younger learners should be connected to elder mentors\n    And Helen should be recognized as educator, not just \"nice grandma\"\n    And care tokens should reflect her teaching work\n    And the protocol should coordinate intergenerational learning\n    And educational value should flow in both directions\n    And youth should learn to value elder wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

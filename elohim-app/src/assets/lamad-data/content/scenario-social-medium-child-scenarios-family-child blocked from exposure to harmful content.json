@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+  "contentType": "scenario",
+  "title": "Child blocked from exposure to harmful content",
+  "description": "Child blocked from exposure to harmful content",
+  "content": "Scenario: Child blocked from exposure to harmful content\n    Given Emma's uncle shares a news article about violence\n    And the content is appropriate for adults but not children\n    When the article is contributed to the family space\n    Then the guardian agent evaluates age-appropriateness\n    And Emma's view is automatically filtered or summarized\n    And her parents can choose to discuss the topic with her directly\n    And Emma never sees graphic or traumatizing content\n    And family communication continues without disruption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-family",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

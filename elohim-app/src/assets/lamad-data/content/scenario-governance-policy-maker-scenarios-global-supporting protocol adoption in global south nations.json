@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-supporting protocol adoption in global south nations",
+  "contentType": "scenario",
+  "title": "Supporting protocol adoption in Global South nations",
+  "description": "Supporting protocol adoption in Global South nations",
+  "content": "Scenario: Supporting protocol adoption in Global South nations\n    Given developing nations need technology transfer and support\n    And protocol shouldn't be Global North privilege\n    When I advocate for international development support\n    Then I promote: funding for Global South protocol infrastructure\n    And I support: technology transfer and capacity building\n    And I resist: digital colonialism disguised as development\n    And I ensure: Global South communities control their adoption\n    And I fund: mutual aid between wealthy and poor communities\n    And I work: toward global equity in democratic AI governance\n    And I recognize: that justice requires reducing inequality\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

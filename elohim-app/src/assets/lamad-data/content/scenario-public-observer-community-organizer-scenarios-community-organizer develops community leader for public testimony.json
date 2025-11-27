@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-community-organizer develops community leader for public testimony",
+  "contentType": "scenario",
+  "title": "Organizer develops community leader for public testimony",
+  "description": "Organizer develops community leader for public testimony",
+  "content": "Scenario: Organizer develops community leader for public testimony\n    Given a tenant has never spoken at public meetings\n    And they want to testify about rent burden at city council\n    When the organizer uses Observer to support leadership development\n    Then the tenant receives accessible data on local rent patterns\n    And gets sample testimony framework personalized to their experience\n    And sees common questions and effective response strategies\n    And practices using Observer's preparation tools\n    And emerges as powerful community voice not dependent on organizer\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,board_member",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

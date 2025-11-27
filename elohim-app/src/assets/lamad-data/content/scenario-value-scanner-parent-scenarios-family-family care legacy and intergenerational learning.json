@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-family care legacy and intergenerational learning",
+  "contentType": "scenario",
+  "title": "Family care legacy and intergenerational learning",
+  "description": "Family care legacy and intergenerational learning",
+  "content": "Scenario: Family care legacy and intergenerational learning\n    Given Sarah learned caregiving from her own parents\n    And she is teaching care practices to Tommy and Emma\n    When the family_elohim tracks intergenerational patterns\n    Then it should recognize care legacy across generations\n    And it should show how care practices are transmitted\n    And it should value Sarah's role in teaching next generation\n    And intergenerational care knowledge should be recognized\n    And the system should support positive care culture transmission\n    And family care economy should build across generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

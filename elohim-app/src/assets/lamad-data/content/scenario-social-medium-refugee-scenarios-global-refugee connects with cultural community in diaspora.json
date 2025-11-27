@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-refugee-scenarios-global-refugee connects with cultural community in diaspora",
+  "contentType": "scenario",
+  "title": "Refugee connects with cultural community in diaspora",
+  "description": "Refugee connects with cultural community in diaspora",
+  "content": "Scenario: Refugee connects with cultural community in diaspora\n    Given Amira wants to maintain Syrian cultural connections\n    When she joins the Syrian diaspora cultural community\n    And the community includes refugees across multiple countries\n    Then she finds others who share her language and culture\n    And cultural practices, recipes, and traditions are preserved\n    And she participates in Arabic language maintenance\n    And her children can learn their cultural heritage\n    And the community provides mutual support across diaspora\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:refugee",
+    "governance_layer:global",
+    "related_users:displaced_person,activist,family",
+    "related_layers:nation_state,cultural_linguistic,family",
+    "elohim_agents:translation_agent,protection_agent,sanctuary_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/refugee/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-refugee-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-refugee-scenarios-global",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

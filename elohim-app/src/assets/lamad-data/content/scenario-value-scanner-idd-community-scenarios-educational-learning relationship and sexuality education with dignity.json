@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning relationship and sexuality education with dignity",
+  "contentType": "scenario",
+  "title": "Learning relationship and sexuality education with dignity",
+  "description": "Learning relationship and sexuality education with dignity",
+  "content": "Scenario: Learning relationship and sexuality education with dignity\n    Given Jordan is an adult with the same needs and desires as any adult\n    And comprehensive sexuality education is a right\n    When Jordan participates in relationships and sexuality education\n    Then instruction is accessible, honest, and dignity-preserving\n    And topics include healthy relationships, consent, and body autonomy\n    And Jordan's questions are answered respectfully\n    And Jordan learns to navigate relationships safely and joyfully\n    And Jordan's adult sexuality is honored, not ignored or shamed\n    And education supports Jordan's full adult human experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

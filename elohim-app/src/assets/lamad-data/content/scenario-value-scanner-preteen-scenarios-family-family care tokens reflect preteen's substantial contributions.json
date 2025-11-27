@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-family care tokens reflect preteen's substantial contributions",
+  "contentType": "scenario",
+  "title": "Family care tokens reflect preteen's substantial contributions",
+  "description": "Family care tokens reflect preteen's substantial contributions",
+  "content": "Scenario: Family care tokens reflect preteen's substantial contributions\n    Given the family participates in care token economy\n    And Marcus performs significant household labor\n    When family care tokens are calculated\n    Then Marcus's contributions should be valued at realistic rates\n    And tokens should reflect that his work would be compensated if adult performed it\n    And family care token total should include his contributions\n    And tokens should qualify family for community resource access\n    And Marcus's demonstrated stewardship should be evidence of family capability\n    And care economy should channel support to families like Marcus's\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

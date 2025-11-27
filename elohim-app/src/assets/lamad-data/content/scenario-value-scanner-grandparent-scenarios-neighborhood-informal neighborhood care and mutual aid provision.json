@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-informal neighborhood care and mutual aid provision",
+  "contentType": "scenario",
+  "title": "Informal neighborhood care and mutual aid provision",
+  "description": "Informal neighborhood care and mutual aid provision",
+  "content": "Scenario: Informal neighborhood care and mutual aid provision\n    Given Margaret helps neighbors with various small needs\n    And she receives help from neighbors when needed\n    When the neighborhood_elohim tracks mutual aid\n    Then it should recognize Margaret's care contributions to neighbors\n    And it should track reciprocal neighborhood support\n    And small acts of care should accumulate as care tokens\n    And neighborhood care economy should be visible and valued\n    And mutual aid should strengthen neighborhood bonds\n    And Margaret should build neighborhood care relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-comparing protocol adoption outcomes across hundreds of communities",
+  "contentType": "scenario",
+  "title": "Comparing protocol adoption outcomes across hundreds of communities",
+  "description": "Comparing protocol adoption outcomes across hundreds of communities",
+  "content": "Scenario: Comparing protocol adoption outcomes across hundreds of communities\n    Given I am studying all communities in the state that adopted Elohim Protocol\n    And I have comparison group of similar communities without adoption\n    When I analyze outcomes data from 200+ communities over 5 years\n    Then I examine: which communities adopted and which didn't (selection patterns)\n    And I measure: wellbeing, trust, economic resilience, social cohesion differences\n    And I use: difference-in-differences analysis to estimate causal effects\n    And I control: for demographics, economics, political culture confounds\n    And I identify: what predicts adoption success vs struggle\n    And I provide: statistical evidence about protocol effectiveness at scale\n    And I distinguish: average effects from heterogeneous effects across community types\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

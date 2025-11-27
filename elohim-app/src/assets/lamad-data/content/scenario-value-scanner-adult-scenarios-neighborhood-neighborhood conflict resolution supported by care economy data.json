@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood conflict resolution supported by care economy data",
+  "contentType": "scenario",
+  "title": "Neighborhood conflict resolution supported by care economy data",
+  "description": "Neighborhood conflict resolution supported by care economy data",
+  "content": "Scenario: Neighborhood conflict resolution supported by care economy data\n    Given neighbors sometimes have conflicts\n    And disputes can damage neighborhood cohesion\n    When neighborhood conflicts arise\n    Then the neighborhood_elohim should provide context from care patterns\n    And it should show each party's contributions to neighborhood\n    And it should facilitate resolution based on mutual care\n    And conflicts should be addressed before they escalate\n    And care economy should support neighborhood harmony\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

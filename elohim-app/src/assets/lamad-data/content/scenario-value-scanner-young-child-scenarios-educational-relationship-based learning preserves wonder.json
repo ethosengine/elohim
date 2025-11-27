@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-relationship-based learning preserves wonder",
+  "contentType": "scenario",
+  "title": "Relationship-based learning preserves wonder",
+  "description": "Relationship-based learning preserves wonder",
+  "content": "Scenario: Relationship-based learning preserves wonder\n    Given Tommy needs wonder preservation during learning\n    And relationship is primary for ages 5-7\n    When the personal_agent teaches Tommy about care economy\n    Then teaching should happen through story and relationship\n    And the agent should feel like a caring guide, not a system\n    And learning should be framed as adventures: \"What will make Emma smile?\"\n    And transactional language should never be used\n    And wonder at the world should be preserved, not diminished\n    And the magic of caring should remain intact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

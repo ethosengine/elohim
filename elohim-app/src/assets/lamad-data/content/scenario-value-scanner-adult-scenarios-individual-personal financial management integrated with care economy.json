@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-individual-personal financial management integrated with care economy",
+  "contentType": "scenario",
+  "title": "Personal financial management integrated with care economy",
+  "description": "Personal financial management integrated with care economy",
+  "content": "Scenario: Personal financial management integrated with care economy\n    Given Sarah manages household finances on $65k/year combined income\n    And budgeting is complex across multiple care contexts\n    When Sarah makes purchasing decisions\n    Then her personal_agent should track budget in real-time\n    And it should integrate financial constraints with nutritional needs, developmental appropriateness, family values\n    And it should help Sarah make informed trade-offs\n    And financial tools should serve care economy goals, not just spending tracking\n    And budget management should feel supportive, not restrictive\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:individual",
+    "related_users:young_adult,middle_aged,parent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

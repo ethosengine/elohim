@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-lifelong learning beyond formal education",
+  "contentType": "scenario",
+  "title": "Lifelong learning beyond formal education",
+  "description": "Lifelong learning beyond formal education",
+  "content": "Scenario: Lifelong learning beyond formal education\n    Given Kenji's learning will continue after graduation\n    And education is lifelong process, not just college phase\n    When the educational_elohim supports ongoing learning\n    Then it should help Kenji develop self-directed learning capabilities\n    And it should recognize informal learning as valuable as formal coursework\n    And it should encourage learning from community, work, and life experience\n    And lifelong learning should be valued as care economy participation\n    And the system should support learning as continuous development\n    And education should be understood as lifelong care economy investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

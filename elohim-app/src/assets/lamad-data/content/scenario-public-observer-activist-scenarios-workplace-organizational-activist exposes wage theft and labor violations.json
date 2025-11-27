@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-workplace-organizational-activist exposes wage theft and labor violations",
+  "contentType": "scenario",
+  "title": "Activist exposes wage theft and labor violations",
+  "description": "Activist exposes wage theft and labor violations",
+  "content": "Scenario: Activist exposes wage theft and labor violations\n    Given workers report widespread wage theft\n    And enforcement seems inadequate\n    When the Observer tracks labor violations and enforcement\n    Then the activist documents thousands of violations annually\n    And shows penalties are minimal and rarely collected\n    And identifies which employers are repeat offenders\n    And exposes regulatory capture of labor enforcement\n    And worker protection becomes political accountability issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,community_organizer,politician",
+    "related_layers:municipality,industry_sector,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

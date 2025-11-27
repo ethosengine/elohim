@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood representation and voice for retirees",
+  "contentType": "scenario",
+  "title": "Neighborhood representation and voice for retirees",
+  "description": "Neighborhood representation and voice for retirees",
+  "content": "Scenario: Neighborhood representation and voice for retirees\n    Given Margaret has time to attend neighborhood meetings\n    And retired residents have important perspective and needs\n    When neighborhood governance decisions are made\n    Then Margaret's participation and voice should be valued\n    And retired residents' interests should be represented\n    And her care contributions should give her standing in decisions\n    And neighborhood should benefit from elder wisdom and participation\n    And Margaret should help shape neighborhood policies and priorities\n    And all age groups should be represented in neighborhood governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

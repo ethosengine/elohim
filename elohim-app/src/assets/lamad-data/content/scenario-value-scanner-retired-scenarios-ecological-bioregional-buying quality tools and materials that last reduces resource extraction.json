@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-buying quality tools and materials that last reduces resource extraction",
+  "contentType": "scenario",
+  "title": "Buying quality tools and materials that last reduces resource extraction",
+  "description": "Buying quality tools and materials that last reduces resource extraction",
+  "content": "Scenario: Buying quality tools and materials that last reduces resource extraction\n    Given Frank learned to invest in quality tools and materials\n    And durability reduces waste and manufacturing impact\n    When Frank makes purchasing decisions\n    Then his personal_agent should support quality-over-quantity choices\n    And the bioregional_elohim should track durability practices\n    And buying quality should be recognized as ecological stewardship\n    And Frank's knowledge of durability should inform others\n    And throwaway culture should be countered by his construction wisdom\n    And consumption patterns should favor longevity and repairability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

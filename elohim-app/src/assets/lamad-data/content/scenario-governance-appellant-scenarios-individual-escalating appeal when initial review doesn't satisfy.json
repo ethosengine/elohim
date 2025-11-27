@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-escalating appeal when initial review doesn't satisfy",
+  "contentType": "scenario",
+  "title": "Escalating appeal when initial review doesn't satisfy",
+  "description": "Escalating appeal when initial review doesn't satisfy",
+  "content": "Scenario: Escalating appeal when initial review doesn't satisfy\n    Given my Community Elohim review upheld the original decision\n    And I still believe my constitutional rights were violated\n    When I choose to escalate to peer agent review\n    Then three randomly-selected Family Elohim agents from other families review my case\n    And A Constitutional Council observer monitors the peer review\n    And The peer agents investigate deeper than the original review\n    And They can override, modify, or affirm the original decision\n    And I receive their judgment within one week\n    And I retain the right to escalate further to Constitutional Council if needed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual",
+    "related_users:constitutional_council_member,technical_expert,community_leader",
+    "related_layers:family,community",
+    "elohim_agents:family_elohim,individual_support_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

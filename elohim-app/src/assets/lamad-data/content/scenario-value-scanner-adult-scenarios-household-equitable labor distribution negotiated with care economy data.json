@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-equitable labor distribution negotiated with care economy data",
+  "contentType": "scenario",
+  "title": "Equitable labor distribution negotiated with care economy data",
+  "description": "Equitable labor distribution negotiated with care economy data",
+  "content": "Scenario: Equitable labor distribution negotiated with care economy data\n    Given Sarah feels she's doing more than her fair share\n    And her partner may not see the full scope of her labor\n    When they discuss household labor distribution\n    Then the household_elohim should provide specific contribution data\n    And Sarah's invisible labor should be quantified explicitly\n    And both partners should see objective assessment\n    And negotiations should be based on facts, not perceptions\n    And equitable arrangements should be reachable through visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

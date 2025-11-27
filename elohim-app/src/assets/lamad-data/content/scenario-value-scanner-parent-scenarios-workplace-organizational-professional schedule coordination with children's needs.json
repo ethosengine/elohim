@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-professional schedule coordination with children's needs",
+  "contentType": "scenario",
+  "title": "Professional schedule coordination with children's needs",
+  "description": "Professional schedule coordination with children's needs",
+  "content": "Scenario: Professional schedule coordination with children's needs\n    Given Tommy and Emma have school schedules, activities, appointments\n    And Sarah's work schedule must coordinate with family needs\n    When the workplace_elohim helps coordinate scheduling\n    Then it should integrate work and family calendars\n    And it should surface conflicts between professional and parenting obligations\n    And it should help Sarah negotiate necessary flexibility\n    And the system should recognize scheduling as complex coordination work\n    And workplace should accommodate parent scheduling needs\n    And Sarah should have tools to manage impossible complexity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

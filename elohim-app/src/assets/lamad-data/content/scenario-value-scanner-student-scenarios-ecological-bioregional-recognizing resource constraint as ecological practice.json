@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-recognizing resource constraint as ecological practice",
+  "contentType": "scenario",
+  "title": "Recognizing resource constraint as ecological practice",
+  "description": "Recognizing resource constraint as ecological practice",
+  "content": "Scenario: Recognizing resource constraint as ecological practice\n    Given Kenji's $180/week budget forces minimal consumption\n    And ecological sustainability requires reduced consumption\n    When the bioregional_elohim reframes Kenji's scarcity\n    Then it should recognize that living on limited resources is low ecological impact\n    And it should validate \"Your minimal consumption is ecological stewardship\"\n    And it should show how his constrained lifestyle aligns with sustainability\n    And resource constraint should be recognized as ecological care\n    And the system should honor scarcity as ecological practice\n    And Kenji should understand his poverty as inadvertently sustainable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

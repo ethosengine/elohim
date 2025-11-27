@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-addressing protocol-tax law integration questions",
+  "contentType": "scenario",
+  "title": "Addressing protocol-tax law integration questions",
+  "description": "Addressing protocol-tax law integration questions",
+  "content": "Scenario: Addressing protocol-tax law integration questions\n    Given protocol creates novel economic relationships\n    And tax implications are unclear\n    When I work with revenue department on clarification\n    Then we determine: tax treatment of care tokens\n    And we address: property tax implications of resource sharing\n    And we clarify: whether mutual aid counts for social safety net\n    And we create: certainty enabling protocol to function\n    And we avoid: creating impossible tax burdens\n    And we ensure: tax policy doesn't undermine protocol benefits\n    And legal clarity: supports implementation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

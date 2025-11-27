@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-community-community care economy education delivered by experienced practitioners",
+  "contentType": "scenario",
+  "title": "Community care economy education delivered by experienced practitioners",
+  "description": "Community care economy education delivered by experienced practitioners",
+  "content": "Scenario: Community care economy education delivered by experienced practitioners\n    Given Robert has decades of care economy participation\n    And many community members don't understand care economy principles\n    And his experience makes him credible educator\n    When community_elohim identifies education opportunities\n    Then it should connect Robert to community education initiatives\n    And recognize him as qualified to teach care economy practices\n    And support him in leading workshops, presentations, or courses\n    And value his teaching as community care contribution\n    And help community members learn from practitioners, not just theorists\n    And build community care economy literacy through peer education\n    And demonstrate that care economy spreads through experienced advocates\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:community",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,municipality,workplace_organizational,family",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

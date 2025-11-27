@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry standards influenced toward care-friendly practices",
+  "contentType": "scenario",
+  "title": "Industry standards influenced toward care-friendly practices",
+  "description": "Industry standards influenced toward care-friendly practices",
+  "content": "Scenario: Industry standards influenced toward care-friendly practices\n    Given Robert has professional standing in his industry\n    And industry standards affect millions of workers\n    And care-friendly standards would benefit workers across the sector\n    When industry_elohim connects Robert to standards development\n    Then it should identify opportunities to influence industry standards\n    And help him advocate for care leave, flexible work, and family support standards\n    And connect him to industry associations and standards bodies\n    And surface how care-friendly standards improve productivity and retention\n    And support him in leveraging professional position for sector transformation\n    And build industry practices that normalize care responsibilities\n    And demonstrate that industry standards can advance care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:industry_sector",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:workplace_organizational,municipality,community,ecological_bioregional",
+    "elohim_agents:personal_agent,industry_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

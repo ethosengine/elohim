@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-seasonal eating patterns support bioregional food systems",
+  "contentType": "scenario",
+  "title": "Seasonal eating patterns support bioregional food systems",
+  "description": "Seasonal eating patterns support bioregional food systems",
+  "content": "Scenario: Seasonal eating patterns support bioregional food systems\n    Given Margaret shops for seasonal produce\n    And seasonal eating reduces food miles and supports local agriculture\n    When the bioregional_elohim tracks food choices\n    Then seasonal eating patterns should be recognized\n    And Margaret's choices should support bioregional food systems\n    And local, seasonal food should be prioritized in recommendations\n    And eating with seasons should be encouraged and facilitated\n    And bioregional awareness should develop through practice\n    And Margaret's food choices should strengthen local food economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

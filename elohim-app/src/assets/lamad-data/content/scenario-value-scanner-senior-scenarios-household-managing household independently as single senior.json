@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-managing household independently as single senior",
+  "contentType": "scenario",
+  "title": "Managing household independently as single senior",
+  "description": "Managing household independently as single senior",
+  "content": "Scenario: Managing household independently as single senior\n    Given Margaret lives alone in her household\n    And she manages all household responsibilities independently\n    When Margaret coordinates household tasks\n    Then her personal_agent should support her independence\n    And all household labor should be visible and valued\n    And the system should help her maintain self-sufficiency\n    And she should feel capable, not isolated\n    And household management should feel manageable\n    And her autonomy should be preserved and celebrated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

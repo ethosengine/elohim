@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-refugee-scenarios-global-refugee protected from human trafficking scheme",
+  "contentType": "scenario",
+  "title": "Refugee protected from human trafficking scheme",
+  "description": "Refugee protected from human trafficking scheme",
+  "content": "Scenario: Refugee protected from human trafficking scheme\n    Given Amira is seeking employment in Germany\n    When traffickers posing as employers try to contact her\n    And they offer suspiciously lucrative jobs requiring isolation\n    Then the protection agent identifies trafficking patterns\n    And the fraudulent messages never reach Amira\n    And she is protected without knowing she was targeted\n    And legitimate employment resources continue to reach her\n    And vulnerable refugees are protected from exploitation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:refugee",
+    "governance_layer:global",
+    "related_users:displaced_person,activist,family",
+    "related_layers:nation_state,cultural_linguistic,family",
+    "elohim_agents:translation_agent,protection_agent,sanctuary_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/refugee/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-refugee-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-refugee-scenarios-global",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

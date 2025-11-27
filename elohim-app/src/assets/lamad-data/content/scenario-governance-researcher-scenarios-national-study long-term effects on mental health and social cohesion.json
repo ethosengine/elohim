@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-study long-term effects on mental health and social cohesion",
+  "contentType": "scenario",
+  "title": "Study long-term effects on mental health and social cohesion",
+  "description": "Study long-term effects on mental health and social cohesion",
+  "content": "Scenario: Study long-term effects on mental health and social cohesion\n    Given protocol aims to reduce loneliness and improve wellbeing\n    When James analyzes decade of mental health and cohesion data\n    Then he finds sustained reduction in loneliness indicators\n    And he documents improved community social networks\n    And he examines whether benefits distribute equitably\n    And he identifies mental health improvements particularly strong for isolated individuals\n    And long-term health effects justify protocol as public health intervention\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

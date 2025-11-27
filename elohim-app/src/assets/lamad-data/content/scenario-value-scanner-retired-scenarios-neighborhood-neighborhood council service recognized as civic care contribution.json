@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood council service recognized as civic care contribution",
+  "contentType": "scenario",
+  "title": "Neighborhood council service recognized as civic care contribution",
+  "description": "Neighborhood council service recognized as civic care contribution",
+  "content": "Scenario: Neighborhood council service recognized as civic care contribution\n    Given Frank serves on his neighborhood council\n    And he attends meetings, participates in decisions, and contributes expertise\n    And council service requires time, knowledge, and commitment\n    When the neighborhood_elohim tracks civic participation\n    Then Frank's council service should be quantified as care labor\n    And meeting attendance and preparation time should be valued\n    And his construction expertise contributions should be recognized\n    And governance participation should accumulate care tokens\n    And Frank should experience himself as valued neighborhood leader\n    And civic engagement should be recognized as care economy contribution\n    And his voice in neighborhood governance should carry appropriate weight\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

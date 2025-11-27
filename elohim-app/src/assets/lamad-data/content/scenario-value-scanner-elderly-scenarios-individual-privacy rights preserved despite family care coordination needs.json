@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-privacy rights preserved despite family care coordination needs",
+  "contentType": "scenario",
+  "title": "Privacy rights preserved despite family care coordination needs",
+  "description": "Privacy rights preserved despite family care coordination needs",
+  "content": "Scenario: Privacy rights preserved despite family care coordination needs\n    Given Helen's family needs information for care coordination\n    And Helen retains full personhood and privacy rights\n    When Helen's care data is accessed\n    Then Helen must maintain control over her own data\n    And she must explicitly delegate any family access\n    And default should preserve her privacy unless she chooses sharing\n    And she is not someone to be managed without consent\n    And safety needs do not automatically override privacy rights\n    And the system must balance autonomy with necessary coordination\n    And Helen remains a person with full rights, not a patient to be managed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

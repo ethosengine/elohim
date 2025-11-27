@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-neighborhood care economy helps young adult on tight budget",
+  "contentType": "scenario",
+  "title": "Neighborhood care economy helps young adult on tight budget",
+  "description": "Neighborhood care economy helps young adult on tight budget",
+  "content": "Scenario: Neighborhood care economy helps young adult on tight budget\n    Given Aisha has limited financial resources\n    And neighborhood cooperation can reduce costs\n    When Aisha participates in neighborhood care economy\n    Then bulk buying should reduce her grocery costs\n    And resource sharing should reduce acquisition needs\n    And skill exchanges should replace paid services\n    And the neighborhood_elohim should identify cost-saving opportunities\n    And community participation should improve financial sustainability\n    And care economy should make tight budgets more livable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

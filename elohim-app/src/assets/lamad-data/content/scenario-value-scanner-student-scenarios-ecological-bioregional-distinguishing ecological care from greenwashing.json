@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-distinguishing ecological care from greenwashing",
+  "contentType": "scenario",
+  "title": "Distinguishing ecological care from greenwashing",
+  "description": "Distinguishing ecological care from greenwashing",
+  "content": "Scenario: Distinguishing ecological care from greenwashing\n    Given many products and institutions claim environmental responsibility falsely\n    And Kenji needs to distinguish genuine ecological care from marketing\n    When the bioregional_elohim helps Kenji evaluate environmental claims\n    Then it should teach him to recognize greenwashing\n    And it should help him identify genuinely sustainable practices\n    And it should build critical ecological literacy\n    And it should protect him from false environmental marketing\n    And the system should teach sophisticated ecological analysis\n    And Kenji should distinguish real care economy from extractive economy in green clothing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

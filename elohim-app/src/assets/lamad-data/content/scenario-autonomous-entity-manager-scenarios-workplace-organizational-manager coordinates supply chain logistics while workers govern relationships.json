@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager coordinates supply chain logistics while workers govern relationships",
+  "contentType": "scenario",
+  "title": "Manager coordinates supply chain logistics while workers govern relationships",
+  "description": "Manager coordinates supply chain logistics while workers govern relationships",
+  "content": "Scenario: Manager coordinates supply chain logistics while workers govern relationships\n    Given workers democratically selected Johnson Farm as supplier\n    And day-to-day ordering and logistics needs coordination\n    When supply chain operations continue\n    Then Marcus manages ordering logistics and inventory tracking\n    And Marcus coordinates deliveries and quality checks\n    But workers govern supplier relationship and strategic decisions\n    And Marcus cannot unilaterally change suppliers or negotiate major terms\n    And his coordination role enables worker governance, not replaces it\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,supplier,small_business_owner]",
+    "related_layers:[individual,community,industry_sector]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-accessing community resources as independent adult",
+  "contentType": "scenario",
+  "title": "Accessing community resources as independent adult",
+  "description": "Accessing community resources as independent adult",
+  "content": "Scenario: Accessing community resources as independent adult\n    Given Aisha is now an independent adult community member\n    And community resources are available based on contribution\n    When Aisha accesses community care economy resources\n    Then the community_elohim should recognize her adult status\n    And she should access resources based on care contributions\n    And her participation should be tracked at community level\n    And she should have different access than dependent children\n    And the system should treat her as autonomous adult participant\n    And community resources should support her independence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

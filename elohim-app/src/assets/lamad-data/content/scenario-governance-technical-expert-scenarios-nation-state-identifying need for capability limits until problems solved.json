@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-identifying need for capability limits until problems solved",
+  "contentType": "scenario",
+  "title": "Identifying need for capability limits until problems solved",
+  "description": "Identifying need for capability limits until problems solved",
+  "content": "Scenario: Identifying need for capability limits until problems solved\n    Given agents approach human comprehension limits\n    And National Council questions if oversight remains meaningful\n    When I assess whether democratic governance can continue\n    Then I honestly acknowledge: limits of our technical understanding\n    And I clarify: what can and cannot be verified currently\n    And I explore: research pathways to better explainability\n    And I may recommend: limiting agent capability until oversight works\n    And I accept: that this may slow AI development\n    And I prioritize: democratic governance over technical optimization\n    And I demonstrate: humility about technological limits\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

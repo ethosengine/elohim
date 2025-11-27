@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community medical equipment lending supported by care economy",
+  "contentType": "scenario",
+  "title": "Community medical equipment lending supported by care economy",
+  "description": "Community medical equipment lending supported by care economy",
+  "content": "Scenario: Community medical equipment lending supported by care economy\n    Given David needs increasing assistive equipment as disease progresses\n    And purchasing equipment is financially impossible\n    When James needs medical equipment\n    Then the community_elohim should connect to equipment lending libraries\n    And his care contributions should give standing to access equipment\n    And borrowing should be dignified and based on care economy\n    And community should pool medical resources for caregiver access\n    And equipment access should reduce financial burden\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

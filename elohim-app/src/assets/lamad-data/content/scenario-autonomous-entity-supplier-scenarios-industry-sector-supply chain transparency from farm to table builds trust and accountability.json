@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-supply chain transparency from farm to table builds trust and accountability",
+  "contentType": "scenario",
+  "title": "Supply chain transparency from farm to table builds trust and accountability",
+  "description": "Supply chain transparency from farm to table builds trust and accountability",
+  "content": "Scenario: Supply chain transparency from farm to table builds trust and accountability\n    Given corporate food system is opaque making accountability impossible\n    And customers and workers don't know where food comes from or how people were treated\n    When democratic supply chain implements radical transparency\n    Then customers trace food from specific farm (Johnson Farm tomatoes) to their plate\n    And farming practices (organic, regenerative) are documented and visible\n    And farmworker wages and conditions are transparent\n    And value distribution is clear showing fair compensation throughout chain\n    And industry_sector_elohim provides supply chain transparency platform\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:industry_sector",
+    "related_users:[worker,franchise_operator,small_business_owner,supplier]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

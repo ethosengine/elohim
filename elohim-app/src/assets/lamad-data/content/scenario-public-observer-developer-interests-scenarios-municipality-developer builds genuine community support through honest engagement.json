@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer builds genuine community support through honest engagement",
+  "contentType": "scenario",
+  "title": "Developer builds genuine community support through honest engagement",
+  "description": "Developer builds genuine community support through honest engagement",
+  "content": "Scenario: Developer builds genuine community support through honest engagement\n    Given a developer is planning mixed-use development\n    And recognizes that authentic community input creates sustainable projects\n    When the Observer facilitates real community engagement\n    Then the developer accesses genuine community priorities not astroturf voices\n    And learns neighborhood actually needs affordable retail space and childcare\n    And adjusts project design to address real community needs\n    And negotiates community benefits agreement with accountability tracking\n    And builds lasting community relationships not managed opposition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

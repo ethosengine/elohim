@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-learning across contexts builds coherent knowledge",
+  "contentType": "scenario",
+  "title": "Learning across contexts builds coherent knowledge",
+  "description": "Learning across contexts builds coherent knowledge",
+  "content": "Scenario: Learning across contexts builds coherent knowledge\n    Given Jasmine learns in school, at work, in family, and in community\n    And knowledge fragments across contexts\n    When her personal_agent integrates learning from all contexts\n    Then she should see connections: \"Your work customer service builds communication skills valuable in all contexts\"\n    And understand how different learning experiences reinforce each other\n    And develop coherent knowledge rather than fragmented skills\n    And learn to translate capabilities across contexts\n    And build sophisticated understanding through integrated experience\n    And maintain coherent identity while navigating multiple learning environments\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

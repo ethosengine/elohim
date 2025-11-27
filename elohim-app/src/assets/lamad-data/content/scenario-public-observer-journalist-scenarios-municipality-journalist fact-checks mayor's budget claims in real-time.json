@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist fact-checks mayor's budget claims in real-time",
+  "contentType": "scenario",
+  "title": "Journalist fact-checks mayor's budget claims in real-time",
+  "description": "Journalist fact-checks mayor's budget claims in real-time",
+  "content": "Scenario: Journalist fact-checks mayor's budget claims in real-time\n    Given the mayor gives state of city address with budget claims\n    And the journalist watches speech with deadline pressure\n    When the Observer provides instant fact-checking against city records\n    Then the journalist verifies mayor claims crime is down (true by 3%)\n    And fact-checks claim of record affordable housing investment (false - down 12%)\n    And checks police budget claim against actual spending (misleading framing)\n    And publishes real-time fact-check during speech\n    And rhetoric meets evidence-based accountability immediately\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

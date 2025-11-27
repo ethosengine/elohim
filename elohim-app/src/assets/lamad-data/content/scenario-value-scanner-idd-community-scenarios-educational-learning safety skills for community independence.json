@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning safety skills for community independence",
+  "contentType": "scenario",
+  "title": "Learning safety skills for community independence",
+  "description": "Learning safety skills for community independence",
+  "content": "Scenario: Learning safety skills for community independence\n    Given Jordan wants to navigate community more independently\n    And safety education supports risk-taking and growth\n    When Jordan takes community safety education\n    Then the training covers real-world scenarios (crossing streets, stranger danger)\n    And instruction uses visual supports and repeated practice\n    And Jordan can demonstrate understanding in accessible ways\n    And safety skills increase Jordan's independent community access\n    And education balances safety with dignity and autonomy\n    And Jordan's capability for safe independence grows through learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

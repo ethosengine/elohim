@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-developer environmental compliance becomes state accountability issue",
+  "contentType": "scenario",
+  "title": "Developer environmental compliance becomes state accountability issue",
+  "description": "Developer environmental compliance becomes state accountability issue",
+  "content": "Scenario: Developer environmental compliance becomes state accountability issue\n    Given a developer's projects consistently violate state environmental standards\n    But receives minimal enforcement from state regulators\n    When the Observer documents violation patterns and regulatory response\n    Then analysis shows: 67 violations across 8 projects over 5 years\n    And penalties total $180K while profits exceed $40M\n    And state regulators approve new permits despite violation history\n    And regulatory capture becomes statistically undeniable\n    And developer faces pressure for genuine environmental compliance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:provincial_state",
+    "related_users:politician,board_member,citizen,activist",
+    "related_layers:municipality,county_regional,ecological",
+    "elohim_agents:public_observer,state_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

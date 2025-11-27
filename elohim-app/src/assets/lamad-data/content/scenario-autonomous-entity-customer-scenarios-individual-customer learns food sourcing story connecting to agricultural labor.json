@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer learns food sourcing story connecting to agricultural labor",
+  "contentType": "scenario",
+  "title": "Customer learns food sourcing story connecting to agricultural labor",
+  "description": "Customer learns food sourcing story connecting to agricultural labor",
+  "content": "Scenario: Customer learns food sourcing story connecting to agricultural labor\n    Given corporate food system obscures where food comes from and who grew it\n    And Ms. Johnson wants to know her food's origin but lacked information\n    When democratic supply chain provides sourcing transparency\n    Then she learns tomatoes come from Johnson Farm where Tom practices regenerative agriculture\n    And she can visit farm during open houses if interested\n    And farmworker conditions and wages are transparent\n    And food becomes connected to human labor and environmental stewardship, not faceless commodity\n    And community_elohim provides supply chain stories and farm connections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-community-activist documents neighborhood displacement patterns",
+  "contentType": "scenario",
+  "title": "Activist documents neighborhood displacement patterns",
+  "description": "Activist documents neighborhood displacement patterns",
+  "content": "Scenario: Activist documents neighborhood displacement patterns\n    Given the activist is organizing against gentrification\n    And needs evidence of displacement in specific neighborhoods\n    When the Observer provides hyperlocal data\n    Then the activist sees rent increase patterns by block\n    And views eviction filing trends over time\n    And identifies buildings with code violations\n    And maps demographic changes showing displacement\n    And organizes residents with documented evidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_organizer,citizen,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

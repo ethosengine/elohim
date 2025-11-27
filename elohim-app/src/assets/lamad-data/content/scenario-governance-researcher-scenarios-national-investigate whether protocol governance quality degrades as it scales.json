@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-investigate whether protocol governance quality degrades as it scales",
+  "contentType": "scenario",
+  "title": "Investigate whether protocol governance quality degrades as it scales",
+  "description": "Investigate whether protocol governance quality degrades as it scales",
+  "content": "Scenario: Investigate whether protocol governance quality degrades as it scales\n    Given protocol expanded from dozens to thousands of communities\n    When James examines governance quality metrics over scale\n    Then he tracks Constitutional Council deliberation quality\n    And he measures appeal resolution fairness over time\n    And he examines whether coordination complexity overwhelms benefits\n    And he finds quality generally sustains but identifies scaling challenges\n    And research informs protocol architecture improvements\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

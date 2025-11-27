@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-household-household routines maintained for cognitive support",
+  "contentType": "scenario",
+  "title": "Household routines maintained for cognitive support",
+  "description": "Household routines maintained for cognitive support",
+  "content": "Scenario: Household routines maintained for cognitive support\n    Given Helen's dementia makes routine important for functioning\n    And familiar patterns help her maintain independence\n    When the household_elohim supports daily routines\n    Then her established patterns should be preserved\n    And reminders should support her existing habits\n    And changes should be minimized to reduce confusion\n    And her personal_agent should say \"Time for your morning tea, like always\"\n    And routine should provide cognitive scaffolding\n    And household familiarity should support her capability\n    And the protocol should recognize that routine enables autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:household",
+    "related_users:caregiver,family_member,home_health_aide",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

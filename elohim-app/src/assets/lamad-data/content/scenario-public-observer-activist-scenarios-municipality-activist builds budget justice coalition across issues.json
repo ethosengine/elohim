@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-municipality-activist builds budget justice coalition across issues",
+  "contentType": "scenario",
+  "title": "Activist builds budget justice coalition across issues",
+  "description": "Activist builds budget justice coalition across issues",
+  "content": "Scenario: Activist builds budget justice coalition across issues\n    Given multiple communities face budget cuts affecting different services\n    And the activist works on housing but sees connections\n    When the Observer reveals municipal budget priorities\n    Then the activist sees cuts to housing, transit, libraries, and social services\n    And identifies shared interest across issue silos\n    And facilitates coalition of housing, transit, and education advocates\n    And budget fight becomes coordinated multi-issue campaign\n    And fragmented advocacy becomes unified power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:municipality",
+    "related_users:community_organizer,politician,citizen,journalist",
+    "related_layers:community,provincial_state,county_regional",
+    "elohim_agents:public_observer,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

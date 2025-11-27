@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-district-board member tracks implementation of previous transportation policy",
+  "contentType": "scenario",
+  "title": "Board member tracks implementation of previous transportation policy",
+  "description": "Board member tracks implementation of previous transportation policy",
+  "content": "Scenario: Board member tracks implementation of previous transportation policy\n    Given board voted two years ago to optimize bus routes for efficiency\n    And transportation director promised improved reliability and cost savings\n    And parents increasingly complain about late buses and long routes\n    When the board member checks Observer implementation tracking\n    Then they see on-time performance has actually declined since policy change\n    And discover cost savings didn't materialize as promised\n    And find low-income neighborhoods disproportionately affected by route changes\n    And access parent feedback data showing systematic reliability problems\n    And impact tracking reveals staff promises diverged from actual outcomes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:district",
+    "related_users:citizen,parent,teacher,politician,activist",
+    "related_layers:municipality,community,educational",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

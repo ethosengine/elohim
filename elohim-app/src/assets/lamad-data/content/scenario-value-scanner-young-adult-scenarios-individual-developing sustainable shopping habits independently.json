@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-developing sustainable shopping habits independently",
+  "contentType": "scenario",
+  "title": "Developing sustainable shopping habits independently",
+  "description": "Developing sustainable shopping habits independently",
+  "content": "Scenario: Developing sustainable shopping habits independently\n    Given Aisha is establishing her adult shopping patterns\n    And she wants to reduce food waste\n    When Aisha scans items at the store\n    Then the personal_agent should track purchase patterns\n    And it should identify what she consistently uses versus what spoils\n    And it should suggest sustainable alternatives\n    And the system should help her build efficient shopping habits\n    And waste reduction analytics should inform future decisions\n    And Aisha should develop adult competence through practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

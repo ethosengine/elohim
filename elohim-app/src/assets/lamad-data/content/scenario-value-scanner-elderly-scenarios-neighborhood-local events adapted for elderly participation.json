@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-local events adapted for elderly participation",
+  "contentType": "scenario",
+  "title": "Local events adapted for elderly participation",
+  "description": "Local events adapted for elderly participation",
+  "content": "Scenario: Local events adapted for elderly participation\n    Given neighborhood events are important for community connection\n    And Helen's limitations affect her ability to participate\n    When neighborhood events are planned\n    Then the neighborhood_elohim should advocate for accessibility\n    And events should include seating, accessible locations, and quiet spaces\n    And transportation should be coordinated for those with mobility limits\n    And Helen should be able to participate in neighborhood life\n    And adaptation should enable, not separate\n    And the protocol should ensure elderly inclusion in community events\n    And neighborhood culture should include all ages and capabilities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

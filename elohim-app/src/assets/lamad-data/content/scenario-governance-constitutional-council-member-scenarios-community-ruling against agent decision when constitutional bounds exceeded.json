@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-ruling against agent decision when constitutional bounds exceeded",
+  "contentType": "scenario",
+  "title": "Ruling against agent decision when constitutional bounds exceeded",
+  "description": "Ruling against agent decision when constitutional bounds exceeded",
+  "content": "Scenario: Ruling against agent decision when constitutional bounds exceeded\n    Given I am reviewing an appeal where agent clearly overstepped\n    And the facts show the decision violated constitutional principles\n    When our council rules the agent decision unconstitutional\n    Then the decision is: immediately overturned\n    And appellant's preferences are: automatically restored\n    And the incident is: documented as error in agent's record\n    And similar interventions: require higher thresholds going forward\n    And protocol improvements are: proposed and implemented\n    And agent learns: from legitimate critique without being punished\n    And accountability works: without compromising agent autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

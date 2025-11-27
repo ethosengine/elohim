@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-intergenerational care economy makes elder value visible",
+  "contentType": "scenario",
+  "title": "Intergenerational care economy makes elder value visible",
+  "description": "Intergenerational care economy makes elder value visible",
+  "content": "Scenario: Intergenerational care economy makes elder value visible\n    Given care economy spans all ages and capabilities\n    And Helen both receives and gives care\n    When community care tokens are tracked\n    Then Helen's lifetime contributions should be visible to community\n    And her current contributions should be recognized alongside care receipt\n    And younger generations should see care flowing across entire lifespan\n    And the protocol should demonstrate that humans have value at all ages\n    And community should learn that care reciprocity spans generations\n    And success should prove that care economy values elders as full participants\n    And Helen should experience community standing based on lifetime of contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

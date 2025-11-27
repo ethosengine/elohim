@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-teen's care contributions give standing in municipal conversations",
+  "contentType": "scenario",
+  "title": "Teen's care contributions give standing in municipal conversations",
+  "description": "Teen's care contributions give standing in municipal conversations",
+  "content": "Scenario: Teen's care contributions give standing in municipal conversations\n    Given Jasmine has accumulated significant care economy participation\n    And she contributes household labor, paid work, volunteering, and civic engagement\n    When municipal discussions about youth policy occur\n    Then her care contributions should give her legitimate standing\n    And municipal_elohim should recognize her as a constitutional participant\n    And she should not be dismissed due to age\n    And her voice should carry weight based on demonstrated contribution\n    And the municipality should recognize teens as current participants, not future constituents\n    And youth civic engagement should be valued as care work for democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

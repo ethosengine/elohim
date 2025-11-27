@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-advocating for elder-friendly community policies",
+  "contentType": "scenario",
+  "title": "Advocating for elder-friendly community policies",
+  "description": "Advocating for elder-friendly community policies",
+  "content": "Scenario: Advocating for elder-friendly community policies\n    Given Margaret represents retired community members' interests\n    And community policies affect elder well-being and participation\n    When community considers policies on housing, transportation, or services\n    Then Margaret's voice and advocacy should be valued\n    And her care contributions should give her standing in decisions\n    And elder perspective should inform community planning\n    And age-friendly policies should be prioritized\n    And community should serve members of all ages\n    And Margaret should help shape community for aging population\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

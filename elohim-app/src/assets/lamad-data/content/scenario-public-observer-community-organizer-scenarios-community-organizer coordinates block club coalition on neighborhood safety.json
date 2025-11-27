@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-community-organizer coordinates block club coalition on neighborhood safety",
+  "contentType": "scenario",
+  "title": "Organizer coordinates block club coalition on neighborhood safety",
+  "description": "Organizer coordinates block club coalition on neighborhood safety",
+  "content": "Scenario: Organizer coordinates block club coalition on neighborhood safety\n    Given five block clubs care about pedestrian safety improvements\n    And members work different shifts and speak different languages\n    When the organizer uses Observer for coalition coordination\n    Then all members see shared information base in their languages\n    And can engage asynchronously on their schedules\n    And track who's committed to testify at traffic commission\n    And coordinate meeting attendance across 35 residents\n    And coalition functions at scale without exhausting organizer\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,board_member",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-coordinating care during family member illness",
+  "contentType": "scenario",
+  "title": "Coordinating care during family member illness",
+  "description": "Coordinating care during family member illness",
+  "content": "Scenario: Coordinating care during family member illness\n    Given Jordan's mother becomes seriously ill\n    And the family is coordinating care support\n    When the family discusses how to help\n    Then Jordan is included in family care planning\n    And the personal_agent helps Jordan understand the situation\n    And Jordan can offer contributions at their capability (visits, calls)\n    And Jordan's care offerings are recognized and valued\n    And the family doesn't automatically exclude Jordan from caregiving\n    And Jordan experiences being a contributing family member in crisis\n    And Jordan's capacity to give care is honored\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

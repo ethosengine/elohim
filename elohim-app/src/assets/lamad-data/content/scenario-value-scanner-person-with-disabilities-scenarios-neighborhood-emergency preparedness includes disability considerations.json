@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-emergency preparedness includes disability considerations",
+  "contentType": "scenario",
+  "title": "Emergency preparedness includes disability considerations",
+  "description": "Emergency preparedness includes disability considerations",
+  "content": "Scenario: Emergency preparedness includes disability considerations\n    Given emergencies affect disabled people disproportionately\n    And Alex has specific emergency needs\n    When the neighborhood plans for emergencies\n    Then Alex should be included in emergency planning\n    And neighborhood should know about residents with access needs\n    And evacuation plans should accommodate wheelchair users\n    And the neighborhood_elohim should coordinate disability-inclusive preparedness\n    And Alex's expertise should shape neighborhood emergency protocols\n    And disabled neighbors should be protected, not forgotten\n    And inclusive planning should reduce vulnerability for all residents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:neighborhood",
+    "related_users:adult,elderly,parent,child,caregiver",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

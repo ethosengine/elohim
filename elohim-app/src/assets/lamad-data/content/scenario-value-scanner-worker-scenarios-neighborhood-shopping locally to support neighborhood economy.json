@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-shopping locally to support neighborhood economy",
+  "contentType": "scenario",
+  "title": "Shopping locally to support neighborhood economy",
+  "description": "Shopping locally to support neighborhood economy",
+  "content": "Scenario: Shopping locally to support neighborhood economy\n    Given I need to buy groceries and household items\n    And local businesses are part of neighborhood care economy\n    When I shop for necessities\n    Then the protocol should identify accessible local businesses\n    And recognize that shopping locally is care economy participation\n    And show me how my purchases support neighborhood resilience\n    And accumulate care tokens for supporting local commerce\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

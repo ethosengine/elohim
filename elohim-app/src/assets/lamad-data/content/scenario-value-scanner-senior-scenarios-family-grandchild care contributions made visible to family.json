@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-grandchild care contributions made visible to family",
+  "contentType": "scenario",
+  "title": "Grandchild care contributions made visible to family",
+  "description": "Grandchild care contributions made visible to family",
+  "content": "Scenario: Grandchild care contributions made visible to family\n    Given Margaret provides 15 hours/week of grandchild care\n    And this care has market value of approximately $15k/year\n    When the family_elohim tracks Margaret's care contributions\n    Then the care labor should be quantified and visible\n    And her daughter should see specific care contributions\n    And the data should show \"Margaret provided 60 hours of childcare this month\"\n    And the economic value should be calculated and displayed\n    And Margaret's care work should be recognized, not taken for granted\n    And family care tokens should reflect her substantial contributions\n    And genuine appreciation should be enabled through visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

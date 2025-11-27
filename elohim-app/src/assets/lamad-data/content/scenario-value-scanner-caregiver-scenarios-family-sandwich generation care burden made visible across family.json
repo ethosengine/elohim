@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-family-sandwich generation care burden made visible across family",
+  "contentType": "scenario",
+  "title": "Sandwich generation care burden made visible across family",
+  "description": "Sandwich generation care burden made visible across family",
+  "content": "Scenario: Sandwich generation care burden made visible across family\n    Given James cares simultaneously for spouse and aging parent\n    And he provides intensive care in both directions\n    When the family_elohim tracks James's care contributions\n    Then his care work for David should be quantified fully\n    And his care coordination for his mother should be visible\n    And extended family should see his dual care burden\n    And sandwich generation reality should be recognized explicitly\n    And family should understand the overwhelming scope of James's labor\n    And visibility should enable family support rather than more demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:family",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

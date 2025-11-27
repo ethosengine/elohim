@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-local financial institutions develop lending products for democratic conversions",
+  "contentType": "scenario",
+  "title": "Local financial institutions develop lending products for democratic conversions",
+  "description": "Local financial institutions develop lending products for democratic conversions",
+  "content": "Scenario: Local financial institutions develop lending products for democratic conversions\n    Given banks lack experience financing worker ownership transitions\n    And conversion financing barriers limit democratic economy growth\n    When Rosa's successful conversion demonstrates creditworthiness of democratic model\n    Then local banks and credit unions develop conversion lending products\n    And community development financial institutions (CDFIs) prioritize democratic business\n    And municipal policy supports conversion lending through guarantees or partnerships\n    And financial infrastructure emerges for scaling democratic conversions citywide\n    And municipality_elohim coordinates with financial institutions on product development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

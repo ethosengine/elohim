@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-teen's civic engagement recognized as care contribution",
+  "contentType": "scenario",
+  "title": "Teen's civic engagement recognized as care contribution",
+  "description": "Teen's civic engagement recognized as care contribution",
+  "content": "Scenario: Teen's civic engagement recognized as care contribution\n    Given Jasmine participates in community service projects\n    And she attends city council meetings about youth issues\n    When her civic engagement is tracked\n    Then it should be recognized as care work for the community\n    And political participation should be valued in care economy\n    And she should learn that civic engagement is care labor\n    And her generation should understand that democracy requires active care work\n    And community_elohim should make visible that youth civic participation matters\n    And her care tokens should reflect her contribution to democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

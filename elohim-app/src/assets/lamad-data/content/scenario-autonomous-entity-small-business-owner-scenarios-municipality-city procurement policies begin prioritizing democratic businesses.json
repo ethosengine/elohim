@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-city procurement policies begin prioritizing democratic businesses",
+  "contentType": "scenario",
+  "title": "City procurement policies begin prioritizing democratic businesses",
+  "description": "City procurement policies begin prioritizing democratic businesses",
+  "content": "Scenario: City procurement policies begin prioritizing democratic businesses\n    Given municipality purchases vehicles and services from private vendors\n    And public procurement can support democratic economy development\n    When Rosa's Auto bids for city fleet maintenance contracts\n    Then municipal procurement gives preference to worker-owned businesses\n    And democratic enterprises compete successfully for public contracts\n    And taxpayer money supports living wages and community wealth, not corporate extraction\n    And procurement policy changes demonstrate municipal commitment to economic democracy\n    And municipality_elohim tracks procurement impacts on democratic business viability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-expressing food preferences with visual support",
+  "contentType": "scenario",
+  "title": "Expressing food preferences with visual support",
+  "description": "Expressing food preferences with visual support",
+  "content": "Scenario: Expressing food preferences with visual support\n    Given Jordan has specific food likes and dislikes\n    And the group home is planning weekly meals\n    When Jordan uses the meal preference feature\n    Then the interface shows pictures of food options\n    And Jordan can indicate preferences using simple icons (thumbs up/down)\n    And the system uses simple language (\"Do you like chicken?\")\n    And Jordan's choices are communicated to household meal planning\n    And Jordan experiences their preferences being honored\n    And the personal_agent provides encouragement throughout\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

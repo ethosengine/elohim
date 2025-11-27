@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen co-workers coordinate through care economy networks",
+  "contentType": "scenario",
+  "title": "Teen co-workers coordinate through care economy networks",
+  "description": "Teen co-workers coordinate through care economy networks",
+  "content": "Scenario: Teen co-workers coordinate through care economy networks\n    Given Jasmine works with other teens and young adults\n    And worker solidarity improves conditions for all\n    When teen workers coordinate through care economy\n    Then workplace_elohim should facilitate peer worker networks\n    And support information sharing about workplace conditions\n    And enable collective advocacy for better treatment\n    And help young workers recognize common interests\n    And build understanding that workers have power through solidarity\n    And demonstrate care economy principles in workplace organizing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

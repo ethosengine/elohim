@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-board member evaluates superintendent budget proposal with impact analysis",
+  "contentType": "scenario",
+  "title": "Board member evaluates superintendent budget proposal with impact analysis",
+  "description": "Board member evaluates superintendent budget proposal with impact analysis",
+  "content": "Scenario: Board member evaluates superintendent budget proposal with impact analysis\n    Given administration proposes budget with cuts and reallocations\n    And presents optimistic framing of difficult trade-offs\n    When the Observer provides impact analysis\n    Then they see which students and schools bear burden of cuts\n    And understand transportation changes affect working parent schedules\n    And identify which programs lose funding versus protected priorities\n    And compare budget choices to similar districts\n    And ask informed questions challenging rosy assumptions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

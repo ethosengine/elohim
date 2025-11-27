@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent tracks municipal library service commitments",
+  "contentType": "scenario",
+  "title": "Parent tracks municipal library service commitments",
+  "description": "Parent tracks municipal library service commitments",
+  "content": "Scenario: Parent tracks municipal library service commitments\n    Given the city council promised to restore library weekend hours\n    And the parent's children depend on library for homework and programs\n    When three months pass without weekend hours being restored\n    Then the Observer alerts parent about the broken commitment\n    And provides evidence from the original council promise\n    And shows which council members voted for the restoration\n    And parent can demand accountability for family-serving commitments\n    And municipal promises to families persist despite turnover\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-participating in neighborhood informal care economy",
+  "contentType": "scenario",
+  "title": "Participating in neighborhood informal care economy",
+  "description": "Participating in neighborhood informal care economy",
+  "content": "Scenario: Participating in neighborhood informal care economy\n    Given Jordan's elderly neighbor sometimes needs help bringing in groceries\n    And Jordan is capable of carrying light bags\n    When the neighbor needs assistance\n    Then Jordan can offer help at their capability level\n    And the neighbor accepts Jordan's help graciously\n    And Jordan's care contribution is real and meaningful\n    And the Value Scanner records Jordan's caregiving\n    And Jordan accumulates care tokens for helping neighbor\n    And Jordan experiences being a care provider, not just recipient\n    And the neighborhood care economy includes Jordan as contributor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

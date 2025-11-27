@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-schedule flexibility for solo parent managing complex logistics",
+  "contentType": "scenario",
+  "title": "Schedule flexibility for solo parent managing complex logistics",
+  "description": "Schedule flexibility for solo parent managing complex logistics",
+  "content": "Scenario: Schedule flexibility for solo parent managing complex logistics\n    Given Maria coordinates three children's schools, activities, and appointments alone\n    And rigid work schedules create impossible conflicts for single parents\n    When Maria's work schedule is determined\n    Then the workplace_elohim should advocate for flexible scheduling options\n    And Maria should have ability to adjust hours for critical parenting needs\n    And flexibility should be policy, not personal favor requiring explanation\n    And schedule should enable sustainable work-parenting integration\n    And single parents should access flexibility without career penalty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

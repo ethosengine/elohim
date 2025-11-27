@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-community-journalist investigates playground neglect in underserved neighborhood",
+  "contentType": "scenario",
+  "title": "Journalist investigates playground neglect in underserved neighborhood",
+  "description": "Journalist investigates playground neglect in underserved neighborhood",
+  "content": "Scenario: Journalist investigates playground neglect in underserved neighborhood\n    Given residents complain about dangerous playground conditions\n    And the journalist needs context on maintenance patterns\n    When the Observer provides hyperlocal infrastructure data\n    Then the journalist sees playground hasn't been maintained in 5 years\n    And compares to monthly maintenance in affluent neighborhoods\n    And documents injury reports and resident complaints ignored\n    And tracks city budget showing maintenance disparities\n    And publishes accountability story on infrastructure racism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:community",
+    "related_users:citizen,activist,community_organizer,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

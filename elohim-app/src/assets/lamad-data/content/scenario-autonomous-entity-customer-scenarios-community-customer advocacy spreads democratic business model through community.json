@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer advocacy spreads democratic business model through community",
+  "contentType": "scenario",
+  "title": "Customer advocacy spreads democratic business model through community",
+  "description": "Customer advocacy spreads democratic business model through community",
+  "content": "Scenario: Customer advocacy spreads democratic business model through community\n    Given Ms. Johnson experiences benefits of democratic business personally\n    And neighbors don't know democratic alternatives exist\n    When satisfied customers share experiences and advocate for democratic businesses\n    Then she tells neighbors about worker ownership and improved quality\n    And brings isolated elders to senior meal program\n    And word-of-mouth advocacy builds customer base for democratic businesses\n    And community awareness of economic democracy grows through customer stories\n    And community_elohim supports customer advocacy and community education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

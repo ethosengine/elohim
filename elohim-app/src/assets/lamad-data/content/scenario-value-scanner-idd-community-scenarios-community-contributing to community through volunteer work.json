@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-contributing to community through volunteer work",
+  "contentType": "scenario",
+  "title": "Contributing to community through volunteer work",
+  "description": "Contributing to community through volunteer work",
+  "content": "Scenario: Contributing to community through volunteer work\n    Given the local food bank needs volunteers\n    And Jordan wants to help community members in need\n    When Jordan volunteers at the food bank\n    Then tasks are adapted to Jordan's capabilities (sorting, carrying)\n    And volunteer coordinators provide clear, accessible instructions\n    And Jordan's work genuinely contributes to food bank operations\n    And Jordan accumulates care tokens for volunteer service\n    And Jordan is recognized as a valued volunteer, not as someone being helped\n    And Jordan experiences being a community care provider\n    And Jordan's contributions are celebrated authentically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-transitioning from child to adult in family system",
+  "contentType": "scenario",
+  "title": "Transitioning from child to adult in family system",
+  "description": "Transitioning from child to adult in family system",
+  "content": "Scenario: Transitioning from child to adult in family system\n    Given Jordan turned 26 and family dynamics are shifting\n    And parents are learning to see Jordan as an adult\n    When family interactions reveal old patterns (treating Jordan as child)\n    Then the family_elohim surfaces the pattern respectfully\n    And the system provides education about adult autonomy for IDD people\n    And Jordan can express feelings about wanting adult treatment\n    And the family receives support for the transition\n    And Jordan's growth toward greater autonomy is celebrated\n    And the family system evolves to honor Jordan's adult status\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

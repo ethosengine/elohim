@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-appealing family emergency decision in crisis",
+  "contentType": "scenario",
+  "title": "Appealing family emergency decision in crisis",
+  "description": "Appealing family emergency decision in crisis",
+  "content": "Scenario: Appealing family emergency decision in crisis\n    Given during a family emergency Family Elohim made rapid decisions\n    And I believe the urgency didn't justify the privacy violations\n    When I file an appeal after the crisis has passed\n    Then the Constitutional Council evaluates if emergency protocols were properly invoked\n    And They examine if the agent demonstrated proportionality under urgency\n    And They consider if less invasive emergency responses were available\n    And They assess if family members were informed as quickly as possible\n    And The appeal establishes precedent for emergency intervention thresholds\n    And Protocol improvements address crisis decision-making procedures\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

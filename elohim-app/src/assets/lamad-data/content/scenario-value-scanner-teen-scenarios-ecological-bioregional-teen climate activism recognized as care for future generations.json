@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-teen climate activism recognized as care for future generations",
+  "contentType": "scenario",
+  "title": "Teen climate activism recognized as care for future generations",
+  "description": "Teen climate activism recognized as care for future generations",
+  "content": "Scenario: Teen climate activism recognized as care for future generations\n    Given Jasmine participates in climate action organizing\n    And she attends climate strikes and advocates for environmental policy\n    When bioregional_elohim tracks her environmental engagement\n    Then it should recognize climate activism as care work\n    And value her labor for intergenerational justice\n    And understand that fighting for climate action is care for future\n    And track civic environmental engagement alongside other care contributions\n    And demonstrate that ecological advocacy is essential care economy work\n    And support her generation's environmental leadership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

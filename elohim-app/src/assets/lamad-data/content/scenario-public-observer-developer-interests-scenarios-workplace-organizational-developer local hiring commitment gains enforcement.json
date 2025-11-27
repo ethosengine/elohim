@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer local hiring commitment gains enforcement",
+  "contentType": "scenario",
+  "title": "Developer local hiring commitment gains enforcement",
+  "description": "Developer local hiring commitment gains enforcement",
+  "content": "Scenario: Developer local hiring commitment gains enforcement\n    Given a developer promised 60% local hiring as approval condition\n    And community counted on jobs for neighborhood residents\n    When the Observer tracks hiring outcomes\n    Then analysis shows: only 22% of jobs went to local residents\n    And most workers came from outside region\n    And community that bore development impacts didn't receive promised jobs\n    And accountability creates consequences for broken employment commitments\n    And future commitments require enforceable mechanisms\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,activist,community_organizer,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-neighborhood connection reduces isolation for young adult",
+  "contentType": "scenario",
+  "title": "Neighborhood connection reduces isolation for young adult",
+  "description": "Neighborhood connection reduces isolation for young adult",
+  "content": "Scenario: Neighborhood connection reduces isolation for young adult\n    Given Aisha moved to a new city alone\n    And social isolation is a risk for young adults\n    When Aisha builds neighborhood care relationships\n    Then the neighborhood_elohim should facilitate meaningful connections\n    And care-based relationships should reduce loneliness\n    And practical cooperation should create authentic community\n    And the system should address isolation through care economy\n    And neighborhood bonds should provide social support\n    And belonging should emerge from reciprocal care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

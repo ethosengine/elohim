@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood knowledge and connection from long residence",
+  "contentType": "scenario",
+  "title": "Neighborhood knowledge and connection from long residence",
+  "description": "Neighborhood knowledge and connection from long residence",
+  "content": "Scenario: Neighborhood knowledge and connection from long residence\n    Given Margaret has lived in neighborhood for many years\n    And she knows neighborhood history, patterns, and relationships\n    When the neighborhood_elohim recognizes resident knowledge\n    Then it should value Margaret's accumulated neighborhood wisdom\n    And it should recognize long-term residents as knowledge keepers\n    And her connections should be seen as neighborhood social capital\n    And institutional memory should be valued and utilized\n    And Margaret's knowledge should inform neighborhood decisions\n    And elder residents should be recognized as neighborhood resources\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

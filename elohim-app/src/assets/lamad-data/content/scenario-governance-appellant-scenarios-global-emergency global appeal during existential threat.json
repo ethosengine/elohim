@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-emergency global appeal during existential threat",
+  "contentType": "scenario",
+  "title": "Emergency global appeal during existential threat",
+  "description": "Emergency global appeal during existential threat",
+  "content": "Scenario: Emergency global appeal during existential threat\n    Given AI agents worldwide detect imminent catastrophic risk\n    And agents take coordinated action affecting billions\n    And appellants challenge actions as overreach despite emergency\n    When global Constitutional Council reviews in crisis\n    Then the council convenes within hours via distributed coordination\n    And the council maintains democratic legitimacy under extreme urgency\n    And the council evaluates whether agent actions aligned with constitutional minimums\n    And the council balances extinction prevention with human autonomy\n    And appellants ensure even existential crisis doesn't eliminate oversight\n    And humanity retains governance authority even in emergency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

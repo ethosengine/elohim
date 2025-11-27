@@ -1,0 +1,33 @@
+{
+  "id": "feature-social-medium-child-scenarios-educational",
+  "contentType": "feature",
+  "title": "Educational Participation for Child",
+  "description": "As a child in the social_medium system Operating at the educational governance layer I want to participate in learning communities safely So that I can grow intellectually while protected and supported",
+  "content": "@epic:social_medium\n@user_type:child\n@governance_layer:educational\n@related_users:elder,content_creator,community_moderator\n@related_layers:individual,family,neighborhood\n@elohim_agents:guardian_agent,learning_agent,moderation_agent\n\nFeature: Educational Participation for Child\n  As a child in the social_medium system\n  Operating at the educational governance layer\n  I want to participate in learning communities safely\n  So that I can grow intellectually while protected and supported\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the child user is registered in the system\n    And the educational governance context is active\n    And Emma, age 10, is enrolled in Riverside Elementary\n\n  Scenario: Child joins school homework help space\n    Given Emma's school has a homework help space on the Elohim network\n    And the space is moderated by teachers and parent volunteers\n    When Emma joins the space through her school connection\n    Then she gains access to homework help from peers and mentors\n    And all participants are verified members of the school community\n    And the moderation agent maintains supportive atmosphere\n    And predatory behavior is structurally impossible\n    And Emma can ask questions and help classmates\n\n  Scenario: Child contributes to science fair project collaboration\n    Given Emma is working on a science fair project about local ecology\n    And several classmates are working on related projects\n    When Emma creates a contribution about discovering salamanders in the creek\n    And she shares photos and observations with classmates\n    Then the contribution reaches her project team immediately\n    And her teacher can provide feedback and guidance\n    And the learning agent surfaces related educational resources\n    And Emma learns collaborative research skills\n    And the project documentation is preserved for science fair presentation\n\n  Scenario: Child protected from cyberbullying attempt\n    Given Emma participates in school reading club space\n    When another student tries to post mean comments about Emma\n    Then the guardian agent detects harmful intent before posting\n    And the comment is prevented from reaching Emma\n    And the space moderator is alerted to address the behavior\n    And the student who posted receives appropriate intervention\n    And Emma continues participating without being harmed\n    And restorative process helps both students learn and grow\n\n  Scenario: Child earns district reach through exceptional science project\n    Given Emma's ecology project demonstrates unusual depth and quality\n    And her teacher nominates it for district-wide educational showcase\n    When the nomination is evaluated by educational moderators\n    Then Emma's project is featured in district educational space\n    And other students across the district can learn from her work\n    And Emma experiences recognition for quality contribution\n    And she connects with other young scientists in the district\n    And this exceptional contribution earns her expanded educational reach\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:elder,content_creator,community_moderator",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:guardian_agent,learning_agent,moderation_agent",
+    "social-medium",
+    "feature"
+  ],
+  "sourcePath": "social_medium/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "scenario-social-medium-child-scenarios-educational-child joins school homework help space",
+    "scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+    "scenario-social-medium-child-scenarios-educational-child protected from cyberbullying attempt",
+    "scenario-social-medium-child-scenarios-educational-child earns district reach through exceptional science project",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "scenarioCount": 4
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

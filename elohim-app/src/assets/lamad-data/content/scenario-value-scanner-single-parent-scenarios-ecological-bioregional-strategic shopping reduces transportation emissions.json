@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-strategic shopping reduces transportation emissions",
+  "contentType": "scenario",
+  "title": "Strategic shopping reduces transportation emissions",
+  "description": "Strategic shopping reduces transportation emissions",
+  "content": "Scenario: Strategic shopping reduces transportation emissions\n    Given Maria carefully plans shopping trips to maximize efficiency\n    And she coordinates purchases to minimize separate trips\n    When transportation patterns are analyzed\n    Then the bioregional_elohim should recognize her efficient transportation\n    And it should value her trip consolidation as emissions reduction\n    And her careful planning should be seen as environmental stewardship\n    And economic efficiency should be recognized as climate contribution\n    And Maria should see her behavior as environmentally valuable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,household,community_member,environmental_advocate",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

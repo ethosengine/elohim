@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-family decision-making includes margaret's voice",
+  "contentType": "scenario",
+  "title": "Family decision-making includes Margaret's voice",
+  "description": "Family decision-making includes Margaret's voice",
+  "content": "Scenario: Family decision-making includes Margaret's voice\n    Given Margaret makes substantial contributions to family flourishing\n    And family decisions affect her care capacity\n    When family decisions are being made\n    Then Margaret's care contributions should give her legitimate standing\n    And her voice should carry weight in family governance\n    And decisions should consider impact on her care capacity\n    And Margaret should be respected as autonomous adult contributor\n    And family governance should be multigenerational and equitable\n    And her retirement doesn't diminish her authority in family\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

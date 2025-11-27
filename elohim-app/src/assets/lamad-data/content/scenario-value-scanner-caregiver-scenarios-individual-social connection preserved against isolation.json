@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-individual-social connection preserved against isolation",
+  "contentType": "scenario",
+  "title": "Social connection preserved against isolation",
+  "description": "Social connection preserved against isolation",
+  "content": "Scenario: Social connection preserved against isolation\n    Given intensive caregiving creates profound isolation\n    And James loses social connections as care intensifies\n    When the personal_agent monitors social isolation\n    Then it should recognize dangerous isolation patterns\n    And it should prompt James to maintain key relationships\n    And it should suggest respite opportunities for social connection\n    And it should connect him to other caregivers who understand\n    And social isolation should be actively prevented\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:individual",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

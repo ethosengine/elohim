@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-natural experiment comparing communities with vs without protocol",
+  "contentType": "scenario",
+  "title": "Natural experiment comparing communities with vs without protocol",
+  "description": "Natural experiment comparing communities with vs without protocol",
+  "content": "Scenario: Natural experiment comparing communities with vs without protocol\n    Given some adjacent communities adopted protocol while neighbors didn't\n    And these communities are similar in demographics and economics\n    When I study outcomes comparing adopters to non-adopters\n    Then I isolate: protocol effects from confounding factors\n    And I measure: differences in wellbeing, crisis response, social cohesion\n    And I examine: spillover effects across community boundaries\n    And I analyze: why some communities adopted and others resisted\n    And I provide: quasi-experimental evidence about causality\n    And My findings distinguish: correlation from causation in protocol effects\n    And Evidence serves policymakers deciding whether to support adoption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

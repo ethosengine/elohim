@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-educational-board member evaluates budget allocating resources across schools",
+  "contentType": "scenario",
+  "title": "Board member evaluates budget allocating resources across schools",
+  "description": "Board member evaluates budget allocating resources across schools",
+  "content": "Scenario: Board member evaluates budget allocating resources across schools\n    Given superintendent proposes budget with significant changes to school staffing\n    And budget presentation emphasizes district-wide efficiency and priorities\n    And board wants to understand impacts on different schools and student populations\n    When the board member requests Observer resource equity analysis\n    Then they receive per-pupil spending comparison across all district schools\n    And see staffing changes impact by school demographics and current performance\n    And access analysis of which students gain versus lose resources under proposal\n    And discover budget concentrates cuts in already-struggling schools\n    And equity analysis reveals disparate impacts staff presentation minimized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,citizen,politician,activist",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

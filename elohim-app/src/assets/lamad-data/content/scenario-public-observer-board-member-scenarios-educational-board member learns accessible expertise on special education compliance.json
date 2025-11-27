@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-educational-board member learns accessible expertise on special education compliance",
+  "contentType": "scenario",
+  "title": "Board member learns accessible expertise on special education compliance",
+  "description": "Board member learns accessible expertise on special education compliance",
+  "content": "Scenario: Board member learns accessible expertise on special education compliance\n    Given district faces federal monitoring for special education compliance issues\n    And board must oversee corrective action plan with complex legal requirements\n    And board member has no special education or legal background\n    When the board member uses Observer to understand the situation\n    Then they receive plain-language explanation of IDEA requirements and violations\n    And see comparison of district's special education outcomes to state averages\n    And access key questions to ask superintendent about implementation capacity\n    And get examples of how other districts achieved compliance\n    And accessible expertise enables informed oversight without full-time study\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,citizen,politician,activist",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-collective organizing with other disabled workers",
+  "contentType": "scenario",
+  "title": "Collective organizing with other disabled workers",
+  "description": "Collective organizing with other disabled workers",
+  "content": "Scenario: Collective organizing with other disabled workers\n    Given disabled workers face common workplace barriers\n    And collective action is more powerful than individual advocacy\n    When Alex connects with other disabled workers\n    Then the workplace_elohim should facilitate disabled worker organizing\n    And it should help Alex build solidarity with other disabled employees\n    And collective accommodation requests should be coordinated\n    And workplace accessibility improvements should benefit all disabled workers\n    And the protocol should support disability labor organizing\n    And collective power should be built for systemic workplace change\n    And Alex should be connected to broader disability labor rights movements\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,young_adult,caregiver",
+    "related_layers:individual,household,community,healthcare_medical",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

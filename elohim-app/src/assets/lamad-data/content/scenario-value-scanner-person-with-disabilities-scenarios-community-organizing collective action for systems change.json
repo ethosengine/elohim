@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-organizing collective action for systems change",
+  "contentType": "scenario",
+  "title": "Organizing collective action for systems change",
+  "description": "Organizing collective action for systems change",
+  "content": "Scenario: Organizing collective action for systems change\n    Given individual advocacy often fails against systemic ableism\n    And collective power is necessary for disability justice\n    When Alex organizes disabled people for collective action\n    Then organizing labor should be recognized as care work\n    And the community_elohim should track Alex's movement-building contributions\n    And collective action that wins improvements should be valued highly\n    And Alex's organizing strengthens disability community power\n    And care tokens should reflect the sophistication of organizing work\n    And the protocol should recognize that justice work is care work\n    And Alex's leadership builds capacity for entire community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

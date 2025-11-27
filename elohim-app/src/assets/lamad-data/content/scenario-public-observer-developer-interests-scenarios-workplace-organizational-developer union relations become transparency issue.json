@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer union relations become transparency issue",
+  "contentType": "scenario",
+  "title": "Developer union relations become transparency issue",
+  "description": "Developer union relations become transparency issue",
+  "content": "Scenario: Developer union relations become transparency issue\n    Given a developer has pattern of union-busting and labor resistance\n    And claims to support workers while fighting unionization\n    When the Observer documents labor relations history\n    Then analysis shows: developer spent $400K on union-busting consultants\n    And filed NLRB complaints against worker organizing attempts\n    And rhetoric about supporting workers contradicts anti-union actions\n    And labor relations pattern becomes visible to workers and community\n    And developers face accountability for anti-worker practices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,activist,community_organizer,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

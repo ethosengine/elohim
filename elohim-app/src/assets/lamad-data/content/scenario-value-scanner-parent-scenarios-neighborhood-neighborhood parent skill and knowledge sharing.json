@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood parent skill and knowledge sharing",
+  "contentType": "scenario",
+  "title": "Neighborhood parent skill and knowledge sharing",
+  "description": "Neighborhood parent skill and knowledge sharing",
+  "content": "Scenario: Neighborhood parent skill and knowledge sharing\n    Given different parents have different expertise\n    And Sarah has teaching skills while others have different capabilities\n    When the neighborhood_elohim facilitates knowledge exchange\n    Then it should connect parents for skill sharing\n    And Sarah could teach value literacy while learning car repair\n    And knowledge exchange should be tracked and valued\n    And diverse parent expertise should strengthen whole community\n    And neighborhood care economy should be knowledge-rich\n    And the system should enable parent-to-parent education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-receiving family inheritance and gifts with agency",
+  "contentType": "scenario",
+  "title": "Receiving family inheritance and gifts with agency",
+  "description": "Receiving family inheritance and gifts with agency",
+  "content": "Scenario: Receiving family inheritance and gifts with agency\n    Given Jordan's grandmother passed away and left Jordan an inheritance\n    And Jordan has the right to benefit from the inheritance\n    When the family discusses the inheritance\n    Then Jordan participates in decisions about the money\n    And the personal_agent helps Jordan understand inheritance options\n    And if guardianship requires oversight, it's done with dignity\n    And Jordan has voice in how the money is used for their benefit\n    And Jordan's personhood and rights are fully respected\n    And the family_elohim ensures Jordan's interests are protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

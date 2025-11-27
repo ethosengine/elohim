@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-challenging tipped wage systems",
+  "contentType": "scenario",
+  "title": "Challenging tipped wage systems",
+  "description": "Challenging tipped wage systems",
+  "content": "Scenario: Challenging tipped wage systems\n    Given tipped minimum wage is exploitative and creates instability\n    When workers organize to eliminate tipped wage and demand full minimum wage\n    Then the protocol should support advocacy for one fair wage\n    And provide evidence of problems with tipped wage systems\n    And help workers coordinate across tipped industries\n    And push for legislative elimination of tipped wage carveouts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

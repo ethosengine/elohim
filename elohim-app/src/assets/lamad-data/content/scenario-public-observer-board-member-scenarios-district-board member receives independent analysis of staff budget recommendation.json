@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-district-board member receives independent analysis of staff budget recommendation",
+  "contentType": "scenario",
+  "title": "Board member receives independent analysis of staff budget recommendation",
+  "description": "Board member receives independent analysis of staff budget recommendation",
+  "content": "Scenario: Board member receives independent analysis of staff budget recommendation\n    Given district superintendent recommends budget with significant program cuts\n    And 200-page budget packet emphasizes efficiency and fiscal responsibility\n    And board meeting is in 3 days with vote expected\n    When the board member requests Observer independent analysis\n    Then they receive concise summary identifying key trade-offs staff minimized\n    And see comparison of per-student spending across district schools showing disparities\n    And access data on community impacts of proposed cuts by demographic group\n    And get examples of how similar districts managed budget challenges differently\n    And independent analysis reveals information asymmetry in staff presentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:district",
+    "related_users:citizen,parent,teacher,politician,activist",
+    "related_layers:municipality,community,educational",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

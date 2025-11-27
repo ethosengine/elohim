@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-workplace privacy from family care data",
+  "contentType": "scenario",
+  "title": "Workplace privacy from family care data",
+  "description": "Workplace privacy from family care data",
+  "content": "Scenario: Workplace privacy from family care data\n    Given Sarah's parenting data should not be accessible to employer\n    And strict privacy boundaries are essential\n    When workplace and personal systems interact\n    Then the workplace must have zero access to family care data\n    And Sarah's personal_agent should protect her privacy absolutely\n    And the workplace_elohim should respect complete privacy boundaries\n    And the system should prevent workplace surveillance of personal life\n    And professional and family spheres should remain separate\n    And Sarah's care data should be her sovereign information\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

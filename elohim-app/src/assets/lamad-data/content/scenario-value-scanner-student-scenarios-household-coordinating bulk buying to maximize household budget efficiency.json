@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-coordinating bulk buying to maximize household budget efficiency",
+  "contentType": "scenario",
+  "title": "Coordinating bulk buying to maximize household budget efficiency",
+  "description": "Coordinating bulk buying to maximize household budget efficiency",
+  "content": "Scenario: Coordinating bulk buying to maximize household budget efficiency\n    Given Kenji and roommates each have limited grocery budgets\n    And bulk buying saves money but requires coordination\n    When Kenji proposes coordinated bulk purchase of rice, beans, and cooking oil\n    Then the household_elohim should facilitate group buying coordination\n    And it should track who pays what and how costs are divided\n    And it should calculate savings: \"Bulk rice saves each person $8/month\"\n    And it should help roommates see financial benefit of coordination\n    And the system should reduce friction in shared purchasing\n    And collective buying should be easy and fair\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

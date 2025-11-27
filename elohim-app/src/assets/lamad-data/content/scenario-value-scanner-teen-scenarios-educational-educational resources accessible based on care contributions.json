@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-educational resources accessible based on care contributions",
+  "contentType": "scenario",
+  "title": "Educational resources accessible based on care contributions",
+  "description": "Educational resources accessible based on care contributions",
+  "content": "Scenario: Educational resources accessible based on care contributions\n    Given Jasmine has accumulated care tokens through contributions\n    And the community offers educational programs and tutoring\n    When she seeks additional educational support\n    Then her care tokens should be convertible to educational access\n    And she should be able to use care economy participation to access learning resources\n    And educational opportunities should not be limited to those who can pay market rates\n    And her demonstrated contribution should give her standing to access education\n    And care economy should support educational equity\n    And reduce barriers to educational access for contributing community members\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

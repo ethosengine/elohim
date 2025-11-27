@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-municipality-housing authority board member evaluates rent increase proposal",
+  "contentType": "scenario",
+  "title": "Housing authority board member evaluates rent increase proposal",
+  "description": "Housing authority board member evaluates rent increase proposal",
+  "content": "Scenario: Housing authority board member evaluates rent increase proposal\n    Given authority staff recommends rent increases to cover operating costs\n    And staff presentation emphasizes authority's fiduciary responsibility and budget needs\n    And tenant advocates testify about hardship but lack supporting data\n    When the board member requests Observer independent analysis\n    Then they receive comparison of authority's costs to peer housing authorities\n    And see tenant income data showing rent burden impacts by increase level\n    And access analysis of cost drivers and alternative budget approaches\n    And discover authority's administrative costs higher than similar authorities\n    And independent analysis reveals trade-offs staff presentation minimized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:municipality",
+    "related_users:citizen,developer_interests,politician,activist,community_organizer",
+    "related_layers:district,community,ecological",
+    "elohim_agents:public_observer,domain_elohim,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

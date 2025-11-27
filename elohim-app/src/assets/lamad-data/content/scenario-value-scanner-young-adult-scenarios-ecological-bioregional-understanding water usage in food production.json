@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding water usage in food production",
+  "contentType": "scenario",
+  "title": "Understanding water usage in food production",
+  "description": "Understanding water usage in food production",
+  "content": "Scenario: Understanding water usage in food production\n    Given food production uses significant water resources\n    And water scarcity is increasing\n    When the bioregional_elohim displays environmental data\n    Then it should include water usage in impact assessment\n    And it should explain water costs of different foods\n    And it should help her choose lower water-impact options\n    And bioregional water context should inform recommendations\n    And she should understand food-water connections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

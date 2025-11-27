@@ -1,0 +1,36 @@
+{
+  "id": "feature-public-observer-developer-interests-scenarios-provincial-state",
+  "contentType": "feature",
+  "title": "State Development Policy and Accountability for Developer Interests",
+  "description": "As a developer in the public_observer system Operating at the provincial_state governance layer I want transparent policy frameworks and accountable lobbying So that state policy serves community development not just developer extraction",
+  "content": "@epic:public_observer\n@user_type:developer_interests\n@governance_layer:provincial_state\n@related_users:politician,board_member,citizen,activist\n@related_layers:municipality,county_regional,ecological\n@elohim_agents:public_observer,state_elohim,accountability_elohim\n\nFeature: State Development Policy and Accountability for Developer Interests\n  As a developer in the public_observer system\n  Operating at the provincial_state governance layer\n  I want transparent policy frameworks and accountable lobbying\n  So that state policy serves community development not just developer extraction\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the developer_interests user is registered in the system\n    And the provincial_state governance context is active\n\n  Scenario: Responsible developer advocates for sensible state housing policy\n    Given state housing regulations create barriers to affordable development\n    And a responsible developer wants to build more affordable housing\n    When the Observer provides state policy navigation and advocacy tools\n    Then the developer understands state regulatory framework\n    And identifies which regulations genuinely protect community versus serve NIMBYism\n    And engages in transparent policy advocacy for streamlined affordable housing approval\n    And makes case based on evidence not just developer profit\n    And transparent advocacy distinguishes from corrupt lobbying\n\n  Scenario: Developer lobbying relationships become transparent\n    Given a developer lobbies state legislature for favorable policy\n    And makes campaign donations to key committee members\n    When the Observer tracks lobbying and political relationships\n    Then constituents see: $250K in donations to housing committee members\n    And identify correlation between donations and votes on developer-friendly bills\n    And the developer faces accountability for political influence\n    And legislators face scrutiny about who they serve\n    And transparent relationships create pressure for merit-based policy\n\n  Scenario: Developer subsidy accountability reveals actual outcomes\n    Given a developer received $10M state tax credit for \"affordable housing\"\n    And claimed it would produce 200 affordable units\n    When the Observer tracks subsidy outcomes\n    Then analysis shows: only 35 units meet affordability criteria\n    And most units are market-rate generating developer profit\n    And state subsidy mostly subsidized luxury development\n    And taxpayers see poor return on public investment\n    And accountability creates pressure for subsidy reform\n\n  Scenario: Responsible developer demonstrates subsidy effectiveness\n    Given a responsible developer builds genuinely affordable housing\n    And uses state subsidies to serve low-income residents\n    When the Observer tracks development outcomes against state investment\n    Then analysis shows: 180 units meet affordability criteria from $8M subsidy\n    And residents are actually low-income workforce families\n    And units remain affordable through long-term deed restrictions\n    And state investment created genuine community benefit\n    And responsible development gains advantage in subsidy allocation\n\n  Scenario: Developer faces accountability for state policy capture\n    Given a developer lobbies for state law preempting local control\n    And funds astroturf \"affordability advocacy\" groups\n    When the Observer reveals developer funding and advocacy patterns\n    Then citizens see: \"housing advocates\" are developer-funded front groups\n    And state preemption bill eliminates local affordable housing requirements\n    And policy serves developer profit not affordable housing\n    And manufactured grassroots campaigns face exposure\n    And policy debate gains transparency about real interests\n\n  Scenario: Developer environmental compliance becomes state accountability issue\n    Given a developer's projects consistently violate state environmental standards\n    But receives minimal enforcement from state regulators\n    When the Observer documents violation patterns and regulatory response\n    Then analysis shows: 67 violations across 8 projects over 5 years\n    And penalties total $180K while profits exceed $40M\n    And state regulators approve new permits despite violation history\n    And regulatory capture becomes statistically undeniable\n    And developer faces pressure for genuine environmental compliance\n\n  Scenario: State development policy outcomes versus promises\n    Given state legislature passed developer-backed \"affordable housing\" law\n    And promised it would increase affordable housing supply\n    When the Observer tracks actual outcomes three years later\n    Then analysis shows: luxury housing increased 40%\n    And affordable housing decreased 8%\n    And displacement accelerated in gentrifying neighborhoods\n    And policy delivered opposite of promised outcomes\n    And evidence supports policy reform not developer rhetoric\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:provincial_state",
+    "related_users:politician,board_member,citizen,activist",
+    "related_layers:municipality,county_regional,ecological",
+    "elohim_agents:public_observer,state_elohim,accountability_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-responsible developer advocates for sensible state housing policy",
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-developer lobbying relationships become transparent",
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-developer subsidy accountability reveals actual outcomes",
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-responsible developer demonstrates subsidy effectiveness",
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-developer faces accountability for state policy capture",
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-developer environmental compliance becomes state accountability issue",
+    "scenario-public-observer-developer-interests-scenarios-provincial-state-state development policy outcomes versus promises",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 7
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

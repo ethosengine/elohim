@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-workers access transparent financial information previously hidden by corporate",
+  "contentType": "scenario",
+  "title": "Workers access transparent financial information previously hidden by corporate",
+  "description": "Workers access transparent financial information previously hidden by corporate",
+  "content": "Scenario: Workers access transparent financial information previously hidden by corporate\n    Given corporate kept financial information opaque to workers\n    And workers now have complete financial transparency\n    When workers access the financial dashboard\n    Then they see real-time revenue, costs, and profit\n    And they see exactly how much was previously extracted by franchise fees\n    And they see supplier costs and markup comparisons\n    And they see complete compensation breakdown for all workers\n    And they can audit any financial transaction\n    And workplace_elohim ensures financial literacy support for all workers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:workplace_organizational",
+    "related_users:[manager,supplier,small_business_owner,franchise_operator]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

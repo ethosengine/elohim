@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-identity preserved through memory challenges",
+  "contentType": "scenario",
+  "title": "Identity preserved through memory challenges",
+  "description": "Identity preserved through memory challenges",
+  "content": "Scenario: Identity preserved through memory challenges\n    Given Helen's dementia causes increasing memory difficulties\n    And her sense of self needs support and continuity\n    When her personal_agent interacts with her over time\n    Then it should help maintain her identity continuity\n    And it should reference her history: \"You worked as a teacher for 30 years\"\n    And it should support her self-concept despite cognitive changes\n    And it should remind her of relationships and accomplishments\n    And her personhood should remain intact even as memory fades\n    And the protocol should serve the human being she remains\n    And dignity should be preserved regardless of cognitive capacity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

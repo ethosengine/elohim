@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-building neighborhood resilience through worker solidarity",
+  "contentType": "scenario",
+  "title": "Building neighborhood resilience through worker solidarity",
+  "description": "Building neighborhood resilience through worker solidarity",
+  "content": "Scenario: Building neighborhood resilience through worker solidarity\n    Given many neighbors are also workers with similar constraints\n    When workers connect and support each other\n    Then the protocol should facilitate worker mutual aid networks\n    And coordinate support systems designed for workers' schedules\n    And build neighborhood culture of worker solidarity\n    And demonstrate that care economy serves workers' needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

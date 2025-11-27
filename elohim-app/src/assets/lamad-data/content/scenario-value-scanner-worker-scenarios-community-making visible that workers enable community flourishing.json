@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-making visible that workers enable community flourishing",
+  "contentType": "scenario",
+  "title": "Making visible that workers enable community flourishing",
+  "description": "Making visible that workers enable community flourishing",
+  "content": "Scenario: Making visible that workers enable community flourishing\n    Given community depends on workers' labor for functioning\n    And workers are often invisible or undervalued\n    When the community assesses what makes life possible\n    Then the protocol should make visible workers' essential contributions\n    And demonstrate that workers deserve dignity and fair compensation\n    And build community consciousness about care labor embedded in all work\n    And catalyze community support for worker justice and care economy principles\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

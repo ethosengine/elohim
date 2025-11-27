@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-teaching practical life skills and competencies",
+  "contentType": "scenario",
+  "title": "Teaching practical life skills and competencies",
+  "description": "Teaching practical life skills and competencies",
+  "content": "Scenario: Teaching practical life skills and competencies\n    Given Margaret has lifetime of practical knowledge\n    And grandchildren need to learn cooking, cleaning, budgeting, self-care\n    When Margaret teaches practical skills\n    Then the educational_elohim should recognize life skills teaching\n    And it should value practical education as essential learning\n    And it should track skills development over time\n    And life skills teaching should accumulate care tokens\n    And Margaret's practical wisdom should be recognized as education\n    And informal skill development should be valued alongside academic learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

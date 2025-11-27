@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-participating in civic education and voting preparation",
+  "contentType": "scenario",
+  "title": "Participating in civic education and voting preparation",
+  "description": "Participating in civic education and voting preparation",
+  "content": "Scenario: Participating in civic education and voting preparation\n    Given Jordan is a citizen with the right to vote\n    And informed voting requires accessible civic education\n    When election season approaches and Jordan wants to vote\n    Then the educational_elohim provides voter education in accessible format\n    And candidates and issues are explained with simple language and visuals\n    And Jordan learns about voting process step-by-step\n    And Jordan can make informed voting choices with support\n    And Jordan's civic participation is enabled through education\n    And Jordan experiences full citizenship through accessible learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

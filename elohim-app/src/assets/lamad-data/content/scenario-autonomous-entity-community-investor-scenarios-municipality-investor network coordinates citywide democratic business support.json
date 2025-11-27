@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-investor network coordinates citywide democratic business support",
+  "contentType": "scenario",
+  "title": "Investor network coordinates citywide democratic business support",
+  "description": "Investor network coordinates citywide democratic business support",
+  "content": "Scenario: Investor network coordinates citywide democratic business support\n    Given isolated community investment pools lack coordination\n    And municipal-scale transformation requires network coordination\n    When investors organize citywide community investment network\n    Then capital is coordinated across neighborhoods for strategic conversions\n    And successful practices are shared across community investment pools\n    And collective bargaining power increases with financial institutions\n    And citywide democratic economy infrastructure develops through investor coordination\n    And municipality_elohim facilitates citywide investor network coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

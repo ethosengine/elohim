@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-community investment supports municipal affordable housing development",
+  "contentType": "scenario",
+  "title": "Community investment supports municipal affordable housing development",
+  "description": "Community investment supports municipal affordable housing development",
+  "content": "Scenario: Community investment supports municipal affordable housing development\n    Given housing is major community need and investment opportunity\n    And Patricia wants to invest in affordable housing with democratic governance\n    When community investment expands to housing cooperatives\n    Then her capital supports converting apartment buildings to resident ownership\n    And affordable housing is preserved through democratic governance\n    And housing investment provides returns while addressing municipal affordability crisis\n    And community wealth-building extends to housing alongside businesses\n    And municipality_elohim coordinates housing cooperative investment and development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

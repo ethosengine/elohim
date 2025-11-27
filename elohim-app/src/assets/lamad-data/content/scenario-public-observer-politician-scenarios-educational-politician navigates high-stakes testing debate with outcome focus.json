@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician navigates high-stakes testing debate with outcome focus",
+  "contentType": "scenario",
+  "title": "Politician navigates high-stakes testing debate with outcome focus",
+  "description": "Politician navigates high-stakes testing debate with outcome focus",
+  "content": "Scenario: Politician navigates high-stakes testing debate with outcome focus\n    Given testing requirements create political controversy\n    And both supporters and critics make competing claims\n    When the Observer analyzes testing data and educational impacts\n    Then they see how much instructional time testing consumes\n    And understand what testing reveals versus distorts about learning\n    And identify schools where testing drives harmful practices\n    And review alternative assessment models in other states\n    And balance accountability needs with teaching and learning quality\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

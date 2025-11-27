@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-community-activist builds coalition across neighborhood boundaries",
+  "contentType": "scenario",
+  "title": "Activist builds coalition across neighborhood boundaries",
+  "description": "Activist builds coalition across neighborhood boundaries",
+  "content": "Scenario: Activist builds coalition across neighborhood boundaries\n    Given multiple neighborhoods face similar housing challenges\n    And the activist has credibility in their own neighborhood\n    When they reach out to activists in adjacent neighborhoods\n    And they propose forming a district-level coalition\n    Then cross-neighborhood connections are negotiated through mutual trust\n    And a district-layer organizing space is created\n    And patterns from successful housing campaigns surface as resources\n    And the coalition coordinates action while respecting local autonomy\n    And each neighborhood maintains its own decision-making process\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_moderator,content_creator,elder,child",
+    "related_layers:individual,neighborhood,district",
+    "elohim_agents:moderation_agent,coordination_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

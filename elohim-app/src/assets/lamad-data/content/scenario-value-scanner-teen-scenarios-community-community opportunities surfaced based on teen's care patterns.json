@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-community opportunities surfaced based on teen's care patterns",
+  "contentType": "scenario",
+  "title": "Community opportunities surfaced based on teen's care patterns",
+  "description": "Community opportunities surfaced based on teen's care patterns",
+  "content": "Scenario: Community opportunities surfaced based on teen's care patterns\n    Given Jasmine has demonstrated leadership through her care contributions\n    And the community is recruiting for youth advisory board\n    When the community_elohim analyzes needs and capabilities\n    Then it should surface the opportunity to Jasmine\n    And explain why she's a good match: \"Your care contributions demonstrate the leadership they're seeking\"\n    And connect her care work to civic opportunities\n    And help her see pathways from care contribution to community leadership\n    And demonstrate that care economy participation opens doors\n    And recognize her capabilities rather than just her potential\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

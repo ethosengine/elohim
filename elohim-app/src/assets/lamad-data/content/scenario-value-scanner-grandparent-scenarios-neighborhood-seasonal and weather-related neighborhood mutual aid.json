@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-seasonal and weather-related neighborhood mutual aid",
+  "contentType": "scenario",
+  "title": "Seasonal and weather-related neighborhood mutual aid",
+  "description": "Seasonal and weather-related neighborhood mutual aid",
+  "content": "Scenario: Seasonal and weather-related neighborhood mutual aid\n    Given Margaret is often available during daytime\n    And neighborhood needs vary with seasons and weather\n    When the neighborhood coordinates seasonal care\n    Then the neighborhood_elohim should facilitate seasonal mutual aid\n    And Margaret might help with snow observation, mail collection, or storm preparation\n    And she should receive help with physical tasks she cannot do\n    And seasonal care should be reciprocal and community-building\n    And neighborhood resilience should increase through elder participation\n    And Margaret should contribute according to her capacity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

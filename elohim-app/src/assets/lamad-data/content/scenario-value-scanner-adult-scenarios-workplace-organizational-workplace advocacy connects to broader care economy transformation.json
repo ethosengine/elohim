@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace advocacy connects to broader care economy transformation",
+  "contentType": "scenario",
+  "title": "Workplace advocacy connects to broader care economy transformation",
+  "description": "Workplace advocacy connects to broader care economy transformation",
+  "content": "Scenario: Workplace advocacy connects to broader care economy transformation\n    Given Sarah's workplace advocacy could influence other employers\n    And workplace policy changes could spread\n    When Sarah's workplace successfully implements care economy policies\n    Then the workplace_elohim should share success with other organizations\n    And effective policies should be documented and promoted\n    And Sarah's advocacy should contribute to broader transformation\n    And workplace care economy should grow from successful examples\n    And employment should shift toward care economy principles at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

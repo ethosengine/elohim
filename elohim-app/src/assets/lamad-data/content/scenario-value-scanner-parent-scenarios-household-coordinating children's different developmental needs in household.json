@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-coordinating children's different developmental needs in household",
+  "contentType": "scenario",
+  "title": "Coordinating children's different developmental needs in household",
+  "description": "Coordinating children's different developmental needs in household",
+  "content": "Scenario: Coordinating children's different developmental needs in household\n    Given Tommy (5) needs wonder-preservation\n    And Emma (8) needs autonomy-building\n    When Sarah coordinates household routines\n    Then the household_elohim should help balance different needs\n    And it should suggest how to serve both children appropriately\n    And it should track whether each child's needs are being met\n    And developmental coordination should be recognized as complex work\n    And Sarah's skilled navigation of competing needs should be valued\n    And household care should serve all members' flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

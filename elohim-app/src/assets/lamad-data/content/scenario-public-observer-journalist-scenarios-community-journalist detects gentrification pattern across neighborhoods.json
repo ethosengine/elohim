@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-community-journalist detects gentrification pattern across neighborhoods",
+  "contentType": "scenario",
+  "title": "Journalist detects gentrification pattern across neighborhoods",
+  "description": "Journalist detects gentrification pattern across neighborhoods",
+  "content": "Scenario: Journalist detects gentrification pattern across neighborhoods\n    Given individual rent increases in scattered buildings\n    And the journalist suspects coordinated displacement\n    When the Observer tracks evictions and rent increases across community\n    Then the journalist sees systematic pattern of displacement\n    And identifies corporate landlord acquiring properties neighborhood-wide\n    And documents residents being priced out block by block\n    And connects individual stories to structural pattern\n    And publishes investigation exposing organized gentrification\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:community",
+    "related_users:citizen,activist,community_organizer,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

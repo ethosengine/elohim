@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-family-teen participates in family governance decisions with real voice",
+  "contentType": "scenario",
+  "title": "Teen participates in family governance decisions with real voice",
+  "description": "Teen participates in family governance decisions with real voice",
+  "content": "Scenario: Teen participates in family governance decisions with real voice\n    Given the family is making decisions about a major purchase (new appliance)\n    And Jasmine has accumulated significant care contributions\n    And she has relevant knowledge and preferences\n    When the family_elohim facilitates the decision process\n    Then Jasmine's voice should carry weight in the decision\n    And her input should be solicited and genuinely considered\n    And she should participate as a junior partner, not just be consulted\n    And the family should make decisions that reflect all members' input\n    And Jasmine should learn that her participation in family governance is legitimate\n    And the decision process should prepare her for adult household management\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:family",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-unsuccessful appeal but protocol transparency builds trust",
+  "contentType": "scenario",
+  "title": "Unsuccessful appeal but protocol transparency builds trust",
+  "description": "Unsuccessful appeal but protocol transparency builds trust",
+  "content": "Scenario: Unsuccessful appeal but protocol transparency builds trust\n    Given my appeal was reviewed and the agent's decision was affirmed\n    And I didn't get the outcome I wanted\n    When I receive the Constitutional Council's detailed reasoning\n    Then I can see that my appeal was genuinely considered not dismissed\n    And I understand the constitutional principles that were applied\n    And I see how my case compares to similar precedents\n    And I know I had meaningful recourse even though I didn't prevail\n    And The transparency helps me trust the process even in defeat\n    And Trust in community governance is maintained through honest engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-municipal care economy data informs state and federal policy",
+  "contentType": "scenario",
+  "title": "Municipal care economy data informs state and federal policy",
+  "description": "Municipal care economy data informs state and federal policy",
+  "content": "Scenario: Municipal care economy data informs state and federal policy\n    Given Riverside municipality has comprehensive care economy data\n    And thousands of teens participate in tracked care contributions\n    When state or federal policymakers study youth economics\n    Then municipal_elohim should provide anonymized aggregate data\n    And demonstrate economic value of teen care contributions at scale\n    And inform policy about youth employment, education, and wellbeing\n    And show that care economy framework reveals invisible youth labor\n    And support evidence-based policy at higher governance levels\n    And contribute to national conversation about youth participation in economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

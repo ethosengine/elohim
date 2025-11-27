@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-reciprocal care flows challenge narrative of one-directional dependence",
+  "contentType": "scenario",
+  "title": "Reciprocal care flows challenge narrative of one-directional dependence",
+  "description": "Reciprocal care flows challenge narrative of one-directional dependence",
+  "content": "Scenario: Reciprocal care flows challenge narrative of one-directional dependence\n    Given family relationships often assume disabled people only receive care\n    And Alex actually provides substantial care to family\n    When the family_elohim tracks care contributions\n    Then Alex's care work for family should be made visible\n    And Alex provides emotional support, advice, practical help to family members\n    And care should be recognized as flowing in multiple directions\n    And the narrative that Alex only takes should be countered with data\n    And family should see Alex as care contributor, not just recipient\n    And reciprocity should be made undeniable through quantification\n    And cultural assumptions should be challenged by visible reality\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

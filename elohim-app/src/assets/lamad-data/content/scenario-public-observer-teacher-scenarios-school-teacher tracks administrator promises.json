@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher tracks administrator promises",
+  "contentType": "scenario",
+  "title": "Teacher tracks administrator promises",
+  "description": "Teacher tracks administrator promises",
+  "content": "Scenario: Teacher tracks administrator promises\n    Given the principal promised to reduce paperwork burden\n    And six months have passed\n    When the Observer tracks promise implementation\n    Then teachers document paperwork actually increased 15%\n    And evidence shows gap between promise and reality\n    And teachers bring accountability data to next site council\n    And administrator either delivers on commitment or explains why not\n    And promises become enforceable through transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

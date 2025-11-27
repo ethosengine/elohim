@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+  "contentType": "scenario",
+  "title": "Child creates first contribution within family circle",
+  "description": "Child creates first contribution within family circle",
+  "content": "Scenario: Child creates first contribution within family circle\n    Given Emma wants to share her art project with her family\n    When she creates a contribution with a photo of her drawing\n    And she writes \"I made this at school today!\"\n    Then the contribution is immediately visible to all family members\n    And it stays within the family circle by default\n    And family members can respond with encouragement\n    And the guardian agent tracks this as positive creative expression\n    And Emma learns that sharing creates connection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-family",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

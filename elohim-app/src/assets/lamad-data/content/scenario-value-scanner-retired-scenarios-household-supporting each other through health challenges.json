@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-household-supporting each other through health challenges",
+  "contentType": "scenario",
+  "title": "Supporting each other through health challenges",
+  "description": "Supporting each other through health challenges",
+  "content": "Scenario: Supporting each other through health challenges\n    Given one or both partners may face health crises\n    And partners provide mutual care and support\n    When the household_elohim tracks caregiving between partners\n    Then it should recognize care provided by each partner\n    And it should surface when care burden becomes unsustainable\n    And it should suggest external support when needed\n    And care between partners should be valued and visible\n    And the system should protect relationship health under care stress\n    And mutual care should strengthen rather than strain partnership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:household",
+    "related_users:senior,spouse,partner,elderly",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

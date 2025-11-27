@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-educational-teacher reveals disciplinary policy impacts on students",
+  "contentType": "scenario",
+  "title": "Teacher reveals disciplinary policy impacts on students",
+  "description": "Teacher reveals disciplinary policy impacts on students",
+  "content": "Scenario: Teacher reveals disciplinary policy impacts on students\n    Given district implements zero-tolerance discipline policy\n    And claims it improves school safety and learning environment\n    When teachers track disciplinary policy impacts through Observer\n    Then teachers document disproportionate impact on students of color\n    And show suspensions increase rather than decrease behavior issues\n    And demonstrate how exclusionary discipline harms student learning\n    And propose restorative practices as evidence-based alternative\n    And disciplinary policy becomes educational equity issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:educational",
+    "related_users:parent,board_member,student,administrator,community_organizer",
+    "related_layers:school,district,provincial_state",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-community provides safety net when teen faces crisis",
+  "contentType": "scenario",
+  "title": "Community provides safety net when teen faces crisis",
+  "description": "Community provides safety net when teen faces crisis",
+  "content": "Scenario: Community provides safety net when teen faces crisis\n    Given Jasmine encounters a family crisis or household instability\n    And she has been a consistent community contributor\n    When the crisis occurs and she needs support\n    Then the community_elohim should surface available resources\n    And her care contributions should give her standing to access support\n    And community institutions should respond to protect her wellbeing\n    And the system should preserve her autonomy and dignity\n    And demonstrate that care economy operates as mutual aid\n    And show that communities care for members who have cared for community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

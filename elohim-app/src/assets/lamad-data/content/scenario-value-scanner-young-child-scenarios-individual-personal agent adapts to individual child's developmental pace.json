@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-individual-personal agent adapts to individual child's developmental pace",
+  "contentType": "scenario",
+  "title": "Personal agent adapts to individual child's developmental pace",
+  "description": "Personal agent adapts to individual child's developmental pace",
+  "content": "Scenario: Personal agent adapts to individual child's developmental pace\n    Given Tommy is 5 years old\n    And his developmental pace may differ from age-based averages\n    When the personal_agent interacts with Tommy over time\n    Then it should observe Tommy's actual capabilities\n    And it should adapt guidance to his individual pace\n    And it should not enforce rigid age-based expectations\n    And it should support Tommy's unique development\n    And learning should be paced to Tommy's readiness\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:individual",
+    "related_users:parent,child,grandparent",
+    "related_layers:family,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.199597",
+  "updatedAt": "2025-11-21T18:54:29.199597"
+}

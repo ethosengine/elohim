@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-value literacy education through lived experience at advanced age",
+  "contentType": "scenario",
+  "title": "Value literacy education through lived experience at advanced age",
+  "description": "Value literacy education through lived experience at advanced age",
+  "content": "Scenario: Value literacy education through lived experience at advanced age\n    Given Helen uses Value Scanner with assistance\n    And she's learning care economy principles through practice\n    When Helen makes care-based decisions\n    Then she should be learning that her contributions still matter\n    And value literacy should be accessible at all ages\n    And care economy principles should be demonstrated through her experience\n    And she should understand that care has value regardless of age\n    And the protocol should teach through experience, not explanation\n    And Helen should internalize that she has worth beyond productivity\n    And care economy education should include all ages\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

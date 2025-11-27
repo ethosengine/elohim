@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-pursuing personal interest through adult education",
+  "contentType": "scenario",
+  "title": "Pursuing personal interest through adult education",
+  "description": "Pursuing personal interest through adult education",
+  "content": "Scenario: Pursuing personal interest through adult education\n    Given Jordan loves art and wants to improve drawing skills\n    And the community college offers accessible art classes\n    When Jordan enrolls in the drawing class\n    Then registration process uses accessible language and support\n    And the instructor adapts teaching to Jordan's learning style\n    And Jordan creates art alongside other adult students\n    And Jordan's artistic expression is valued, not patronized\n    And Jordan experiences being a lifelong learner\n    And Jordan's creative contributions are celebrated authentically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-skill sharing network for household tasks maria cannot do alone",
+  "contentType": "scenario",
+  "title": "Skill sharing network for household tasks Maria cannot do alone",
+  "description": "Skill sharing network for household tasks Maria cannot do alone",
+  "content": "Scenario: Skill sharing network for household tasks Maria cannot do alone\n    Given some household tasks are difficult or impossible for one person\n    And Maria cannot afford to hire professionals for everything\n    When Maria needs help with household tasks requiring multiple people or specialized skills\n    Then the neighborhood_elohim should coordinate skill sharing network\n    And neighbors should exchange help based on different capabilities\n    And Maria should access household help through reciprocal labor exchange\n    And skill sharing should enable household maintenance without money or partner\n    And neighborhood cooperation should solve single-parent capability gaps\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

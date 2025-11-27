@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-board member monitors discipline disparities and pushes for equity",
+  "contentType": "scenario",
+  "title": "Board member monitors discipline disparities and pushes for equity",
+  "description": "Board member monitors discipline disparities and pushes for equity",
+  "content": "Scenario: Board member monitors discipline disparities and pushes for equity\n    Given the politician committed to equitable school climate\n    When the Observer tracks discipline outcomes by demographics\n    Then they see Black students suspended at 3x rate of white students\n    And learn similar behaviors result in different consequences by race\n    And identify which schools have restorative practices versus zero-tolerance\n    And compare district patterns to best-practice districts\n    And champion policy reform for equitable discipline\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

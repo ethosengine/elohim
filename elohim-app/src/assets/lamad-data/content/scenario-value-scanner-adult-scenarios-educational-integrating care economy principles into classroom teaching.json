@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-integrating care economy principles into classroom teaching",
+  "contentType": "scenario",
+  "title": "Integrating care economy principles into classroom teaching",
+  "description": "Integrating care economy principles into classroom teaching",
+  "content": "Scenario: Integrating care economy principles into classroom teaching\n    Given Sarah teaches in a traditional school system\n    And she wants to bring care economy into curriculum\n    When Sarah designs lessons for her students\n    Then the educational_elohim should provide age-appropriate resources\n    And she should teach that care work creates value\n    And students should learn through concrete experiences\n    And classroom should become care economy learning environment\n    And Sarah should spread care economy principles to hundreds of children\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-participating in global constitutional convention as observer",
+  "contentType": "scenario",
+  "title": "Participating in global constitutional convention as observer",
+  "description": "Participating in global constitutional convention as observer",
+  "content": "Scenario: Participating in global constitutional convention as observer\n    Given Global Constitutional Convention convenes with 10,000 delegates\n    And I attend as policy maker observer not delegate\n    When I observe global deliberative democracy\n    Then I learn: from how diverse humanity deliberates together\n    And I see: what enables agreement despite profound disagreement\n    And I witness: ordinary citizens governing existential questions\n    And I prepare: to implement constitutional amendments in my nation\n    And I translate: global constitutional evolution into national law\n    And I am humbled: by wisdom of randomly-selected citizens\n    And I understand: my role as servant of democratic will\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

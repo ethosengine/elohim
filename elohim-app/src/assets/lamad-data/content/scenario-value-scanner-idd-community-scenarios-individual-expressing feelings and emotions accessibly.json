@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-expressing feelings and emotions accessibly",
+  "contentType": "scenario",
+  "title": "Expressing feelings and emotions accessibly",
+  "description": "Expressing feelings and emotions accessibly",
+  "content": "Scenario: Expressing feelings and emotions accessibly\n    Given Jordan wants to communicate how they're feeling\n    And verbal expression might be challenging sometimes\n    When Jordan uses the feelings check-in feature\n    Then the interface shows emotion faces (happy, sad, angry, scared, etc.)\n    And Jordan can select the face that matches their feeling\n    And the system asks simple follow-up questions with visual aids\n    And Jordan's feelings are communicated to their support network\n    And Jordan's emotional expression is honored and validated\n    And support is offered if Jordan is struggling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

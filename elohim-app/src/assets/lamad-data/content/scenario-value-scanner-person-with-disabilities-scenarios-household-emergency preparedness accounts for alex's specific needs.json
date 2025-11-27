@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-emergency preparedness accounts for alex's specific needs",
+  "contentType": "scenario",
+  "title": "Emergency preparedness accounts for Alex's specific needs",
+  "description": "Emergency preparedness accounts for Alex's specific needs",
+  "content": "Scenario: Emergency preparedness accounts for Alex's specific needs\n    Given Alex has disability-related emergency considerations\n    And emergencies require rapid response\n    When the household_elohim plans for emergency scenarios\n    Then emergency plans should account for Alex's mobility limitations\n    And evacuation plans should be accessible to Alex\n    And medical equipment needs should be factored into emergency supplies\n    And support worker backup plans should be established\n    And Alex should have accessible emergency communication methods\n    And emergency preparedness should reduce Alex's vulnerability\n    And planning should be proactive, not reactive\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:household",
+    "related_users:adult,young_adult,elderly,caregiver,support_worker",
+    "related_layers:individual,family,community,workplace_organizational",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-being recognized for work contributions publicly",
+  "contentType": "scenario",
+  "title": "Being recognized for work contributions publicly",
+  "description": "Being recognized for work contributions publicly",
+  "content": "Scenario: Being recognized for work contributions publicly\n    Given the library celebrates Employee Appreciation Week\n    And all staff members are recognized for their contributions\n    When Jordan is recognized for their work\n    Then the recognition celebrates Jordan's genuine contributions\n    And Jordan is honored as a valued employee, not a charity case\n    And specific accomplishments are named (not just \"trying hard\")\n    And Jordan's work helping organize library is highlighted\n    And Jordan experiences authentic professional recognition\n    And colleagues see Jordan as contributing peer\n    And Jordan's worker identity is affirmed and celebrated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

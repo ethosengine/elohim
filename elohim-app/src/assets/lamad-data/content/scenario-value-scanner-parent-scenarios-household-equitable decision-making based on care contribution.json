@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-equitable decision-making based on care contribution",
+  "contentType": "scenario",
+  "title": "Equitable decision-making based on care contribution",
+  "description": "Equitable decision-making based on care contribution",
+  "content": "Scenario: Equitable decision-making based on care contribution\n    Given Sarah contributes 75% of household labor\n    And household decisions affect everyone\n    When major household decisions need to be made\n    Then the household_elohim should weight input by care contribution\n    And Sarah's voice should carry appropriate weight\n    And care tokens should give her standing in decisions\n    And those who do the work should have power over the work\n    And household governance should be based on care economy equity\n    And Sarah should have decision authority matching her labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

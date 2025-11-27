@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-educational governance includes parent and teacher voices",
+  "contentType": "scenario",
+  "title": "Educational governance includes parent and teacher voices",
+  "description": "Educational governance includes parent and teacher voices",
+  "content": "Scenario: Educational governance includes parent and teacher voices\n    Given Sarah is both parent and teacher\n    And educational governance affects her professionally and personally\n    When educational policy decisions are made\n    Then Sarah should have voice from both perspectives\n    And parent care contributions should influence school policy\n    And teacher care contributions should shape education governance\n    And educational democracy should include those who do education care work\n    And Sarah's dual perspective should be valued in governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

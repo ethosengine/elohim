@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-accessibility consulting creates community economic opportunity",
+  "contentType": "scenario",
+  "title": "Accessibility consulting creates community economic opportunity",
+  "description": "Accessibility consulting creates community economic opportunity",
+  "content": "Scenario: Accessibility consulting creates community economic opportunity\n    Given Alex has deep expertise in accessibility and universal design\n    And organizations need guidance to improve accessibility\n    When Alex provides accessibility consulting\n    Then this skilled professional work should be appropriately compensated\n    And the community_elohim should facilitate connecting Alex to consulting opportunities\n    And care tokens should reflect the value of Alex's expertise\n    And accessibility work should be recognized as economic contribution\n    And the protocol should support disabled people's economic participation\n    And Alex's knowledge should create income opportunities\n    And community should pay fairly for disability expertise\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

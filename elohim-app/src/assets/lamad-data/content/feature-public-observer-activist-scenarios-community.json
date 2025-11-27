@@ -1,0 +1,34 @@
+{
+  "id": "feature-public-observer-activist-scenarios-community",
+  "contentType": "feature",
+  "title": "Community Organizing for Activist",
+  "description": "As an activist in the public_observer system Operating at the community governance layer I want to build grassroots power and document local impacts So that community voices drive policy decisions",
+  "content": "@epic:public_observer\n@user_type:activist\n@governance_layer:community\n@related_users:community_organizer,citizen,parent\n@related_layers:municipality,neighborhood,district\n@elohim_agents:public_observer,community_elohim\n\nFeature: Community Organizing for Activist\n  As an activist in the public_observer system\n  Operating at the community governance layer\n  I want to build grassroots power and document local impacts\n  So that community voices drive policy decisions\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the community governance context is active\n\n  Scenario: Activist documents neighborhood displacement patterns\n    Given the activist is organizing against gentrification\n    And needs evidence of displacement in specific neighborhoods\n    When the Observer provides hyperlocal data\n    Then the activist sees rent increase patterns by block\n    And views eviction filing trends over time\n    And identifies buildings with code violations\n    And maps demographic changes showing displacement\n    And organizes residents with documented evidence\n\n  Scenario: Activist identifies affected community members for organizing\n    Given a city policy will impact 300 residents in the neighborhood\n    And the activist needs to build organized base\n    When the Observer detects affected residents\n    Then the activist can see community impact patterns\n    And identify residents most affected by the issue\n    And facilitate grassroots testimony development\n    And build coalition grounded in lived experience\n    And transform policy analysis into community power\n\n  Scenario: Activist tracks local environmental justice issues\n    Given pollution sources affect the activist's community\n    And residents report health concerns\n    When the Observer documents environmental conditions\n    Then the activist sees air quality trends by neighborhood\n    And maps proximity of industrial facilities to residences\n    And tracks permit violations and regulatory responses\n    And organizes community for accountability demands\n    And environmental racism becomes documented and actionable\n\n  Scenario: Activist coordinates neighborhood tenant association\n    Given multiple tenants face similar landlord issues\n    And the activist is organizing tenant power\n    When the Observer facilitates secure coordination\n    Then tenants can connect without landlord surveillance\n    And see patterns across different units and buildings\n    And coordinate collective bargaining for repairs\n    And track landlord compliance with commitments\n    And individual tenant struggles become collective action\n\n  Scenario: Activist connects community issue to citywide pattern\n    Given the activist is fighting playground neglect locally\n    When the Observer shows citywide park maintenance data\n    Then the activist sees systematic under-investment in certain neighborhoods\n    And identifies which communities face similar conditions\n    And connects local organizing to citywide advocacy\n    And frames individual grievance as structural injustice\n    And builds power through pattern recognition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_organizer,citizen,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-activist-scenarios-community-activist documents neighborhood displacement patterns",
+    "scenario-public-observer-activist-scenarios-community-activist identifies affected community members for organizing",
+    "scenario-public-observer-activist-scenarios-community-activist tracks local environmental justice issues",
+    "scenario-public-observer-activist-scenarios-community-activist coordinates neighborhood tenant association",
+    "scenario-public-observer-activist-scenarios-community-activist connects community issue to citywide pattern",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

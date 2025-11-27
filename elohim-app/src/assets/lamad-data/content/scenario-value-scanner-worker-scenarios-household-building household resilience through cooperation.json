@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-building household resilience through cooperation",
+  "contentType": "scenario",
+  "title": "Building household resilience through cooperation",
+  "description": "Building household resilience through cooperation",
+  "content": "Scenario: Building household resilience through cooperation\n    Given shared households can pool resources and reduce individual burden\n    When we practice care economy cooperation\n    Then the protocol should help us maximize mutual benefit\n    And identify opportunities for efficiency through sharing\n    And support us in building household community\n    And demonstrate that cooperative care reduces costs and increases well-being\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

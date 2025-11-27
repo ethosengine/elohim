@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical appointment coordination across multiple specialists",
+  "contentType": "scenario",
+  "title": "Medical appointment coordination across multiple specialists",
+  "description": "Medical appointment coordination across multiple specialists",
+  "content": "Scenario: Medical appointment coordination across multiple specialists\n    Given David requires regular appointments with multiple providers\n    And James must coordinate complex scheduling\n    When the healthcare_elohim manages appointments\n    Then it should maintain integrated calendar across providers\n    And it should remind James of upcoming appointments\n    And it should coordinate transportation and timing\n    And it should prepare James with information needed for each visit\n    And medical coordination burden should be reduced through system support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

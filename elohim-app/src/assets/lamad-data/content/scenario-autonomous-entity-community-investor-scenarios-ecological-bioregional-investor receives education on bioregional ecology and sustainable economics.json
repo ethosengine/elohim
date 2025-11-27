@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investor receives education on bioregional ecology and sustainable economics",
+  "contentType": "scenario",
+  "title": "Investor receives education on bioregional ecology and sustainable economics",
+  "description": "Investor receives education on bioregional ecology and sustainable economics",
+  "content": "Scenario: Investor receives education on bioregional ecology and sustainable economics\n    Given most investors lack understanding of bioregional ecological systems\n    And Patricia wants to make ecologically-informed investment decisions\n    When investment network provides bioregional ecology education\n    Then she learns about watershed dynamics, soil health, biodiversity, climate impacts\n    And investment decisions are informed by ecological understanding\n    And investor community develops ecological literacy and stewardship values\n    And education strengthens commitment to sustainable investment\n    And bioregional_elohim provides ecological education and investment guidance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

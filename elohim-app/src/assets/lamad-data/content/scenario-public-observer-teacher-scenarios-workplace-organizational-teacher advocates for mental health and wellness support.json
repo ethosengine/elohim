@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for mental health and wellness support",
+  "contentType": "scenario",
+  "title": "Teacher advocates for mental health and wellness support",
+  "description": "Teacher advocates for mental health and wellness support",
+  "content": "Scenario: Teacher advocates for mental health and wellness support\n    Given teaching is emotionally demanding work with high burnout\n    And district provides minimal employee mental health support\n    When teachers document wellness needs and impacts through Observer\n    Then data shows 68% of teachers experience burnout symptoms\n    And 82% say job stress affects personal life and health\n    And teachers identify needed supports (counseling, reasonable workload, respect)\n    And union negotiates wellness provisions in contract\n    And teacher wellbeing becomes labor rights priority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

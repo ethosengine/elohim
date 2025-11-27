@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-building disability community infrastructure as care economy practice",
+  "contentType": "scenario",
+  "title": "Building disability community infrastructure as care economy practice",
+  "description": "Building disability community infrastructure as care economy practice",
+  "content": "Scenario: Building disability community infrastructure as care economy practice\n    Given Alex works to connect disabled people to each other\n    And peer networks are essential care economy infrastructure\n    When Alex facilitates disability community connections\n    Then the community_elohim should recognize network-building as care work\n    And peer support groups Alex organizes should count as care contribution\n    And accessible events Alex coordinates should accumulate tokens\n    And disability culture-building should be valued appropriately\n    And Alex's infrastructure work strengthens entire care economy\n    And the protocol should see that disability community is care infrastructure\n    And Alex's organizing makes mutual aid possible for others\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

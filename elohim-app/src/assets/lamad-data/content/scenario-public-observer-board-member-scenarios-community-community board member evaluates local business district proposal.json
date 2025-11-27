@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-community-community board member evaluates local business district proposal",
+  "contentType": "scenario",
+  "title": "Community board member evaluates local business district proposal",
+  "description": "Community board member evaluates local business district proposal",
+  "content": "Scenario: Community board member evaluates local business district proposal\n    Given neighborhood association considers supporting business district designation\n    And designation would create additional fees and services\n    And board wants to understand community sentiment and likely impacts\n    When the board member requests Observer analysis\n    Then they receive survey data from local businesses on designation interest\n    And see examples from peer neighborhoods with outcomes and lessons\n    And access analysis of which businesses would benefit versus be burdened\n    And discover resident concerns about gentrification impacts not mentioned by advocates\n    And independent analysis reveals trade-offs beyond promoter presentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,community_organizer,politician",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

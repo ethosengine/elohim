@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher evaluates budget priorities with evidence",
+  "contentType": "scenario",
+  "title": "Teacher evaluates budget priorities with evidence",
+  "description": "Teacher evaluates budget priorities with evidence",
+  "content": "Scenario: Teacher evaluates budget priorities with evidence\n    Given the district approved $2M for new administration positions\n    But rejected $800K for reducing class sizes\n    When the Observer makes budget trade-offs transparent\n    Then teachers see value priorities (administration vs instruction)\n    And calculate that rejected proposal would fund 16 teaching positions\n    And document that administrative overhead increased 40% in five years\n    And organize parents and community around budget priorities\n    And fiscal policy becomes professional accountability issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

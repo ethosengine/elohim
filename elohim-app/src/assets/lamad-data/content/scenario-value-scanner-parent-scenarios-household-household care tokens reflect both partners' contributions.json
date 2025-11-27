@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-household care tokens reflect both partners' contributions",
+  "contentType": "scenario",
+  "title": "Household care tokens reflect both partners' contributions",
+  "description": "Household care tokens reflect both partners' contributions",
+  "content": "Scenario: Household care tokens reflect both partners' contributions\n    Given both Sarah and her partner contribute to household\n    And contributions are currently very unequal\n    When household care tokens are calculated\n    Then they should reflect actual labor performed\n    And Sarah's 75% contribution should yield 75% of household tokens\n    And tokens should give standing in household resource decisions\n    And economic equity should follow labor equity\n    And care contributions should determine household governance power\n    And the partner should understand that tokens reflect actual work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

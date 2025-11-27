@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional care economy connects households to land stewardship",
+  "contentType": "scenario",
+  "title": "Bioregional care economy connects households to land stewardship",
+  "description": "Bioregional care economy connects households to land stewardship",
+  "content": "Scenario: Bioregional care economy connects households to land stewardship\n    Given Sarah's household depends on bioregional ecological health\n    And land stewardship is collective care work\n    When Sarah participates in bioregional care economy\n    Then the bioregional_elohim should connect her to land stewardship opportunities\n    And it should link food purchases to regenerative agriculture\n    And it should enable Sarah to support ecological restoration\n    And care for land should be recognized as care work\n    And bioregional care should extend beyond human relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

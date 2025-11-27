@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-learning household management skills not taught in formal education",
+  "contentType": "scenario",
+  "title": "Learning household management skills not taught in formal education",
+  "description": "Learning household management skills not taught in formal education",
+  "content": "Scenario: Learning household management skills not taught in formal education\n    Given Aisha's college education didn't include life skills\n    And she needs practical household management capabilities\n    When Aisha uses the Value Scanner educational features\n    Then the personal_agent should teach grocery shopping efficiency\n    And it should provide meal planning education\n    And it should teach nutrition basics within budget constraints\n    And it should explain waste reduction strategies\n    And practical life skills should be taught through direct application\n    And education should fill gaps from formal schooling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

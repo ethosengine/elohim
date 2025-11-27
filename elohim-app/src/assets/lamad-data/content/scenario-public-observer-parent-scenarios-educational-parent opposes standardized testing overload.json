@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent opposes standardized testing overload",
+  "contentType": "scenario",
+  "title": "Parent opposes standardized testing overload",
+  "description": "Parent opposes standardized testing overload",
+  "content": "Scenario: Parent opposes standardized testing overload\n    Given the parent's child faces excessive standardized testing\n    And tests create stress without improving learning\n    When the parent reviews Observer's testing policy context\n    Then they see how many instructional days lost to testing\n    And understand which tests are federally required vs optional\n    And learn about opt-out policies and parent rights\n    And discover other parents concerned about testing burden\n    And parent coalition advocates for reducing unnecessary testing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

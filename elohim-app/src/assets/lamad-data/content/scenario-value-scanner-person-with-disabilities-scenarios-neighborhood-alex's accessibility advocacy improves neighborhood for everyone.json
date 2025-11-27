@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-alex's accessibility advocacy improves neighborhood for everyone",
+  "contentType": "scenario",
+  "title": "Alex's accessibility advocacy improves neighborhood for everyone",
+  "description": "Alex's accessibility advocacy improves neighborhood for everyone",
+  "content": "Scenario: Alex's accessibility advocacy improves neighborhood for everyone\n    Given Alex documents accessibility barriers in the neighborhood\n    And improved accessibility benefits elderly residents, parents with strollers, delivery workers\n    When the neighborhood_elohim tracks Alex's advocacy contributions\n    Then Alex's work identifying barriers should accumulate care tokens\n    And advocacy for curb cuts, accessible entrances, better lighting benefits whole neighborhood\n    And Alex's contributions should be recognized as care work for community\n    And the protocol should make visible how disability advocacy serves everyone\n    And Alex should be seen as neighborhood improver, not complainer\n    And care economy should value Alex's expertise about accessibility\n    And neighborhood should understand Alex's work as gift to all residents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:neighborhood",
+    "related_users:adult,elderly,parent,child,caregiver",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer receives honest cost-benefit analysis",
+  "contentType": "scenario",
+  "title": "Developer receives honest cost-benefit analysis",
+  "description": "Developer receives honest cost-benefit analysis",
+  "content": "Scenario: Developer receives honest cost-benefit analysis\n    Given a developer projects $5M annual tax revenue from proposed development\n    But omits infrastructure costs and school capacity burden\n    When the Observer provides independent analysis\n    Then the developer sees: net tax impact only $800K after infrastructure costs\n    And school enrollment increase requires $2M capacity expansion\n    And traffic impacts need $1.5M intersection improvements\n    And honest accounting reveals actual community trade-offs\n    And realistic projections inform better civic decisions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

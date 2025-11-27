@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-teen learns bioregional water and energy systems",
+  "contentType": "scenario",
+  "title": "Teen learns bioregional water and energy systems",
+  "description": "Teen learns bioregional water and energy systems",
+  "content": "Scenario: Teen learns bioregional water and energy systems\n    Given Jasmine lives in a watershed with specific water dynamics\n    And her consumption affects water and energy resources\n    When her personal_agent explains resource connections\n    Then it should teach her about local water sources and constraints\n    And show how her choices affect regional water availability\n    And explain energy systems powering her community\n    And connect individual consumption to collective resource management\n    And build understanding of herself as participant in bioregional systems\n    And develop ecological citizenship grounded in local ecosystems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-traditional knowledge of food preservation and storage",
+  "contentType": "scenario",
+  "title": "Traditional knowledge of food preservation and storage",
+  "description": "Traditional knowledge of food preservation and storage",
+  "content": "Scenario: Traditional knowledge of food preservation and storage\n    Given Margaret knows how to preserve food, reduce waste, maximize resources\n    And these skills were essential in her generation\n    When the bioregional_elohim tracks traditional ecological knowledge\n    Then it should recognize Margaret's food preservation skills as valuable\n    And it should value her knowledge of canning, freezing, storing food\n    And it should facilitate teaching these skills to grandchildren\n    And traditional knowledge should be documented and transmitted\n    And Margaret's expertise should contribute to food security\n    And ecological wisdom should accumulate care tokens\n    And sustainable food practices should be valued and preserved\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

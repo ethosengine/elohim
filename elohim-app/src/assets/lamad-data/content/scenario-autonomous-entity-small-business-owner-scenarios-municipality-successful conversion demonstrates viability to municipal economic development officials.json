@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-successful conversion demonstrates viability to municipal economic development officials",
+  "contentType": "scenario",
+  "title": "Successful conversion demonstrates viability to municipal economic development officials",
+  "description": "Successful conversion demonstrates viability to municipal economic development officials",
+  "content": "Scenario: Successful conversion demonstrates viability to municipal economic development officials\n    Given city economic development typically subsidizes corporate expansion\n    And officials are skeptical of alternative ownership models\n    When Rosa's conversion proves successful with documented outcomes\n    Then municipality sees concrete evidence: workers earning living wages without subsidies\n    And job quality improves (higher wages, benefits, ownership) without tax breaks\n    And community institution is preserved, not destroyed by corporate acquisition\n    And municipal economic development data shows democratic ownership creates better outcomes\n    And municipality_elohim provides officials with impact documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

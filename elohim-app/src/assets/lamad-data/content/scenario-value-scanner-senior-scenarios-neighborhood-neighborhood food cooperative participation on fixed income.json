@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-neighborhood food cooperative participation on fixed income",
+  "contentType": "scenario",
+  "title": "Neighborhood food cooperative participation on fixed income",
+  "description": "Neighborhood food cooperative participation on fixed income",
+  "content": "Scenario: Neighborhood food cooperative participation on fixed income\n    Given Margaret's $150/week budget could benefit from bulk buying\n    And neighbors face similar budget constraints\n    When the neighborhood_elohim identifies food cooperative opportunities\n    Then Margaret should be connected to bulk buying networks\n    And her participation should reduce her grocery costs\n    And she should contribute her time and organizational skills\n    And the cooperative should reduce individual household scarcity\n    And neighborhood coordination should make fixed incomes stretch further\n    And collective action should create better outcomes than individual effort\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

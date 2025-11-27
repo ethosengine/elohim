@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-participating in peer-led educational workshops",
+  "contentType": "scenario",
+  "title": "Participating in peer-led educational workshops",
+  "description": "Participating in peer-led educational workshops",
+  "content": "Scenario: Participating in peer-led educational workshops\n    Given IDD community members teach each other valuable skills\n    And peer education is powerful and relatable\n    When Jordan attends a peer-led workshop on public transportation\n    Then the peer educator teaches from lived experience\n    And instruction is naturally accessible (IDD peer teaching IDD peer)\n    And Jordan learns strategies that actually work in practice\n    And Jordan accumulates care tokens for participating in peer learning community\n    And the peer educator accumulates tokens for teaching contribution\n    And Jordan experiences IDD community as source of knowledge and support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

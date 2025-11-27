@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-educational pace adapts to individual developmental readiness",
+  "contentType": "scenario",
+  "title": "Educational pace adapts to individual developmental readiness",
+  "description": "Educational pace adapts to individual developmental readiness",
+  "content": "Scenario: Educational pace adapts to individual developmental readiness\n    Given Tommy's development may differ from age averages\n    And learning readiness varies widely at ages 5-7\n    When the personal_agent teaches value concepts\n    Then instruction should adapt to Tommy's actual capabilities\n    And the system should observe Tommy's comprehension\n    And pacing should match Tommy's readiness, not chronological age\n    And no child should be pushed beyond developmental capacity\n    And no child should be held back from what they're ready to learn\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-advising on ecological standing amendment technical implications",
+  "contentType": "scenario",
+  "title": "Advising on ecological standing amendment technical implications",
+  "description": "Advising on ecological standing amendment technical implications",
+  "content": "Scenario: Advising on ecological standing amendment technical implications\n    Given delegates consider granting ecosystems constitutional personhood\n    And technical implementation is uncertain\n    When I explain how agents would implement ecological standing\n    Then I clarify: how ecosystem \"voice\" would be technically represented\n    And I explore: methods for translating ecological data into constitutional claims\n    And I assess: challenges in balancing human and ecological rights\n    And I present: what's technically possible vs what requires research\n    And I avoid: either dismissing as impossible or ignoring challenges\n    And I enable: delegates to choose values given technical reality\n    And I serve: constitutional innovation with technical honesty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

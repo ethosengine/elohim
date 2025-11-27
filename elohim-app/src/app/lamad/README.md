@@ -1,27 +1,40 @@
 # Lamad Module
 
-**Lamad** (לָמַד - Hebrew: "to learn/teach") is the graph-based learning and documentation platform for the Elohim Protocol.
+**Lamad** (לָמַד - Hebrew: "to learn/teach") is the path-centric learning infrastructure for the Elohim Protocol.
 
-## Intent
+## Document Hierarchy
 
-This module implements the **Meaning Map**, a navigation interface that guides users through the complexity of the Elohim Protocol (and potentially any other domain) using:
+### Source of Truth
+1. [**`LAMAD_API_SPECIFICATION_v1.0.md`**](./LAMAD_API_SPECIFICATION_v1.0.md) - Authoritative interface contract
+2. [**`IMPLEMENTATION_PLAN.md`**](./IMPLEMENTATION_PLAN.md) - Detailed implementation guide
 
-1.  **Affinity**: Tracking user engagement to tailor the journey.
-2.  **Orientation**: Calculating the "next best step" toward a target subject.
-3.  **Attestations**: Unlocking content based on proven capacity (Fog of War).
+### Agentic Guidance (for AI Agents)
+- [`claude.md`](./claude.md) - Architecture overview & coordination
+- [`models/claude.md`](./models/claude.md) - Data model implementation TODOs
+- [`services/claude.md`](./services/claude.md) - Service layer implementation TODOs
+- [`components/claude.md`](./components/claude.md) - UI component implementation TODOs
+- [`renderers/claude.md`](./renderers/claude.md) - Rendering system implementation TODOs
 
-## Architectural Distinction
+All development, refactoring, and architectural decisions must align with these documents.
 
-It is critical to distinguish **Lamad** from **Elohim**:
+## Core Philosophy
 
-*   **Lamad** is the **Structure**: The nodes, edges, content, and metadata. It is the library.
-*   **Elohim** are the **Agents**: The active intelligence that curates, protects, and guides users through the Lamad structure.
+Lamad operates on three fundamental separations of concern:
 
-This module builds the **Structure** (Lamad) so the **Agents** (Elohim) have a place to work.
+1.  **Territory (`ContentNode`)**: The immutable units of knowledge (videos, docs, simulations).
+2.  **Journey (`LearningPath`)**: The curated paths that add narrative meaning and sequence to the Territory.
+3.  **Traveler (`Agent`)**: The sovereign agents whose progress, affinity, and attestations shape their experience.
 
-## Key Directories
+## Directory Structure
 
-*   `models/`: Defines the static shape of the graph (Nodes, Relationships, Types).
-*   `parsers/`: Converts raw source files (Markdown, Gherkin) into Graph Nodes.
-*   `components/`: Visualizes the Meaning Map and Content.
-*   `services/`: Manages graph state and affinity tracking.
+*   `models/`: TypeScript interfaces defining the Territory, Journey, and Traveler states.
+*   `services/`: Business logic (the "Elohim" agents) for navigation, graph exploration, and progress tracking.
+*   `components/`: Angular UI components for the "Meaning Map", "Path Navigator", and dashboards.
+*   `renderers/`: Extensible rendering engine for different content types (Markdown, Video, Interactive).
+*   `parsers/`: Tools to ingest source content (Markdown, Gherkin) into the Graph.
+*   `adapters/`: Legacy adapters for migration.
+
+## Development Status
+
+We are currently migrating from the "Prototype" architecture to the **v1.0 Architecture**.
+See [**`IMPLEMENTATION_PLAN.md`**](./IMPLEMENTATION_PLAN.md) for the active roadmap.

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-coordinating shared household with roommates",
+  "contentType": "scenario",
+  "title": "Coordinating shared household with roommates",
+  "description": "Coordinating shared household with roommates",
+  "content": "Scenario: Coordinating shared household with roommates\n    Given Aisha has two roommates\n    And the household needs equitable resource distribution\n    When the household_elohim coordinates shared responsibilities\n    Then it should track each person's contributions\n    And it should help distribute household labor fairly\n    And it should manage shared grocery purchases\n    And it should coordinate cleaning and maintenance tasks\n    And the system should make invisible household work visible\n    And equity should be maintained through transparent tracking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-neighborhood resource sharing reduces household costs",
+  "contentType": "scenario",
+  "title": "Neighborhood resource sharing reduces household costs",
+  "description": "Neighborhood resource sharing reduces household costs",
+  "content": "Scenario: Neighborhood resource sharing reduces household costs\n    Given Margaret has tools, skills, and time\n    And she has limited budget for purchasing services\n    When the neighborhood_elohim coordinates resource sharing\n    Then Margaret should share tools she owns but neighbors need\n    And she should borrow tools she needs occasionally\n    And skill sharing should reduce need for paid services\n    And neighborhood tool library should benefit all members\n    And Margaret's resources should be accessible to community\n    And she should access neighbors' resources when needed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

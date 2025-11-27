@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-individual-individual privacy is constitutionally protected while value is witnessed",
+  "contentType": "scenario",
+  "title": "Individual privacy is constitutionally protected while value is witnessed",
+  "description": "Individual privacy is constitutionally protected while value is witnessed",
+  "content": "Scenario: Individual privacy is constitutionally protected while value is witnessed\n    Given the Observer network documents workplace contributions\n    And Emma prefers privacy about certain personal matters\n    When Emma sets her privacy preferences\n    Then work contributions are documented (with her consent)\n    And personal conversations are not recorded or analyzed\n    And bathroom breaks are not monitored for duration\n    And her personal data (health, family, beliefs) remains sovereign\n    And surveillance serves dignity protection, not corporate control\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:individual",
+    "related_users:[manager,customer,supplier,community_investor]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

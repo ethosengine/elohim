@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-cross-cultural family appeal about care norms",
+  "contentType": "scenario",
+  "title": "Cross-cultural family appeal about care norms",
+  "description": "Cross-cultural family appeal about care norms",
+  "content": "Scenario: Cross-cultural family appeal about care norms\n    Given our family's cultural background has different care expectations\n    And Family Elohim applied default protocol assumptions\n    When I appeal that the decision didn't respect our cultural context\n    Then the Constitutional Council considers cultural specificity in family care\n    And They evaluate if the agent accommodated legitimate cultural variation\n    And They distinguish cultural respect from cultural relativism about harm\n    And They examine if our family could calibrate agent to our values\n    And The appeal supports cultural diversity within constitutional bounds\n    And Family Elohim learns to honor multiple models of family care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

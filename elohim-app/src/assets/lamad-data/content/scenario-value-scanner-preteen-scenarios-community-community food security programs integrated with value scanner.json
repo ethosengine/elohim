@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-community food security programs integrated with value scanner",
+  "contentType": "scenario",
+  "title": "Community food security programs integrated with Value Scanner",
+  "description": "Community food security programs integrated with Value Scanner",
+  "content": "Scenario: Community food security programs integrated with Value Scanner\n    Given Marcus manages food budget under severe constraints\n    And community food security programs exist\n    When Marcus's nutritional patterns indicate need\n    Then the community_elohim should connect him to food programs\n    And integration should be seamless, not requiring separate applications\n    And his care contributions should establish eligibility\n    And programs should be framed as community care exchanges\n    And access should not require stigmatizing means testing\n    And food security should be treated as community responsibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

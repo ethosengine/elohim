@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer faces accountability for past broken promises",
+  "contentType": "scenario",
+  "title": "Developer faces accountability for past broken promises",
+  "description": "Developer faces accountability for past broken promises",
+  "content": "Scenario: Developer faces accountability for past broken promises\n    Given a developer claimed \"200 jobs\" in previous project\n    But Observer tracking shows only 12 permanent jobs materialized\n    When the developer proposes new project with similar claims\n    Then planning commission sees documented gap between promises and delivery\n    And community members access track record evidence\n    And developer must explain past failures or adjust projections\n    And accountability creates pressure for honest projections\n    And extractive practices face uncomfortable transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

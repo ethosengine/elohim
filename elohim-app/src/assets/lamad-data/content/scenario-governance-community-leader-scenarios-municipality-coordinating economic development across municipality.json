@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-coordinating economic development across municipality",
+  "contentType": "scenario",
+  "title": "Coordinating economic development across municipality",
+  "description": "Coordinating economic development across municipality",
+  "content": "Scenario: Coordinating economic development across municipality\n    Given Riverside needs economic revitalization\n    And different neighborhoods have different economic needs\n    When I coordinate city-wide economic development strategy\n    Then Municipal Elohim: analyzes economic flows and opportunities\n    And we identify: where business support like Maria's loan needed most\n    And we coordinate: workforce development with neighborhood needs\n    And we ensure: economic growth benefits whole city not just wealthy areas\n    And we integrate: protocol support with traditional economic development\n    And we maintain: accountability to residents for economic choices\n    And coordination strengthens: inclusive economic resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

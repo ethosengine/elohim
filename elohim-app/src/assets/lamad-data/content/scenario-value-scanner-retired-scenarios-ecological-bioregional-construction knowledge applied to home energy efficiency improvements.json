@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-construction knowledge applied to home energy efficiency improvements",
+  "contentType": "scenario",
+  "title": "Construction knowledge applied to home energy efficiency improvements",
+  "description": "Construction knowledge applied to home energy efficiency improvements",
+  "content": "Scenario: Construction knowledge applied to home energy efficiency improvements\n    Given Frank has expertise in building systems and repairs\n    And home energy efficiency reduces environmental impact and costs\n    When the bioregional_elohim coordinates weatherization and efficiency\n    Then it should connect Frank's skills to home efficiency improvements\n    And facilitate community weatherization projects\n    And recognize efficiency work as ecological care contribution\n    And help low-income households reduce energy costs and consumption\n    And Frank's construction knowledge should serve ecological and equity goals\n    And his volunteer work should build community energy resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

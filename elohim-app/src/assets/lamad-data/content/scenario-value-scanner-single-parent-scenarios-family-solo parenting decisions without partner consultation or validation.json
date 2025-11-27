@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-solo parenting decisions without partner consultation or validation",
+  "contentType": "scenario",
+  "title": "Solo parenting decisions without partner consultation or validation",
+  "description": "Solo parenting decisions without partner consultation or validation",
+  "content": "Scenario: Solo parenting decisions without partner consultation or validation\n    Given Maria makes every parenting decision alone\n    And she has no co-parent to discuss, debate, or validate choices\n    When Maria faces difficult parenting decisions\n    Then the family_elohim should provide decision support and perspective\n    And it should help her think through consequences and options\n    And it should partially fill the gap of missing partner consultation\n    And it should validate her decision-making authority\n    And Maria should have AI thinking partner for parenting choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

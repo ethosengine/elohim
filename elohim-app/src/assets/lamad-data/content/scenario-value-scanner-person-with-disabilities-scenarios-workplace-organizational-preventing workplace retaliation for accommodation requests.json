@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-preventing workplace retaliation for accommodation requests",
+  "contentType": "scenario",
+  "title": "Preventing workplace retaliation for accommodation requests",
+  "description": "Preventing workplace retaliation for accommodation requests",
+  "content": "Scenario: Preventing workplace retaliation for accommodation requests\n    Given employers sometimes retaliate against workers who request accommodations\n    And retaliation can be subtle (worse assignments, social exclusion, negative evaluations)\n    When Alex requests accommodations or asserts rights\n    Then the workplace_elohim should monitor for retaliation patterns\n    And it should document timeline of accommodation requests and subsequent treatment changes\n    And it should help Alex identify legally actionable retaliation\n    And Alex should be connected to legal resources if retaliation occurs\n    And the protocol should protect Alex from employer retaliation systematically\n    And documentation should support legal claims if necessary\n    And Alex should feel supported in asserting rights without fear\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,young_adult,caregiver",
+    "related_layers:individual,household,community,healthcare_medical",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

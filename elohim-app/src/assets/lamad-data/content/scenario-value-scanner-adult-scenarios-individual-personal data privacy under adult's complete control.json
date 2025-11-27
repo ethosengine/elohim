@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-individual-personal data privacy under adult's complete control",
+  "contentType": "scenario",
+  "title": "Personal data privacy under adult's complete control",
+  "description": "Personal data privacy under adult's complete control",
+  "content": "Scenario: Personal data privacy under adult's complete control\n    Given Sarah's care contributions generate detailed personal data\n    And this data reveals intimate patterns of her life\n    When Sarah's data is collected and stored\n    Then she must have complete control over all data sharing\n    And she should decide what partner sees, what children see, what community sees\n    And workplace should never access personal care economy data\n    And her privacy must be absolute unless she chooses to share\n    And she should manage family members' privacy while maintaining oversight of children\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:individual",
+    "related_users:young_adult,middle_aged,parent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

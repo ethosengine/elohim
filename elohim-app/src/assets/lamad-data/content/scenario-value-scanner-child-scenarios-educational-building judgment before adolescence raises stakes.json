@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-building judgment before adolescence raises stakes",
+  "contentType": "scenario",
+  "title": "Building judgment before adolescence raises stakes",
+  "description": "Building judgment before adolescence raises stakes",
+  "content": "Scenario: Building judgment before adolescence raises stakes\n    Given Emma is practicing value decisions ages 8-10\n    And adolescence will bring higher-stakes choices\n    When Emma develops decision-making skills through scanner\n    Then she should build capacity while consequences are manageable\n    And judgment should be practiced in low-risk context\n    And she should develop value literacy before teen years\n    And safe practice should prepare her for Real Responsibility phase (11-13)\n    And developmental progression should scaffold increasing autonomy\n    And early practice should enable later capability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

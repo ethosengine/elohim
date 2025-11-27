@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-making both partners' care contributions visible",
+  "contentType": "scenario",
+  "title": "Making both partners' care contributions visible",
+  "description": "Making both partners' care contributions visible",
+  "content": "Scenario: Making both partners' care contributions visible\n    Given Sarah performs meal planning, shopping, cooking, child coordination\n    And her partner performs other household labor\n    And much of this work is invisible in traditional economics\n    When the household_elohim tracks contributions\n    Then both partners' care work should be quantified specifically\n    And invisible labor imbalances should become visible\n    And Sarah and partner should see who's doing what\n    And data should replace resentment in household discussions\n    And visibility should enable fair distribution negotiations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

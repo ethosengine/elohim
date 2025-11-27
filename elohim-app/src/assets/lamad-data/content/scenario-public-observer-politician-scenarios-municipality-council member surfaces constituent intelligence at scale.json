@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member surfaces constituent intelligence at scale",
+  "contentType": "scenario",
+  "title": "Council member surfaces constituent intelligence at scale",
+  "description": "Council member surfaces constituent intelligence at scale",
+  "content": "Scenario: Council member surfaces constituent intelligence at scale\n    Given the politician represents 50,000 residents\n    And only 20 constituents typically attend council meetings\n    When the Observer aggregates constituent patterns from civic engagement\n    Then the politician sees 230 families losing 90 minutes daily to bus delays\n    And identifies senior centers underutilized due to access barriers\n    And learns small businesses struggle with permit complexity\n    And hears from working parents and shift workers who can't attend meetings\n    And understands actual constituent needs beyond loudest voices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

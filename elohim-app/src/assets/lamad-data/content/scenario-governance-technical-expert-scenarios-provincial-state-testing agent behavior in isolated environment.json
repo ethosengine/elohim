@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-testing agent behavior in isolated environment",
+  "contentType": "scenario",
+  "title": "Testing agent behavior in isolated environment",
+  "description": "Testing agent behavior in isolated environment",
+  "content": "Scenario: Testing agent behavior in isolated environment\n    Given council needs to understand counterfactual scenarios\n    And I can run agents in test environments\n    When I conduct controlled experiments for council\n    Then I test: what agent would decide if input X were different\n    And I verify: robustness of constitutional alignment\n    And I explore: boundary cases and edge conditions\n    And I provide: evidence grounded in testing not speculation\n    And I avoid: affecting production systems\n    And testing enables: informed judgment about agent behavior\n    And council decisions: rest on verified evidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

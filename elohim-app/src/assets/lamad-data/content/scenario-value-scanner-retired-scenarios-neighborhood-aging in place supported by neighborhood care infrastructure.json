@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-aging in place supported by neighborhood care infrastructure",
+  "contentType": "scenario",
+  "title": "Aging in place supported by neighborhood care infrastructure",
+  "description": "Aging in place supported by neighborhood care infrastructure",
+  "content": "Scenario: Aging in place supported by neighborhood care infrastructure\n    Given Frank plans to age in his neighborhood\n    And neighborhoods can support aging in place through care economy\n    When the neighborhood_elohim coordinates aging support\n    Then it should connect Frank to neighbors who can provide future support\n    And facilitate reciprocal care arrangements as needs change\n    And coordinate check-ins and assistance for aging residents\n    And Frank's current contributions should create future neighborhood support\n    And care reciprocity should operate at neighborhood scale\n    And aging in place should be supported through neighborhood care economy\n    And Frank should experience security in continuing neighborhood membership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

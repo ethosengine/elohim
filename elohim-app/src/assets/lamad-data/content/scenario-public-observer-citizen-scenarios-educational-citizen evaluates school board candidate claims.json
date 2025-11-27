@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-educational-citizen evaluates school board candidate claims",
+  "contentType": "scenario",
+  "title": "Citizen evaluates school board candidate claims",
+  "description": "Citizen evaluates school board candidate claims",
+  "content": "Scenario: Citizen evaluates school board candidate claims\n    Given a school board candidate promises to improve education quality\n    And the election is approaching\n    When the citizen reviews Observer analysis\n    Then they see the candidate's specific policy positions\n    And view comparisons to successful districts' approaches\n    And understand likely impacts of proposed policies\n    And can evaluate campaign promises against evidence\n    And informed voting becomes accessible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:educational",
+    "related_users:parent,teacher,board_member,student",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,district_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

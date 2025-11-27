@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment measures success through bioregional flourishing indicators",
+  "contentType": "scenario",
+  "title": "Community investment measures success through bioregional flourishing indicators",
+  "description": "Community investment measures success through bioregional flourishing indicators",
+  "content": "Scenario: Community investment measures success through bioregional flourishing indicators\n    Given traditional investment measures only financial returns\n    And Patricia wants holistic measurement of investment impacts\n    When bioregional investment develops comprehensive success metrics\n    Then returns are measured as: financial (5% annually), ecological (carbon sequestered, biodiversity supported)\n    And social indicators (living wages, democratic governance, community wellbeing)\n    And bioregional health (watershed quality, soil carbon, ecosystem resilience)\n    And investment success is holistic bioregional flourishing, not just profit\n    And bioregional_elohim provides comprehensive impact measurement framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:ecological_bioregional",
+    "related_users:[supplier,worker,community_investor]",
+    "related_layers:[community,municipality]",
+    "elohim_agents:[bioregional_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "governance-organizations-a-problem-well-stated-is-half-solved-your-undivided-attention-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Jun 25, 2021 ... We've explored many different problems on Your Undivided Attention \u2014 addiction, disinformation, polarization, climate change, and more.",
+  "content": "---\nnode_type: organization\norg_id: a_problem_well_stated_is_half_solved_your_undivided_attention\nname: \"A Problem Well-Stated is Half-Solved | Your Undivided Attention\"\nurl: \"https://your-undivided-attention.simplecast.com/episodes/a-problem-well-stated-is-half-solved-0nI8m2G3\"\ngem_id: \"bQugwqHWDwOxhQIuG7p4\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: [public_observer, social_medium]\n\nepic_relationships:\n  governance:\n    inspiration: \"[How A Problem Well-Stated is Half-Solved | Your Undivided Attention inspires the governance epic]\"\n    parallel_work: []\n  public_observer:\n    inspiration: \"[How A Problem Well-Stated is Half-Solved | Your Undivided Attention inspires the public_observer epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How A Problem Well-Stated is Half-Solved | Your Undivided Attention inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# A Problem Well-Stated is Half-Solved | Your Undivided Attention\n\n## Description\n\nJun 25, 2021 ... We've explored many different problems on Your Undivided Attention \u2014 addiction, disinformation, polarization, climate change, and more.\n\n**Publisher:** Your Undivided Attention\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how A Problem Well-Stated is Half-Solved | Your Undivided Attention relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: public_observer\n\n[How A Problem Well-Stated is Half-Solved | Your Undivided Attention also inspires the public_observer epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: social_medium\n\n[How A Problem Well-Stated is Half-Solved | Your Undivided Attention also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://your-undivided-attention.simplecast.com/episodes/a-problem-well-stated-is-half-solved-0nI8m2G3\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n- `public_observer` - [Connection description]\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/a_problem_well_stated_is_half_solved_your_undivided_attention/README.md",
+  "relatedNodeIds": [
+    "public-observer-epic",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [
+      "public_observer",
+      "social_medium"
+    ],
+    "primary_epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

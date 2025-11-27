@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-individual-documenting personal needs for advocacy",
+  "contentType": "scenario",
+  "title": "Documenting personal needs for advocacy",
+  "description": "Documenting personal needs for advocacy",
+  "content": "Scenario: Documenting personal needs for advocacy\n    Given I experience specific challenges due to work conditions\n    When I want to advocate for changes\n    Then the protocol should help me document my needs\n    And provide evidence of how current conditions affect my well-being\n    And support me in articulating what I need to thrive\n    And empower me to advocate for care-economy-aligned workplace policies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

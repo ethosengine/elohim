@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community transportation support for medical appointments",
+  "contentType": "scenario",
+  "title": "Community transportation support for medical appointments",
+  "description": "Community transportation support for medical appointments",
+  "content": "Scenario: Community transportation support for medical appointments\n    Given James must coordinate multiple medical appointments\n    And transportation logistics are overwhelming\n    When the community_elohim organizes transportation support\n    Then volunteer drivers should be available for medical appointments\n    And transportation should accommodate David's cognitive needs\n    And scheduling should be reliable for multiple appointments\n    And community should reduce transportation burden\n    And medical access should not require James to manage everything alone\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

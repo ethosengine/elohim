@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-navigating workplace power dynamics",
+  "contentType": "scenario",
+  "title": "Navigating workplace power dynamics",
+  "description": "Navigating workplace power dynamics",
+  "content": "Scenario: Navigating workplace power dynamics\n    Given employers have significant power over workers\n    And I may fear retaliation for advocating for my needs\n    When I need to navigate workplace advocacy carefully\n    Then the protocol should help me understand my protections\n    And provide strategies for advocacy that minimize retaliation risk\n    And connect me with legal resources if needed\n    And support me in exercising my rights despite power imbalance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-providing audit access to deep technical details",
+  "contentType": "scenario",
+  "title": "Providing audit access to deep technical details",
+  "description": "Providing audit access to deep technical details",
+  "content": "Scenario: Providing audit access to deep technical details\n    Given I need to verify agent decision pathway for appeal\n    And I have deeper access than ordinary citizens\n    When I examine agent source code, decision logs, and cryptographic proofs\n    Then my access is: logged and transparent\n    And I can: examine but not modify systems\n    And I verify: whether agent followed claimed constitutional principles\n    And I check: cryptographic proof validity\n    And I identify: any technical vulnerabilities or errors\n    And my audit: is itself auditable by other experts\n    And deep access: serves genuine oversight not manipulation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

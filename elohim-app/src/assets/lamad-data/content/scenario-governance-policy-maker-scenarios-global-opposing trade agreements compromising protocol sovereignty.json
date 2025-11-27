@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-opposing trade agreements compromising protocol sovereignty",
+  "contentType": "scenario",
+  "title": "Opposing trade agreements compromising protocol sovereignty",
+  "description": "Opposing trade agreements compromising protocol sovereignty",
+  "content": "Scenario: Opposing trade agreements compromising protocol sovereignty\n    Given trade negotiations may include digital governance provisions\n    And some proposals would restrict community autonomy\n    When I evaluate trade agreement implications\n    Then I identify: provisions threatening protocol sovereignty\n    And I oppose: requirements mandating centralization or backdoors\n    And I insist: on preserving community choice\n    And I coalition: with other nations defending autonomy\n    And I use: evidence showing protocol benefits economic wellbeing\n    And I resist: regulatory arbitrage through trade agreements\n    And I protect: democratic governance from corporate capture via trade\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

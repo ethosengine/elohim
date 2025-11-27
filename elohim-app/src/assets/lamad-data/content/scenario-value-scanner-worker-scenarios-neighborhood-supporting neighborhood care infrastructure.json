@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-supporting neighborhood care infrastructure",
+  "contentType": "scenario",
+  "title": "Supporting neighborhood care infrastructure",
+  "description": "Supporting neighborhood care infrastructure",
+  "content": "Scenario: Supporting neighborhood care infrastructure\n    Given neighborhood has community spaces, gardens, or shared resources\n    When I have time to contribute to maintaining shared infrastructure\n    Then the protocol should recognize this as care contribution\n    And coordinate volunteer opportunities that fit my schedule\n    And accumulate care tokens for infrastructure support\n    And help build neighborhood commons that benefit all residents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

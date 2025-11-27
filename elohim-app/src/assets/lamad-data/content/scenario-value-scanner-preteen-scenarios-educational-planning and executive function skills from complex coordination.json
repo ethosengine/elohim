@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-planning and executive function skills from complex coordination",
+  "contentType": "scenario",
+  "title": "Planning and executive function skills from complex coordination",
+  "description": "Planning and executive function skills from complex coordination",
+  "content": "Scenario: Planning and executive function skills from complex coordination\n    Given Marcus coordinates meals across week\n    And he manages inventory, shopping lists, multi-store trips\n    When Marcus exercises planning capabilities\n    Then his executive function should be developing rapidly\n    And he should be learning advanced planning and organization\n    And time management and future orientation should develop\n    And working memory and cognitive flexibility should be exercised\n    And the personal_agent should support executive function development\n    And real responsibility should build sophisticated planning capacity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

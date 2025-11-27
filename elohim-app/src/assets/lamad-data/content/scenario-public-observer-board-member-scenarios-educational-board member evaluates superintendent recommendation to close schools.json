@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-educational-board member evaluates superintendent recommendation to close schools",
+  "contentType": "scenario",
+  "title": "Board member evaluates superintendent recommendation to close schools",
+  "description": "Board member evaluates superintendent recommendation to close schools",
+  "content": "Scenario: Board member evaluates superintendent recommendation to close schools\n    Given superintendent recommends closing three schools for efficiency\n    And 200-page closure analysis emphasizes cost savings and facility utilization\n    And affected communities organized opposition but lack data to counter staff analysis\n    When the board member requests Observer independent analysis\n    Then they receive impact assessment showing commute time increases for affected families\n    And see enrollment data contradicting claims of declining student numbers\n    And access demographic analysis showing closures disproportionately affect low-income students\n    And get comparison of how peer districts addressed facility challenges without closure\n    And independent analysis reveals information staff presentation minimized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,citizen,politician,activist",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

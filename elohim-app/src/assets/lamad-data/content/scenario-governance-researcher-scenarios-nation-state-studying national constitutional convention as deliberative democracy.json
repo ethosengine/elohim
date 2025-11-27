@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-studying national constitutional convention as deliberative democracy",
+  "contentType": "scenario",
+  "title": "Studying national Constitutional Convention as deliberative democracy",
+  "description": "Studying national Constitutional Convention as deliberative democracy",
+  "content": "Scenario: Studying national Constitutional Convention as deliberative democracy\n    Given National Constitutional Convention convenes with randomly-selected citizens\n    And this is largest deliberative democracy experiment in history\n    When I study the convention process and outcomes\n    Then I examine: how 10,000 citizens deliberate on existential questions\n    And I analyze: what enables productive vs polarizing disagreement\n    And I assess: quality of deliberation at unprecedented scale\n    And I explore: how amendments emerge from collective wisdom\n    And I track: influence of diverse perspectives vs expert domination\n    And I investigate: whether citizens can make wise choices under deep uncertainty\n    And My research tests: limits and possibilities of democratic capacity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

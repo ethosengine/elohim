@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-funding community protocol infrastructure sustainably",
+  "contentType": "scenario",
+  "title": "Funding community protocol infrastructure sustainably",
+  "description": "Funding community protocol infrastructure sustainably",
+  "content": "Scenario: Funding community protocol infrastructure sustainably\n    Given Riverside needs resources for community nodes and maintenance\n    And we are relatively poor community\n    When I cobble together funding from multiple sources\n    Then we allocate: municipal budget treating this as public infrastructure\n    And we create: community ownership cooperative with resident investment\n    And we apply: for state and federal grants\n    And we participate: in mutual aid with wealthier communities\n    And we ensure: community retains ownership\n    And we plan: for 10-year sustainability not just pilot\n    And public investment: supports democratic governance tools\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-household participation in multigenerational care coordination",
+  "contentType": "scenario",
+  "title": "Household participation in multigenerational care coordination",
+  "description": "Household participation in multigenerational care coordination",
+  "content": "Scenario: Household participation in multigenerational care coordination\n    Given Margaret provides care both to grandchildren and her elderly mother\n    And Robert provides support to his own aging family\n    When the household coordinates all care obligations\n    Then the household_elohim should track all family care commitments\n    And it should help balance multiple care responsibilities\n    And it should prevent household care burden from becoming excessive\n    And both partners should understand total household care load\n    And household should be able to set sustainable boundaries\n    And care obligations should be manageable and sustainable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

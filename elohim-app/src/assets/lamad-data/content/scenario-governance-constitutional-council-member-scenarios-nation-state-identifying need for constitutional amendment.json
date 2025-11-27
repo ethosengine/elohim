@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-identifying need for constitutional amendment",
+  "contentType": "scenario",
+  "title": "Identifying need for constitutional amendment",
+  "description": "Identifying need for constitutional amendment",
+  "content": "Scenario: Identifying need for constitutional amendment\n    Given repeated appeals reveal gap in constitutional framework\n    And no interpretation can adequately address the issue\n    When we deliberate and recognize amendment is needed\n    Then we document: the fundamental gap we've identified\n    And we propose: amendment language for consideration\n    And we provide: justification grounded in accumulated appeals\n    And we submit: proposal to next Global Constitutional Convention\n    And we demonstrate: constitution remains living document\n    And we enable: constitutional evolution responsive to reality\n    And we show: how individual suffering informs systemic improvement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:nation_state",
+    "related_users:appellant,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

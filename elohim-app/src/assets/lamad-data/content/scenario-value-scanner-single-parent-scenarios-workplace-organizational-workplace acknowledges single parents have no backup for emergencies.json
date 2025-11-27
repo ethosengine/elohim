@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-workplace acknowledges single parents have no backup for emergencies",
+  "contentType": "scenario",
+  "title": "Workplace acknowledges single parents have no backup for emergencies",
+  "description": "Workplace acknowledges single parents have no backup for emergencies",
+  "content": "Scenario: Workplace acknowledges single parents have no backup for emergencies\n    Given Maria has no co-parent to handle child illness, school emergencies, or family crises\n    And she must handle every emergency alone while maintaining employment\n    When workplace policies address family emergencies\n    Then the workplace_elohim should make visible that single parents have no backup\n    And policies should recognize emergencies are inevitable and not optional\n    And Maria should be able to handle crises without job security risk\n    And single parent realities should inform workplace family leave policies\n    And employers should understand solo parents cannot simply \"find coverage\" at home\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

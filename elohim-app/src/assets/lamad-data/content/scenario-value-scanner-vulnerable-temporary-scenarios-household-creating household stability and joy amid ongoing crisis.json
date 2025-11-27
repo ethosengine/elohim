@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-household-creating household stability and joy amid ongoing crisis",
+  "contentType": "scenario",
+  "title": "Creating household stability and joy amid ongoing crisis",
+  "description": "Creating household stability and joy amid ongoing crisis",
+  "content": "Scenario: Creating household stability and joy amid ongoing crisis\n    Given my children need not just survival but moments of normalcy and happiness\n    And resources for \"extras\" are nonexistent\n    When I try to create positive household experiences\n    Then the Value Scanner helps me identify low-cost/no-cost ways to create joy\n    And surfaces community resources for children's activities and experiences\n    And helps me maintain household traditions and celebrations\n    And reminds me that emotional presence matters more than material provision\n    And tracks moments of household happiness and connection\n    And my personal_agent suggests activities that fit our constraints\n    And recognizes emotional care work as valuable as material provision\n    And validates that I am providing good childhood despite circumstances\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

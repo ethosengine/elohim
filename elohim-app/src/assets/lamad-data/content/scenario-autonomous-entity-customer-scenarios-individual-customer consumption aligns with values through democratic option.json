@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer consumption aligns with values through democratic option",
+  "contentType": "scenario",
+  "title": "Customer consumption aligns with values through democratic option",
+  "description": "Customer consumption aligns with values through democratic option",
+  "content": "Scenario: Customer consumption aligns with values through democratic option\n    Given Ms. Johnson opposed worker exploitation but lacked alternatives\n    And corporate greenwashing made ethical consumption impossible to verify\n    When democratic business provides transparent ethical alternative\n    Then her consumption supports values: worker dignity, fair wages, environmental stewardship, community wealth\n    And alignment between values and consumption reduces moral cognitive dissonance\n    And she feels good about supporting democratic business, not guilty about corporate extraction\n    And ethical consumption becomes real choice, not marketing manipulation\n    And community_elohim helps communicate values alignment opportunities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

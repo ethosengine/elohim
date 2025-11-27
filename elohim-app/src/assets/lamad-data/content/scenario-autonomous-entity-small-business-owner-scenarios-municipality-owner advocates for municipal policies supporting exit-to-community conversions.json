@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-owner advocates for municipal policies supporting exit-to-community conversions",
+  "contentType": "scenario",
+  "title": "Owner advocates for municipal policies supporting exit-to-community conversions",
+  "description": "Owner advocates for municipal policies supporting exit-to-community conversions",
+  "content": "Scenario: Owner advocates for municipal policies supporting exit-to-community conversions\n    Given Rosa's successful transition positions her as credible advocate\n    And municipal policy could support or obstruct future conversions\n    When Rosa testifies to city council about conversion benefits\n    Then her personal story demonstrates exit-to-community is dignified and viable\n    And she advocates for: business conversion support programs and community investment tax credits\n    And city council hears directly from small business owner who chose democratic path\n    And her advocacy influences municipal economic development strategy\n    And municipality_elohim coordinates advocate network across converted owners\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:municipality",
+    "related_users:[worker,franchise_operator,community_investor,manager]",
+    "related_layers:[community,workplace_organizational]",
+    "elohim_agents:[municipality_elohim,community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

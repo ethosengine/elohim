@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-multi-family appeal about shared resources",
+  "contentType": "scenario",
+  "title": "Multi-family appeal about shared resources",
+  "description": "Multi-family appeal about shared resources",
+  "content": "Scenario: Multi-family appeal about shared resources\n    Given multiple families share community resources\n    And Family Elohim decisions affect resource distribution across families\n    When we collectively appeal an allocation we believe is unjust\n    Then the appeal bridges family layer to community layer governance\n    And The Constitutional Council evaluates inter-family equity\n    And They consider if resource distribution follows constitutional minimums\n    And They examine if families had meaningful participation in allocation process\n    And The appeal can trigger community deliberation on sharing principles\n    And Multi-family coordination patterns emerge through appeal precedents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

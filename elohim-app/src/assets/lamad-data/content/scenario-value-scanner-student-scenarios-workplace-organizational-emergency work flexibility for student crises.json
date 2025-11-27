@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-workplace-organizational-emergency work flexibility for student crises",
+  "contentType": "scenario",
+  "title": "Emergency work flexibility for student crises",
+  "description": "Emergency work flexibility for student crises",
+  "content": "Scenario: Emergency work flexibility for student crises\n    Given students face emergencies (illness, family crisis, housing instability)\n    And rigid work schedules can worsen crises\n    When Kenji experiences emergency situation\n    Then the workplace_elohim should help him communicate need for emergency time off\n    And it should advocate for employer flexibility during crisis\n    And it should recognize emergency accommodation as care economy practice\n    And employers should support workers through crises\n    And the system should help Kenji access emergency workplace support\n    And care economy workplaces respond to worker emergencies with flexibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employee,young_adult,manager",
+    "related_layers:individual,educational,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

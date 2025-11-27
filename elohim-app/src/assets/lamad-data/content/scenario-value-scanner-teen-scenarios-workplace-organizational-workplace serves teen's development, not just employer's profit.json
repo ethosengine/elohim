@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-workplace serves teen's development, not just employer's profit",
+  "contentType": "scenario",
+  "title": "Workplace serves teen's development, not just employer's profit",
+  "description": "Workplace serves teen's development, not just employer's profit",
+  "content": "Scenario: Workplace serves teen's development, not just employer's profit\n    Given Jasmine's work should contribute to her flourishing\n    And employment should support her transition to adulthood\n    When workplace_elohim evaluates the work relationship\n    Then it should assess whether work supports her development\n    And flag if work interferes with education or wellbeing\n    And recognize if employer is investing in her skill development\n    And identify if work experience is building her career capability\n    And advocate that employment should serve mutual benefit\n    And help her understand that healthy employment supports worker flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

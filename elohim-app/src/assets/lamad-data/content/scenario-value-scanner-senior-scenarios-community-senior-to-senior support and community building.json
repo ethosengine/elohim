@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-senior-to-senior support and community building",
+  "contentType": "scenario",
+  "title": "Senior-to-senior support and community building",
+  "description": "Senior-to-senior support and community building",
+  "content": "Scenario: Senior-to-senior support and community building\n    Given Margaret is in \"younger\" senior cohort (65-74)\n    And older seniors (75+) need support and connection\n    When the community_elohim coordinates senior support\n    Then Margaret should be part of senior mutual aid networks\n    And her peer support should be recognized as care contribution\n    And senior-to-senior care should prevent isolation\n    And age-matched support should be valued alongside intergenerational\n    And senior community should be strengthened through care economy\n    And Margaret should build relationships with peers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

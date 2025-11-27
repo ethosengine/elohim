@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-household-household schedule coordination around intensive care demands",
+  "contentType": "scenario",
+  "title": "Household schedule coordination around intensive care demands",
+  "description": "Household schedule coordination around intensive care demands",
+  "content": "Scenario: Household schedule coordination around intensive care demands\n    Given David requires constant supervision and care\n    And James must balance caregiving with part-time work\n    When household schedules are coordinated\n    Then the household_elohim should integrate care demands with work\n    And it should identify conflicts between care and employment\n    And it should help James negotiate sustainable scheduling\n    And household operations should be possible despite constraints\n    And schedule coordination should prevent impossible demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:household",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

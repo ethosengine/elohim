@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-global research network coordinating cross-cultural studies",
+  "contentType": "scenario",
+  "title": "Global research network coordinating cross-cultural studies",
+  "description": "Global research network coordinating cross-cultural studies",
+  "content": "Scenario: Global research network coordinating cross-cultural studies\n    Given protocol has been adopted in diverse nations worldwide\n    And I am part of international research consortium\n    When we coordinate parallel studies across continents\n    Then we examine: how cultural context shapes constitutional interpretation\n    And we compare: collectivist vs individualist societies' implementations\n    And we analyze: different political systems' integration patterns\n    And we identify: universal patterns vs cultural adaptations\n    And we share: methodologies and data (with appropriate protection)\n    And we test: whether democratic AI governance is Western innovation or universal possibility\n    And Our global collaboration reveals: humanity's shared and diverse governance approaches\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

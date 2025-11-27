@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-workplace-organizational-workplace skills as transferable care economy capabilities",
+  "contentType": "scenario",
+  "title": "Workplace skills as transferable care economy capabilities",
+  "description": "Workplace skills as transferable care economy capabilities",
+  "content": "Scenario: Workplace skills as transferable care economy capabilities\n    Given Kenji develops skills through work (customer service, teamwork, reliability)\n    And these capabilities serve him throughout life\n    When the workplace_elohim documents Kenji's skill development\n    Then it should recognize customer service as care economy skill\n    And it should value teamwork, communication, and problem-solving\n    And it should translate work skills to care economy capabilities\n    And it should help Kenji articulate skills for future opportunities\n    And the system should recognize all work as capability development\n    And Kenji should understand his part-time work as building life skills\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employee,young_adult,manager",
+    "related_layers:individual,educational,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

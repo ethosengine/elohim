@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood boundaries prevent over-commitment",
+  "contentType": "scenario",
+  "title": "Neighborhood boundaries prevent over-commitment",
+  "description": "Neighborhood boundaries prevent over-commitment",
+  "content": "Scenario: Neighborhood boundaries prevent over-commitment\n    Given Robert has limited capacity amid other demands\n    And neighborhood participation could expand indefinitely\n    And sustainable participation requires boundaries\n    When neighborhood_elohim monitors Robert's neighborhood engagement\n    Then it should recognize when neighborhood demands exceed his capacity\n    And help him set healthy boundaries on neighborhood participation\n    And surface when he's taking on too much neighborhood responsibility\n    And support him in saying no to additional commitments\n    And ensure neighborhood participation enhances rather than depletes him\n    And protect him from burnout through over-commitment\n    And help him maintain sustainable neighborhood engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

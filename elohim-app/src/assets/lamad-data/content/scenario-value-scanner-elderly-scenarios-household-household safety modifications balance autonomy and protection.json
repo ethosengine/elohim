@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-household-household safety modifications balance autonomy and protection",
+  "contentType": "scenario",
+  "title": "Household safety modifications balance autonomy and protection",
+  "description": "Household safety modifications balance autonomy and protection",
+  "content": "Scenario: Household safety modifications balance autonomy and protection\n    Given Helen has mobility limitations and fall risk\n    And safety modifications would reduce risk\n    When household safety needs are assessed\n    Then modifications should be proposed, not imposed\n    And Helen should decide what changes occur in her home\n    And options should be presented with dignity: \"Would grab bars help you feel safer?\"\n    And her preferences about aesthetics and comfort should matter\n    And safety should support her autonomy, not restrict it\n    And the goal should be enabling continued home living\n    And Helen's agency over her space should be preserved\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:household",
+    "related_users:caregiver,family_member,home_health_aide",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-coordinating household care economy with spouse",
+  "contentType": "scenario",
+  "title": "Coordinating household care economy with spouse",
+  "description": "Coordinating household care economy with spouse",
+  "content": "Scenario: Coordinating household care economy with spouse\n    Given Margaret shares household with a spouse\n    And both are retired and contributing care labor\n    When the household_elohim tracks care contributions\n    Then it should recognize both partners' care work\n    And it should help distribute household labor equitably\n    And it should track who does what to prevent invisible labor\n    And it should facilitate conversations about fair distribution\n    And both partners should experience valued contributions\n    And equity should be maintained in retirement partnership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

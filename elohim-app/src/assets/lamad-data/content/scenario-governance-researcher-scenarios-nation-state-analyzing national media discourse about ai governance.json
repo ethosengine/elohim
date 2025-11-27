@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-analyzing national media discourse about ai governance",
+  "contentType": "scenario",
+  "title": "Analyzing national media discourse about AI governance",
+  "description": "Analyzing national media discourse about AI governance",
+  "content": "Scenario: Analyzing national media discourse about AI governance\n    Given public understanding is shaped by media coverage\n    And I want to understand how protocol is portrayed and discussed\n    When I analyze national media coverage over time\n    Then I examine: framing (opportunity vs threat, freedom vs control)\n    And I identify: key narratives and their evolution\n    And I assess: accuracy of coverage vs actual protocol function\n    And I explore: elite discourse vs grassroots perspectives\n    And I analyze: how coverage affects public opinion and adoption\n    And I track: whether critical discourse improves protocol or undermines it\n    And My research reveals: democratic deliberation about democratic AI\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

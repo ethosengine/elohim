@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-learning about ecological carrying capacity and limits",
+  "contentType": "scenario",
+  "title": "Learning about ecological carrying capacity and limits",
+  "description": "Learning about ecological carrying capacity and limits",
+  "content": "Scenario: Learning about ecological carrying capacity and limits\n    Given ecosystems have finite carrying capacity\n    And consumption must stay within ecological limits\n    When the personal_agent teaches environmental concepts\n    Then it should explain ecological limits and boundaries\n    And it should help her understand planetary boundaries\n    And it should frame consumption within ecological context\n    And she should learn that infinite growth is impossible\n    And ecological literacy should include limits and constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

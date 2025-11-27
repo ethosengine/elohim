@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-resisting corporate lobbying for regulatory capture",
+  "contentType": "scenario",
+  "title": "Resisting corporate lobbying for regulatory capture",
+  "description": "Resisting corporate lobbying for regulatory capture",
+  "content": "Scenario: Resisting corporate lobbying for regulatory capture\n    Given tech companies lobby for regulations favoring incumbents\n    And they push: backdoor mandates, centralization requirements, licensing barriers\n    When I defend protocol sovereignty against capture\n    Then I use: cryptographic impossibility arguments (backdoors break verification)\n    And I present: evidence that regulation would harm innovation\n    And I coalition: with community leaders showing grassroots opposition\n    And I reference: international examples of protocol sovereignty working\n    And I require: transparency about lobbying and funding\n    And I resist: well-funded pressure through political courage\n    And I protect: democratic governance from corporate control\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

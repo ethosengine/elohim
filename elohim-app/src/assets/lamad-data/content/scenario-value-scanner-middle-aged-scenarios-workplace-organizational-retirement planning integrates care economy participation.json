@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-retirement planning integrates care economy participation",
+  "contentType": "scenario",
+  "title": "Retirement planning integrates care economy participation",
+  "description": "Retirement planning integrates care economy participation",
+  "content": "Scenario: Retirement planning integrates care economy participation\n    Given Robert is in pre-retirement years\n    And retirement planning should include care economy dimensions\n    And his care contributions should be valued in retirement\n    When workplace_elohim supports retirement planning\n    Then it should help him plan retirement that honors care economy participation\n    And surface how accumulated care tokens could support retirement\n    And explore retirement roles that leverage care economy expertise\n    And help him transition from full-time employment to care economy contribution\n    And recognize that retirement can include meaningful care economy participation\n    And build retirement vision that includes continued community contribution\n    And demonstrate that care economy operates across full lifecycle\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,household,family,industry_sector",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

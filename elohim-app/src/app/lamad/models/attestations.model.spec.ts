@@ -4,7 +4,7 @@ import {
   AttestationJourney,
   Endorsement,
   AttestationRequirement,
-  ContentAccessRequirement,
+  AttestationAccessRequirement,
   UserAttestations,
   AttestationProgress
 } from './attestations.model';
@@ -37,7 +37,7 @@ describe('Attestations Model', () => {
         name: '4th Grade Math',
         description: 'Mastery of 4th grade mathematics',
         type: 'educational',
-        earnedAt: new Date('2025-01-01'),
+        earnedAt: '2025-01-01T00:00:00.000Z',
         revocable: false
       };
 
@@ -53,14 +53,14 @@ describe('Attestations Model', () => {
         name: 'Ham Radio Technician',
         description: 'FCC Ham Radio Technician License',
         type: 'skill',
-        earnedAt: new Date('2025-01-01'),
-        expiresAt: new Date('2030-01-01'),
+        earnedAt: '2025-01-01T00:00:00.000Z',
+        expiresAt: '2030-01-01T00:00:00.000Z',
         issuedBy: 'FCC',
         revocable: true,
         metadata: { licenseNumber: 'KA1ABC' }
       };
 
-      expect(attestation.expiresAt).toEqual(new Date('2030-01-01'));
+      expect(attestation.expiresAt).toEqual('2030-01-01T00:00:00.000Z');
       expect(attestation.issuedBy).toBe('FCC');
       expect(attestation.metadata?.['licenseNumber']).toBe('KA1ABC');
     });
@@ -72,8 +72,8 @@ describe('Attestations Model', () => {
         nodesVisited: ['node-1', 'node-2', 'node-3'],
         startingAffinity: { 'node-1': 0.0, 'node-2': 0.0 },
         endingAffinity: { 'node-1': 0.8, 'node-2': 0.9 },
-        startDate: new Date('2025-01-01'),
-        endDate: new Date('2025-02-01')
+        startDate: '2025-01-01T00:00:00.000Z',
+        endDate: '2025-02-01T00:00:00.000Z'
       };
 
       expect(journey.nodesVisited.length).toBe(3);
@@ -90,8 +90,8 @@ describe('Attestations Model', () => {
         applicationsCompleted: ['app-1'],
         endorsements: [],
         timeInvested: 3600000,
-        startDate: new Date('2025-01-01'),
-        endDate: new Date('2025-01-15')
+        startDate: '2025-01-01T00:00:00.000Z',
+        endDate: '2025-01-15T00:00:00.000Z'
       };
 
       expect(journey.exercisesCompleted?.length).toBe(2);
@@ -105,7 +105,7 @@ describe('Attestations Model', () => {
       const endorsement: Endorsement = {
         endorserId: 'user-2',
         endorserName: 'John Doe',
-        endorsedAt: new Date('2025-01-15'),
+        endorsedAt: '2025-01-15T00:00:00.000Z',
         reason: 'Demonstrated competence',
         weight: 1.0
       };
@@ -118,7 +118,7 @@ describe('Attestations Model', () => {
     it('should work with minimal fields', () => {
       const endorsement: Endorsement = {
         endorserId: 'user-2',
-        endorsedAt: new Date('2025-01-15')
+        endorsedAt: '2025-01-15T00:00:00.000Z'
       };
 
       expect(endorsement.endorserId).toBe('user-2');
@@ -152,9 +152,9 @@ describe('Attestations Model', () => {
     });
   });
 
-  describe('ContentAccessRequirement interface', () => {
+  describe('AttestationAccessRequirement interface', () => {
     it('should create access requirement with OR logic', () => {
-      const access: ContentAccessRequirement = {
+      const access: AttestationAccessRequirement = {
         contentNodeId: 'advanced-content',
         requiredAttestations: ['att-1', 'att-2'],
         steward: 'steward-1',
@@ -166,7 +166,7 @@ describe('Attestations Model', () => {
     });
 
     it('should create access requirement with AND logic', () => {
-      const access: ContentAccessRequirement = {
+      const access: AttestationAccessRequirement = {
         contentNodeId: 'advanced-content',
         requiredAllAttestations: ['att-1', 'att-2'],
         steward: 'steward-1',
@@ -177,7 +177,7 @@ describe('Attestations Model', () => {
     });
 
     it('should support alternative endorsements', () => {
-      const access: ContentAccessRequirement = {
+      const access: AttestationAccessRequirement = {
         contentNodeId: 'advanced-content',
         alternativeEndorsements: {
           count: 5,
@@ -191,7 +191,7 @@ describe('Attestations Model', () => {
     });
 
     it('should include reason and explanation', () => {
-      const access: ContentAccessRequirement = {
+      const access: AttestationAccessRequirement = {
         contentNodeId: 'sensitive-content',
         requiredAttestations: ['trauma-support'],
         steward: 'community',
@@ -210,7 +210,7 @@ describe('Attestations Model', () => {
       const userAttestations: UserAttestations = {
         userId: 'user-1',
         attestations: [],
-        lastUpdated: new Date('2025-01-01')
+        lastUpdated: '2025-01-01T00:00:00.000Z'
       };
 
       expect(userAttestations.userId).toBe('user-1');
@@ -223,7 +223,7 @@ describe('Attestations Model', () => {
         name: 'Attestation 1',
         description: 'First',
         type: 'educational',
-        earnedAt: new Date(),
+        earnedAt: '2025-01-01T00:00:00.000Z',
         revocable: false
       };
 
@@ -232,14 +232,14 @@ describe('Attestations Model', () => {
         name: 'Attestation 2',
         description: 'Second',
         type: 'skill',
-        earnedAt: new Date(),
+        earnedAt: '2025-01-01T00:00:00.000Z',
         revocable: false
       };
 
       const userAttestations: UserAttestations = {
         userId: 'user-1',
         attestations: [attestation1, attestation2],
-        lastUpdated: new Date()
+        lastUpdated: '2025-01-01T00:00:00.000Z'
       };
 
       expect(userAttestations.attestations.length).toBe(2);
@@ -282,10 +282,10 @@ describe('Attestations Model', () => {
           durationSoFar: 0
         },
         percentComplete: 25,
-        estimatedCompletion: new Date('2025-03-01')
+        estimatedCompletion: '2025-03-01T00:00:00.000Z'
       };
 
-      expect(progress.estimatedCompletion).toEqual(new Date('2025-03-01'));
+      expect(progress.estimatedCompletion).toEqual('2025-03-01T00:00:00.000Z');
     });
   });
 });

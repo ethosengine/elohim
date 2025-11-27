@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-pushing for industry scheduling regulations",
+  "contentType": "scenario",
+  "title": "Pushing for industry scheduling regulations",
+  "description": "Pushing for industry scheduling regulations",
+  "content": "Scenario: Pushing for industry scheduling regulations\n    Given unpredictable scheduling is endemic in food service\n    When workers advocate for fair scheduling laws\n    Then the protocol should support advocacy for scheduling regulations\n    Such as advance notice requirements, predictable hours, right to request schedule\n    And provide evidence of harm from current scheduling practices\n    And coordinate workers pushing for legislative change\n    And transform industry standards through policy intervention\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

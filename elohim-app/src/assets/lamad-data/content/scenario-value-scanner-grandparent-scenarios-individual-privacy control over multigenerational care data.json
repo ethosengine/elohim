@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-privacy control over multigenerational care data",
+  "contentType": "scenario",
+  "title": "Privacy control over multigenerational care data",
+  "description": "Privacy control over multigenerational care data",
+  "content": "Scenario: Privacy control over multigenerational care data\n    Given Margaret's data includes information about grandchildren and her mother\n    And health information is particularly sensitive\n    When Margaret determines data sharing preferences\n    Then she must have complete control over all her data\n    And she should choose what's shared with family members\n    And she can demonstrate care value to family if she wishes\n    And she can maintain complete privacy if she prefers\n    And health data sharing must be explicitly consented\n    And Margaret's autonomy over her information must be absolute\n    And privacy across generations must be carefully managed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

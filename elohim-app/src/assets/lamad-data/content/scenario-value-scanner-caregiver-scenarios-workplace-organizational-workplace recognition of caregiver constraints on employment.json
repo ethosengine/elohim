@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace recognition of caregiver constraints on employment",
+  "contentType": "scenario",
+  "title": "Workplace recognition of caregiver constraints on employment",
+  "description": "Workplace recognition of caregiver constraints on employment",
+  "content": "Scenario: Workplace recognition of caregiver constraints on employment\n    Given James can only work ~20 hours/week due to caregiving\n    And his availability is constrained by care needs\n    When the workplace_elohim communicates with employers\n    Then James's caregiving situation should be visible to employer\n    And his reduced availability should be explained as care-related\n    And employer should understand caregiving constraints on capacity\n    And caregiver status should be recognized as legitimate limit\n    And workplace should accommodate caregiving realities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,middle_aged,employee,contractor",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

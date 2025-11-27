@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member tracks accountability commitments systematically",
+  "contentType": "scenario",
+  "title": "Council member tracks accountability commitments systematically",
+  "description": "Council member tracks accountability commitments systematically",
+  "content": "Scenario: Council member tracks accountability commitments systematically\n    Given the politician made campaign promises to constituents\n    And committed to specific actions in community meetings\n    When the Observer monitors commitment tracking\n    Then they receive alerts when deadlines approach\n    And see status of all promises made across forums\n    And get nudges to follow through on community pledges\n    And build constituent trust through documented delivery\n    And maintain integrity against overwhelming office demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

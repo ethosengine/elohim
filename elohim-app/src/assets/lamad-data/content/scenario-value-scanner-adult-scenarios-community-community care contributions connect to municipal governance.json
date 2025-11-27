@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-community-community care contributions connect to municipal governance",
+  "contentType": "scenario",
+  "title": "Community care contributions connect to municipal governance",
+  "description": "Community care contributions connect to municipal governance",
+  "content": "Scenario: Community care contributions connect to municipal governance\n    Given Sarah's community care work is substantial\n    And municipal policy affects community well-being\n    When municipal governance decisions are made\n    Then Sarah's care contributions should give her voice\n    And community care economy data should inform municipal policy\n    And care work should be recognized at municipal level\n    And Sarah's advocacy should carry weight based on demonstrated contribution\n    And care economy should scale from community to municipal governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:community",
+    "related_users:parent,worker,educator,caregiver,community_member",
+    "related_layers:neighborhood,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

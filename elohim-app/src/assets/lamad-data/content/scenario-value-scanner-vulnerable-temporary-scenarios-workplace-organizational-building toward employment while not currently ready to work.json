@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-building toward employment while not currently ready to work",
+  "contentType": "scenario",
+  "title": "Building toward employment while not currently ready to work",
+  "description": "Building toward employment while not currently ready to work",
+  "content": "Scenario: Building toward employment while not currently ready to work\n    Given I am still in acute crisis or early trauma recovery\n    And employment right now would overwhelm my capacity\n    When I plan for future employment while not currently seeking work\n    Then the workplace_elohim helps me identify skill-building opportunities\n    And surfaces training, education, or credential programs I could pursue\n    And validates that not being employment-ready yet is appropriate\n    And helps me build toward future employment at my pace\n    And tracks my skill development and preparation\n    And my personal_agent identifies low-pressure ways to build employment readiness\n    And recognizes that recovery before employment is often necessary\n    And supports my timeline for employment readiness\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

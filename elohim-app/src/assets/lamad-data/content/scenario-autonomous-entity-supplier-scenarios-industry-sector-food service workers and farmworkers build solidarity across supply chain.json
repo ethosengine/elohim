@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-food service workers and farmworkers build solidarity across supply chain",
+  "contentType": "scenario",
+  "title": "Food service workers and farmworkers build solidarity across supply chain",
+  "description": "Food service workers and farmworkers build solidarity across supply chain",
+  "content": "Scenario: Food service workers and farmworkers build solidarity across supply chain\n    Given workers in restaurants and farms were isolated from each other\n    And corporate structure prevented relationship building across supply chain\n    When democratic network connects food workers and farmworkers\n    Then Emma (restaurant worker) and Tom's farmworkers coordinate directly\n    And workers across supply chain recognize shared interests and values\n    And solidarity builds between urban food service and rural agriculture\n    And cross-training opportunities enable workers to learn full food system\n    And industry_sector_elohim facilitates worker connections across supply chain\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:industry_sector",
+    "related_users:[worker,franchise_operator,small_business_owner,supplier]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

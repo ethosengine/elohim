@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-sustainable consumption choices tracked as environmental care work",
+  "contentType": "scenario",
+  "title": "Sustainable consumption choices tracked as environmental care work",
+  "description": "Sustainable consumption choices tracked as environmental care work",
+  "content": "Scenario: Sustainable consumption choices tracked as environmental care work\n    Given Jasmine preferentially chooses sustainable products\n    And she has bought local/seasonal/sustainable products in 12 of 15 purchases\n    When bioregional_elohim analyzes her consumption patterns\n    Then it should recognize her environmental care contributions\n    And track her choices as care work for ecosystem health\n    And calculate environmental impact reduction from her choices\n    And value bioregional stewardship in care token allocation\n    And demonstrate that ecological care creates economic value\n    And recognize environmental activism as legitimate care labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

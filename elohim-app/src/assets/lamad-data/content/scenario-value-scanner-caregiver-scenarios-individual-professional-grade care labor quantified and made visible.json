@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-individual-professional-grade care labor quantified and made visible",
+  "contentType": "scenario",
+  "title": "Professional-grade care labor quantified and made visible",
+  "description": "Professional-grade care labor quantified and made visible",
+  "content": "Scenario: Professional-grade care labor quantified and made visible\n    Given James provides skilled care equivalent to professional nursing\n    And he manages medications with precision\n    And he provides cognitive support and emotional care\n    And this work would be valued at $50k+/year for a stranger\n    When the personal_agent tracks James's care contributions\n    Then his care labor should be quantified as professional-grade work\n    And care tokens should reflect the true value of his skills\n    And his contributions should be valued at professional nursing rates\n    And invisible care work should become economically visible\n    And society should see he's performing skilled professional care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:individual",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

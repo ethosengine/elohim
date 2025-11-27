@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent coordinates school crossing guard advocacy",
+  "contentType": "scenario",
+  "title": "Parent coordinates school crossing guard advocacy",
+  "description": "Parent coordinates school crossing guard advocacy",
+  "content": "Scenario: Parent coordinates school crossing guard advocacy\n    Given the community removed crossing guards at three intersections\n    And the parent's child crosses one of these intersections daily\n    When the Observer connects parents with children at all three crossings\n    Then parents form rapid coalition with documented safety data\n    And coordinate to attend the community safety meeting together\n    And present unified testimony about near-miss incidents\n    And individual parent concerns become undeniable pattern\n    And crossing guards are restored within two weeks\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

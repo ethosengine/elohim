@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-making visible that work schedules limit neighborhood participation",
+  "contentType": "scenario",
+  "title": "Making visible that work schedules limit neighborhood participation",
+  "description": "Making visible that work schedules limit neighborhood participation",
+  "content": "Scenario: Making visible that work schedules limit neighborhood participation\n    Given many neighborhood activities happen during work hours\n    When my work schedule prevents participation\n    Then the protocol should make visible that employment structures exclude workers\n    And advocate for neighborhood activities at accessible times\n    And help neighborhood understand workers' constraints\n    And push for inclusive neighborhood care economy design\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

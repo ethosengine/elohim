@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-educational-educational institutions recognize teen care contributions",
+  "contentType": "scenario",
+  "title": "Educational institutions recognize teen care contributions",
+  "description": "Educational institutions recognize teen care contributions",
+  "content": "Scenario: Educational institutions recognize teen care contributions\n    Given Jasmine volunteers extensively while maintaining academic work\n    And educational institutions value \"well-rounded\" students\n    When her school evaluates her holistically\n    Then educational_elohim should make her care contributions visible\n    And provide comprehensive view of her capabilities beyond grades\n    And colleges should see her substantial care economy participation\n    And recognize leadership demonstrated through care work\n    And value care contributions alongside academic and extracurricular achievements\n    And support her access to educational opportunities based on comprehensive participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:educational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

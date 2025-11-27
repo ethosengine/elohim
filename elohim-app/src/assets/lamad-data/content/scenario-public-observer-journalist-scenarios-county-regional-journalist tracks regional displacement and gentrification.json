@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist tracks regional displacement and gentrification",
+  "contentType": "scenario",
+  "title": "Journalist tracks regional displacement and gentrification",
+  "description": "Journalist tracks regional displacement and gentrification",
+  "content": "Scenario: Journalist tracks regional displacement and gentrification\n    Given housing costs rise across metropolitan region\n    And the journalist investigates who benefits and who is harmed\n    When the Observer tracks displacement patterns regionally\n    Then the journalist sees working-class communities of color losing residents\n    And maps evictions, rent increases, and demographic changes\n    And identifies corporate landlords buying properties across region\n    And documents regional coordination of displacement\n    And publishes investigation connecting local experiences to regional pattern\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:county_regional",
+    "related_users:journalist,activist,politician,citizen",
+    "related_layers:municipality,provincial_state,community",
+    "elohim_agents:public_observer,regional_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

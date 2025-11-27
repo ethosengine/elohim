@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-connecting with other single parents for resource sharing",
+  "contentType": "scenario",
+  "title": "Connecting with other single parents for resource sharing",
+  "description": "Connecting with other single parents for resource sharing",
+  "content": "Scenario: Connecting with other single parents for resource sharing\n    Given Maria shares specific challenges and constraints with other single parents\n    And mutual support among single parents is especially valuable\n    When the neighborhood_elohim identifies community composition\n    Then it should connect Maria to other single parents in her neighborhood\n    And it should facilitate resource sharing specific to solo parenting needs\n    And it should create peer support network among those with shared experience\n    And single parents should find each other for mutual aid and understanding\n    And Maria should have neighborhood community that truly gets her situation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-navigating family history of medical trauma",
+  "contentType": "scenario",
+  "title": "Navigating family history of medical trauma",
+  "description": "Navigating family history of medical trauma",
+  "content": "Scenario: Navigating family history of medical trauma\n    Given Alex may have experienced medical trauma in childhood\n    And family might have painful history around Alex's disability\n    When family discusses disability-related topics\n    Then the family_elohim should recognize potential trauma triggers\n    And it should support Alex in managing difficult family dynamics\n    And Alex should have tools to redirect unhelpful conversations\n    And family should be prompted toward disability justice frameworks\n    And the protocol should help family shift from medical to social model\n    And Alex should be supported in processing family history\n    And healing should be possible through better frameworks\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

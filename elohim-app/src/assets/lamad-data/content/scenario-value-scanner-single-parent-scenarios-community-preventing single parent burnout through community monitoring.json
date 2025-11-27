@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-preventing single parent burnout through community monitoring",
+  "contentType": "scenario",
+  "title": "Preventing single parent burnout through community monitoring",
+  "description": "Preventing single parent burnout through community monitoring",
+  "content": "Scenario: Preventing single parent burnout through community monitoring\n    Given Maria operates at unsustainable intensity with no co-parent relief\n    And burnout is extremely common among solo parents\n    When the community_elohim monitors Maria's well-being\n    Then it should detect warning signs of approaching burnout\n    And it should proactively offer respite care and support\n    And it should coordinate community intervention before crisis occurs\n    And burnout prevention should be community responsibility\n    And Maria should have community safety net watching for her well-being\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

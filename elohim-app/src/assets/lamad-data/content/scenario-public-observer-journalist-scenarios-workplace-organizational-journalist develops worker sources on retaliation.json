@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist develops worker sources on retaliation",
+  "contentType": "scenario",
+  "title": "Journalist develops worker sources on retaliation",
+  "description": "Journalist develops worker sources on retaliation",
+  "content": "Scenario: Journalist develops worker sources on retaliation\n    Given workers face retaliation for organizing or complaining\n    And fear job loss for speaking to journalist\n    When the Observer provides secure anonymous channel\n    Then workers share evidence of retaliation and illegal firings\n    And journalist investigates without exposing individual sources\n    And aggregates worker experiences to show pattern\n    And verifies claims through labor board records\n    And publishes investigation protecting sources while exposing employer\n    And source protection enables workers to speak truth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,union_organizer,activist,politician",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,labor_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

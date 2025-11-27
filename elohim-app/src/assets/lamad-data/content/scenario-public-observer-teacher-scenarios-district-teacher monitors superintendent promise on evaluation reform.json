@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher monitors superintendent promise on evaluation reform",
+  "contentType": "scenario",
+  "title": "Teacher monitors superintendent promise on evaluation reform",
+  "description": "Teacher monitors superintendent promise on evaluation reform",
+  "content": "Scenario: Teacher monitors superintendent promise on evaluation reform\n    Given the superintendent promised to reduce evaluation paperwork burden\n    And teachers experience evaluation as compliance not professional growth\n    When the Observer tracks implementation over time\n    Then teachers document that paperwork actually increased\n    And evaluation time went from 8 hours to 12 hours annually\n    And no evidence of professional development benefit\n    And bring accountability data to board on broken promise\n    And administrative commitments become enforceable through transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

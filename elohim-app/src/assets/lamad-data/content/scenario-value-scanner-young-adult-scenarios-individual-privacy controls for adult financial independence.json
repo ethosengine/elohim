@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-privacy controls for adult financial independence",
+  "contentType": "scenario",
+  "title": "Privacy controls for adult financial independence",
+  "description": "Privacy controls for adult financial independence",
+  "content": "Scenario: Privacy controls for adult financial independence\n    Given Aisha has full adult autonomy\n    And she wants to keep financial details private\n    When Aisha configures her privacy settings\n    Then she should have complete control over data sharing\n    And her financial information should remain private by default\n    And she should explicitly consent to any family visibility\n    And workplace should have no access to personal data\n    And privacy controls should be granular and transparent\n    And the system should respect her adult independence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

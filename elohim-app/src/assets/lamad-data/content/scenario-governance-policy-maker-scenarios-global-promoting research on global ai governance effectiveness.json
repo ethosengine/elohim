@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-global-promoting research on global ai governance effectiveness",
+  "contentType": "scenario",
+  "title": "Promoting research on global AI governance effectiveness",
+  "description": "Promoting research on global AI governance effectiveness",
+  "content": "Scenario: Promoting research on global AI governance effectiveness\n    Given we need evidence about what works across contexts\n    And global patterns require global research\n    When I support international research infrastructure\n    Then I fund: global research networks\n    And I promote: data sharing with privacy protection\n    And I support: global South researchers leading local studies\n    And I ensure: open access to findings\n    And I enable: cumulative knowledge building\n    And I use: evidence for global policy advocacy\n    And I demonstrate: policy making based on science not ideology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,technical_expert,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

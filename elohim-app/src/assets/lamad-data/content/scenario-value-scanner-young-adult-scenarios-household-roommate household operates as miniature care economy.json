@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-roommate household operates as miniature care economy",
+  "contentType": "scenario",
+  "title": "Roommate household operates as miniature care economy",
+  "description": "Roommate household operates as miniature care economy",
+  "content": "Scenario: Roommate household operates as miniature care economy\n    Given Aisha lives with roommates\n    And the household functions as a care economy unit\n    When household care tokens are calculated\n    Then all forms of household labor should be valued\n    And cooking, cleaning, shopping, and maintenance should all count\n    And emotional labor of household coordination should be recognized\n    And care tokens should enable equitable exchange\n    And the household should function as mutual support network\n    And care economy principles should prevent household exploitation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

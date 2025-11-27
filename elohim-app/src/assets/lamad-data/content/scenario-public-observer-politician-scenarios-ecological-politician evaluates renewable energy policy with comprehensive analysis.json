@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-ecological-politician evaluates renewable energy policy with comprehensive analysis",
+  "contentType": "scenario",
+  "title": "Politician evaluates renewable energy policy with comprehensive analysis",
+  "description": "Politician evaluates renewable energy policy with comprehensive analysis",
+  "content": "Scenario: Politician evaluates renewable energy policy with comprehensive analysis\n    Given competing proposals for renewable energy development\n    And conflicting claims about costs and benefits\n    When the Observer analyzes renewable energy options and impacts\n    Then they see cost trajectories of different energy sources\n    And understand job creation in renewable versus fossil fuel sectors\n    And identify environmental and health benefits of clean energy\n    And review successful renewable policies in other jurisdictions\n    And make informed energy policy decisions beyond ideology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

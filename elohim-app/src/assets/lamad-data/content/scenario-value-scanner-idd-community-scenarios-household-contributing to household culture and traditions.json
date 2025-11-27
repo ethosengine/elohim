@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-contributing to household culture and traditions",
+  "contentType": "scenario",
+  "title": "Contributing to household culture and traditions",
+  "description": "Contributing to household culture and traditions",
+  "content": "Scenario: Contributing to household culture and traditions\n    Given the household is building shared traditions\n    And Jordan loves music and dancing\n    When Jordan suggests Friday night dance parties\n    Then the household considers Jordan's idea democratically\n    And Jordan's cultural contribution is valued\n    And the household adopts Friday dance as a tradition\n    And Jordan accumulates care tokens for culture-building contribution\n    And Jordan experiences shaping their household community\n    And Jordan's joy and creativity enrich household life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

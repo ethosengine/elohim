@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-provincial-state-legislator evaluates major bill with comprehensive impact analysis",
+  "contentType": "scenario",
+  "title": "Legislator evaluates major bill with comprehensive impact analysis",
+  "description": "Legislator evaluates major bill with comprehensive impact analysis",
+  "content": "Scenario: Legislator evaluates major bill with comprehensive impact analysis\n    Given education reform legislation has 200 pages\n    And supporters present optimistic outcomes while opponents predict disaster\n    When the Observer provides evidence-based impact analysis\n    Then they see how similar legislation performed in other states\n    And understand fiscal impacts on districts with different demographics\n    And identify which students benefit versus harmed by changes\n    And review educator and parent perspectives from constituent communities\n    And make informed vote beyond partisan talking points\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:provincial_state",
+    "related_users:citizen,activist,community_organizer,journalist,lobbyist",
+    "related_layers:municipality,district,county_regional,educational,ecological,workplace",
+    "elohim_agents:public_observer,regional_elohim,constituent_elohim,legislative_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

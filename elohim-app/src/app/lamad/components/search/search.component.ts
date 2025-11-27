@@ -2,8 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DocumentGraphService } from '../../services/document-graph.service';
-import { ContentNode } from '../../models/content-node.model';
+import { SearchService } from '../../services/search.service';
+import { SearchResult } from '../../models/search.model';
 
 @Component({
   selector: 'app-search',
@@ -20,14 +20,14 @@ import { ContentNode } from '../../models/content-node.model';
       <div class="results-section" *ngIf="hasSearched">
         <h2>Results ({{results.length}})</h2>
         <div class="results-list" *ngIf="results.length > 0">
-          <a *ngFor="let node of results"
-             [routerLink]="getNodeRoute(node)"
+          <a *ngFor="let result of results"
+             [routerLink]="getNodeRoute(result)"
              class="result-card">
-            <div class="result-type">{{getNodeTypeIcon(node.contentType)}} {{node.contentType}}</div>
-            <h3>{{node.title}}</h3>
-            <p>{{node.description}}</p>
+            <div class="result-type">{{getNodeTypeIcon(result.contentType)}} {{result.contentType}}</div>
+            <h3>{{result.title}}</h3>
+            <p>{{result.description}}</p>
             <div class="result-tags">
-              <span *ngFor="let tag of node.tags.slice(0, 3)" class="tag">{{tag}}</span>
+              <span *ngFor="let tag of result.tags.slice(0, 3)" class="tag">{{tag}}</span>
             </div>
           </a>
         </div>
@@ -57,12 +57,13 @@ import { ContentNode } from '../../models/content-node.model';
 })
 export class SearchComponent implements OnInit {
   query = '';
-  results: ContentNode[] = [];
+  results: SearchResult[] = [];
   hasSearched = false;
+  isLoading = false;
 
   constructor(
     private readonly route: ActivatedRoute,
-    private readonly documentGraphService: DocumentGraphService
+    private readonly searchService: SearchService
   ) {}
 
   ngOnInit(): void {
@@ -77,11 +78,22 @@ export class SearchComponent implements OnInit {
   performSearch(): void {
     if (!this.query.trim()) return;
     this.hasSearched = true;
-    this.results = this.documentGraphService.searchNodes(this.query);
+    this.isLoading = true;
+
+    this.searchService.search({ text: this.query }).subscribe({
+      next: (searchResults) => {
+        this.results = searchResults.results;
+        this.isLoading = false;
+      },
+      error: () => {
+        this.results = [];
+        this.isLoading = false;
+      }
+    });
   }
 
-  getNodeRoute(node: ContentNode): string[] {
-    return ['/lamad/content', node.id];
+  getNodeRoute(result: SearchResult): string[] {
+    return ['/lamad/content', result.id];
   }
 
   getNodeTypeIcon(type: string): string {

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-deliberating fundamental constitutional tension",
+  "contentType": "scenario",
+  "title": "Deliberating fundamental constitutional tension",
+  "description": "Deliberating fundamental constitutional tension",
+  "content": "Scenario: Deliberating fundamental constitutional tension\n    Given an appeal reveals tension between care and privacy at constitutional level\n    And regional councils have reached conflicting interpretations\n    When we deliberate on national constitutional question\n    Then we ask: \"Does mental health intervention ever justify privacy breach constitutionally?\"\n    And we examine: not just case application but principle itself\n    And we consider: implications for millions of future cases\n    And we consult: technical experts, researchers, community leaders\n    And we deliberate: over multiple sessions spanning weeks\n    And we craft: comprehensive opinion with deep reasoning\n    And we create: national precedent guiding all lower councils\n    And we shape: constitutional understanding for generation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:nation_state",
+    "related_users:appellant,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

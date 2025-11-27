@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member distinguishes grassroots from astroturf campaign",
+  "contentType": "scenario",
+  "title": "Council member distinguishes grassroots from astroturf campaign",
+  "description": "Council member distinguishes grassroots from astroturf campaign",
+  "content": "Scenario: Council member distinguishes grassroots from astroturf campaign\n    Given the politician receives flood of emails opposing rent control\n    And campaigns look like authentic constituent concern\n    When the Observer analyzes communication patterns\n    Then they see template messages from industry lobbying firm\n    And identify coordinated timing and identical language\n    And distinguish 5 genuine constituent concerns from 200 manufactured messages\n    And understand actual constituent sentiment versus manipulation\n    And make decisions based on real community needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

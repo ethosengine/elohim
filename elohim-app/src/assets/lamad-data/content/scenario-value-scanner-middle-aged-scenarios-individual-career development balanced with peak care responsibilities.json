@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-career development balanced with peak care responsibilities",
+  "contentType": "scenario",
+  "title": "Career development balanced with peak care responsibilities",
+  "description": "Career development balanced with peak care responsibilities",
+  "content": "Scenario: Career development balanced with peak care responsibilities\n    Given Robert has substantial professional responsibilities\n    And his care demands are also at peak levels\n    And he has opportunities for career advancement\n    When Robert considers professional development opportunities\n    Then his personal_agent should help him assess realistic capacity\n    And analyze: \"This promotion would add 10 hours weekly with your parents needing increased care\"\n    And support him in making career decisions that honor his full life context\n    And help him recognize that care responsibilities are legitimate constraints on career\n    And surface when career advancement would create unsustainable burden\n    And validate that choosing care over career advancement is reasonable\n    And ensure he doesn't sacrifice relationships for professional success\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

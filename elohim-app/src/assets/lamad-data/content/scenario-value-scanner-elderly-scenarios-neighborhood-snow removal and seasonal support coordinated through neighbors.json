@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-snow removal and seasonal support coordinated through neighbors",
+  "contentType": "scenario",
+  "title": "Snow removal and seasonal support coordinated through neighbors",
+  "description": "Snow removal and seasonal support coordinated through neighbors",
+  "content": "Scenario: Snow removal and seasonal support coordinated through neighbors\n    Given Helen cannot safely shovel snow or do seasonal maintenance\n    And neighbors have varying capabilities and availability\n    When seasonal support needs arise\n    Then the neighborhood_elohim should coordinate volunteer schedules\n    And neighbors should be matched to tasks based on capability\n    And Helen should experience this as neighborly care, not charity\n    And volunteer work should be recognized with care tokens\n    And reciprocal support should be tracked across seasons\n    And the protocol should coordinate practical mutual aid\n    And neighborhood care economy should handle seasonal challenges\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

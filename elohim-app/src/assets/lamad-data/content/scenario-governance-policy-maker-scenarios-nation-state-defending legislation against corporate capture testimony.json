@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-defending legislation against corporate capture testimony",
+  "contentType": "scenario",
+  "title": "Defending legislation against corporate capture testimony",
+  "description": "Defending legislation against corporate capture testimony",
+  "content": "Scenario: Defending legislation against corporate capture testimony\n    Given corporate lobbyists testify against my legislation\n    And they claim it \"stifles innovation\"\n    When I respond in committee hearing\n    Then I present: evidence from Riverside and research\n    And I show: protocol improves community outcomes\n    And I demonstrate: constitutional oversight working\n    And I compare: to corporate AI failures (surveillance, discrimination, no recourse)\n    And I argue: we're stifling extraction, enabling flourishing\n    And I maintain: that democracy deserves support\n    And committee votes: 8-5 in favor despite lobbying\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

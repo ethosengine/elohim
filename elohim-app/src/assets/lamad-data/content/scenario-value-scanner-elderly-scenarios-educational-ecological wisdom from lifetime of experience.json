@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-ecological wisdom from lifetime of experience",
+  "contentType": "scenario",
+  "title": "Ecological wisdom from lifetime of experience",
+  "description": "Ecological wisdom from lifetime of experience",
+  "content": "Scenario: Ecological wisdom from lifetime of experience\n    Given Helen has observed environmental changes over 82 years\n    And her generation has knowledge of pre-industrial practices\n    When Helen shares ecological knowledge\n    Then her observations should inform environmental education\n    And traditional sustainable practices should be preserved\n    And her lifetime of data should be valued in climate education\n    And care tokens should reflect her contribution to ecological stewardship\n    And the protocol should recognize elders as environmental historians\n    And ecological education should include elder perspectives\n    And Helen's knowledge should contribute to community sustainability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-research on national appeal patterns informs my case",
+  "contentType": "scenario",
+  "title": "Research on national appeal patterns informs my case",
+  "description": "Research on national appeal patterns informs my case",
+  "content": "Scenario: Research on national appeal patterns informs my case\n    Given Dr. Chen has analyzed thousands of national appeals\n    And his research identifies patterns I should know about\n    When I prepare my national-level appeal\n    Then I can access research findings about success factors\n    And I understand which constitutional arguments have prevailed\n    And I see where protocol improvements emerged from appeals\n    And I learn from anonymized cases similar to mine\n    And Research democratizes knowledge of how to appeal effectively\n    And My appeal benefits from collective learning across appellants\n    And Individual justice and systemic knowledge work together\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

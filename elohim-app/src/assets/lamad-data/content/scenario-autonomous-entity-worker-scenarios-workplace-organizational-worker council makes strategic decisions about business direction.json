@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-worker council makes strategic decisions about business direction",
+  "contentType": "scenario",
+  "title": "Worker council makes strategic decisions about business direction",
+  "description": "Worker council makes strategic decisions about business direction",
+  "content": "Scenario: Worker council makes strategic decisions about business direction\n    Given corporate previously mandated menu, pricing, and suppliers\n    And workers now govern these strategic decisions democratically\n    When Emma proposes direct relationships with local farmers\n    Then worker council deliberates on supply chain transition\n    And workers analyze cost/benefit of local vs. corporate sourcing\n    And workers vote on adopting Johnson Farm as primary vegetable supplier\n    And the decision is implemented immediately\n    And menu adapts to seasonal availability from democratic supplier relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:workplace_organizational",
+    "related_users:[manager,supplier,small_business_owner,franchise_operator]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

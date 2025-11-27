@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-provincial-state-appeal precedent cited in research on democratic ai governance",
+  "contentType": "scenario",
+  "title": "Appeal precedent cited in research on democratic AI governance",
+  "description": "Appeal precedent cited in research on democratic AI governance",
+  "content": "Scenario: Appeal precedent cited in research on democratic AI governance\n    Given my appeal created important regional precedent\n    And Dr. James Chen is researching constitutional council effectiveness\n    When he analyzes appeal patterns and outcomes\n    Then my case (anonymized) becomes research data\n    And The precedent illustrates how sortition governance works\n    And Research findings feed back into protocol improvement\n    And My appeal contributes to global understanding of democratic AI governance\n    And Individual justice and systemic learning happen together\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,technical_expert,policy_maker,researcher",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

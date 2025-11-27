@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-educational-board member prepares for teacher contract negotiation",
+  "contentType": "scenario",
+  "title": "Board member prepares for teacher contract negotiation",
+  "description": "Board member prepares for teacher contract negotiation",
+  "content": "Scenario: Board member prepares for teacher contract negotiation\n    Given board must negotiate collective bargaining agreement with teachers union\n    And superintendent provides analysis emphasizing district's budget constraints\n    And board wants to balance fiscal responsibility with teacher retention and quality\n    When the board member uses Observer labor relations context\n    Then they receive comparison of district's teacher compensation to regional market\n    And see teacher turnover and vacancy data by school showing retention challenges\n    And access analysis of contract proposals' impact on recruitment and budget\n    And get examples of creative solutions from peer district negotiations\n    And accessible expertise helps board negotiate effectively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,citizen,politician,activist",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

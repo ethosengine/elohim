@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-appellant case reveals gap in global constitutional framework",
+  "contentType": "scenario",
+  "title": "Appellant case reveals gap in global constitutional framework",
+  "description": "Appellant case reveals gap in global constitutional framework",
+  "content": "Scenario: Appellant case reveals gap in global constitutional framework\n    Given Marcus's mental health intervention appeal\n    And similar appeals occur worldwide across cultures\n    And constitutional interpretations vary dramatically between regions\n    When the pattern is analyzed for global constitutional significance\n    Then researchers identify fundamental unresolved question\n    And the question is whether privacy is universal right or culturally specific\n    And appellants from diverse cultures share their experiences\n    And the question is elevated for Constitutional Convention consideration\n    And Marcus's case contributes to global constitutional deliberation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

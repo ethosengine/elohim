@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-personal flourishing recognized as legitimate goal",
+  "contentType": "scenario",
+  "title": "Personal flourishing recognized as legitimate goal",
+  "description": "Personal flourishing recognized as legitimate goal",
+  "content": "Scenario: Personal flourishing recognized as legitimate goal\n    Given Alex has the right to pursue their own flourishing\n    And society often treats disabled lives as tragedies\n    When the personal_agent supports Alex's well-being\n    Then it should frame Alex's flourishing as inherent right\n    And it should support Alex's self-determined goals\n    And disability should not be assumed to diminish quality of life\n    And Alex's life should be treated as valuable as anyone's\n    And personal goals should be respected, not pitied\n    And the protocol should embody belief in Alex's full humanity\n    And Alex should experience affirmation of their worth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

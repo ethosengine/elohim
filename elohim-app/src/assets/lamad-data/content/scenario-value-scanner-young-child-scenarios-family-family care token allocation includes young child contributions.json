@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-family care token allocation includes young child contributions",
+  "contentType": "scenario",
+  "title": "Family care token allocation includes young child contributions",
+  "description": "Family care token allocation includes young child contributions",
+  "content": "Scenario: Family care token allocation includes young child contributions\n    Given the family participates in care token economy\n    And Tommy has made multiple care contributions\n    When family care tokens are calculated\n    Then Tommy's contributions should be valued appropriately\n    And his care work should not be dismissed as \"just helping\"\n    And tokens should accumulate to the family account\n    And Tommy should have age-appropriate awareness of his contributions\n    And the family should receive care token supplements for low income\n    And the scanner should be accessible regardless of economic status\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

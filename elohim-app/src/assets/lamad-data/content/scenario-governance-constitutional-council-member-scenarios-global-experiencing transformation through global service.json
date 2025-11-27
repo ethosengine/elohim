@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-experiencing transformation through global service",
+  "contentType": "scenario",
+  "title": "Experiencing transformation through global service",
+  "description": "Experiencing transformation through global service",
+  "content": "Scenario: Experiencing transformation through global service\n    Given I began as nurse who never imagined governance role\n    And I served community, regional, national, now global councils\n    When I reflect on my journey through sortition democracy\n    Then I have developed: constitutional literacy and deliberative wisdom\n    And I have learned: to judge under uncertainty with humility\n    And I have experienced: democratic participation as transformation\n    And I have contributed: to governance at every scale\n    And I have become: more fully human through invitation to govern\n    And I have proven: ordinary people can address extraordinary questions\n    And I embody: hope that democracy can govern with AI toward flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

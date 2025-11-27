@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-voice interface enables hands-free shopping list creation",
+  "contentType": "scenario",
+  "title": "Voice interface enables hands-free shopping list creation",
+  "description": "Voice interface enables hands-free shopping list creation",
+  "content": "Scenario: Voice interface enables hands-free shopping list creation\n    Given Alex is planning their weekly groceries\n    And Alex has difficulty with fine motor tasks\n    When Alex wants to create a shopping list\n    Then Alex should be able to use voice commands exclusively\n    And the system should accurately recognize Alex's speech patterns\n    And Alex should be able to add, remove, and modify items by voice\n    And the interface should provide clear audio feedback\n    And Alex should not be forced to use touch or keyboard if they choose voice\n    And the experience should be as efficient as visual interface\n    And Alex should have equal access to all shopping features\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

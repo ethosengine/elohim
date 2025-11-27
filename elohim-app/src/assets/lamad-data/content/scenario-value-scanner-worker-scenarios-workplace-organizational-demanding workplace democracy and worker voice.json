@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-demanding workplace democracy and worker voice",
+  "contentType": "scenario",
+  "title": "Demanding workplace democracy and worker voice",
+  "description": "Demanding workplace democracy and worker voice",
+  "content": "Scenario: Demanding workplace democracy and worker voice\n    Given decisions affecting my life are made without my input\n    When I want to advocate for worker participation in decisions\n    Then the protocol should support advocacy for workplace democracy\n    And help me articulate the case for worker voice in governance\n    And provide information about worker ownership and cooperative models\n    And build consciousness that workers deserve decision-making power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

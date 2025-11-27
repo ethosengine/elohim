@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-community-citizen tracks accountability for neighborhood commitments",
+  "contentType": "scenario",
+  "title": "Citizen tracks accountability for neighborhood commitments",
+  "description": "Citizen tracks accountability for neighborhood commitments",
+  "content": "Scenario: Citizen tracks accountability for neighborhood commitments\n    Given the community council promised playground repairs in 60 days\n    And the commitment was made during a public meeting\n    When 60 days pass\n    Then the Observer alerts the citizen about the deadline\n    And tracks whether repairs were completed\n    And provides evidence for accountability conversations\n    And prevents institutional forgetting of commitments\n    And democracy includes follow-through tracking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:community",
+    "related_users:parent,activist,community_organizer,journalist",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

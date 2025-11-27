@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-workplace-organizational-activist fights for paid sick leave policy",
+  "contentType": "scenario",
+  "title": "Activist fights for paid sick leave policy",
+  "description": "Activist fights for paid sick leave policy",
+  "content": "Scenario: Activist fights for paid sick leave policy\n    Given workers lack basic workplace protections\n    And the activist campaigns for paid sick leave ordinance\n    When the Observer shows public health and economic impacts\n    Then the activist demonstrates workers go to work sick\n    And spread illness because they can't afford to stay home\n    And public health costs of no sick leave\n    And presents evidence from cities with successful sick leave policies\n    And worker protection becomes public health imperative\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,community_organizer,politician",
+    "related_layers:municipality,industry_sector,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

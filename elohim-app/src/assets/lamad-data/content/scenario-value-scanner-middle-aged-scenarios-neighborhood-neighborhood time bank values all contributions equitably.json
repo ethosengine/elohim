@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood time bank values all contributions equitably",
+  "contentType": "scenario",
+  "title": "Neighborhood time bank values all contributions equitably",
+  "description": "Neighborhood time bank values all contributions equitably",
+  "content": "Scenario: Neighborhood time bank values all contributions equitably\n    Given Robert contributes professional skills and labor\n    And neighbors contribute different skills and capacities\n    And all contributions have value in care economy\n    When neighborhood_elohim manages time bank\n    Then it should value Robert's professional mentoring and manual labor equally\n    And recognize all neighborhood contributions as care work\n    And prevent hierarchy where professional skills are valued more than care labor\n    And build neighborhood equity through time bank reciprocity\n    And demonstrate care economy principles in practice\n    And strengthen neighborhood through mutual recognition\n    And create alternative economy based on care rather than market\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-historical and comparative analysis contextualizing protocol",
+  "contentType": "scenario",
+  "title": "Historical and comparative analysis contextualizing protocol",
+  "description": "Historical and comparative analysis contextualizing protocol",
+  "content": "Scenario: Historical and comparative analysis contextualizing protocol\n    Given I want to understand what's genuinely novel vs reinventing wheels\n    And I study governance history and comparative political theory\n    When I contextualize Elohim Protocol in historical perspective\n    Then I compare: to Athenian democracy's sortition practices\n    And I examine: medieval communes' participatory governance\n    And I analyze: modern citizens' assemblies and deliberative innovations\n    And I explore: attempts to govern non-human powerful systems (corporations, markets)\n    And I identify: what ancient wisdom applies and what's unprecedented\n    And I assess: whether humanity has governed comparable complexity before\n    And My historical analysis reveals: patterns and lessons across millennia\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

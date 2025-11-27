@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-personal values forming through conscious choice-making",
+  "contentType": "scenario",
+  "title": "Personal values forming through conscious choice-making",
+  "description": "Personal values forming through conscious choice-making",
+  "content": "Scenario: Personal values forming through conscious choice-making\n    Given Emma is making repeated value-based decisions\n    And she is old enough to articulate reasons for choices\n    When Emma reflects on why she makes certain choices\n    Then her personal_agent should help her identify her values\n    And the agent should ask \"What matters to you about this choice?\"\n    And Emma should begin to consciously understand her value framework\n    And her values should be forming through reflection, not imposition\n    And she should develop moral reasoning capacity\n    And individual value formation should be supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

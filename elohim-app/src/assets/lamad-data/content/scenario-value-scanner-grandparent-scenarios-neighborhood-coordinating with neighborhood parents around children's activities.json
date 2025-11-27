@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating with neighborhood parents around children's activities",
+  "contentType": "scenario",
+  "title": "Coordinating with neighborhood parents around children's activities",
+  "description": "Coordinating with neighborhood parents around children's activities",
+  "content": "Scenario: Coordinating with neighborhood parents around children's activities\n    Given Margaret cares for grandchildren in neighborhood context\n    And she interacts with other children and parents\n    When Margaret participates in neighborhood child activities\n    Then the neighborhood_elohim should help coordinate with other parents\n    And it should facilitate communication about children's play and safety\n    And it should support collective neighborhood childcare\n    And Margaret should be recognized as part of neighborhood care network\n    And grandparents should be valued participants in children's community\n    And neighborhood should benefit from grandparent engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

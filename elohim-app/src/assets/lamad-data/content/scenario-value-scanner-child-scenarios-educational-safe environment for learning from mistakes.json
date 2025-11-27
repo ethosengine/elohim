@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-safe environment for learning from mistakes",
+  "contentType": "scenario",
+  "title": "Safe environment for learning from mistakes",
+  "description": "Safe environment for learning from mistakes",
+  "content": "Scenario: Safe environment for learning from mistakes\n    Given Emma is practicing value literacy\n    And mistakes are essential to learning\n    When Emma makes a choice that doesn't work out well\n    Then the experience should be treated as learning opportunity\n    And her personal_agent should guide reflection: \"How did that work out?\"\n    And no shame or punishment should be attached to mistakes\n    And consequences should be educational, not harmful\n    And judgment should be built through safe practice\n    And error should be normalized as part of learning process\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

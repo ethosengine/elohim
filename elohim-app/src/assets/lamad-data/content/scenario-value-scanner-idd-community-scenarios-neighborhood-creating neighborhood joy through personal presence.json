@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-creating neighborhood joy through personal presence",
+  "contentType": "scenario",
+  "title": "Creating neighborhood joy through personal presence",
+  "description": "Creating neighborhood joy through personal presence",
+  "content": "Scenario: Creating neighborhood joy through personal presence\n    Given Jordan has an infectious smile and loves greeting people\n    And Jordan's positive energy affects everyone they encounter\n    When Jordan walks through the neighborhood\n    Then neighbors often smile back and feel uplifted\n    And Jordan's emotional contribution to neighborhood atmosphere is real\n    And the neighborhood_elohim recognizes Jordan's joy-spreading as care work\n    And Jordan accumulates care tokens for emotional care contribution\n    And neighbors tell stories about \"Jordan who makes everyone smile\"\n    And Jordan's unique contribution to community is celebrated\n    And Jordan experiences being valued for who they are\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

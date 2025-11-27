@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-connecting with neighbors through shared shopping",
+  "contentType": "scenario",
+  "title": "Connecting with neighbors through shared shopping",
+  "description": "Connecting with neighbors through shared shopping",
+  "content": "Scenario: Connecting with neighbors through shared shopping\n    Given Aisha shops at local grocery stores\n    And other neighbors shop at the same stores\n    When the neighborhood_elohim identifies potential connections\n    Then it should suggest connecting with nearby residents\n    And it should surface bulk buying opportunities\n    And it should facilitate resource sharing among neighbors\n    And introductions should be based on mutual care interests\n    And the system should help build neighborhood relationships organically\n    And community should form through practical cooperation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

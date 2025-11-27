@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen's labor contribution valued at appropriate care economy rates",
+  "contentType": "scenario",
+  "title": "Teen's labor contribution valued at appropriate care economy rates",
+  "description": "Teen's labor contribution valued at appropriate care economy rates",
+  "content": "Scenario: Teen's labor contribution valued at appropriate care economy rates\n    Given Jasmine works 15 hours per week\n    And her labor has real economic value\n    When workplace_elohim calculates her care contributions\n    Then it should value her work at care economy rates, not just market wages\n    And recognize that her labor enables the business to function\n    And track the full value she creates, not just what she's paid\n    And help her understand the difference between value created and compensation received\n    And build her critical awareness of labor economics\n    And prepare her to advocate for fair value recognition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

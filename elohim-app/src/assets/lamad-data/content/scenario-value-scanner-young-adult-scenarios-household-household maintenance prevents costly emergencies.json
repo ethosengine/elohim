@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-household maintenance prevents costly emergencies",
+  "contentType": "scenario",
+  "title": "Household maintenance prevents costly emergencies",
+  "description": "Household maintenance prevents costly emergencies",
+  "content": "Scenario: Household maintenance prevents costly emergencies\n    Given Aisha is learning household maintenance\n    And prevention is cheaper than emergency repairs\n    When the personal_agent tracks household maintenance\n    Then it should provide preventive maintenance schedules\n    And it should flag issues before they become emergencies\n    And it should educate about maintenance tasks Aisha might not know\n    And the system should protect her from expensive neglect\n    And household competence should include preventive thinking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

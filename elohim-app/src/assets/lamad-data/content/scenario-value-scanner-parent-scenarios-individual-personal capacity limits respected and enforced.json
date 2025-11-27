@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-individual-personal capacity limits respected and enforced",
+  "contentType": "scenario",
+  "title": "Personal capacity limits respected and enforced",
+  "description": "Personal capacity limits respected and enforced",
+  "content": "Scenario: Personal capacity limits respected and enforced\n    Given Sarah has finite energy, time, and emotional capacity\n    And demands regularly exceed her available resources\n    When Sarah approaches capacity limits\n    Then the personal_agent should help her identify what to drop\n    And it should validate saying no to non-essential demands\n    And it should recognize that she cannot do everything\n    And capacity constraints should be treated as real boundaries\n    And the system should support sustainable pacing\n    And Sarah should learn that limitations are human, not failure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:individual",
+    "related_users:adult,worker,child,partner",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

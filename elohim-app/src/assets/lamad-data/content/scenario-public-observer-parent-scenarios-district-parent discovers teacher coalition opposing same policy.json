@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent discovers teacher coalition opposing same policy",
+  "contentType": "scenario",
+  "title": "Parent discovers teacher coalition opposing same policy",
+  "description": "Parent discovers teacher coalition opposing same policy",
+  "content": "Scenario: Parent discovers teacher coalition opposing same policy\n    Given the district proposes eliminating planning periods for teachers\n    And the parent sees this will harm their child's education quality\n    When the Observer shows teacher union concerns about the policy\n    Then the parent understands teachers oppose it for same reasons\n    And natural parent-teacher alliance becomes visible\n    And parent and teacher testimonies reinforce each other\n    And coordinated advocacy prevents divide-and-conquer tactics\n    And district can't pit parents against teachers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

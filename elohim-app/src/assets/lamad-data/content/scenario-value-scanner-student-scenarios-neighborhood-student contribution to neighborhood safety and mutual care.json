@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-student contribution to neighborhood safety and mutual care",
+  "contentType": "scenario",
+  "title": "Student contribution to neighborhood safety and mutual care",
+  "description": "Student contribution to neighborhood safety and mutual care",
+  "content": "Scenario: Student contribution to neighborhood safety and mutual care\n    Given Kenji walks neighborhood streets regularly\n    And neighborhood safety is collective responsibility\n    When Kenji participates in neighborhood mutual care\n    Then the neighborhood_elohim should recognize his watchfulness\n    And it should value informal safety contributions: checking on neighbors, reporting issues\n    And it should accumulate care tokens for neighborhood care work\n    And students should be recognized as safety contributors, not threats\n    And the system should value informal mutual aid\n    And neighborhood care should be understood as everyone's work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

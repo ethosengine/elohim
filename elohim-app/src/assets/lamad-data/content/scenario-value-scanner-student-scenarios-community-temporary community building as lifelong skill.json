@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-temporary community building as lifelong skill",
+  "contentType": "scenario",
+  "title": "Temporary community building as lifelong skill",
+  "description": "Temporary community building as lifelong skill",
+  "content": "Scenario: Temporary community building as lifelong skill\n    Given Kenji's college community is temporary\n    And he will leave after graduation\n    When the personal_agent reflects on community participation\n    Then it should help Kenji see community building as transferable skill\n    And it should validate that temporary communities are still real\n    And it should teach him that community is built through care relationships\n    And the agent should help him understand he'll build community wherever he goes\n    And the system should frame student community as practice for lifelong participation\n    And Kenji should learn that community is created, not just inherited\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

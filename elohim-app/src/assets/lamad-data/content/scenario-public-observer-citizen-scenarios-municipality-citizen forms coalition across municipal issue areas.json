@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-municipality-citizen forms coalition across municipal issue areas",
+  "contentType": "scenario",
+  "title": "Citizen forms coalition across municipal issue areas",
+  "description": "Citizen forms coalition across municipal issue areas",
+  "content": "Scenario: Citizen forms coalition across municipal issue areas\n    Given 230 families are losing time to bus delays\n    And 47 teachers are concerned about school overcrowding\n    And both issues stem from municipal transportation budget\n    When the Observer detects the pattern connection\n    Then citizens see the larger civic context\n    And can coordinate with teachers and other affected groups\n    And build more powerful coalition across stakeholder types\n    And isolated concerns become coordinated advocacy\n    And cross-issue patterns surface organically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:municipality",
+    "related_users:activist,politician,board_member,journalist",
+    "related_layers:community,district,county_regional",
+    "elohim_agents:public_observer,municipal_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

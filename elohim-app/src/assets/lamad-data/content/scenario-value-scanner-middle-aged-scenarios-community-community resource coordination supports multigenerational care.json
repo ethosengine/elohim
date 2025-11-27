@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-community-community resource coordination supports multigenerational care",
+  "contentType": "scenario",
+  "title": "Community resource coordination supports multigenerational care",
+  "description": "Community resource coordination supports multigenerational care",
+  "content": "Scenario: Community resource coordination supports multigenerational care\n    Given Robert coordinates care across multiple generations\n    And community resources exist but are hard to navigate\n    And he needs eldercare support, young adult resources, and family services\n    When community_elohim coordinates resources\n    Then it should connect Robert to relevant community support services\n    And surface eldercare programs for his parents\n    And identify young adult support programs for his children\n    And connect him to caregiver support groups\n    And reduce time spent researching and coordinating resources\n    And demonstrate that community infrastructure should serve caregivers\n    And make visible the resources built through care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:community",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,municipality,workplace_organizational,family",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

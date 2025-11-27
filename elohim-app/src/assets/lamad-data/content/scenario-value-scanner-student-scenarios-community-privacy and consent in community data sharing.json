@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-privacy and consent in community data sharing",
+  "contentType": "scenario",
+  "title": "Privacy and consent in community data sharing",
+  "description": "Privacy and consent in community data sharing",
+  "content": "Scenario: Privacy and consent in community data sharing\n    Given community coordination requires some information sharing\n    And Kenji has full privacy rights\n    When the community_elohim manages community information\n    Then Kenji must control what community data is shared\n    And his participation should be visible only with his consent\n    And community care should not require surveillance\n    And privacy should be protected while enabling coordination\n    And the system should balance community connection with individual privacy\n    And Kenji should participate in community on his own terms\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

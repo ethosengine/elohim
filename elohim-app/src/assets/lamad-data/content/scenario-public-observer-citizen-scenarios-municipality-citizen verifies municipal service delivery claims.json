@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-municipality-citizen verifies municipal service delivery claims",
+  "contentType": "scenario",
+  "title": "Citizen verifies municipal service delivery claims",
+  "description": "Citizen verifies municipal service delivery claims",
+  "content": "Scenario: Citizen verifies municipal service delivery claims\n    Given city officials claim streets are maintained equitably\n    And the citizen's neighborhood has persistent potholes\n    When the Observer tracks service delivery patterns\n    Then the citizen sees which neighborhoods receive infrastructure investment\n    And compares response times across different areas\n    And identifies disparities in municipal services\n    And presents evidence for accountability demands\n    And equitable service delivery becomes measurable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:municipality",
+    "related_users:activist,politician,board_member,journalist",
+    "related_layers:community,district,county_regional",
+    "elohim_agents:public_observer,municipal_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

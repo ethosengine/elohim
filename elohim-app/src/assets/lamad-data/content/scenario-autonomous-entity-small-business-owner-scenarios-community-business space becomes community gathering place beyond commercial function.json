@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-business space becomes community gathering place beyond commercial function",
+  "contentType": "scenario",
+  "title": "Business space becomes community gathering place beyond commercial function",
+  "description": "Business space becomes community gathering place beyond commercial function",
+  "content": "Scenario: Business space becomes community gathering place beyond commercial function\n    Given auto repair shop could serve community beyond car service\n    And neighborhood lacks gathering spaces for organizing and connection\n    When democratic governance considers community space usage\n    Then workers offer shop space for community meetings after business hours\n    And neighborhood organizing groups can use facilities for free\n    And youth apprenticeship programs connect young people to skilled trades\n    And community bulletin board shares neighborhood information and mutual aid\n    And business becomes community hub, not just commercial enterprise\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

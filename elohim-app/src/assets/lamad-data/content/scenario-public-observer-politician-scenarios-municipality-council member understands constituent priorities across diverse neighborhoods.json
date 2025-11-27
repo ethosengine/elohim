@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member understands constituent priorities across diverse neighborhoods",
+  "contentType": "scenario",
+  "title": "Council member understands constituent priorities across diverse neighborhoods",
+  "description": "Council member understands constituent priorities across diverse neighborhoods",
+  "content": "Scenario: Council member understands constituent priorities across diverse neighborhoods\n    Given the politician represents economically and ethnically diverse district\n    And different communities have different needs\n    When the Observer aggregates constituent sentiment\n    Then they see working parents prioritize after-school programs\n    And learn seniors need meal delivery and transit access\n    And understand immigrant communities face language barriers in services\n    And identify disabled residents struggle with accessibility\n    And balance diverse constituent needs in policy positions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

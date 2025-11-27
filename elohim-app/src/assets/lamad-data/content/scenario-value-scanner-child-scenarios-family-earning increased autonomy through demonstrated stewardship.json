@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-earning increased autonomy through demonstrated stewardship",
+  "contentType": "scenario",
+  "title": "Earning increased autonomy through demonstrated stewardship",
+  "description": "Earning increased autonomy through demonstrated stewardship",
+  "content": "Scenario: Earning increased autonomy through demonstrated stewardship\n    Given Emma has shown good judgment over time\n    And parents can adjust boundaries through family_elohim\n    When Emma's decision patterns demonstrate capability\n    Then Sarah should be prompted to expand Emma's freedom\n    And specific areas for increased autonomy should be suggested\n    And Emma should understand connection between responsibility and freedom\n    And the family should have clear process for granting trust\n    And autonomy should be earned through demonstrated care\n    And family governance should respond to growing capability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-community-moderator-scenarios-community-moderator coordinates with other moderators on cross-community issue",
+  "contentType": "scenario",
+  "title": "Moderator coordinates with other moderators on cross-community issue",
+  "description": "Moderator coordinates with other moderators on cross-community issue",
+  "content": "Scenario: Moderator coordinates with other moderators on cross-community issue\n    Given a coordinated harassment campaign targets multiple communities\n    And the pattern detection agent identifies the coordinated nature\n    When Alex and moderators from affected communities are alerted\n    Then they can coordinate response while respecting local autonomy\n    And each community handles the issue according to their standards\n    And patterns are shared to protect other communities\n    And the coordinated attack is neutralized through cooperation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:community_moderator",
+    "governance_layer:community",
+    "related_users:activist,content_creator,child,elder",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:moderation_agent,pattern_detection_agent,restorative_justice_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/community_moderator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-community-moderator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-community-moderator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

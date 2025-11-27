@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-preventing work-care burnout through boundary support",
+  "contentType": "scenario",
+  "title": "Preventing work-care burnout through boundary support",
+  "description": "Preventing work-care burnout through boundary support",
+  "content": "Scenario: Preventing work-care burnout through boundary support\n    Given Maria faces constant impossible conflicts between work and sole parenting\n    And work-care conflict is primary driver of single parent burnout\n    When the workplace_elohim monitors Maria's situation\n    Then it should detect when conflicts are becoming unsustainable\n    And it should alert Maria before burnout occurs\n    And it should help her maintain necessary boundaries with employer\n    And it should suggest interventions including policy advocacy or job changes if needed\n    And Maria should have AI support for preventing work-driven burnout\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

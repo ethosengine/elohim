@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-educational-teaching reciprocity and mutual care through experience",
+  "contentType": "scenario",
+  "title": "Teaching reciprocity and mutual care through experience",
+  "description": "Teaching reciprocity and mutual care through experience",
+  "content": "Scenario: Teaching reciprocity and mutual care through experience\n    Given Tommy is learning social and moral concepts\n    And reciprocity is foundational to care economy\n    When Tommy both gives and receives care through the scanner\n    Then he should learn that care flows in multiple directions\n    And he should experience receiving recognition for his care\n    And he should practice recognizing others' care for him\n    And reciprocal care patterns should be modeled\n    And mutual flourishing should be taught through practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:educational",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer privacy is protected while patterns inform worker decisions",
+  "contentType": "scenario",
+  "title": "Customer privacy is protected while patterns inform worker decisions",
+  "description": "Customer privacy is protected while patterns inform worker decisions",
+  "content": "Scenario: Customer privacy is protected while patterns inform worker decisions\n    Given corporate surveillance tracks customers for manipulative marketing\n    And Ms. Johnson values privacy but also appreciates being known\n    When democratic business respects privacy while valuing relationships\n    Then workers remember her through human relationship, not algorithmic tracking\n    And no customer data is sold or used for manipulation\n    And aggregate patterns (many customers requesting vegan options) inform decisions without individual surveillance\n    And privacy and personalization coexist through human dignity, not data extraction\n    And community_elohim ensures privacy-protecting pattern recognition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

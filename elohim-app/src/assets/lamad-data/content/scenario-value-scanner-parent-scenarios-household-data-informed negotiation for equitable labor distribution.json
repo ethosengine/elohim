@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-data-informed negotiation for equitable labor distribution",
+  "contentType": "scenario",
+  "title": "Data-informed negotiation for equitable labor distribution",
+  "description": "Data-informed negotiation for equitable labor distribution",
+  "content": "Scenario: Data-informed negotiation for equitable labor distribution\n    Given household labor distribution is currently inequitable\n    And Sarah wants fair partnership without resentment\n    When Sarah and her partner negotiate labor distribution\n    Then the household_elohim should provide specific data\n    And it should show time spent, complexity of tasks, and mental load\n    And it should enable \"Let's talk about the 75/25 split\" conversation\n    And negotiation should be based on reality, not perception\n    And the system should support movement toward equity\n    And care economy principles should guide fair distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

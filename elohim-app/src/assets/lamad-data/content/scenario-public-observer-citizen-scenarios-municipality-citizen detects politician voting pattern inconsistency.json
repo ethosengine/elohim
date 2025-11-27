@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-municipality-citizen detects politician voting pattern inconsistency",
+  "contentType": "scenario",
+  "title": "Citizen detects politician voting pattern inconsistency",
+  "description": "Citizen detects politician voting pattern inconsistency",
+  "content": "Scenario: Citizen detects politician voting pattern inconsistency\n    Given a council member claims to support affordable housing\n    And the citizen cares about housing affordability\n    When the Observer tracks voting records over time\n    Then the citizen sees the council member voted against 5 housing measures\n    And approved tax breaks for luxury development\n    And observes patterns vs rhetoric divergence\n    And can hold officials accountable in elections\n    And political theater becomes visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:municipality",
+    "related_users:activist,politician,board_member,journalist",
+    "related_layers:community,district,county_regional",
+    "elohim_agents:public_observer,municipal_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

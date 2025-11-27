@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-protecting margaret's time for self-care and personal life",
+  "contentType": "scenario",
+  "title": "Protecting Margaret's time for self-care and personal life",
+  "description": "Protecting Margaret's time for self-care and personal life",
+  "content": "Scenario: Protecting Margaret's time for self-care and personal life\n    Given Margaret's family depends on her care contributions\n    And she needs time for her own health and well-being\n    When the family_elohim monitors Margaret's time allocation\n    Then it should protect her time for personal needs\n    And it should flag when family demands encroach on self-care\n    And Margaret should be supported in setting boundaries\n    And family should understand that her care capacity requires self-care\n    And she should be encouraged to maintain her own friendships and interests\n    And the system should prevent family from consuming all her time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

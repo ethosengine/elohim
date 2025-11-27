@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-industry-sector-workers coordinate industry response to supply chain disruption",
+  "contentType": "scenario",
+  "title": "Workers coordinate industry response to supply chain disruption",
+  "description": "Workers coordinate industry response to supply chain disruption",
+  "content": "Scenario: Workers coordinate industry response to supply chain disruption\n    Given tomato blight affects regional supply from Johnson Farm\n    And individual entities would struggle with ingredient shortage\n    When industry_sector_elohim detects the disruption\n    Then sector workers coordinate menu adjustments across all entities\n    And workers share alternative supplier relationships\n    And entities with surplus inventory support those with shortages\n    And sector responds collectively to minimize customer impact\n    And coordinated resilience prevents business failures and worker layoffs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:industry_sector",
+    "related_users:[worker,supplier,franchise_operator,manager]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

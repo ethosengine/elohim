@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-individual-activist recovers data after device seizure",
+  "contentType": "scenario",
+  "title": "Activist recovers data after device seizure",
+  "description": "Activist recovers data after device seizure",
+  "content": "Scenario: Activist recovers data after device seizure\n    Given the activist's device was confiscated during a protest\n    And their data was pre-distributed to sanctuary institutions\n    When the activist obtains new hardware and initiates recovery\n    And they authenticate through biometric and social verification\n    And the sanctuary institutions verify the activist's safety and free will\n    Then all organizing data, contacts, and history are restored\n    And the compromised device's access is permanently revoked\n    And the activist resumes organizing with full digital sovereignty\n    And the network logs the rights violation for documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:individual",
+    "related_users:community_moderator,content_creator",
+    "related_layers:community,affinity_network",
+    "elohim_agents:protection_agent,sanctuary_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-individual",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-individual",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

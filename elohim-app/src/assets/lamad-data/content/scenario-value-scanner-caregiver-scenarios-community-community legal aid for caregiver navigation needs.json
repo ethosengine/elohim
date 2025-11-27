@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community legal aid for caregiver navigation needs",
+  "contentType": "scenario",
+  "title": "Community legal aid for caregiver navigation needs",
+  "description": "Community legal aid for caregiver navigation needs",
+  "content": "Scenario: Community legal aid for caregiver navigation needs\n    Given James needs advance directives, power of attorney, possibly guardianship\n    And legal services are expensive and complex\n    When the community_elohim connects to legal resources\n    Then legal aid should be accessible based on care contributions\n    And attorneys should understand caregiver-specific needs\n    And legal navigation should be supported through care economy\n    And community should ensure caregivers access legal protections\n    And legal complexity should not be impossible barrier\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

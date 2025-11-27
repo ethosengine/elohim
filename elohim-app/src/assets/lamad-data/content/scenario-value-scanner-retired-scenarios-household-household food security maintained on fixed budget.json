@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-household-household food security maintained on fixed budget",
+  "contentType": "scenario",
+  "title": "Household food security maintained on fixed budget",
+  "description": "Household food security maintained on fixed budget",
+  "content": "Scenario: Household food security maintained on fixed budget\n    Given household has $140/week grocery budget for two people\n    And nutritional needs change with age for both partners\n    When the household_elohim supports food planning\n    Then it should help maintain nutrition within budget constraints\n    And it should coordinate meal planning for both partners' dietary needs\n    And it should reduce food waste to maximize budget efficiency\n    And it should connect household to community food resources without stigma\n    And food security should be maintained with dignity\n    And household should not face nutrition inadequacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:household",
+    "related_users:senior,spouse,partner,elderly",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

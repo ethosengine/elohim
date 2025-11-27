@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-neighborhood-neighborhood bulk shopping coordination",
+  "contentType": "scenario",
+  "title": "Neighborhood bulk shopping coordination",
+  "description": "Neighborhood bulk shopping coordination",
+  "content": "Scenario: Neighborhood bulk shopping coordination\n    Given Margaret shops regularly at local stores\n    And bulk buying could reduce costs for multiple households\n    When the neighborhood_elohim coordinates shopping\n    Then Margaret should be connected to shopping cooperatives\n    And she could coordinate bulk purchases given her time availability\n    And multiple households should split bulk quantities\n    And Margaret's organizational labor should be recognized\n    And cost savings should benefit all participating households\n    And her time availability should serve neighborhood benefit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:neighborhood",
+    "related_users:middle_aged,elderly,retired,neighbor,community_member",
+    "related_layers:individual,household,family,community,ecological_bioregional",
+    "elohim_agents:personal_agent,household_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

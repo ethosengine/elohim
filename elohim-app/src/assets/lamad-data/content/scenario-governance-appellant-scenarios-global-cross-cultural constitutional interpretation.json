@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-global-cross-cultural constitutional interpretation",
+  "contentType": "scenario",
+  "title": "Cross-cultural constitutional interpretation",
+  "description": "Cross-cultural constitutional interpretation",
+  "content": "Scenario: Cross-cultural constitutional interpretation\n    Given appeals from collectivist and individualist cultures\n    And one culture views family intervention as natural care\n    And another culture views same intervention as autonomy violation\n    When global council interprets universal constitutional minimums\n    Then the council distinguishes coercion from cultural difference\n    And the council establishes that genuine consent within cultural context suffices\n    And the council prohibits force but doesn't mandate individualism\n    And appellants from both cultures feel heard\n    And constitutional pluralism is preserved within universal boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,researcher,technical_expert",
+    "related_layers:nation_state",
+    "elohim_agents:global_elohim,national_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

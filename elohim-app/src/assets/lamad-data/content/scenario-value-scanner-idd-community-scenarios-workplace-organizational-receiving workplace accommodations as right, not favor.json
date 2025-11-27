@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-receiving workplace accommodations as right, not favor",
+  "contentType": "scenario",
+  "title": "Receiving workplace accommodations as right, not favor",
+  "description": "Receiving workplace accommodations as right, not favor",
+  "content": "Scenario: Receiving workplace accommodations as right, not favor\n    Given Jordan needs extra time to learn new library procedures\n    And reasonable accommodations are legally required\n    When new cataloging software is introduced\n    Then the library provides extended training time for Jordan\n    And instruction is adapted to Jordan's learning style\n    And accommodations are provided matter-of-factly, not begrudgingly\n    And Jordan's right to accessibility is honored\n    And Jordan can perform job with appropriate support\n    And Jordan experiences workplace inclusion through accommodation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

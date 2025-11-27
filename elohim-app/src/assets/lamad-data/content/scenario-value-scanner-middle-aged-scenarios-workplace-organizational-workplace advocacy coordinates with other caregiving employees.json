@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace advocacy coordinates with other caregiving employees",
+  "contentType": "scenario",
+  "title": "Workplace advocacy coordinates with other caregiving employees",
+  "description": "Workplace advocacy coordinates with other caregiving employees",
+  "content": "Scenario: Workplace advocacy coordinates with other caregiving employees\n    Given Robert works with other employees managing care responsibilities\n    And collective advocacy is more effective than individual negotiation\n    And workplace care economy benefits all caregiving employees\n    When workplace_elohim facilitates collective advocacy\n    Then it should connect Robert with other caregiving employees\n    And support formation of employee resource groups for caregivers\n    And facilitate collective advocacy for care-friendly policies\n    And build workplace power through caregiver solidarity\n    And demonstrate that care economy includes collective action\n    And create workplace transformation through organized advocacy\n    And leverage numbers for policy change\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,household,family,industry_sector",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

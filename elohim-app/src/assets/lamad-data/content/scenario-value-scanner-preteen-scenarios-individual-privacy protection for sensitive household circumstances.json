@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-privacy protection for sensitive household circumstances",
+  "contentType": "scenario",
+  "title": "Privacy protection for sensitive household circumstances",
+  "description": "Privacy protection for sensitive household circumstances",
+  "content": "Scenario: Privacy protection for sensitive household circumstances\n    Given Marcus's household situation must be protected\n    And his family's economic constraints are private information\n    When Marcus's care contributions are tracked\n    Then his specific circumstances must not be broadcast\n    And data about shopping patterns must remain confidential\n    And community resource coordination should use anonymized data\n    And his privacy should be protected even while receiving support\n    And no stigmatizing exposure of family situation should occur\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

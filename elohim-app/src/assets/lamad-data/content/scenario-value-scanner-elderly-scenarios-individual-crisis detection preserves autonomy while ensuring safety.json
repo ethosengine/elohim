@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-crisis detection preserves autonomy while ensuring safety",
+  "contentType": "scenario",
+  "title": "Crisis detection preserves autonomy while ensuring safety",
+  "description": "Crisis detection preserves autonomy while ensuring safety",
+  "content": "Scenario: Crisis detection preserves autonomy while ensuring safety\n    Given Helen lives alone with family and community support\n    And she is at risk for falls and medication errors\n    When the system detects potential crisis indicators\n    Then safety monitoring should occur without surveillance feeling\n    And alerts should go to Helen first when appropriate\n    And emergency contacts should be notified only when necessary\n    And intervention should preserve her agency: \"Helen, you haven't moved in a while. Are you okay?\"\n    And she should be consulted before family is contacted when possible\n    And safety should enhance autonomy, not replace it\n    And the system should balance protection with dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

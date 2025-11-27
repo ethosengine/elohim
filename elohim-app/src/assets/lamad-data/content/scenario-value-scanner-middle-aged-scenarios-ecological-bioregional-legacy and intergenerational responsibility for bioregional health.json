@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-legacy and intergenerational responsibility for bioregional health",
+  "contentType": "scenario",
+  "title": "Legacy and intergenerational responsibility for bioregional health",
+  "description": "Legacy and intergenerational responsibility for bioregional health",
+  "content": "Scenario: Legacy and intergenerational responsibility for bioregional health\n    Given Robert's generation has substantially affected bioregional ecology\n    And his choices affect ecological inheritance for grandchildren\n    And intergenerational responsibility requires ecological repair and protection\n    When bioregional_elohim supports legacy planning\n    Then it should help Robert understand his generation's ecological impact\n    And recognize responsibility to repair damage and protect bioregional health\n    And surface opportunities for ecological restoration participation\n    And support him in building positive ecological legacy\n    And connect ecological stewardship to care for grandchildren's future\n    And demonstrate that care economy includes intergenerational ecological responsibility\n    And build commitment to bioregional health as care for future generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

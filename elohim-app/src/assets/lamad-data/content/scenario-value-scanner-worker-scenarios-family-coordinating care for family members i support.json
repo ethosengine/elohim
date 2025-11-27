@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-coordinating care for family members i support",
+  "contentType": "scenario",
+  "title": "Coordinating care for family members I support",
+  "description": "Coordinating care for family members I support",
+  "content": "Scenario: Coordinating care for family members I support\n    Given I may have dependents or family I support financially\n    When my care responsibilities extend beyond myself\n    Then the protocol should help me coordinate care for dependents\n    And optimize limited resources across family needs\n    And connect me to support systems for working families\n    And recognize that work-family balance requires systemic support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

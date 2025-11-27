@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-participating in community food systems",
+  "contentType": "scenario",
+  "title": "Participating in community food systems",
+  "description": "Participating in community food systems",
+  "content": "Scenario: Participating in community food systems\n    Given I work in food preparation and understand food systems\n    And community has food co-ops, gardens, or alternative food access\n    When I participate in community food initiatives\n    Then the protocol should recognize my expertise and contribution\n    And help me access affordable, quality food through community systems\n    And accumulate care tokens for food systems participation\n    And support building community food sovereignty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

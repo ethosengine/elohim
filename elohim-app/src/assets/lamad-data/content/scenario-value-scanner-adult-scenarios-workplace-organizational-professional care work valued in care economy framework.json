@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-professional care work valued in care economy framework",
+  "contentType": "scenario",
+  "title": "Professional care work valued in care economy framework",
+  "description": "Professional care work valued in care economy framework",
+  "content": "Scenario: Professional care work valued in care economy framework\n    Given Sarah's teaching is professional care work\n    And care economy should recognize professional caregiving\n    When Sarah's care contributions are tracked\n    Then her professional teaching should count as care labor\n    And it should be valued alongside household care\n    And Sarah should see her career as care economy participation\n    And professional care workers should be recognized explicitly\n    And care economy should include paid care work, not just unpaid\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+  "contentType": "scenario",
+  "title": "Activist prevents extraction by powerful institutions",
+  "description": "Activist prevents extraction by powerful institutions",
+  "content": "Scenario: Activist prevents extraction by powerful institutions\n    Given major foundations want to \"support\" the climate movement\n    And they offer funding that would create dependency and moderate demands\n    When the network evaluates the funding opportunity\n    Then historical patterns of movement capture surface for consideration\n    And communities who worked with these funders share experiences\n    And the network collectively evaluates risks and benefits\n    And alternative solidarity economy models are proposed\n    And the movement maintains independence while building sustainable support\n    And extractive relationships are refused through collective accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:global",
+    "related_users:refugee,displaced_person,activist,content_creator",
+    "related_layers:nation_state,continental,affinity_network,cultural_linguistic",
+    "elohim_agents:translation_agent,verification_agent,pattern_recognition_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-global",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

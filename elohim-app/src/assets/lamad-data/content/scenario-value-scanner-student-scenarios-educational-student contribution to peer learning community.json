@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-student contribution to peer learning community",
+  "contentType": "scenario",
+  "title": "Student contribution to peer learning community",
+  "description": "Student contribution to peer learning community",
+  "content": "Scenario: Student contribution to peer learning community\n    Given Kenji helps classmates understand difficult concepts\n    And peer teaching strengthens everyone's learning\n    When the educational_elohim tracks peer teaching\n    Then it should recognize Kenji's teaching labor as care contribution\n    And it should accumulate care tokens for tutoring peers\n    And it should value \"Kenji explained organic chemistry to 3 struggling classmates\"\n    And peer education should be recognized as community care work\n    And the system should make student teaching labor visible\n    And intellectual generosity should be valued and encouraged\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

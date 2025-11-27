@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-local business accessibility for elderly with mobility limitations",
+  "contentType": "scenario",
+  "title": "Local business accessibility for elderly with mobility limitations",
+  "description": "Local business accessibility for elderly with mobility limitations",
+  "content": "Scenario: Local business accessibility for elderly with mobility limitations\n    Given Helen needs to access local shops and services\n    And her mobility limitations make some businesses inaccessible\n    When the neighborhood_elohim assesses accessibility\n    Then it should surface which local businesses are accessible\n    And it should encourage accessibility improvements\n    And it should coordinate volunteer support for inaccessible locations\n    And Helen should be able to participate in neighborhood commerce\n    And local economy should include elderly residents\n    And the protocol should advocate for universal accessibility\n    And neighborhood should adapt to enable elder participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

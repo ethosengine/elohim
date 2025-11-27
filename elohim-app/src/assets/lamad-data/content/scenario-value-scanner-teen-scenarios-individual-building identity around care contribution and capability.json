@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-building identity around care contribution and capability",
+  "contentType": "scenario",
+  "title": "Building identity around care contribution and capability",
+  "description": "Building identity around care contribution and capability",
+  "content": "Scenario: Building identity around care contribution and capability\n    Given Jasmine has made substantial care contributions over months\n    And she balances multiple demanding contexts successfully\n    When she reflects on her Value Scanner usage and care economy participation\n    Then she should experience herself as a capable, contributing adult\n    And her identity should be forming around care for others and community\n    And she should understand that her work has genuine economic value\n    And she should expect to be taken seriously in economic conversations\n    And she should internalize that care economy principles are normal\n    And her self-concept should reflect her actual capability and contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

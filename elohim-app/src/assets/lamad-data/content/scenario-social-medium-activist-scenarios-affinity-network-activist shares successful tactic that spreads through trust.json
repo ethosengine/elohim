@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-affinity-network-activist shares successful tactic that spreads through trust",
+  "contentType": "scenario",
+  "title": "Activist shares successful tactic that spreads through trust",
+  "description": "Activist shares successful tactic that spreads through trust",
+  "content": "Scenario: Activist shares successful tactic that spreads through trust\n    Given a community successfully pressured a bank to divest from fossil fuels\n    And the activist documents the strategy with evidence of impact\n    When they contribute the tactic to the climate justice network\n    And other activists review and validate the approach\n    Then the tactic enters the network's pattern library\n    And it surfaces for communities facing similar challenges\n    And 23 communities adapt the tactic to their local context\n    And improvements flow back into the pattern library\n    And the network tracks collective impact across implementations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:affinity_network",
+    "related_users:activist,content_creator,refugee,displaced_person",
+    "related_layers:community,nation_state,global,cultural_linguistic",
+    "elohim_agents:coordination_agent,translation_agent,pattern_recognition_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-coordinating employment search with childcare constraints",
+  "contentType": "scenario",
+  "title": "Coordinating employment search with childcare constraints",
+  "description": "Coordinating employment search with childcare constraints",
+  "content": "Scenario: Coordinating employment search with childcare constraints\n    Given I can only work when childcare is available and affordable\n    And childcare availability severely limits employment options\n    When I search for employment compatible with childcare\n    Then the workplace_elohim filters opportunities by schedule and childcare compatibility\n    And identifies employers offering childcare support or flexibility\n    And helps me calculate whether employment pays enough after childcare costs\n    And coordinates employment search with childcare subsidy applications\n    And validates that childcare constraints are real barriers, not excuses\n    And my personal_agent tracks childcare availability and employment schedule compatibility\n    And recognizes that coordinating employment and childcare is complex labor\n    And ensures employment genuinely improves rather than worsens my situation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

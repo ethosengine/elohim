@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-senior learning programs adapted for cognitive accessibility",
+  "contentType": "scenario",
+  "title": "Senior learning programs adapted for cognitive accessibility",
+  "description": "Senior learning programs adapted for cognitive accessibility",
+  "content": "Scenario: Senior learning programs adapted for cognitive accessibility\n    Given Helen participates in senior learning programs\n    And her cognitive and physical capabilities require accommodation\n    When Helen engages with educational content\n    Then programs should be paced for senior learners\n    And materials should use large fonts and high contrast\n    And voice content should be available alongside visual\n    And no time pressure should be imposed\n    And learning should be meaningful, not make-work\n    And the protocol should ensure education remains accessible at all ages\n    And Helen should experience genuine learning, not patronizing activities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

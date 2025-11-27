@@ -1,0 +1,34 @@
+{
+  "id": "feature-public-observer-community-organizer-scenarios-ecological",
+  "contentType": "feature",
+  "title": "Environmental Justice Organizing for Community Organizer",
+  "description": "As a community organizer in the public_observer system Operating at the ecological functional layer I want to build community power to fight environmental racism and demand green investment So that environmental burdens and benefits are distributed equitably",
+  "content": "@epic:public_observer\n@user_type:community_organizer\n@governance_layer:ecological\n@related_users:citizen,activist,parent,politician\n@related_layers:community,municipality,bioregional\n@elohim_agents:public_observer,ecological_elohim,coalition_elohim\n\nFeature: Environmental Justice Organizing for Community Organizer\n  As a community organizer in the public_observer system\n  Operating at the ecological functional layer\n  I want to build community power to fight environmental racism and demand green investment\n  So that environmental burdens and benefits are distributed equitably\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_organizer user is registered in the system\n    And the ecological governance context is active\n\n  Scenario: Organizer documents environmental justice disparities for campaign\n    Given industrial pollution concentrates in low-income neighborhoods of color\n    While parks and trees concentrate in wealthy white areas\n    When the Observer provides environmental equity data\n    Then the organizer sees pollution sources mapped by neighborhood demographics\n    And views park access and tree canopy distribution\n    And calculates health impact disparities from environmental conditions\n    And identifies affected communities for organizing base\n    And environmental racism becomes documented and actionable\n\n  Scenario: Organizer mobilizes community against polluting facility permit\n    Given a company seeks permit for facility in Black neighborhood\n    And already has history of violations\n    When the organizer uses Observer to support community opposition\n    Then they access company's complete violation and enforcement record\n    And see health impacts from similar facilities elsewhere\n    And calculate cumulative pollution burden on neighborhood\n    And organize residents for powerful testimony at permit hearing\n    And environmental organizing prevents new pollution in overburdened community\n\n  Scenario: Organizer builds coalition for climate adaptation investment\n    Given low-income neighborhoods face worst climate impacts\n    But climate funding flows to wealthy areas\n    When the organizer uses Observer to identify alignment\n    Then they connect communities facing flooding, heat islands, poor air quality\n    And document systematic disinvestment in climate resilience\n    And coordinate coalition demanding equitable climate spending\n    And facilitate testimony from diverse affected communities\n    And climate justice becomes redistributive investment campaign\n\n  Scenario: Organizer creates accessible materials on environmental permit process\n    Given residents want to oppose toxic facility\n    But permit process is technical and intimidating\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of permit requirements\n    And get templates for submitting public comments\n    And see examples of successful community opposition\n    And access data residents can cite in testimony\n    And complex regulatory process becomes accessible to community\n\n  Scenario: Organizer tracks accountability for green space investment promise\n    Given city committed to park improvements in underserved neighborhoods\n    And the organizer's coalition won the commitment through campaign\n    When the Observer tracks implementation progress\n    Then the organizer monitors park renovation timeline and budget\n    And receives alerts when spending lags or shifts to other areas\n    And documents completion showing community organizing created change\n    And has evidence to pressure officials if promises aren't kept\n    And environmental justice organizing includes accountability for implementation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,parent,politician",
+    "related_layers:community,municipality,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,coalition_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-community-organizer-scenarios-ecological-organizer documents environmental justice disparities for campaign",
+    "scenario-public-observer-community-organizer-scenarios-ecological-organizer mobilizes community against polluting facility permit",
+    "scenario-public-observer-community-organizer-scenarios-ecological-organizer builds coalition for climate adaptation investment",
+    "scenario-public-observer-community-organizer-scenarios-ecological-organizer creates accessible materials on environmental permit process",
+    "scenario-public-observer-community-organizer-scenarios-ecological-organizer tracks accountability for green space investment promise",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

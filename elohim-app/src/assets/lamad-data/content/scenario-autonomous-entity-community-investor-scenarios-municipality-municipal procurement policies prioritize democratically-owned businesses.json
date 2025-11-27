@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-municipal procurement policies prioritize democratically-owned businesses",
+  "contentType": "scenario",
+  "title": "Municipal procurement policies prioritize democratically-owned businesses",
+  "description": "Municipal procurement policies prioritize democratically-owned businesses",
+  "content": "Scenario: Municipal procurement policies prioritize democratically-owned businesses\n    Given city purchases goods and services from private vendors\n    And public procurement can support democratic economy development\n    When investors advocate for democratic business procurement preferences\n    Then municipal contracts give priority to worker-owned businesses\n    And Patricia's investments benefit from stable public sector demand\n    And taxpayer money supports living wages and democratic governance\n    And procurement policy demonstrates municipal commitment to economic democracy\n    And municipality_elohim tracks democratic business procurement and impacts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

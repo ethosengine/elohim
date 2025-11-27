@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal work-family policy advocacy based on personal navigation",
+  "contentType": "scenario",
+  "title": "Municipal work-family policy advocacy based on personal navigation",
+  "description": "Municipal work-family policy advocacy based on personal navigation",
+  "content": "Scenario: Municipal work-family policy advocacy based on personal navigation\n    Given Robert balances intense career demands with family care\n    And he's learned that work-family balance requires systemic support\n    And municipal policy can support or hinder work-family balance\n    When municipal_elohim supports his policy advocacy\n    Then it should connect him to municipal work-family policy development\n    And help him advocate for paid family leave, flexible work policies, and caregiver protections\n    And surface opportunities to testify or serve on municipal commissions\n    And recognize his experience as policy expertise\n    And channel his voice toward municipal employment standards\n    And build municipal support for working caregivers\n    And demonstrate that care economy requires policy transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

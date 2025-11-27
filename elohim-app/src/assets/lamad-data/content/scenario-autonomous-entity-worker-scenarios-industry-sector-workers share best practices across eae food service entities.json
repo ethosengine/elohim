@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-industry-sector-workers share best practices across eae food service entities",
+  "contentType": "scenario",
+  "title": "Workers share best practices across EAE food service entities",
+  "description": "Workers share best practices across EAE food service entities",
+  "content": "Scenario: Workers share best practices across EAE food service entities\n    Given Maria has developed effective training methods at ChickenMax\n    And Garden Bowl Express is onboarding new workers\n    When Maria's training patterns are documented by REA system\n    Then industry_sector_elohim identifies the transferable practice\n    And Garden Bowl workers are notified of Maria's successful training approach\n    And Maria is invited to conduct cross-entity training session\n    And her expertise benefits the entire food service sector\n    And Maria receives compensation for sector contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:industry_sector",
+    "related_users:[worker,supplier,franchise_operator,manager]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

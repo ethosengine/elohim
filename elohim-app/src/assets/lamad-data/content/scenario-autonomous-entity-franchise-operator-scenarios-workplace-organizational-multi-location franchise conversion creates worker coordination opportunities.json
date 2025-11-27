@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-multi-location franchise conversion creates worker coordination opportunities",
+  "contentType": "scenario",
+  "title": "Multi-location franchise conversion creates worker coordination opportunities",
+  "description": "Multi-location franchise conversion creates worker coordination opportunities",
+  "content": "Scenario: Multi-location franchise conversion creates worker coordination opportunities\n    Given James's three locations previously competed for corporate favor\n    And workers at different locations didn't coordinate or support each other\n    When all three locations convert to democratic EAE network simultaneously\n    Then workers across locations share learning and mutual support\n    And successful practices at one location spread to others\n    And workers can transfer between locations while maintaining ownership stakes\n    And collective bargaining power increases through multi-location coordination\n    And workplace_elohim facilitates inter-location worker collaboration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,supplier,customer]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

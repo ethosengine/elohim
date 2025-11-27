@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist fact-checks regional economic development claims",
+  "contentType": "scenario",
+  "title": "Journalist fact-checks regional economic development claims",
+  "description": "Journalist fact-checks regional economic development claims",
+  "content": "Scenario: Journalist fact-checks regional economic development claims\n    Given county officials tout major economic development success\n    And claim massive job creation and tax revenue\n    When the Observer analyzes economic development outcomes\n    Then the journalist verifies jobs created are lower-wage than promised\n    And finds tax incentives cost more than revenue generated\n    And sees environmental violations and labor law violations\n    And tracks development firm's record in other regions\n    And publishes accountability story on corporate welfare\n    And instant research exposes exaggerated claims\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:county_regional",
+    "related_users:journalist,activist,politician,citizen",
+    "related_layers:municipality,provincial_state,community",
+    "elohim_agents:public_observer,regional_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

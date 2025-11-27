@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer relationship transparency creates ethical incentives",
+  "contentType": "scenario",
+  "title": "Developer relationship transparency creates ethical incentives",
+  "description": "Developer relationship transparency creates ethical incentives",
+  "content": "Scenario: Developer relationship transparency creates ethical incentives\n    Given a developer has made campaign donations to three council members\n    And those members must vote on the developer's project\n    When the Observer makes relationships visible\n    Then constituents see donation patterns and voting correlations\n    And the developer faces scrutiny about influence versus merit\n    And council members face accountability for conflicts of interest\n    And transparency creates pressure for decisions based on community benefit\n    And legitimate projects must stand on merits not political relationships\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-building neighborhood safety through mutual care",
+  "contentType": "scenario",
+  "title": "Building neighborhood safety through mutual care",
+  "description": "Building neighborhood safety through mutual care",
+  "content": "Scenario: Building neighborhood safety through mutual care\n    Given neighborhoods are safer when residents know each other\n    And Aisha wants to feel secure in her new home\n    When Aisha participates in neighborhood care networks\n    Then the connections should build mutual familiarity\n    And the neighborhood_elohim should strengthen social fabric\n    And care relationships should create natural neighborhood watch\n    And safety should emerge from community bonds\n    And the system should build security through care, not surveillance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

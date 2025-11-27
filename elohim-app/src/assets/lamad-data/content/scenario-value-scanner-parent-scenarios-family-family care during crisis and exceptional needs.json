@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-family care during crisis and exceptional needs",
+  "contentType": "scenario",
+  "title": "Family care during crisis and exceptional needs",
+  "description": "Family care during crisis and exceptional needs",
+  "content": "Scenario: Family care during crisis and exceptional needs\n    Given family members sometimes have crisis needs\n    And Sarah might need to care for sick parent or struggling sibling\n    When family crisis occurs\n    Then the family_elohim should coordinate emergency care response\n    And it should show who has capacity to help\n    And it should recognize crisis care as extraordinary contribution\n    And temporary intensive care should be specially valued\n    And the system should enable family mutual aid during crisis\n    And care economy should support family resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

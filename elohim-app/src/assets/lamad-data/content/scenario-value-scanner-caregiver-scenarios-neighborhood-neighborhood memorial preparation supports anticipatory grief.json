@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood memorial preparation supports anticipatory grief",
+  "contentType": "scenario",
+  "title": "Neighborhood memorial preparation supports anticipatory grief",
+  "description": "Neighborhood memorial preparation supports anticipatory grief",
+  "content": "Scenario: Neighborhood memorial preparation supports anticipatory grief\n    Given David's condition is progressive and terminal\n    And James experiences anticipatory grief constantly\n    When the neighborhood_elohim recognizes grief support needs\n    Then it should connect James to grief support resources\n    And neighbors should be prepared to support through eventual loss\n    And anticipatory grief should be recognized and honored\n    And neighborhood should plan to support James through progressive loss\n    And care relationships should extend through grief and beyond\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

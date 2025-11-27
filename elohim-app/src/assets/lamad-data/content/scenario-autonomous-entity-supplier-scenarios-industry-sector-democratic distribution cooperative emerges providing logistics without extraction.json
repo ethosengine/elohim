@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-democratic distribution cooperative emerges providing logistics without extraction",
+  "contentType": "scenario",
+  "title": "Democratic distribution cooperative emerges providing logistics without extraction",
+  "description": "Democratic distribution cooperative emerges providing logistics without extraction",
+  "content": "Scenario: Democratic distribution cooperative emerges providing logistics without extraction\n    Given some distribution infrastructure is useful (aggregation, transportation, storage)\n    And corporate distributors provide this but extract massively beyond cost\n    When democratic network creates worker-owned distribution cooperative\n    Then logistics services are provided at cost-recovery, not profit maximization\n    And distribution workers gain ownership and democratic governance\n    And necessary functions are preserved without extraction\n    And democratic cooperative proves distribution infrastructure can be democratically operated\n    And industry_sector_elohim coordinates democratic distribution cooperative development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:industry_sector",
+    "related_users:[worker,franchise_operator,small_business_owner,supplier]",
+    "related_layers:[workplace_organizational,community,ecological_bioregional]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

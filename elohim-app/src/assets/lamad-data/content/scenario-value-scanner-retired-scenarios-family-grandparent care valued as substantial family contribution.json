@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-grandparent care valued as substantial family contribution",
+  "contentType": "scenario",
+  "title": "Grandparent care valued as substantial family contribution",
+  "description": "Grandparent care valued as substantial family contribution",
+  "content": "Scenario: Grandparent care valued as substantial family contribution\n    Given Frank provides occasional care for grandchildren\n    And this care enables his adult children to work\n    And grandparent care provides developmental benefits beyond childcare\n    When family_elohim tracks grandparent care contributions\n    Then Frank's care labor should be quantified specifically\n    And the market value of childcare should be calculated\n    And developmental benefits of grandparent relationship should be recognized\n    And care should be valued, not assumed as \"leisure time with grandkids\"\n    And Frank's contributions should create legitimate family care tokens\n    And his care work should be visible to adult children\n    And grandparenting should be recognized as valuable care economy participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

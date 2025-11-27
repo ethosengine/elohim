@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-family-child's substantive care contributions visible to family",
+  "contentType": "scenario",
+  "title": "Child's substantive care contributions visible to family",
+  "description": "Child's substantive care contributions visible to family",
+  "content": "Scenario: Child's substantive care contributions visible to family\n    Given Emma has made budget-conscious cereal choice\n    And she selected store brand to save $2\n    When the family_elohim processes the contribution\n    Then Emma's stewardship should be visible on family dashboard\n    And parent Sarah should receive specific recognition prompts\n    And the prompt should highlight Emma's economic reasoning\n    And the contribution should be attributed with concrete impact\n    And family care tokens should reflect genuine value created\n    And visibility should enable meaningful parental acknowledgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,neighborhood,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

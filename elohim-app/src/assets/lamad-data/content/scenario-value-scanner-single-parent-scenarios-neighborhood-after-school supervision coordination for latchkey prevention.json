@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-after-school supervision coordination for latchkey prevention",
+  "contentType": "scenario",
+  "title": "After-school supervision coordination for latchkey prevention",
+  "description": "After-school supervision coordination for latchkey prevention",
+  "content": "Scenario: After-school supervision coordination for latchkey prevention\n    Given Maria works until 5pm while school ends at 3pm\n    And she cannot afford formal after-school care for three children\n    When children need supervision between school and Maria's work end\n    Then the neighborhood_elohim should coordinate informal after-school care\n    And it should connect Maria to neighbors who are home during those hours\n    And it should track reciprocal care contributions to maintain fairness\n    And neighborhood coordination should provide affordable childcare solution\n    And Maria's children should have safe supervision despite her work schedule\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

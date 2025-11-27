@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood economic circulation increases through distributed ownership",
+  "contentType": "scenario",
+  "title": "Neighborhood economic circulation increases through distributed ownership",
+  "description": "Neighborhood economic circulation increases through distributed ownership",
+  "content": "Scenario: Neighborhood economic circulation increases through distributed ownership\n    Given Rosa's profit ($40K annually) left the neighborhood for her personal use\n    And value extraction limited community benefit despite Rosa's generosity\n    When democratic ownership distributes value throughout community\n    Then worker wage increases ($14 \u2192 $18/hour) circulate in neighborhood economy\n    And community programs receive dedicated funding from value circulation\n    And workers spend locally, supporting other neighborhood businesses\n    And multiplier effects amplify as spending cascades through community\n    And community_elohim documents wealth circulation vs. previous extraction\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

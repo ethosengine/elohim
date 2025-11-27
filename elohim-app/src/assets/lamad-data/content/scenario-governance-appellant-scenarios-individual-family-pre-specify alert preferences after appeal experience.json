@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-pre-specify alert preferences after appeal experience",
+  "contentType": "scenario",
+  "title": "Pre-specify alert preferences after appeal experience",
+  "description": "Pre-specify alert preferences after appeal experience",
+  "content": "Scenario: Pre-specify alert preferences after appeal experience\n    Given Marcus's appeal has been reviewed by Constitutional Council\n    And the council affirmed the agent's decision but recommended enhancements\n    When Marcus wants to prevent future unilateral interventions\n    Then the system allows Marcus to pre-specify his alert preferences\n    And Marcus configures family alerts to require 3-day pattern instead of immediate\n    And Marcus confirms emergency services contact only for imminent danger\n    And the preferences are cryptographically stored and verifiable\n    And future Family Elohim decisions must respect these preferences\n    And Marcus retains ability to update preferences at any time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member faces developer donation pressure with transparency",
+  "contentType": "scenario",
+  "title": "Council member faces developer donation pressure with transparency",
+  "description": "Council member faces developer donation pressure with transparency",
+  "content": "Scenario: Council member faces developer donation pressure with transparency\n    Given the politician received campaign contributions from developers\n    And developer seeks vote on controversial project\n    When the Observer documents the relationship publicly\n    Then they see their campaign finance connections made visible\n    And understand constituents can track voting patterns\n    And face accountability for aligning votes with donors versus community\n    And navigate pressure with transparent decision-making\n    And explain vote rationale with evidence regardless of decision\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

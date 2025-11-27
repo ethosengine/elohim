@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-integrating protocol with national court system",
+  "contentType": "scenario",
+  "title": "Integrating protocol with national court system",
+  "description": "Integrating protocol with national court system",
+  "content": "Scenario: Integrating protocol with national court system\n    Given judicial system must work with protocol governance\n    And judges need training and procedural guidance\n    When I work with judicial branch on integration\n    Then I support: judicial education about agent reasoning\n    And I establish: evidentiary standards for agent testimony\n    And I create: appeal pathways for council-court conflicts\n    And I ensure: due process protections maintained\n    And I respect: judicial independence\n    And I enable: protocol to function within legal framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer learns about supply chain connecting to bioregional food system",
+  "contentType": "scenario",
+  "title": "Customer learns about supply chain connecting to bioregional food system",
+  "description": "Customer learns about supply chain connecting to bioregional food system",
+  "content": "Scenario: Customer learns about supply chain connecting to bioregional food system\n    Given corporate food is anonymous commodity obscuring agricultural connections\n    And Ms. Johnson never thought about where her food came from\n    When democratic transparency reveals supply chain relationships\n    Then she learns about Johnson Farm and Tom's regenerative agriculture\n    And understands her consumption supports farmworkers earning living wages\n    And sees how democratic food system operates bioregionally\n    And consumption connects her to land, ecology, and agricultural labor\n    And community_elohim provides educational supply chain storytelling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-learning from mistakes without shame or judgment",
+  "contentType": "scenario",
+  "title": "Learning from mistakes without shame or judgment",
+  "description": "Learning from mistakes without shame or judgment",
+  "content": "Scenario: Learning from mistakes without shame or judgment\n    Given Aisha will make errors as she learns\n    And learning requires safe failure\n    When Aisha makes suboptimal decisions\n    Then the personal_agent should provide constructive feedback\n    And it should explain what happened and why\n    And it should suggest better approaches for future\n    And feedback should be educational, never judgmental\n    And mistakes should be treated as learning opportunities\n    And the system should create psychologically safe learning environment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

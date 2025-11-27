@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood connection across economic differences",
+  "contentType": "scenario",
+  "title": "Neighborhood connection across economic differences",
+  "description": "Neighborhood connection across economic differences",
+  "content": "Scenario: Neighborhood connection across economic differences\n    Given the neighborhood includes families at different income levels\n    And economic inequality can divide communities\n    When the neighborhood_elohim coordinates care economy\n    Then it should enable connection across economic differences\n    And care tokens should provide support to lower-income families\n    And resource sharing should reduce economic barriers\n    And neighborhood cooperation should reduce inequality impacts\n    And mixed-income community should be strengthened\n    And the system should build solidarity, not division\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

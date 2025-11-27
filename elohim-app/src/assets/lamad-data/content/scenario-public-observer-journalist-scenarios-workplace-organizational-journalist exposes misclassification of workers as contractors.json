@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist exposes misclassification of workers as contractors",
+  "contentType": "scenario",
+  "title": "Journalist exposes misclassification of workers as contractors",
+  "description": "Journalist exposes misclassification of workers as contractors",
+  "content": "Scenario: Journalist exposes misclassification of workers as contractors\n    Given gig economy companies classify workers as independent contractors\n    And the journalist investigates worker classification\n    When the Observer analyzes employment patterns and labor violations\n    Then the journalist sees workers have employer control without worker rights\n    And documents workers denied minimum wage, overtime, and benefits\n    And shows companies avoid taxes through misclassification\n    And identifies regulatory agencies failing to enforce classification rules\n    And publishes investigation on worker exploitation through misclassification\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,union_organizer,activist,politician",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,labor_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-urban food deserts as ecological and economic justice issue",
+  "contentType": "scenario",
+  "title": "Urban food deserts as ecological and economic justice issue",
+  "description": "Urban food deserts as ecological and economic justice issue",
+  "content": "Scenario: Urban food deserts as ecological and economic justice issue\n    Given Marcus may live in urban food desert\n    And food access connects to land use and economic systems\n    When Marcus experiences difficulty accessing fresh food\n    Then he should understand food deserts as systemic failure\n    And the personal_agent should explain how urban planning affects food access\n    And he should learn that food justice requires ecological and economic change\n    And his lived experience should inform political consciousness\n    And care economy should include bioregional food sovereignty\n    And his struggles should fuel commitment to food system transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

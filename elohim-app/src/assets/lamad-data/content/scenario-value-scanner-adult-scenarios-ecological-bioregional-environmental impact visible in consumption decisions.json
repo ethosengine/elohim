@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-environmental impact visible in consumption decisions",
+  "contentType": "scenario",
+  "title": "Environmental impact visible in consumption decisions",
+  "description": "Environmental impact visible in consumption decisions",
+  "content": "Scenario: Environmental impact visible in consumption decisions\n    Given Sarah wants to minimize environmental harm\n    And impact information is often hidden from consumers\n    When Sarah scans products\n    Then the bioregional_elohim should display environmental impact data\n    And it should show carbon footprint, water use, soil health, biodiversity effects\n    And it should make ecological costs visible alongside monetary costs\n    And Sarah should make informed choices about environmental impact\n    And visibility should enable environmentally conscious consumption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

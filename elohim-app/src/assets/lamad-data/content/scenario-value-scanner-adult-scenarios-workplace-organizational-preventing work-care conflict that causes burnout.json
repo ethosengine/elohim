@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-preventing work-care conflict that causes burnout",
+  "contentType": "scenario",
+  "title": "Preventing work-care conflict that causes burnout",
+  "description": "Preventing work-care conflict that causes burnout",
+  "content": "Scenario: Preventing work-care conflict that causes burnout\n    Given Sarah faces constant conflict between work and care demands\n    And this conflict drives burnout in working parents\n    When the workplace_elohim monitors Sarah's situation\n    Then it should detect when work-care conflicts are unsustainable\n    And it should alert Sarah before burnout occurs\n    And it should suggest interventions (boundaries, policy advocacy, job changes)\n    And it should help Sarah maintain long-term career sustainability\n    And burnout prevention should be proactive, not reactive\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

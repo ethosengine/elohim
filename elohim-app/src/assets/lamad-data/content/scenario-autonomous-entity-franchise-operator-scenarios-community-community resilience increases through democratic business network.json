@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-community resilience increases through democratic business network",
+  "contentType": "scenario",
+  "title": "Community resilience increases through democratic business network",
+  "description": "Community resilience increases through democratic business network",
+  "content": "Scenario: Community resilience increases through democratic business network\n    Given isolated franchise locations were vulnerable to corporate closure decisions\n    And closures destroyed community institutions based on distant profit calculations\n    When converted locations join EAE network of mutual support\n    Then businesses survive economic downturns through network coordination\n    And community institutions are protected from arbitrary corporate closure\n    And democratic businesses support each other rather than competing for corporate favor\n    And neighborhood economic stability improves through resilient democratic business network\n    And community_elohim coordinates network support for community economic resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

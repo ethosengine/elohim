@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-coordinating work schedule with personal life",
+  "contentType": "scenario",
+  "title": "Coordinating work schedule with personal life",
+  "description": "Coordinating work schedule with personal life",
+  "content": "Scenario: Coordinating work schedule with personal life\n    Given Jordan has medical appointments and personal commitments\n    And all employees need schedule flexibility sometimes\n    When Jordan needs to request time off\n    Then the personal_agent helps Jordan submit the request\n    And the request process is accessible and clear\n    And Jordan's time-off requests are handled like any employee's\n    And the workplace_elohim facilitates reasonable accommodation\n    And Jordan can balance work and personal life with dignity\n    And Jordan's needs are honored without special pleading\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

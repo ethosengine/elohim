@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-neighborhood youth gain employment pathways with dignity and ownership potential",
+  "contentType": "scenario",
+  "title": "Neighborhood youth gain employment pathways with dignity and ownership potential",
+  "description": "Neighborhood youth gain employment pathways with dignity and ownership potential",
+  "content": "Scenario: Neighborhood youth gain employment pathways with dignity and ownership potential\n    Given franchise locations offered poverty-wage jobs with no advancement or ownership\n    And youth employment was exploitative, not developmental\n    When democratic governance creates dignified youth employment programs\n    Then neighborhood youth earn living wages ($18/hour) with training and support\n    And employment includes path to worker ownership for committed participants\n    And youth experience democratic governance, not hierarchical exploitation\n    And community youth economic opportunity improves dramatically through local democratic businesses\n    And community_elohim documents youth employment outcomes and advancement pathways\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

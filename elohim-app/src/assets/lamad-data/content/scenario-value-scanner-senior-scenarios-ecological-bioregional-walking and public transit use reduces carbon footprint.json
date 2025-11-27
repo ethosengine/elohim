@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-walking and public transit use reduces carbon footprint",
+  "contentType": "scenario",
+  "title": "Walking and public transit use reduces carbon footprint",
+  "description": "Walking and public transit use reduces carbon footprint",
+  "content": "Scenario: Walking and public transit use reduces carbon footprint\n    Given Margaret can no longer afford car ownership\n    And walking/transit use serves ecological goals\n    When the bioregional_elohim tracks transportation patterns\n    Then Margaret's low-carbon mobility should be recognized\n    And walking should be valued as ecological choice\n    And public transit use should be supported and facilitated\n    And her mobility patterns should serve bioregional sustainability\n    And car-free living should be honored as ecological stewardship\n    And economic constraint should be reframed as ecological virtue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

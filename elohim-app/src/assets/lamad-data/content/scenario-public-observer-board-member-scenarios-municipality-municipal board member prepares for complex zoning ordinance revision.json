@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-municipality-municipal board member prepares for complex zoning ordinance revision",
+  "contentType": "scenario",
+  "title": "Municipal board member prepares for complex zoning ordinance revision",
+  "description": "Municipal board member prepares for complex zoning ordinance revision",
+  "content": "Scenario: Municipal board member prepares for complex zoning ordinance revision\n    Given planning staff proposes comprehensive zoning code update\n    And draft ordinance is 150 pages of technical legal language\n    And board must vote within 30 days after public comment period\n    When the board member uses Observer decision support\n    Then they receive executive summary highlighting key policy changes and impacts\n    And see comparison of proposed code to peer municipalities' approaches\n    And access analysis of who benefits and who is burdened by major changes\n    And get specific questions to ask staff about implementation concerns\n    And accessible expertise enables informed judgment on complex ordinance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:municipality",
+    "related_users:citizen,developer_interests,politician,activist,community_organizer",
+    "related_layers:district,community,ecological",
+    "elohim_agents:public_observer,domain_elohim,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

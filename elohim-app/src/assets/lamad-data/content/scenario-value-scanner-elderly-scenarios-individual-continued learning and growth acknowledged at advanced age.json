@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-continued learning and growth acknowledged at advanced age",
+  "contentType": "scenario",
+  "title": "Continued learning and growth acknowledged at advanced age",
+  "description": "Continued learning and growth acknowledged at advanced age",
+  "content": "Scenario: Continued learning and growth acknowledged at advanced age\n    Given Helen participates in senior learning programs\n    And she shares ecological wisdom from decades of experience\n    When Helen engages with educational content\n    Then the system should recognize that learning continues until death\n    And her accumulated knowledge should be valued\n    And opportunities to share wisdom should be surfaced\n    And she should experience ongoing growth and contribution\n    And the protocol should reject notion that personhood ends with productivity decline\n    And Helen should be supported in remaining engaged with life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

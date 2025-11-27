@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-community-journalist develops sources through community surveillance",
+  "contentType": "scenario",
+  "title": "Journalist develops sources through community surveillance",
+  "description": "Journalist develops sources through community surveillance",
+  "content": "Scenario: Journalist develops sources through community surveillance\n    Given the journalist needs community perspectives on proposed development\n    And doesn't know who has relevant knowledge\n    When the Observer identifies community members affected by issue\n    Then the journalist sees residents who testified at past meetings\n    And identifies homeowners on blocks facing displacement\n    And finds small business owners who will lose customers\n    And contacts informed sources with lived experience\n    And community journalism reflects actual community voices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:community",
+    "related_users:citizen,activist,community_organizer,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

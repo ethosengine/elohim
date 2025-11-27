@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-crisis response for disability community during emergencies",
+  "contentType": "scenario",
+  "title": "Crisis response for disability community during emergencies",
+  "description": "Crisis response for disability community during emergencies",
+  "content": "Scenario: Crisis response for disability community during emergencies\n    Given emergencies disproportionately harm disabled people\n    And Alex coordinates disability community emergency response\n    When community faces crisis (pandemic, disaster, etc.)\n    Then Alex's crisis organizing should be recognized as essential care work\n    And the community_elohim should support disability-led emergency response\n    And Alex's work protecting vulnerable community members should be highly valued\n    And care tokens should reflect the lifesaving nature of crisis work\n    And the protocol should enable rapid mutual aid coordination\n    And disability community expertise should guide emergency systems\n    And Alex's leadership should be supported with resources\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

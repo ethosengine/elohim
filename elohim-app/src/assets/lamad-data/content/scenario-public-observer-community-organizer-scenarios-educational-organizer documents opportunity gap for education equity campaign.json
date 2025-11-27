@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-educational-organizer documents opportunity gap for education equity campaign",
+  "contentType": "scenario",
+  "title": "Organizer documents opportunity gap for education equity campaign",
+  "description": "Organizer documents opportunity gap for education equity campaign",
+  "content": "Scenario: Organizer documents opportunity gap for education equity campaign\n    Given gifted programs concentrate in predominantly white schools\n    And advanced placement courses lack availability in low-income schools\n    When the Observer provides education equity data\n    Then the organizer sees enrichment program distribution across district\n    And maps demographic patterns showing systematic disparities\n    And calculates opportunity gaps affecting thousands of students\n    And identifies organizing base of affected families\n    And educational inequality becomes documented basis for organizing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:educational",
+    "related_users:parent,activist,citizen,board_member",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

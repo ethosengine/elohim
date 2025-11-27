@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-participating in neighborhood mutual aid despite time limits",
+  "contentType": "scenario",
+  "title": "Participating in neighborhood mutual aid despite time limits",
+  "description": "Participating in neighborhood mutual aid despite time limits",
+  "content": "Scenario: Participating in neighborhood mutual aid despite time limits\n    Given my neighborhood has mutual aid networks\n    And I have minimal time due to work demands\n    When I want to participate in neighborhood care economy\n    Then the protocol should identify micro-opportunities for contribution\n    And help me participate in ways that fit my schedule\n    And recognize that small contributions matter\n    And connect me to neighborhood resources when I need support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

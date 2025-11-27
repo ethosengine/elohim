@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-secondhand and sharing economy participation",
+  "contentType": "scenario",
+  "title": "Secondhand and sharing economy participation",
+  "description": "Secondhand and sharing economy participation",
+  "content": "Scenario: Secondhand and sharing economy participation\n    Given Maria purchases secondhand when possible to reduce costs\n    And she participates in sharing networks to avoid unnecessary purchases\n    When household acquisition patterns are analyzed\n    Then the bioregional_elohim should recognize her secondhand economy participation\n    And it should value sharing networks as resource efficiency\n    And her practices should be celebrated as circular economy leadership\n    And economic constraint should be honored as environmental wisdom\n    And Maria should be recognized as sustainability practitioner\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,household,community_member,environmental_advocate",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

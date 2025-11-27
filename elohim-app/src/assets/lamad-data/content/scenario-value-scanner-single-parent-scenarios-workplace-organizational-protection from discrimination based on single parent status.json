@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-protection from discrimination based on single parent status",
+  "contentType": "scenario",
+  "title": "Protection from discrimination based on single parent status",
+  "description": "Protection from discrimination based on single parent status",
+  "content": "Scenario: Protection from discrimination based on single parent status\n    Given single parents often face workplace discrimination and bias\n    And employers may view them as less committed or reliable\n    When Maria experiences workplace treatment\n    Then the workplace_elohim should monitor for single parent discrimination\n    And it should document patterns that indicate bias\n    And it should support Maria in addressing discriminatory treatment\n    And single parent status should be protected from workplace discrimination\n    And Maria should have equal opportunity regardless of family structure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

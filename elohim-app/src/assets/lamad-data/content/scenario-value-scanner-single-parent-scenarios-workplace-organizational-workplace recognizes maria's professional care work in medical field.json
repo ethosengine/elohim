@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-workplace recognizes maria's professional care work in medical field",
+  "contentType": "scenario",
+  "title": "Workplace recognizes Maria's professional care work in medical field",
+  "description": "Workplace recognizes Maria's professional care work in medical field",
+  "content": "Scenario: Workplace recognizes Maria's professional care work in medical field\n    Given Maria's medical assistant work is professional caregiving\n    And she provides paid care work while also doing unpaid care at home\n    When Maria's professional contributions are assessed\n    Then the workplace_elohim should recognize her medical work as care labor\n    And her professional caregiving should be valued in care economy framework\n    And she should see her career as care economy participation, not separate from it\n    And care economy should include professional care work, not just household labor\n    And Maria's dual care roles should both be recognized and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

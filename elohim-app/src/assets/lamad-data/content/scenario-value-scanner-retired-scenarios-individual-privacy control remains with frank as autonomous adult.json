@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-individual-privacy control remains with frank as autonomous adult",
+  "contentType": "scenario",
+  "title": "Privacy control remains with Frank as autonomous adult",
+  "description": "Privacy control remains with Frank as autonomous adult",
+  "content": "Scenario: Privacy control remains with Frank as autonomous adult\n    Given Frank's care contribution and health data is being tracked\n    And this information is sensitive and personal\n    When Frank determines data sharing preferences\n    Then he must have complete control over all his data\n    And he should choose what's shared with family, organizations, or community\n    And he can demonstrate care value to family if he wishes\n    And he can maintain complete privacy if he prefers\n    And health data sharing must be explicitly consented\n    And volunteer coordination can share relevant information\n    And Frank's autonomy over his information must be absolute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:individual",
+    "related_users:senior,elderly,middle_aged,worker,volunteer",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-caregiver recognized as essential member of care team",
+  "contentType": "scenario",
+  "title": "Caregiver recognized as essential member of care team",
+  "description": "Caregiver recognized as essential member of care team",
+  "content": "Scenario: Caregiver recognized as essential member of care team\n    Given James attends all medical appointments with David\n    And James knows David's condition better than providers seeing him occasionally\n    When medical providers interact with James and David\n    Then the healthcare_elohim should ensure James is recognized as care team member\n    And providers should treat James as expert on David's daily reality\n    And James's observations should be valued in medical decisions\n    And caregiver knowledge should be integrated into medical care\n    And healthcare system should partner with caregivers, not exclude them\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

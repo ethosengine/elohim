@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-no mandatory overtime that conflicts with solo parenting obligations",
+  "contentType": "scenario",
+  "title": "No mandatory overtime that conflicts with solo parenting obligations",
+  "description": "No mandatory overtime that conflicts with solo parenting obligations",
+  "content": "Scenario: No mandatory overtime that conflicts with solo parenting obligations\n    Given Maria must be available for her children's pickup, dinner, homework, bedtime\n    And she has no partner to cover evening parenting when she works late\n    When workplace demands overtime or schedule extensions\n    Then the workplace_elohim should flag conflicts with parenting obligations\n    And Maria should be able to refuse overtime without retaliation\n    And employers should understand single parents have non-negotiable care obligations\n    And work demands should not force choice between job and children's basic needs\n    And Maria should maintain employment boundaries necessary for parenting\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

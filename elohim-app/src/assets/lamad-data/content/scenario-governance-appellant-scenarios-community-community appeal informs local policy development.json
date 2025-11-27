@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-community appeal informs local policy development",
+  "contentType": "scenario",
+  "title": "Community appeal informs local policy development",
+  "description": "Community appeal informs local policy development",
+  "content": "Scenario: Community appeal informs local policy development\n    Given my appeal revealed gaps in how Community Elohim handles certain situations\n    And Constitutional Council made recommendations for improvement\n    When Community Leader reviews appeal patterns and recommendations\n    Then the leader brings findings to city council for policy response\n    And Local ordinances may be updated to clarify boundaries\n    And Community protocol calibration may be proposed\n    And My individual appeal contributes to broader community governance\n    And Democratic feedback loop connects appeals to policy improvement\n    And Community becomes more responsive through listening to dissent\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

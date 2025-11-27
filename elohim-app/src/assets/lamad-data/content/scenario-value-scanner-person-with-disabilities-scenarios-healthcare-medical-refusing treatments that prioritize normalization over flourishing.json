@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-refusing treatments that prioritize normalization over flourishing",
+  "contentType": "scenario",
+  "title": "Refusing treatments that prioritize normalization over flourishing",
+  "description": "Refusing treatments that prioritize normalization over flourishing",
+  "content": "Scenario: Refusing treatments that prioritize normalization over flourishing\n    Given medical establishment often prioritizes making disabled people \"normal\"\n    And some treatments harm quality of life in pursuit of normalcy\n    When providers recommend treatments focused on normalization\n    Then the personal_agent should help Alex evaluate treatments critically\n    And it should distinguish between treatments that improve Alex's life and those that pursue normalcy\n    And it should support Alex in refusing treatments that don't serve Alex's goals\n    And Alex's definition of quality of life should be respected\n    And the protocol should recognize that disabled lives are valuable as they are\n    And medical goals should align with Alex's flourishing, not societal comfort\n    And Alex should be supported in rejecting medical model thinking\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-coordination of support services with alex maintaining authority",
+  "contentType": "scenario",
+  "title": "Coordination of support services with Alex maintaining authority",
+  "description": "Coordination of support services with Alex maintaining authority",
+  "content": "Scenario: Coordination of support services with Alex maintaining authority\n    Given Alex requires assistance with some physical tasks\n    And Alex coordinates support workers for specific needs\n    When support services are scheduled\n    Then Alex should have complete authority over service direction\n    And the personal_agent should help coordinate schedules efficiently\n    And Alex should be able to communicate needs clearly\n    And support quality should be tracked per Alex's assessment\n    And Alex should experience professional partnership, not caretaking\n    And the relationship should be employer/coordinator to service provider\n    And Alex's autonomy should be structurally protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:individual",
+    "related_users:adult,young_adult,elderly,idd_community,vulnerable_temporary,caregiver",
+    "related_layers:household,family,community,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

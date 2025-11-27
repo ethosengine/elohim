@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-appealing community conflict mediation outcome",
+  "contentType": "scenario",
+  "title": "Appealing community conflict mediation outcome",
+  "description": "Appealing community conflict mediation outcome",
+  "content": "Scenario: Appealing community conflict mediation outcome\n    Given Community Elohim mediated a conflict between me and neighbors\n    And I believe the proposed resolution is unjust\n    When I appeal the mediation outcome\n    Then Constitutional Council reviews if mediation process was fair\n    And They evaluate if all parties had meaningful voice\n    And They examine if constitutional principles guided the resolution\n    And They consider if community harmony was balanced with individual justice\n    And They assess if cultural conflict resolution norms were respected\n    And The appeal can modify the resolution or offer alternative mediation\n    And Community learns how to balance harmony with individual rights\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

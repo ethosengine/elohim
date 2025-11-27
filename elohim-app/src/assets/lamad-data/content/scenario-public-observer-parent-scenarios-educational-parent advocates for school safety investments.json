@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent advocates for school safety investments",
+  "contentType": "scenario",
+  "title": "Parent advocates for school safety investments",
+  "description": "Parent advocates for school safety investments",
+  "content": "Scenario: Parent advocates for school safety investments\n    Given the parent worries about school safety and emergency preparedness\n    And board discusses \"safety measures\" in vague terms\n    When the parent reviews Observer's safety policy analysis\n    Then they see which safety measures are evidence-based vs security theater\n    And understand budget allocations for counselors vs surveillance\n    And learn about trauma-informed approaches to school safety\n    And can advocate for measures that actually protect children\n    And school safety policy centers student wellbeing not punishment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

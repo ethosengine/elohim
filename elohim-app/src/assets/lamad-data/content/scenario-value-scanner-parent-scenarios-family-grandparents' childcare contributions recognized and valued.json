@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-grandparents' childcare contributions recognized and valued",
+  "contentType": "scenario",
+  "title": "Grandparents' childcare contributions recognized and valued",
+  "description": "Grandparents' childcare contributions recognized and valued",
+  "content": "Scenario: Grandparents' childcare contributions recognized and valued\n    Given Sarah's parents provide regular childcare\n    And they help with Tommy and Emma multiple times weekly\n    When the family_elohim tracks grandparent care\n    Then their contributions should be quantified and valued\n    And they should accumulate care tokens for their labor\n    And their work should be recognized as essential family support\n    And grandparents should not be taken for granted\n    And multigenerational care should be reciprocal, not extractive\n    And the system should make grandparent labor visible and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

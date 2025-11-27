@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-teaching that care work creates economic value",
+  "contentType": "scenario",
+  "title": "Teaching that care work creates economic value",
+  "description": "Teaching that care work creates economic value",
+  "content": "Scenario: Teaching that care work creates economic value\n    Given traditional economics makes care work invisible\n    And Emma is forming foundational economic understanding\n    When Emma performs care labor through scanner decisions\n    Then the system should explicitly teach care creates value\n    And her personal_agent should say \"Your stewardship helped your family\"\n    And care contributions should be valued concretely\n    And she should learn caring for others is economically valuable\n    And care economy framework should be established as baseline\n    And she should understand care before being exposed to extraction economics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

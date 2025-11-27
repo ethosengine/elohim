@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-single parent household recognized in community leadership",
+  "contentType": "scenario",
+  "title": "Single parent household recognized in community leadership",
+  "description": "Single parent household recognized in community leadership",
+  "content": "Scenario: Single parent household recognized in community leadership\n    Given Maria's care contributions are extraordinary\n    And she deserves voice in community governance despite time constraints\n    When community leadership positions are filled\n    Then Maria's quantified care work should be visible qualification\n    And her solo parenting should be recognized as demonstrated community commitment\n    And community should make leadership accessible to time-constrained parents\n    And single parents should have governance voice proportionate to care contributions\n    And Maria should be valued as community leader, not marginalized as struggling victim\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

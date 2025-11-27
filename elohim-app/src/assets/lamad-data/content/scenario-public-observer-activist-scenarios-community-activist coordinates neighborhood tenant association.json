@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-community-activist coordinates neighborhood tenant association",
+  "contentType": "scenario",
+  "title": "Activist coordinates neighborhood tenant association",
+  "description": "Activist coordinates neighborhood tenant association",
+  "content": "Scenario: Activist coordinates neighborhood tenant association\n    Given multiple tenants face similar landlord issues\n    And the activist is organizing tenant power\n    When the Observer facilitates secure coordination\n    Then tenants can connect without landlord surveillance\n    And see patterns across different units and buildings\n    And coordinate collective bargaining for repairs\n    And track landlord compliance with commitments\n    And individual tenant struggles become collective action\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_organizer,citizen,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

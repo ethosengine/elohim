@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher reveals disparate working conditions",
+  "contentType": "scenario",
+  "title": "Teacher reveals disparate working conditions",
+  "description": "Teacher reveals disparate working conditions",
+  "content": "Scenario: Teacher reveals disparate working conditions\n    Given some teachers have adequate planning time while others don't\n    And resource distribution within school is inequitable\n    When the Observer documents working conditions by department\n    Then disparities become visible (English: 45min planning, Math: 90min)\n    And teachers identify structural causes vs individual complaints\n    And principal sees evidence requiring fair scheduling\n    And working conditions equity improves school-wide\n    And transparency drives fairness\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

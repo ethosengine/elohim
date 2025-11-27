@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-local knowledge preservation through elderly memory keeping",
+  "contentType": "scenario",
+  "title": "Local knowledge preservation through elderly memory keeping",
+  "description": "Local knowledge preservation through elderly memory keeping",
+  "content": "Scenario: Local knowledge preservation through elderly memory keeping\n    Given Helen remembers 40 years of neighborhood changes\n    And this knowledge has cultural and practical value\n    When neighborhood planning and decisions occur\n    Then the neighborhood_elohim should surface Helen's historical knowledge\n    And her memory of neighborhood patterns should inform planning\n    And oral history should be captured for community archive\n    And Helen should be recognized as neighborhood historian\n    And her contribution to collective memory should be valued\n    And the protocol should preserve local knowledge through elder participation\n    And community memory should include longtime residents' perspectives\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

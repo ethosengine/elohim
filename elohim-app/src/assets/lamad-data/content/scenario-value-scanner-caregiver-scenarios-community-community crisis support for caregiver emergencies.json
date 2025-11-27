@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community crisis support for caregiver emergencies",
+  "contentType": "scenario",
+  "title": "Community crisis support for caregiver emergencies",
+  "description": "Community crisis support for caregiver emergencies",
+  "content": "Scenario: Community crisis support for caregiver emergencies\n    Given caregiving crises can become tragedies quickly\n    And James could reach complete burnout or medical emergency\n    When the community_elohim detects caregiver crisis\n    Then it should provide immediate crisis intervention\n    And emergency respite care should be available immediately\n    And medical support should be accessible for caregiver health\n    And community should have safety net for caregiver collapse\n    And crisis detection should prevent tragedy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

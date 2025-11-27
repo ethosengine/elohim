@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-rebuilding self-concept after trauma and loss",
+  "contentType": "scenario",
+  "title": "Rebuilding self-concept after trauma and loss",
+  "description": "Rebuilding self-concept after trauma and loss",
+  "content": "Scenario: Rebuilding self-concept after trauma and loss\n    Given my sense of self has been damaged by abuse and crisis\n    And I struggle with self-blame and internalized stigma\n    When I engage with the Value Scanner over time\n    Then the system consistently reflects my worth and capability\n    And makes visible my substantial care contributions\n    And celebrates my strengths and achievements\n    And reframes \"survival\" as sophisticated, valuable work\n    And counters stigmatizing narratives about people in crisis\n    And my personal_agent provides affirming, non-judgmental support\n    And the care economy recognizes me as valuable community member\n    And I see evidence of my competence and contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-community investment outcomes inform municipal workforce development",
+  "contentType": "scenario",
+  "title": "Community investment outcomes inform municipal workforce development",
+  "description": "Community investment outcomes inform municipal workforce development",
+  "content": "Scenario: Community investment outcomes inform municipal workforce development\n    Given workforce development programs prepare workers for corporate employment\n    And democratic businesses need workers with cooperative governance skills\n    When community investors demonstrate democratic business viability\n    Then municipal workforce programs add cooperative business and democratic governance training\n    And workers are prepared for democratic enterprise participation\n    And investor advocacy influences workforce development policy\n    And municipal investment in workforce supports democratic economy growth\n    And municipality_elohim coordinates democratic business training curriculum development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

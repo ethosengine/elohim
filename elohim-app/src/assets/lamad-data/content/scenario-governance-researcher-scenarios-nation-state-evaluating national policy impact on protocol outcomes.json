@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-evaluating national policy impact on protocol outcomes",
+  "contentType": "scenario",
+  "title": "Evaluating national policy impact on protocol outcomes",
+  "description": "Evaluating national policy impact on protocol outcomes",
+  "content": "Scenario: Evaluating national policy impact on protocol outcomes\n    Given Senator Ruiz passed legislation supporting protocol adoption\n    And I want to assess whether policy actually improved outcomes\n    When I analyze communities before and after policy implementation\n    Then I examine: whether funding increased adoption rates\n    And I assess: whether legal recognition improved legitimacy\n    And I measure: whether infrastructure support reduced access barriers\n    And I explore: whether regulatory protection prevented capture\n    And I identify: which policy mechanisms worked and which didn't\n    And My evaluation provides: evidence for continued funding and policy refinement\n    And Research serves: accountability and improvement of democratic policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

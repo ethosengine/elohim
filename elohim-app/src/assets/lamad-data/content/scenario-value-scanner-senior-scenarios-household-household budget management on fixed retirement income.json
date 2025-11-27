@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-household budget management on fixed retirement income",
+  "contentType": "scenario",
+  "title": "Household budget management on fixed retirement income",
+  "description": "Household budget management on fixed retirement income",
+  "content": "Scenario: Household budget management on fixed retirement income\n    Given Margaret's household has fixed income of $32k/year\n    And income cannot be increased through additional employment\n    When the household_elohim manages resource allocation\n    Then it should track all household expenses and patterns\n    And it should optimize spending across categories\n    And it should identify opportunities for cost reduction\n    And it should help Margaret maintain quality of life within constraints\n    And the $150/week grocery budget should be managed carefully\n    And household financial dignity should be preserved\n    And the framing should be resource optimization, not poverty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

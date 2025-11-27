@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-continued intellectual engagement prevents cognitive decline",
+  "contentType": "scenario",
+  "title": "Continued intellectual engagement prevents cognitive decline",
+  "description": "Continued intellectual engagement prevents cognitive decline",
+  "content": "Scenario: Continued intellectual engagement prevents cognitive decline\n    Given cognitive engagement supports brain health in aging\n    And intellectual isolation accelerates decline\n    When Helen participates in learning and teaching\n    Then educational engagement should be recognized as health intervention\n    And community should support elder intellectual life\n    And learning opportunities should be accessible and meaningful\n    And the protocol should demonstrate that education serves health in aging\n    And Helen should remain intellectually engaged\n    And cognitive health should be supported through educational participation\n    And investment in elder learning should be justified by health outcomes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

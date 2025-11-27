@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-walking assistance from neighborhood volunteers",
+  "contentType": "scenario",
+  "title": "Walking assistance from neighborhood volunteers",
+  "description": "Walking assistance from neighborhood volunteers",
+  "content": "Scenario: Walking assistance from neighborhood volunteers\n    Given Helen's mobility makes walking difficult\n    And she needs assistance to remain active in neighborhood\n    When neighborhood volunteers offer walking support\n    Then the neighborhood_elohim should coordinate volunteer schedules\n    And volunteers should be matched based on availability and compatibility\n    And Helen's preferences should guide volunteer matching\n    And volunteer care work should be recognized with care tokens\n    And Helen should experience companionship, not charity\n    And the protocol should build reciprocal neighbor relationships\n    And neighborhood support should enable continued engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

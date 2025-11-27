@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-household nutrition planning and execution",
+  "contentType": "scenario",
+  "title": "Household nutrition planning and execution",
+  "description": "Household nutrition planning and execution",
+  "content": "Scenario: Household nutrition planning and execution\n    Given Sarah plans meals for family nutritional needs\n    And she manages Tommy's preferences, Emma's activities, budget constraints\n    When Sarah performs nutrition work\n    Then the household_elohim should track planning and execution separately\n    And it should recognize nutritional knowledge as professional skill\n    And it should value meal planning as complex decision-making\n    And it should show the full scope: planning, shopping, prep, cooking, cleanup\n    And nutrition work should be recognized as health care labor\n    And Sarah's nutrition expertise should be valued professionally\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

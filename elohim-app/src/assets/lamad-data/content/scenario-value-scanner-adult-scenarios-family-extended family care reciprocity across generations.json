@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-extended family care reciprocity across generations",
+  "contentType": "scenario",
+  "title": "Extended family care reciprocity across generations",
+  "description": "Extended family care reciprocity across generations",
+  "content": "Scenario: Extended family care reciprocity across generations\n    Given Sarah's parents provided care for her as a child\n    And she's now providing care to them as they age\n    When multi-generational care patterns are tracked\n    Then the family_elohim should recognize reciprocal care flows\n    And care should be seen as flowing both ways across time\n    And Sarah's care for parents should be valued\n    And parents' previous care for Sarah should be acknowledged\n    And multi-generational reciprocity should be visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

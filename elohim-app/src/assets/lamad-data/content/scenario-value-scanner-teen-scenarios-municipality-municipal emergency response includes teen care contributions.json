@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-municipal emergency response includes teen care contributions",
+  "contentType": "scenario",
+  "title": "Municipal emergency response includes teen care contributions",
+  "description": "Municipal emergency response includes teen care contributions",
+  "content": "Scenario: Municipal emergency response includes teen care contributions\n    Given the municipality experiences emergency situation (natural disaster, pandemic)\n    And community resilience depends on care economy networks\n    When emergency response is coordinated through municipal_elohim\n    Then teen care contributions should be recognized and mobilized\n    And Jasmine's capability should be matched to community needs\n    And youth mutual aid networks should be integrated into response\n    And teen volunteers should be valued as essential emergency workers\n    And care economy should demonstrate that communities survive crises through mutual care\n    And her generation should learn that civic responsibility includes crisis response\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

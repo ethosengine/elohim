@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-addressing protocol implications for labor and employment law",
+  "contentType": "scenario",
+  "title": "Addressing protocol implications for labor and employment law",
+  "description": "Addressing protocol implications for labor and employment law",
+  "content": "Scenario: Addressing protocol implications for labor and employment law\n    Given protocol affects work and value recognition\n    And care work generates care tokens\n    When I update labor law for protocol economy\n    Then I clarify: status of care tokens vs traditional wages\n    And I address: worker protections in protocol-mediated work\n    And I ensure: fair labor standards apply\n    And I update: social insurance for protocol participants\n    And I protect: workers while enabling innovation\n    And law adapts: to new forms of value creation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

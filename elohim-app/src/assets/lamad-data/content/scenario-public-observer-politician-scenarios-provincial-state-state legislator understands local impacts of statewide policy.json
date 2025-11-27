@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-provincial-state-state legislator understands local impacts of statewide policy",
+  "contentType": "scenario",
+  "title": "State legislator understands local impacts of statewide policy",
+  "description": "State legislator understands local impacts of statewide policy",
+  "content": "Scenario: State legislator understands local impacts of statewide policy\n    Given the politician represents specific legislative district\n    And considers statewide legislation\n    When the Observer analyzes district-specific impacts\n    Then they see how legislation affects their constituents specifically\n    And identify trade-offs between district and statewide interests\n    And understand which constituent communities benefit versus harmed\n    And explain vote to constituents with local impact data\n    And balance representation of district versus state interests\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:provincial_state",
+    "related_users:citizen,activist,community_organizer,journalist,lobbyist",
+    "related_layers:municipality,district,county_regional,educational,ecological,workplace",
+    "elohim_agents:public_observer,regional_elohim,constituent_elohim,legislative_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

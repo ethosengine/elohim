@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-coordinating legal family governance with abusive ex-partner",
+  "contentType": "scenario",
+  "title": "Coordinating legal family governance with abusive ex-partner",
+  "description": "Coordinating legal family governance with abusive ex-partner",
+  "content": "Scenario: Coordinating legal family governance with abusive ex-partner\n    Given I am navigating custody, protective orders, and child support with my abuser\n    And I need to minimize contact while managing legal obligations\n    When legal family governance requires communication\n    Then the family_elohim helps me manage legally-required communication only\n    And provides templates for documented, bounded interactions\n    And tracks all communications for legal purposes\n    And helps me maintain protective boundaries while meeting legal requirements\n    And alerts me to concerning patterns or escalation\n    And my personal_agent coaches me through high-stress legal interactions\n    And recognizes this boundary management as substantial emotional labor\n    And validates that minimizing contact while co-parenting is appropriate\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

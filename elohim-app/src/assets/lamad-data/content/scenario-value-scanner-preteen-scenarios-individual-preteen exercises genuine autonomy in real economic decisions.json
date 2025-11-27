@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-preteen exercises genuine autonomy in real economic decisions",
+  "contentType": "scenario",
+  "title": "Preteen exercises genuine autonomy in real economic decisions",
+  "description": "Preteen exercises genuine autonomy in real economic decisions",
+  "content": "Scenario: Preteen exercises genuine autonomy in real economic decisions\n    Given Marcus has $75 budget for weekly groceries\n    And the budget is not hypothetical but actual family resource constraint\n    When Marcus uses the Value Scanner to plan weekly shopping\n    Then he should have full autonomy within budget boundaries\n    And his personal_agent should provide adult-level decision support\n    And the interface should treat him as capable, not as a child\n    And his choices should have real consequences for family survival\n    And the system should recognize he's not practicing but performing\n    And autonomy should be genuine, not simulated learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

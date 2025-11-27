@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-municipality-retired residents as civic engagement resource for municipal governance",
+  "contentType": "scenario",
+  "title": "Retired residents as civic engagement resource for municipal governance",
+  "description": "Retired residents as civic engagement resource for municipal governance",
+  "content": "Scenario: Retired residents as civic engagement resource for municipal governance\n    Given Frank has time freedom enabling substantial civic participation\n    And many retired residents can attend daytime meetings and hearings\n    When the municipal_elohim coordinates civic engagement\n    Then it should recognize retired residents as civic participation resource\n    And facilitate their attendance at municipal meetings and hearings\n    And coordinate testimony and advocacy utilizing their availability\n    And recognize civic engagement as care contribution\n    And retired residents should be understood as democracy infrastructure\n    And Frank should participate meaningfully in municipal governance\n    And elder voice should shape municipal policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:municipality",
+    "related_users:citizen,voter,senior,volunteer,advocate,elder",
+    "related_layers:community,neighborhood,individual,household",
+    "elohim_agents:personal_agent,community_elohim,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

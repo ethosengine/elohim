@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-learning technology skills for independence",
+  "contentType": "scenario",
+  "title": "Learning technology skills for independence",
+  "description": "Learning technology skills for independence",
+  "content": "Scenario: Learning technology skills for independence\n    Given Jordan wants to use a smartphone more independently\n    And technology skills increase autonomy\n    When Jordan takes assistive technology training\n    Then instruction is patient, repetitive, and accessible\n    And the trainer adapts to Jordan's learning pace\n    And Jordan practices each skill until it becomes comfortable\n    And the personal_agent provides ongoing coaching\n    And Jordan's technology capability increases over time\n    And Jordan experiences growing independence through skill development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

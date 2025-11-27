@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-individual-sleep deprivation monitoring and intervention",
+  "contentType": "scenario",
+  "title": "Sleep deprivation monitoring and intervention",
+  "description": "Sleep deprivation monitoring and intervention",
+  "content": "Scenario: Sleep deprivation monitoring and intervention\n    Given Maria wakes at 5am and collapses near midnight daily\n    And chronic sleep deprivation damages health and capacity\n    When the personal_agent tracks Maria's sleep patterns\n    Then it should monitor for dangerous sleep deprivation\n    And it should advocate for more rest when possible\n    And it should help her find efficiency that creates sleep time\n    And it should alert her when sleep deprivation threatens her health\n    And Maria should have support for this basic but often impossible need\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:individual",
+    "related_users:parent,adult,worker,caregiver",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-school board member surfaces parent and teacher concerns at scale",
+  "contentType": "scenario",
+  "title": "School board member surfaces parent and teacher concerns at scale",
+  "description": "School board member surfaces parent and teacher concerns at scale",
+  "content": "Scenario: School board member surfaces parent and teacher concerns at scale\n    Given the politician hears from vocal parents at board meetings\n    But suspects broader community has different priorities\n    When the Observer aggregates parent and teacher input\n    Then they see working parents can't attend evening meetings\n    And learn teachers face classroom supply shortages systematically\n    And identify parent concerns about mental health resources\n    And understand transportation reliability affects family schedules\n    And align policy with broader community needs beyond meeting attendees\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

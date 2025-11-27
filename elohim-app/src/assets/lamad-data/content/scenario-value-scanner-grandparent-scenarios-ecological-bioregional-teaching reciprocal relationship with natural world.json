@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-teaching reciprocal relationship with natural world",
+  "contentType": "scenario",
+  "title": "Teaching reciprocal relationship with natural world",
+  "description": "Teaching reciprocal relationship with natural world",
+  "content": "Scenario: Teaching reciprocal relationship with natural world\n    Given Margaret teaches grandchildren to respect and care for nature\n    And she models reciprocal relationship rather than extractive use\n    When the bioregional_elohim tracks ecological values education\n    Then it should recognize teaching reciprocity with nature\n    And it should value relationship-based environmental ethics\n    And it should track development of ecological consciousness\n    And values education should accumulate care tokens\n    And Margaret's teaching should support bioregional care economy\n    And next generation should learn ecological reciprocity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

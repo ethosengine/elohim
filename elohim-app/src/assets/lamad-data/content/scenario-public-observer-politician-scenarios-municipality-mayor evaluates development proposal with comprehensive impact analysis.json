@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-mayor evaluates development proposal with comprehensive impact analysis",
+  "contentType": "scenario",
+  "title": "Mayor evaluates development proposal with comprehensive impact analysis",
+  "description": "Mayor evaluates development proposal with comprehensive impact analysis",
+  "content": "Scenario: Mayor evaluates development proposal with comprehensive impact analysis\n    Given a developer proposes mixed-use project with rosy projections\n    And activists present worst-case scenarios in opposition\n    When the politician requests Observer impact analysis\n    Then they see developer's track record on past projects in other cities\n    And review infrastructure capacity data (traffic, water, schools)\n    And understand economic benefits distribution (jobs for whom, tax revenue timing)\n    And identify community costs and trade-offs objectively\n    And make informed decision beyond political calculations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

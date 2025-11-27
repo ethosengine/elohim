@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator's local relationships become valuable instead of corporate brand dominance",
+  "contentType": "scenario",
+  "title": "Operator's local relationships become valuable instead of corporate brand dominance",
+  "description": "Operator's local relationships become valuable instead of corporate brand dominance",
+  "content": "Scenario: Operator's local relationships become valuable instead of corporate brand dominance\n    Given franchise model made operator invisible behind corporate brand\n    And James's community relationships were obscured by ChickenMax identity\n    When conversion makes his choice visible to community\n    Then neighbors learn James chose democratic ownership over continuing corporate extraction\n    And local relationships previously invisible become valued and recognized\n    And community respects his decision to prioritize workers and neighborhood\n    And identity shifts from anonymous franchise operator to community member who chose well\n    And workplace_elohim helps communicate transition story to community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

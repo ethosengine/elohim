@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist monitors labor board and regulatory hearings",
+  "contentType": "scenario",
+  "title": "Journalist monitors labor board and regulatory hearings",
+  "description": "Journalist monitors labor board and regulatory hearings",
+  "content": "Scenario: Journalist monitors labor board and regulatory hearings\n    Given the journalist covers labor and employment\n    And must track labor board, wage enforcement, OSHA, and related agencies\n    When the Observer monitors all labor regulatory agencies\n    Then the journalist reviews all violation cases and enforcement actions\n    And receives alerts for significant labor violations\n    And tracks patterns in enforcement and employer violations\n    And comprehensive labor accountability coverage becomes sustainable\n    And worker exploitation cannot hide in regulatory obscurity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,union_organizer,activist,politician",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,labor_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

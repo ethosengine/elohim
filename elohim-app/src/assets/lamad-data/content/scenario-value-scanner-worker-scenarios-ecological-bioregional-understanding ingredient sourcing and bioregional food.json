@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-understanding ingredient sourcing and bioregional food",
+  "contentType": "scenario",
+  "title": "Understanding ingredient sourcing and bioregional food",
+  "description": "Understanding ingredient sourcing and bioregional food",
+  "content": "Scenario: Understanding ingredient sourcing and bioregional food\n    Given my restaurant uses ingredients from various sources\n    And some may be local/seasonal while others are industrial/imported\n    When I want to understand food sourcing\n    Then the protocol should provide information about ingredient origins\n    And help me understand bioregional vs. industrial food systems\n    And recognize that bioregional food supports local ecology and economy\n    And build consciousness about care economy implications of sourcing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

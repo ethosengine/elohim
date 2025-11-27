@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-school board member understands resource distribution across schools",
+  "contentType": "scenario",
+  "title": "School board member understands resource distribution across schools",
+  "description": "School board member understands resource distribution across schools",
+  "content": "Scenario: School board member understands resource distribution across schools\n    Given the politician governs district with 40 schools\n    And limited visibility into daily school operations\n    When the Observer analyzes district resource patterns\n    Then they see experienced teachers concentrated in affluent area schools\n    And identify disparities in per-student spending across buildings\n    And learn which schools lack arts programs and advanced courses\n    And understand facility maintenance varies by neighborhood\n    And advocate for equitable resource distribution with evidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

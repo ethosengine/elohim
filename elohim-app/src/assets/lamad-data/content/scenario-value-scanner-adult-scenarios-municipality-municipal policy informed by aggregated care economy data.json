@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal policy informed by aggregated care economy data",
+  "contentType": "scenario",
+  "title": "Municipal policy informed by aggregated care economy data",
+  "description": "Municipal policy informed by aggregated care economy data",
+  "content": "Scenario: Municipal policy informed by aggregated care economy data\n    Given thousands of residents participate in care economy\n    And their care patterns generate valuable data\n    When municipal policy decisions are made\n    Then the municipal_elohim should provide aggregated care work data\n    And policy makers should see actual patterns of care labor\n    And invisible care work should be quantified at municipal scale\n    And policy should be informed by real care economy patterns\n    And data should reveal needs that traditional economics miss\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

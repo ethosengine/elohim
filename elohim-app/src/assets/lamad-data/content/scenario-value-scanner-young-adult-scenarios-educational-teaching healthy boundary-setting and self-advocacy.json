@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-teaching healthy boundary-setting and self-advocacy",
+  "contentType": "scenario",
+  "title": "Teaching healthy boundary-setting and self-advocacy",
+  "description": "Teaching healthy boundary-setting and self-advocacy",
+  "content": "Scenario: Teaching healthy boundary-setting and self-advocacy\n    Given Aisha needs to learn professional and personal boundaries\n    And boundary-setting is rarely taught explicitly\n    When the personal_agent provides guidance\n    Then it should teach how to set healthy boundaries\n    And it should model self-advocacy language and approaches\n    And it should help her recognize when boundaries are needed\n    And the system should educate about sustainable capacity management\n    And she should learn that boundaries enable sustainable care\n    And self-advocacy should be taught as essential life skill\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

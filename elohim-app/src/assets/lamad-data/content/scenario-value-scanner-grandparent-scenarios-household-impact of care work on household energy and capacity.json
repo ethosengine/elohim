@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-household-impact of care work on household energy and capacity",
+  "contentType": "scenario",
+  "title": "Impact of care work on household energy and capacity",
+  "description": "Impact of care work on household energy and capacity",
+  "content": "Scenario: Impact of care work on household energy and capacity\n    Given Margaret is 68 and active grandchild care is physically demanding\n    And 25 hours/week of childcare affects household energy\n    When the household_elohim monitors capacity\n    Then it should track if care work is affecting Margaret's well-being\n    And it should recognize when care burden is too high\n    And it should help household discuss sustainable care levels\n    And Robert should understand and support Margaret's capacity\n    And household should be able to negotiate care boundaries with family\n    And both partners' well-being should be protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:household",
+    "related_users:senior,partner,spouse,retired",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

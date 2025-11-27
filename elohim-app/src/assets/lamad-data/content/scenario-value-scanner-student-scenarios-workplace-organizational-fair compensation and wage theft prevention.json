@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-workplace-organizational-fair compensation and wage theft prevention",
+  "contentType": "scenario",
+  "title": "Fair compensation and wage theft prevention",
+  "description": "Fair compensation and wage theft prevention",
+  "content": "Scenario: Fair compensation and wage theft prevention\n    Given Kenji depends on every dollar he earns\n    And low-wage employers sometimes violate wage laws\n    When the workplace_elohim monitors Kenji's compensation\n    Then it should verify he's paid for all hours worked\n    And it should flag if he's working off-clock or unpaid\n    And it should teach him to recognize wage theft\n    And it should help him assert right to legal minimum wage\n    And the system should protect vulnerable student workers from exploitation\n    And Kenji should receive every penny he earns\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employee,young_adult,manager",
+    "related_layers:individual,educational,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

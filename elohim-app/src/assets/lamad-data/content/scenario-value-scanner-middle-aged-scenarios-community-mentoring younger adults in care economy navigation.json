@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-community-mentoring younger adults in care economy navigation",
+  "contentType": "scenario",
+  "title": "Mentoring younger adults in care economy navigation",
+  "description": "Mentoring younger adults in care economy navigation",
+  "content": "Scenario: Mentoring younger adults in care economy navigation\n    Given Robert has learned to navigate work-care balance over decades\n    And younger adults are earlier in their journey\n    And his experience could help others avoid struggles\n    When community_elohim coordinates mentoring\n    Then it should connect Robert with younger adults seeking guidance\n    And recognize his mentoring as valuable care contribution\n    And support him in sharing knowledge about care economy practices\n    And help younger generation learn from his experience\n    And value his mentoring in community care tokens\n    And prevent him from being exploited for free emotional labor\n    And build intergenerational knowledge transfer\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:community",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,municipality,workplace_organizational,family",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

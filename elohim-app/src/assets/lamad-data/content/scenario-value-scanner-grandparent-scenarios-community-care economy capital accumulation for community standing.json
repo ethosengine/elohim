@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-care economy capital accumulation for community standing",
+  "contentType": "scenario",
+  "title": "Care economy capital accumulation for community standing",
+  "description": "Care economy capital accumulation for community standing",
+  "content": "Scenario: Care economy capital accumulation for community standing\n    Given Margaret makes substantial community contributions\n    And accumulated care tokens represent community standing\n    When community decisions are made about resources or priorities\n    Then Margaret's care contributions should give her voice\n    And care economy should inform community governance\n    And those who contribute care should have standing in decisions\n    And community should operate on care economy principles\n    And Margaret's service should be recognized in community leadership\n    And care-based governance should be operational\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

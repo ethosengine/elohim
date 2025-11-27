@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-provincial-state-appeal reveals systematic bias across multiple communities",
+  "contentType": "scenario",
+  "title": "Appeal reveals systematic bias across multiple communities",
+  "description": "Appeal reveals systematic bias across multiple communities",
+  "content": "Scenario: Appeal reveals systematic bias across multiple communities\n    Given similar appeals have been filed across many communities in the region\n    And a pattern suggests systematic issue not isolated incidents\n    When I file my appeal as part of this broader pattern\n    Then Regional Constitutional Council treats this as systemic review\n    And Researcher provides analysis of the appeal pattern data\n    And They investigate if protocol implementation has regional bias\n    And They examine if certain demographics are disproportionately affected\n    And They may order regional protocol audit or recalibration\n    And My individual appeal becomes part of systemic justice work\n    And Constitutional accountability operates at scale not just individual cases\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,technical_expert,policy_maker,researcher",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

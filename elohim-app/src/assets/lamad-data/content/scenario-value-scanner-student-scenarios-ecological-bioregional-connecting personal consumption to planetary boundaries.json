@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-connecting personal consumption to planetary boundaries",
+  "contentType": "scenario",
+  "title": "Connecting personal consumption to planetary boundaries",
+  "description": "Connecting personal consumption to planetary boundaries",
+  "content": "Scenario: Connecting personal consumption to planetary boundaries\n    Given Kenji's consumption choices aggregate with billions of others\n    And planetary boundaries define sustainable resource use\n    When the bioregional_elohim shows planetary context\n    Then it should help Kenji understand his consumption in global context\n    And it should show \"Your consumption is well below sustainable average\"\n    And it should connect personal choices to planetary care economy\n    And it should teach him that individual actions scale to collective impact\n    And the system should bridge personal and planetary scales\n    And Kenji should understand himself as participant in planetary care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

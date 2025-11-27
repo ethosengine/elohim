@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-building care economy capital for future aging needs",
+  "contentType": "scenario",
+  "title": "Building care economy capital for future aging needs",
+  "description": "Building care economy capital for future aging needs",
+  "content": "Scenario: Building care economy capital for future aging needs\n    Given Margaret is watching her mother navigate advanced aging\n    And Margaret recognizes she will need care in 10-20 years\n    When Margaret makes care contributions now\n    Then care tokens should accumulate to her individual account\n    And these tokens should represent future care economy resources\n    And the system should help her build reciprocal relationships\n    And she should be preparing for her own increasing care needs\n    And current contributions should create future security\n    And Margaret should experience agency in planning her own aging\n    And care economy capital should provide retirement resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

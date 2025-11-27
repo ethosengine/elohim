@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional economic localization supports care and ecological resilience",
+  "contentType": "scenario",
+  "title": "Bioregional economic localization supports care and ecological resilience",
+  "description": "Bioregional economic localization supports care and ecological resilience",
+  "content": "Scenario: Bioregional economic localization supports care and ecological resilience\n    Given globalized economy increases ecological impact\n    And bioregional economic localization can reduce impact while building care economy\n    And Robert's economic choices affect regional resilience\n    When bioregional_elohim supports economic localization\n    Then it should help Robert source goods and services bioregionally\n    And connect him to regional producers, workers, and care economy networks\n    And recognize that local economic participation reduces transportation impact\n    And demonstrate that care economy and ecological sustainability align through localization\n    And build bioregional economic resilience through local exchange\n    And reduce ecological impact through regional economic relationships\n    And advance care economy through bioregional economic networks\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

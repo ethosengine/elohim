@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-family communication adapted for alex's accessibility needs",
+  "contentType": "scenario",
+  "title": "Family communication adapted for Alex's accessibility needs",
+  "description": "Family communication adapted for Alex's accessibility needs",
+  "content": "Scenario: Family communication adapted for Alex's accessibility needs\n    Given family uses various communication methods\n    And some methods may not be accessible to Alex\n    When family communicates\n    Then the family_elohim should ensure Alex can participate fully\n    And family should use accessible communication formats\n    And Alex should not be excluded by inaccessible technology choices\n    And family should be prompted to accommodate Alex's needs\n    And accessibility should be automatic, not requested each time\n    And Alex should have equal access to all family communication\n    And the system should reduce Alex's communication barriers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

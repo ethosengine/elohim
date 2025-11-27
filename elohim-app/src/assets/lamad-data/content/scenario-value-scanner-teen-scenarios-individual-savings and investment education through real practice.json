@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-savings and investment education through real practice",
+  "contentType": "scenario",
+  "title": "Savings and investment education through real practice",
+  "description": "Savings and investment education through real practice",
+  "content": "Scenario: Savings and investment education through real practice\n    Given Jasmine is saving for college and future goals\n    And she has accumulated $2,400 in savings from work\n    When she explores investment options through her personal_agent\n    Then the agent should provide age-appropriate investment education\n    And explain concepts like compound interest, risk, diversification\n    And connect to her specific goals and timeline\n    And help her understand long-term financial planning\n    And provide resources for learning about different investment vehicles\n    And support her building adult financial capability\n    And never pressure her toward specific investment products\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-research on council effectiveness includes my service",
+  "contentType": "scenario",
+  "title": "Research on council effectiveness includes my service",
+  "description": "Research on council effectiveness includes my service",
+  "content": "Scenario: Research on council effectiveness includes my service\n    Given Dr. Chen studies national council deliberations\n    And my service contributes to understanding democratic AI governance\n    When my deliberations become research data (anonymized)\n    Then researchers learn: how citizens grapple with complexity\n    And they analyze: what enables effective sortition governance\n    And they examine: whether democratic oversight scales successfully\n    And they identify: improvements to support future councils\n    And my service: advances global knowledge of democratic governance\n    And I contribute: to humanity's understanding of how to govern with AI\n    And my unlikely journey: from nurse to constitutional architect serves future generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:nation_state",
+    "related_users:appellant,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

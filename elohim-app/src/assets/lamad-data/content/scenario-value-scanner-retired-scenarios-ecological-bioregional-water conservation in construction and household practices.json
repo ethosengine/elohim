@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-water conservation in construction and household practices",
+  "contentType": "scenario",
+  "title": "Water conservation in construction and household practices",
+  "description": "Water conservation in construction and household practices",
+  "content": "Scenario: Water conservation in construction and household practices\n    Given water is critical bioregional resource\n    And Frank's construction knowledge includes plumbing systems\n    When the bioregional_elohim coordinates water stewardship\n    Then it should facilitate water-efficient plumbing in Habitat work\n    And help Frank repair leaks and improve water systems in community\n    And track water conservation as ecological care contribution\n    And teach water conservation practices to community\n    And Frank's skills should serve bioregional water security\n    And his expertise should build water-wise infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

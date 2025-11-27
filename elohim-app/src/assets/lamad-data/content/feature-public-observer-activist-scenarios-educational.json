@@ -1,0 +1,34 @@
+{
+  "id": "feature-public-observer-activist-scenarios-educational",
+  "contentType": "feature",
+  "title": "Education Justice Advocacy for Activist",
+  "description": "As an activist in the public_observer system Operating at the educational governance layer I want to fight for equitable education and challenge segregation So that all students get quality education regardless of race or class",
+  "content": "@epic:public_observer\n@user_type:activist\n@governance_layer:educational\n@related_users:teacher,parent,student,board_member\n@related_layers:district,municipality,provincial_state\n@elohim_agents:public_observer,education_elohim,district_elohim\n\nFeature: Education Justice Advocacy for Activist\n  As an activist in the public_observer system\n  Operating at the educational governance layer\n  I want to fight for equitable education and challenge segregation\n  So that all students get quality education regardless of race or class\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the educational governance context is active\n\n  Scenario: Activist exposes systematic school resource inequities\n    Given the activist campaigns for education equity\n    And suspects systematic under-resourcing of schools serving students of color\n    When the Observer analyzes district resource distribution\n    Then the activist sees experienced teachers concentrate in white affluent schools\n    And gifted programs and AP courses cluster in privileged areas\n    And facility quality and maintenance vary by neighborhood\n    And per-student spending disparities reach thousands of dollars\n    And segregation pattern becomes legally actionable\n\n  Scenario: Activist challenges school closure targeting Black neighborhoods\n    Given the district proposes closing schools for \"efficiency\"\n    And the activist suspects racial targeting\n    When the Observer analyzes closure patterns across time\n    Then the activist sees schools in Black neighborhoods systematically closed\n    And white neighborhood schools remain open despite similar enrollment\n    And \"efficiency\" rationale masks structural racism\n    And community organizes opposition with documented evidence\n    And racist policy becomes undeniable and challengeable\n\n  Scenario: Activist fights harmful discipline policies\n    Given suspension and expulsion rates seem racially disparate\n    And the activist advocates for restorative justice\n    When the Observer tracks discipline outcomes by race\n    Then the activist shows Black students suspended at 3x rate\n    And for same behaviors as white students who receive warnings\n    And zero-tolerance policies fuel school-to-prison pipeline\n    And presents evidence-based alternatives from other districts\n    And policy reform campaign gains statistical backbone\n\n  Scenario: Activist demands equitable school funding formula\n    Given state funding formula creates massive district disparities\n    And the activist works on statewide education justice\n    When the Observer calculates funding gaps and impacts\n    Then the activist shows low-income districts receive $3000 less per student\n    And demonstrates impact on class sizes and programs\n    And connects families in underfunded districts statewide\n    And builds coalition for funding formula reform\n    And structural inequity becomes focus of political campaign\n\n  Scenario: Activist exposes charter school segregation and under-performance\n    Given charter schools claim to serve disadvantaged students\n    But the activist sees segregation and selective enrollment\n    When the Observer tracks charter school demographics and outcomes\n    Then the activist shows charters are more segregated than district schools\n    And suspension rates for Black students are even higher\n    And test score gains evaporate when controlling for selective enrollment\n    And charter expansion drains resources from district schools\n    And privatization agenda meets evidence-based critique\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-activist-scenarios-educational-activist exposes systematic school resource inequities",
+    "scenario-public-observer-activist-scenarios-educational-activist challenges school closure targeting black neighborhoods",
+    "scenario-public-observer-activist-scenarios-educational-activist fights harmful discipline policies",
+    "scenario-public-observer-activist-scenarios-educational-activist demands equitable school funding formula",
+    "scenario-public-observer-activist-scenarios-educational-activist exposes charter school segregation and under-performance",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

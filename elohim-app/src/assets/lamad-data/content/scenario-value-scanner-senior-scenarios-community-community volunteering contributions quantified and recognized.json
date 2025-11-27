@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-community-community volunteering contributions quantified and recognized",
+  "contentType": "scenario",
+  "title": "Community volunteering contributions quantified and recognized",
+  "description": "Community volunteering contributions quantified and recognized",
+  "content": "Scenario: Community volunteering contributions quantified and recognized\n    Given Margaret volunteers 10 hours/week across community organizations\n    And this represents ~500 hours/year of community labor\n    When the community_elohim tracks volunteer contributions\n    Then all volunteer hours should be quantified and valued\n    And the economic value of her labor should be calculated\n    And community care tokens should accumulate to reflect contributions\n    And Margaret's productivity should be visible despite retirement status\n    And the narrative that retirees \"don't work\" should be countered\n    And her community standing should reflect her contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:community",
+    "related_users:middle_aged,elderly,retired,volunteer,community_organizer,civic_leader",
+    "related_layers:individual,household,family,neighborhood,municipality",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

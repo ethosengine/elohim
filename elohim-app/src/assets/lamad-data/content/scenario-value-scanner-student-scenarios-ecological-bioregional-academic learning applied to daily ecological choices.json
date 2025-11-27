@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-academic learning applied to daily ecological choices",
+  "contentType": "scenario",
+  "title": "Academic learning applied to daily ecological choices",
+  "description": "Academic learning applied to daily ecological choices",
+  "content": "Scenario: Academic learning applied to daily ecological choices\n    Given Kenji studies environmental science academically\n    And he makes consumption decisions daily\n    When the bioregional_elohim connects learning to practice\n    Then it should help him apply academic knowledge to personal choices\n    And it should show \"Your understanding of nitrogen cycles informs food decisions\"\n    And it should bridge theory and practice\n    And it should recognize his daily life as laboratory for ecological care\n    And the system should integrate academic and practical ecological knowledge\n    And Kenji should live his environmental science education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

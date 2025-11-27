@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-part-time work options during intensive parenting periods",
+  "contentType": "scenario",
+  "title": "Part-time work options during intensive parenting periods",
+  "description": "Part-time work options during intensive parenting periods",
+  "content": "Scenario: Part-time work options during intensive parenting periods\n    Given some life stages require more intensive parenting presence\n    And Maria may need reduced hours during children's critical developmental periods\n    When Maria's care responsibilities temporarily increase\n    Then workplace should offer part-time or reduced hours options\n    And reduced schedule should not mean permanent career penalty or benefit loss\n    And single parents should be able to modulate work based on care needs\n    And career paths should accommodate care economy participation\n    And Maria should have flexibility to adjust work commitment based on family needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,single_parent,employer,colleague",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

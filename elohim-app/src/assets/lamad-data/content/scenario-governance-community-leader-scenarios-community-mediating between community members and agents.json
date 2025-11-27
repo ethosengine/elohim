@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-mediating between community members and agents",
+  "contentType": "scenario",
+  "title": "Mediating between community members and agents",
+  "description": "Mediating between community members and agents",
+  "content": "Scenario: Mediating between community members and agents\n    Given Community Elohim makes decisions affecting Riverside residents\n    And some residents don't understand or disagree with decisions\n    When I serve as bridge between residents and agent governance\n    Then I explain: how protocol works in accessible language\n    And I facilitate: residents filing appeals when appropriate\n    And I provide: context to Constitutional Council about local culture\n    And I advocate: for residents when agents miss local knowledge\n    And I maintain: boundary where I don't control agents but collaborate\n    And I enable: democratic participation in AI governance\n    And I am accountable: to residents through elections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-study systematic bias correction over time",
+  "contentType": "scenario",
+  "title": "Study systematic bias correction over time",
+  "description": "Study systematic bias correction over time",
+  "content": "Scenario: Study systematic bias correction over time\n    Given Year 2 research identified bias affecting marginalized communities\n    And protocol modifications were implemented in Year 3\n    When James tracks bias indicators through Year 10\n    Then he measures whether modifications successfully reduced bias\n    And he documents improved outcomes for marginalized communities\n    And he identifies remaining persistent inequalities\n    And he evaluates effectiveness of bias correction mechanisms\n    And longitudinal accountability serves justice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

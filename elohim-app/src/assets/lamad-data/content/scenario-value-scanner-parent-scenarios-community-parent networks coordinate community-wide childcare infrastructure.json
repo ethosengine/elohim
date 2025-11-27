@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-parent networks coordinate community-wide childcare infrastructure",
+  "contentType": "scenario",
+  "title": "Parent networks coordinate community-wide childcare infrastructure",
+  "description": "Parent networks coordinate community-wide childcare infrastructure",
+  "content": "Scenario: Parent networks coordinate community-wide childcare infrastructure\n    Given multiple families need reliable, affordable childcare\n    And current market solutions are inadequate\n    When the community_elohim coordinates childcare infrastructure\n    Then it should enable parent-led cooperative childcare\n    And it should help organize community-owned childcare centers\n    And parent labor should be valued in cooperative structures\n    And care tokens should enable access regardless of income\n    And the community should build childcare as commons, not commodity\n    And the system should enable collective solutions to care needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

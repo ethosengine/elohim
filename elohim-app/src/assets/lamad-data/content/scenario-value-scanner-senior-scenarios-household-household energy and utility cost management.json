@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-household energy and utility cost management",
+  "contentType": "scenario",
+  "title": "Household energy and utility cost management",
+  "description": "Household energy and utility cost management",
+  "content": "Scenario: Household energy and utility cost management\n    Given utilities represent significant portion of fixed income\n    And cost reduction matters for household sustainability\n    When the household_elohim tracks utility usage\n    Then it should help Margaret optimize energy use\n    And it should suggest cost-saving behavioral changes\n    And it should identify assistance programs available to seniors\n    And utility costs should be minimized without sacrificing comfort\n    And Margaret's household should be sustainable on fixed income\n    And dignity should be maintained in resource management\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

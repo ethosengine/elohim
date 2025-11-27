@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace performance while dealing with ongoing trauma and stress",
+  "contentType": "scenario",
+  "title": "Managing workplace performance while dealing with ongoing trauma and stress",
+  "description": "Managing workplace performance while dealing with ongoing trauma and stress",
+  "content": "Scenario: Managing workplace performance while dealing with ongoing trauma and stress\n    Given I am working while still recovering from trauma\n    And trauma symptoms may affect my workplace performance\n    When trauma impacts my work capability\n    Then the workplace_elohim helps me manage performance expectations realistically\n    And provides strategies for trauma management in workplace\n    And helps me access workplace mental health resources if available\n    And validates that trauma affects work capacity and that's normal\n    And identifies when workplace environment is retraumatizing\n    And my personal_agent reminds me of coping strategies during work stress\n    And recognizes that working while traumatized is extraordinarily difficult\n    And supports appropriate accommodations or job changes if needed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

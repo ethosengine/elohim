@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-participating in family celebrations despite work",
+  "contentType": "scenario",
+  "title": "Participating in family celebrations despite work",
+  "description": "Participating in family celebrations despite work",
+  "content": "Scenario: Participating in family celebrations despite work\n    Given family gatherings and celebrations matter for connection\n    And my work schedule may conflict with family events\n    When family plans celebrations or important gatherings\n    Then the protocol should help me advocate for work schedule changes\n    And coordinate around my employment constraints when necessary\n    And help me participate meaningfully even if time is limited\n    And recognize that family care includes celebration and joy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

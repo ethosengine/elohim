@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-community resource allocation prioritizes aging in place",
+  "contentType": "scenario",
+  "title": "Community resource allocation prioritizes aging in place",
+  "description": "Community resource allocation prioritizes aging in place",
+  "content": "Scenario: Community resource allocation prioritizes aging in place\n    Given community resources are limited\n    And policy choices affect elder care\n    When community governance makes allocation decisions\n    Then the community_elohim should surface elder needs\n    And aging in place should be prioritized over institutionalization\n    And Helen's voice should be included in community decisions\n    And resources should flow to enable dignity-preserving care\n    And the protocol should inform community policy\n    And care economy data should demonstrate what elders need to flourish\n    And community should invest in infrastructure that serves all ages\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

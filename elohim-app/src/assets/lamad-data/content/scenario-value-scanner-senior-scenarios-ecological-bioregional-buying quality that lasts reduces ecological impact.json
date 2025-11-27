@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-buying quality that lasts reduces ecological impact",
+  "contentType": "scenario",
+  "title": "Buying quality that lasts reduces ecological impact",
+  "description": "Buying quality that lasts reduces ecological impact",
+  "content": "Scenario: Buying quality that lasts reduces ecological impact\n    Given Margaret learned to buy fewer, better things\n    And durability reduces waste and resource extraction\n    When Margaret makes purchasing decisions\n    Then her personal_agent should support quality-over-quantity choices\n    And the bioregional_elohim should track durability practices\n    And buying quality should be recognized as ecological stewardship\n    And Margaret's knowledge of durability should inform others\n    And consumption patterns should favor longevity\n    And throwaway culture should be countered by senior wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

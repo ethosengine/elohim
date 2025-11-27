@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-household-household privacy maintained while coordinating with extended family",
+  "contentType": "scenario",
+  "title": "Household privacy maintained while coordinating with extended family",
+  "description": "Household privacy maintained while coordinating with extended family",
+  "content": "Scenario: Household privacy maintained while coordinating with extended family\n    Given Robert and Jennifer coordinate with Robert's siblings on parent care\n    And they communicate with adult children about support\n    And they participate in community care economy\n    When household_elohim manages information sharing\n    Then it should protect household privacy while enabling coordination\n    And share parent care information with Robert's siblings appropriately\n    And keep household financial details private from extended family\n    And allow children to access relevant information without full household visibility\n    And ensure community sees care contributions without sensitive details\n    And support household autonomy while enabling family coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:household",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

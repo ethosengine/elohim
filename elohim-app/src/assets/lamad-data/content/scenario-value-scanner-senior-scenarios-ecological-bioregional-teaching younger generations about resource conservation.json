@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-teaching younger generations about resource conservation",
+  "contentType": "scenario",
+  "title": "Teaching younger generations about resource conservation",
+  "description": "Teaching younger generations about resource conservation",
+  "content": "Scenario: Teaching younger generations about resource conservation\n    Given Margaret has decades of conservation knowledge\n    And younger generations need sustainable living skills\n    When the bioregional_elohim coordinates knowledge sharing\n    Then Margaret should teach conservation practices\n    And her knowledge should be transmitted to younger people\n    And teaching should be recognized as ecological care contribution\n    And intergenerational knowledge transfer should strengthen sustainability\n    And senior wisdom should inform bioregional practices\n    And ecological education should flow from elder experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:ecological_bioregional",
+    "related_users:middle_aged,elderly,retired,gardener,steward,elder",
+    "related_layers:individual,household,neighborhood,community,educational",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

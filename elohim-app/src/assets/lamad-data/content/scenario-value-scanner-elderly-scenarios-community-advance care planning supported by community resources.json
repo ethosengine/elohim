@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-advance care planning supported by community resources",
+  "contentType": "scenario",
+  "title": "Advance care planning supported by community resources",
+  "description": "Advance care planning supported by community resources",
+  "content": "Scenario: Advance care planning supported by community resources\n    Given Helen is planning for end of life\n    And advance care planning is complex\n    When Helen accesses community advance planning support\n    Then the community_elohim should connect her to counseling resources\n    And her advance directives should be documented in accessible format\n    And her wishes should be communicated across care networks\n    And community should support death with dignity\n    And the protocol should enable agency over end of life\n    And Helen's values should guide her death as they guided her life\n    And community care economy should extend through end of life\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

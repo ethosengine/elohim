@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-making invisible household care labor visible to roommates",
+  "contentType": "scenario",
+  "title": "Making invisible household care labor visible to roommates",
+  "description": "Making invisible household care labor visible to roommates",
+  "content": "Scenario: Making invisible household care labor visible to roommates\n    Given Kenji cooks meals for all four roommates regularly\n    And he plans menus, shops for ingredients, and manages kitchen\n    When the household_elohim tracks Kenji's household contributions\n    Then it should quantify his cooking labor in care tokens\n    And it should make visible that he provides nutrition care for four people\n    And his roommates should see \"Kenji cooked 18 meals this week for household\"\n    And invisible care work should become undeniably visible\n    And the system should prevent resentment from invisible labor\n    And fair household coordination requires visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

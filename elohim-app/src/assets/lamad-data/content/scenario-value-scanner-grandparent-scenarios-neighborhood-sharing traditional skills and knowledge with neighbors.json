@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-sharing traditional skills and knowledge with neighbors",
+  "contentType": "scenario",
+  "title": "Sharing traditional skills and knowledge with neighbors",
+  "description": "Sharing traditional skills and knowledge with neighbors",
+  "content": "Scenario: Sharing traditional skills and knowledge with neighbors\n    Given Margaret has skills from her generation (cooking, gardening, crafts)\n    And neighbors might benefit from this knowledge\n    When the neighborhood_elohim tracks knowledge sharing\n    Then it should recognize Margaret's teaching as care work\n    And it should facilitate skill-sharing opportunities\n    And it should connect Margaret with neighbors wanting to learn\n    And traditional knowledge should be valued and transmitted\n    And neighborhood should benefit from elder skills and wisdom\n    And Margaret's teaching should accumulate care tokens\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist investigates school discipline disparities",
+  "contentType": "scenario",
+  "title": "Journalist investigates school discipline disparities",
+  "description": "Journalist investigates school discipline disparities",
+  "content": "Scenario: Journalist investigates school discipline disparities\n    Given parents report Black students face harsher discipline\n    And the journalist investigates discipline practices\n    When the Observer analyzes discipline data by race\n    Then the journalist sees Black students suspended at 3.5x rate\n    And documents same behaviors leading to suspension for Black students, warnings for white\n    And tracks individual administrators with extreme disparity patterns\n    And compares to districts using restorative justice successfully\n    And publishes investigation exposing discriminatory discipline\n    And pattern recognition reveals school-to-prison pipeline\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

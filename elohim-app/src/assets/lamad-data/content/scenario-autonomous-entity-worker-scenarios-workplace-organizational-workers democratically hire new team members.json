@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-workers democratically hire new team members",
+  "contentType": "scenario",
+  "title": "Workers democratically hire new team members",
+  "description": "Workers democratically hire new team members",
+  "content": "Scenario: Workers democratically hire new team members\n    Given ChickenMax needs to hire an additional worker\n    And hiring was previously manager's unilateral decision\n    When the hiring process begins\n    Then workers collectively develop job description and qualifications\n    And multiple workers participate in interviewing candidates\n    And workers evaluate candidates based on skill fit and values alignment\n    And final hiring decision requires worker council approval\n    And new hires integrate into democratic culture from day one\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:workplace_organizational",
+    "related_users:[manager,supplier,small_business_owner,franchise_operator]",
+    "related_layers:[individual,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

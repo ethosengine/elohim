@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-climate anxiety and ecological grief with children",
+  "contentType": "scenario",
+  "title": "Climate anxiety and ecological grief with children",
+  "description": "Climate anxiety and ecological grief with children",
+  "content": "Scenario: Climate anxiety and ecological grief with children\n    Given children are aware of environmental crisis\n    And Tommy and Emma may experience climate anxiety\n    When Sarah supports children's ecological emotions\n    Then the personal_agent should recognize this as emotional care work\n    And it should help Sarah process her own climate grief\n    And it should provide resources for talking with children about climate\n    And supporting children's environmental feelings should be valued\n    And the system should recognize emotional dimension of ecological parenting\n    And Sarah's work navigating climate crisis with children should be supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

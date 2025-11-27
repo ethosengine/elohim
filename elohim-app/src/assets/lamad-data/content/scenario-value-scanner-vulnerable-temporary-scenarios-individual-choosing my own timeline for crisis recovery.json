@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-choosing my own timeline for crisis recovery",
+  "contentType": "scenario",
+  "title": "Choosing my own timeline for crisis recovery",
+  "description": "Choosing my own timeline for crisis recovery",
+  "content": "Scenario: Choosing my own timeline for crisis recovery\n    Given well-meaning people have expectations about how quickly I should \"move on\"\n    And I am recovering at my own pace\n    When external pressure conflicts with my needs\n    Then the Value Scanner supports my chosen timeline\n    And validates that recovery is not linear\n    And helps me resist pressure to rush or perform recovery\n    And tracks my progress according to my goals, not external standards\n    And recognizes that trauma recovery takes time\n    And my personal_agent reminds me that my pace is appropriate\n    And celebrates progress without imposing arbitrary milestones\n    And supports my right to heal in my own way\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood care economy includes middle-aged leadership",
+  "contentType": "scenario",
+  "title": "Neighborhood care economy includes middle-aged leadership",
+  "description": "Neighborhood care economy includes middle-aged leadership",
+  "content": "Scenario: Neighborhood care economy includes middle-aged leadership\n    Given Robert has decades of life experience\n    And he has accumulated professional and personal capabilities\n    And he's positioned to contribute neighborhood leadership\n    When neighborhood_elohim recognizes his leadership potential\n    Then it should surface leadership opportunities appropriate to his capacity\n    And connect him to neighborhood governance roles\n    And recognize his care contributions as qualifying him for leadership\n    And help him balance leadership with his existing demands\n    And prevent overcommitment that would overwhelm him\n    And channel his capabilities toward neighborhood improvement\n    And build neighborhood leadership from accumulated care experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

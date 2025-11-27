@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-individual-manager's expertise is valued without requiring worker subordination",
+  "contentType": "scenario",
+  "title": "Manager's expertise is valued without requiring worker subordination",
+  "description": "Manager's expertise is valued without requiring worker subordination",
+  "content": "Scenario: Manager's expertise is valued without requiring worker subordination\n    Given Marcus has genuine operational expertise from years of experience\n    And corporate role required worker subordination to exercise that expertise\n    When Marcus transitions to democratic coordinator\n    Then his scheduling knowledge becomes proposals, not commands\n    And his operations expertise is valued through consultation, not authority\n    And workers request his input because it's helpful, not because it's mandated\n    And his compensation ($72K) reflects expertise without extraction premium\n    And his purpose comes from service, not domination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:individual",
+    "related_users:[worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

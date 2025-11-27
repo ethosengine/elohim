@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-family rituals and traditions maintained by solo parent",
+  "contentType": "scenario",
+  "title": "Family rituals and traditions maintained by solo parent",
+  "description": "Family rituals and traditions maintained by solo parent",
+  "content": "Scenario: Family rituals and traditions maintained by solo parent\n    Given Maria wants to create meaningful family traditions and rituals\n    And she must plan and execute all traditions alone\n    When family traditions and special occasions occur\n    Then the family_elohim should help Maria plan manageable family rituals\n    And it should remind her of important traditions and celebrations\n    And it should help her create meaningful family culture despite time constraints\n    And it should prevent holiday stress from overwhelming solo parent capacity\n    And Maria's family should have rich traditions despite single-parent limitations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

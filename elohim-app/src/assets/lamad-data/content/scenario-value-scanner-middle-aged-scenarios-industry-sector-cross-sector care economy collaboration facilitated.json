@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-cross-sector care economy collaboration facilitated",
+  "contentType": "scenario",
+  "title": "Cross-sector care economy collaboration facilitated",
+  "description": "Cross-sector care economy collaboration facilitated",
+  "content": "Scenario: Cross-sector care economy collaboration facilitated\n    Given care economy affects all industry sectors\n    And cross-sector collaboration could advance shared goals\n    And Robert's professional networks span multiple sectors\n    When industry_elohim facilitates cross-sector collaboration\n    Then it should connect Robert with care economy advocates across sectors\n    And support development of cross-sector care economy initiatives\n    And help build coalitions for policy advocacy\n    And share best practices across industry boundaries\n    And build care economy movement that transcends sector divisions\n    And demonstrate that care economy is universal across industries\n    And advance transformation through cross-sector solidarity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:industry_sector",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:workplace_organizational,municipality,community,ecological_bioregional",
+    "elohim_agents:personal_agent,industry_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-building sustainable household routines",
+  "contentType": "scenario",
+  "title": "Building sustainable household routines",
+  "description": "Building sustainable household routines",
+  "content": "Scenario: Building sustainable household routines\n    Given Aisha wants to establish effective household practices\n    And sustainable routines reduce decision fatigue\n    When Aisha develops household routines\n    Then the personal_agent should help her establish patterns\n    And it should track what routines are working\n    And it should suggest optimizations based on her actual behavior\n    And routines should be sustainable for her lifestyle and energy\n    And the system should help her build household practices that last\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

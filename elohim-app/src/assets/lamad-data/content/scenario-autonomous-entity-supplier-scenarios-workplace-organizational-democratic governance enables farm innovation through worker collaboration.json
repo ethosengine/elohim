@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-democratic governance enables farm innovation through worker collaboration",
+  "contentType": "scenario",
+  "title": "Democratic governance enables farm innovation through worker collaboration",
+  "description": "Democratic governance enables farm innovation through worker collaboration",
+  "content": "Scenario: Democratic governance enables farm innovation through worker collaboration\n    Given individual owner structure limited innovation to Tom's ideas and capacity\n    And workers had innovative ideas but no mechanism to implement them\n    When democratic governance values all workers' innovative contributions\n    Then cultivation technique improvements emerge from farmworker experimentation\n    And workflow optimizations are tested and refined collaboratively\n    And sustainable practice innovations spread through worker knowledge sharing\n    And collective intelligence exceeds individual owner capacity\n    And workplace_elohim documents innovations and shares across democratic farm network\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

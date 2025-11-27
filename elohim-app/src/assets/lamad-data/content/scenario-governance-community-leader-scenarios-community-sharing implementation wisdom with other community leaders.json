@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-sharing implementation wisdom with other community leaders",
+  "contentType": "scenario",
+  "title": "Sharing implementation wisdom with other community leaders",
+  "description": "Sharing implementation wisdom with other community leaders",
+  "content": "Scenario: Sharing implementation wisdom with other community leaders\n    Given I have three years experience implementing protocol in Riverside\n    And other mayors considering adoption seek my advice\n    When I share honest assessment of benefits and challenges\n    Then I describe: what worked (community calibration, Constitutional Council)\n    And I acknowledge: what struggled (elderly accessibility, some controversy)\n    And I explain: factors predicting success (community buy-in, resources, patience)\n    And I provide: practical implementation guidance\n    And I offer: not utopia but better than what we had\n    And I emphasize: communities control adoption speed and approach\n    And peer network: enables learning across communities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

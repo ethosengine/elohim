@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-democratic food service becomes recognized industry sector category",
+  "contentType": "scenario",
+  "title": "Democratic food service becomes recognized industry sector category",
+  "description": "Democratic food service becomes recognized industry sector category",
+  "content": "Scenario: Democratic food service becomes recognized industry sector category\n    Given food service is categorized as: fast food chains, casual dining, fine dining, etc.\n    And democratic ownership is not recognized as distinct sector category\n    When democratic conversions reach critical mass and visibility\n    Then \"democratic food service\" becomes recognized industry category\n    And industry publications, conferences, and research treat it as distinct sector\n    And consumers seek out democratic establishments, creating market demand\n    And sector identity builds pride and coordination among democratic food service workers and operators\n    And industry_sector_elohim advocates for democratic food service sector recognition and support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

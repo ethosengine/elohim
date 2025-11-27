@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-documentation of care work value for future employment",
+  "contentType": "scenario",
+  "title": "Documentation of care work value for future employment",
+  "description": "Documentation of care work value for future employment",
+  "content": "Scenario: Documentation of care work value for future employment\n    Given James's care work develops valuable professional skills\n    And years of family caregiving should count as experience\n    When the workplace_elohim documents James's care work\n    Then it should quantify care contributions professionally\n    And care skills should be framed as professional development\n    And documentation should support future employment applications\n    And family caregiving should be recognized as professional experience\n    And care economy should translate to employment economy value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,middle_aged,employee,contractor",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-educational resources for parents teaching value literacy",
+  "contentType": "scenario",
+  "title": "Educational resources for parents teaching value literacy",
+  "description": "Educational resources for parents teaching value literacy",
+  "content": "Scenario: Educational resources for parents teaching value literacy\n    Given Sarah wants to teach value literacy effectively\n    And she needs pedagogical support for home education\n    When Sarah accesses educational resources\n    Then the educational_elohim should provide parent education materials\n    And resources should be developmentally appropriate for different ages\n    And guidance should help Sarah teach Tommy differently than Emma\n    And Sarah should have tools to be effective value literacy educator\n    And parent education should be supported systematically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

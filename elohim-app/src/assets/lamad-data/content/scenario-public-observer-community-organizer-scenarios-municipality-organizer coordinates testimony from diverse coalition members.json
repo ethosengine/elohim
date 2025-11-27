@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer coordinates testimony from diverse coalition members",
+  "contentType": "scenario",
+  "title": "Organizer coordinates testimony from diverse coalition members",
+  "description": "Organizer coordinates testimony from diverse coalition members",
+  "content": "Scenario: Organizer coordinates testimony from diverse coalition members\n    Given coalition spans four languages and six neighborhoods\n    And members work different shifts limiting meeting availability\n    When the organizer uses Observer for testimony coordination\n    Then members access testimony guidelines in their languages\n    And sign up for speaking slots that work with their schedules\n    And share testimony drafts for peer feedback asynchronously\n    And arrive at city council with coordinated powerful messages\n    And coalition shows municipal government the breadth and depth of community power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,politician,journalist",
+    "related_layers:community,district,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

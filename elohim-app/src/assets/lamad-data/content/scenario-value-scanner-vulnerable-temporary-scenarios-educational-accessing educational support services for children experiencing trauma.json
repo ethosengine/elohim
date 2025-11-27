@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-accessing educational support services for children experiencing trauma",
+  "contentType": "scenario",
+  "title": "Accessing educational support services for children experiencing trauma",
+  "description": "Accessing educational support services for children experiencing trauma",
+  "content": "Scenario: Accessing educational support services for children experiencing trauma\n    Given my children are exhibiting trauma responses affecting learning\n    And schools have support services (counseling, IEPs, 504 plans, trauma-informed support)\n    When I advocate for educational support for my children\n    Then the Value Scanner helps me identify appropriate educational interventions\n    And provides information about my children's rights to services\n    And helps me navigate IEP or 504 plan processes\n    And coordinates with school counselors and support staff\n    And tracks children's educational support needs and services received\n    And my personal_agent reminds me of educational meetings and deadlines\n    And recognizes educational advocacy as sophisticated parenting work\n    And validates that trauma affects learning and requires support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-provincial-state-activist tracks state legislation across session",
+  "contentType": "scenario",
+  "title": "Activist tracks state legislation across session",
+  "description": "Activist tracks state legislation across session",
+  "content": "Scenario: Activist tracks state legislation across session\n    Given hundreds of bills move through state legislature\n    And the activist cannot attend all hearings\n    When the Observer monitors state education legislation\n    Then the activist receives alerts on relevant bills\n    And sees analysis of policy impacts on students\n    And identifies opportunities for testimony\n    And tracks which legislators support or oppose\n    And statewide advocacy becomes sustainable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:provincial_state",
+    "related_users:community_organizer,activist,politician,journalist",
+    "related_layers:municipality,nation_state,county_regional",
+    "elohim_agents:public_observer,regional_elohim,policy_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

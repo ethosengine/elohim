@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-scheduling personal time with cognitive support",
+  "contentType": "scenario",
+  "title": "Scheduling personal time with cognitive support",
+  "description": "Scheduling personal time with cognitive support",
+  "content": "Scenario: Scheduling personal time with cognitive support\n    Given Jordan wants to plan their weekend activities\n    When Jordan opens the schedule planner\n    Then the interface shows time visually (morning/afternoon/evening pictures)\n    And activity options appear as large icons with simple labels\n    And the system guides Jordan step-by-step (\"What do you want Saturday morning?\")\n    And Jordan can select activities they enjoy (park, movies, friends)\n    And the personal_agent helps coordinate support if needed\n    And Jordan's schedule reflects their genuine choices\n    And Jordan maintains decision-making authority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

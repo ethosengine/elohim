@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-ecological-organizer builds coalition for climate adaptation investment",
+  "contentType": "scenario",
+  "title": "Organizer builds coalition for climate adaptation investment",
+  "description": "Organizer builds coalition for climate adaptation investment",
+  "content": "Scenario: Organizer builds coalition for climate adaptation investment\n    Given low-income neighborhoods face worst climate impacts\n    But climate funding flows to wealthy areas\n    When the organizer uses Observer to identify alignment\n    Then they connect communities facing flooding, heat islands, poor air quality\n    And document systematic disinvestment in climate resilience\n    And coordinate coalition demanding equitable climate spending\n    And facilitate testimony from diverse affected communities\n    And climate justice becomes redistributive investment campaign\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,parent,politician",
+    "related_layers:community,municipality,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

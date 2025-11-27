@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-health literacy education empowers self-care",
+  "contentType": "scenario",
+  "title": "Health literacy education empowers self-care",
+  "description": "Health literacy education empowers self-care",
+  "content": "Scenario: Health literacy education empowers self-care\n    Given Margaret navigates complex health systems\n    And health literacy affects health outcomes\n    When the educational_elohim provides health education\n    Then Margaret should access senior-appropriate health information\n    And education should empower her health decision-making\n    And her nursing background should be acknowledged\n    And health literacy should support active aging\n    And education should enhance autonomy in health care\n    And Margaret should be informed patient and advocate\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

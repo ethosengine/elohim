@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-garden and food production as ecological care and education",
+  "contentType": "scenario",
+  "title": "Garden and food production as ecological care and education",
+  "description": "Garden and food production as ecological care and education",
+  "content": "Scenario: Garden and food production as ecological care and education\n    Given Sarah wants children to understand food systems\n    And growing food teaches ecological relationships\n    When Sarah gardens with Tommy and Emma\n    Then the ecological_elohim should recognize gardening as multi-dimensional care\n    And it should value food production, education, and ecological benefit\n    And teaching children to grow food should accumulate care tokens\n    And the system should recognize food sovereignty work\n    And Sarah's effort to build children's food system understanding should be valued\n    And gardening should be recognized as ecological care labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-tracking personal goals and progress during crisis recovery",
+  "contentType": "scenario",
+  "title": "Tracking personal goals and progress during crisis recovery",
+  "description": "Tracking personal goals and progress during crisis recovery",
+  "content": "Scenario: Tracking personal goals and progress during crisis recovery\n    Given I am rebuilding my life after leaving an abusive relationship\n    And I have set personal goals for stability and independence\n    When I make progress toward my goals (even small steps)\n    Then the Value Scanner celebrates my achievements\n    And tracks my progress without imposing external timelines\n    And helps me identify next steps at my pace\n    And recognizes setbacks as normal parts of recovery\n    And maintains my focus on my vision for my future\n    And counters institutional pressure to recover \"faster\" or \"properly\"\n    And my personal_agent reminds me of how far I've come\n    And validates that my timeline is the right timeline\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

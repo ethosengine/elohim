@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-community-activist tracks local environmental justice issues",
+  "contentType": "scenario",
+  "title": "Activist tracks local environmental justice issues",
+  "description": "Activist tracks local environmental justice issues",
+  "content": "Scenario: Activist tracks local environmental justice issues\n    Given pollution sources affect the activist's community\n    And residents report health concerns\n    When the Observer documents environmental conditions\n    Then the activist sees air quality trends by neighborhood\n    And maps proximity of industrial facilities to residences\n    And tracks permit violations and regulatory responses\n    And organizes community for accountability demands\n    And environmental racism becomes documented and actionable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_organizer,citizen,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

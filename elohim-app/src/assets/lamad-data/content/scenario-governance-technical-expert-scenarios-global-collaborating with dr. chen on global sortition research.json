@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-collaborating with dr. chen on global sortition research",
+  "contentType": "scenario",
+  "title": "Collaborating with Dr. Chen on global sortition research",
+  "description": "Collaborating with Dr. Chen on global sortition research",
+  "content": "Scenario: Collaborating with Dr. Chen on global sortition research\n    Given Dr. Chen presents research on constitutional council effectiveness\n    And my technical expertise complements his social science\n    When I help explain technical aspects of his findings\n    Then I clarify: how technical design enables or constrains democratic oversight\n    And I interpret: patterns in agent-council interactions\n    And I assess: whether technical systems adequately support citizen governance\n    And I respect: his authority on democratic theory and outcomes\n    And we integrate: technical and social understanding\n    And we serve: evidence-based global constitutional deliberation\n    And we demonstrate: interdisciplinary collaboration\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-community-community organizations coordinate through care economy principles",
+  "contentType": "scenario",
+  "title": "Community organizations coordinate through care economy principles",
+  "description": "Community organizations coordinate through care economy principles",
+  "content": "Scenario: Community organizations coordinate through care economy principles\n    Given Sarah participates in multiple community organizations\n    And these organizations share care economy values\n    When community organizations coordinate activities\n    Then the community_elohim should facilitate coordination\n    And it should prevent Sarah from being overcommitted\n    And it should enable meaningful contribution across organizations\n    And community sector should adopt care economy practices\n    And organizational effectiveness should improve through coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:community",
+    "related_users:parent,worker,educator,caregiver,community_member",
+    "related_layers:neighborhood,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

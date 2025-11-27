@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-family governance includes frank's voice in his own care planning",
+  "contentType": "scenario",
+  "title": "Family governance includes Frank's voice in his own care planning",
+  "description": "Family governance includes Frank's voice in his own care planning",
+  "content": "Scenario: Family governance includes Frank's voice in his own care planning\n    Given family makes decisions that affect Frank's future\n    And decisions about his care must honor his autonomy\n    When family_elohim facilitates governance decisions\n    Then Frank must have primary voice in his own care planning\n    And adult children should participate but not dominate\n    And Frank's preferences and values must be centered\n    And family should plan with him, not for him\n    And his decades of life experience should be respected\n    And autonomy should be preserved even as needs increase\n    And family governance should empower, never infantilize\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

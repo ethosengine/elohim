@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-provide evidence to senator ruiz for federal policy continuation",
+  "contentType": "scenario",
+  "title": "Provide evidence to Senator Ruiz for federal policy continuation",
+  "description": "Provide evidence to Senator Ruiz for federal policy continuation",
+  "content": "Scenario: Provide evidence to Senator Ruiz for federal policy continuation\n    Given Elena needs evidence that federal funding produces lasting benefits\n    When James presents 10-year findings to Senate Committee\n    Then he shows sustained wellbeing improvements across decade\n    And he demonstrates democratic capacity building persists\n    And he documents cost-effectiveness over long-term horizon\n    And he provides honest assessment of challenges and failures\n    And his rigorous longitudinal research justifies continued federal investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

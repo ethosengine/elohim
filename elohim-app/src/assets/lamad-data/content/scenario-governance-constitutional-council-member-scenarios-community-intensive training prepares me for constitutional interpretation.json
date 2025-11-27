@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-intensive training prepares me for constitutional interpretation",
+  "contentType": "scenario",
+  "title": "Intensive training prepares me for constitutional interpretation",
+  "description": "Intensive training prepares me for constitutional interpretation",
+  "content": "Scenario: Intensive training prepares me for constitutional interpretation\n    Given I have accepted my Constitutional Council appointment\n    And I need to understand constitutional principles to judge agent decisions\n    When I complete 3-week training program\n    Then I learn: constitutional principles and their application\n    And I study: how agents reason and make decisions\n    And I practice: deliberation protocols and consensus building\n    And I review: historical precedents and case studies\n    And I am educated: without being indoctrinated about \"correct\" answers\n    And I develop: judgment capacity not just knowledge\n    And I feel: prepared to serve despite lack of formal expertise\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

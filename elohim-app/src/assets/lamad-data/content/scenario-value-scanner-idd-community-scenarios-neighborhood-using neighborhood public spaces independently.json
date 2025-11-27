@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-using neighborhood public spaces independently",
+  "contentType": "scenario",
+  "title": "Using neighborhood public spaces independently",
+  "description": "Using neighborhood public spaces independently",
+  "content": "Scenario: Using neighborhood public spaces independently\n    Given Jordan loves visiting the nearby park\n    And the park is within safe walking distance\n    When Jordan wants to spend time at the park\n    Then the personal_agent helps Jordan coordinate timing and safety\n    And Jordan can walk to the park with appropriate support level\n    And Jordan uses park facilities like any other community member\n    And park neighbors see Jordan as a regular park user\n    And Jordan's public space usage is a right, not a privilege\n    And Jordan experiences freedom and community belonging\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

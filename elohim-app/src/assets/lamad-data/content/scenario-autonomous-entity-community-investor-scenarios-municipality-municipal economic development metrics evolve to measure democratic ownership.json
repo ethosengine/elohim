@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-municipal economic development metrics evolve to measure democratic ownership",
+  "contentType": "scenario",
+  "title": "Municipal economic development metrics evolve to measure democratic ownership",
+  "description": "Municipal economic development metrics evolve to measure democratic ownership",
+  "content": "Scenario: Municipal economic development metrics evolve to measure democratic ownership\n    Given cities measure economic development by job quantity, not quality\n    And Patricia's investments create high-quality jobs (living wages, ownership, voice)\n    When community investors demonstrate democratic ownership benefits\n    Then municipal metrics include: worker ownership rates, wage levels, democratic governance participation\n    And economic development success is measured by community wealth-building\n    And democratic conversions score highly on quality-focused metrics\n    And policy priorities shift toward job quality through investor advocacy\n    And municipality_elohim provides democratic economy measurement framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

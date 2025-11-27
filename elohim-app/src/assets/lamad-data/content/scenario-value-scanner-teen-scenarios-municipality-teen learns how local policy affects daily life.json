@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-teen learns how local policy affects daily life",
+  "contentType": "scenario",
+  "title": "Teen learns how local policy affects daily life",
+  "description": "Teen learns how local policy affects daily life",
+  "content": "Scenario: Teen learns how local policy affects daily life\n    Given Jasmine participates in municipal care economy\n    And local policies shape her lived experience\n    When she engages with municipal systems through the Value Scanner\n    Then the municipal_elohim should make policy connections visible\n    And explain how local food policy affects her grocery shopping\n    And show how zoning decisions impact neighborhood walkability\n    And connect transit policy to her ability to access work and school\n    And help her understand that municipal governance is not abstract\n    And build her civic literacy through connection to daily experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

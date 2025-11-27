@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-developer receives honest regional impact analysis",
+  "contentType": "scenario",
+  "title": "Developer receives honest regional impact analysis",
+  "description": "Developer receives honest regional impact analysis",
+  "content": "Scenario: Developer receives honest regional impact analysis\n    Given a developer claims project creates regional economic benefit\n    But analysis omits regional infrastructure burden\n    When the Observer provides regional cost-benefit assessment\n    Then the developer sees: promised jobs mostly go to workers from outside region\n    And traffic impacts affect three counties' transportation networks\n    And environmental impacts span watershed affecting six municipalities\n    And honest regional accounting reveals actual trade-offs\n    And local extraction versus regional benefit becomes clear\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

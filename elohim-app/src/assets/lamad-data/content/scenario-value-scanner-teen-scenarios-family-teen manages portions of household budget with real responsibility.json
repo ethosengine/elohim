@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-family-teen manages portions of household budget with real responsibility",
+  "contentType": "scenario",
+  "title": "Teen manages portions of household budget with real responsibility",
+  "description": "Teen manages portions of household budget with real responsibility",
+  "content": "Scenario: Teen manages portions of household budget with real responsibility\n    Given Jasmine has been allocated responsibility for weekly food budget\n    And the family has allocated $100/week for her to manage\n    And this is part of the actual household budget, not pretend\n    When Jasmine makes purchasing decisions\n    Then she should have genuine authority over those funds\n    And her decisions should have real impact on family wellbeing\n    And the family_elohim should track her budget management\n    And provide feedback on value optimization\n    And recognize successful management: \"Jasmine has stayed within budget and met family needs for 12 consecutive weeks\"\n    And support her learning household economics through real practice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:family",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

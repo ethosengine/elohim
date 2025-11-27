@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-disability justice insights inform ecological care economy",
+  "contentType": "scenario",
+  "title": "Disability justice insights inform ecological care economy",
+  "description": "Disability justice insights inform ecological care economy",
+  "content": "Scenario: Disability justice insights inform ecological care economy\n    Given disability justice recognizes that no one is truly independent\n    And disabled people understand interdependence as lived reality\n    When the bioregional_elohim models ecological relationships\n    Then disability justice principles should inform ecological thinking\n    And Alex's understanding of mutual aid should shape environmental approaches\n    And recognition of diverse ways of being should extend to ecological diversity\n    And interdependence should be celebrated, not denied\n    And the protocol should learn from disability community wisdom\n    And ecological systems should embody values disability justice teaches\n    And Alex's expertise about interdependence should be valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent advocates for safe routes to school infrastructure",
+  "contentType": "scenario",
+  "title": "Parent advocates for safe routes to school infrastructure",
+  "description": "Parent advocates for safe routes to school infrastructure",
+  "content": "Scenario: Parent advocates for safe routes to school infrastructure\n    Given the parent's child walks to school along unsafe streets\n    And lacks sidewalks and safe crossings for two blocks\n    When the parent reviews municipal transportation budget\n    Then they see $4M allocated for downtown streetscape improvements\n    And learn zero dollars budgeted for school route safety\n    And connect with other parents whose children walk same routes\n    And present coordinated testimony at city council meeting\n    And municipal infrastructure priorities include children's safety\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

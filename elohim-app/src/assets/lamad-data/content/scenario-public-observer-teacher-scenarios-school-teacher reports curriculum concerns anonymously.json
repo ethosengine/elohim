@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-school-teacher reports curriculum concerns anonymously",
+  "contentType": "scenario",
+  "title": "Teacher reports curriculum concerns anonymously",
+  "description": "Teacher reports curriculum concerns anonymously",
+  "content": "Scenario: Teacher reports curriculum concerns anonymously\n    Given the principal mandates instructional approach contradicting research\n    And the teacher knows this won't work for students\n    When the teacher reports concern through Observer anonymously\n    Then the contribution is documented without revealing identity\n    And pattern detection shows 45 other teachers share concern\n    And school leadership sees collective professional judgment\n    And curriculum decision is reconsidered based on teacher expertise\n    And teacher voice emerges without individual retaliation risk\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:school",
+    "related_users:parent,board_member,student,administrator",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,classroom_elohim,education_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/school.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-school",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-school",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

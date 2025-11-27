@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-municipality-council member exposes budget priorities misaligned with constituent needs",
+  "contentType": "scenario",
+  "title": "Council member exposes budget priorities misaligned with constituent needs",
+  "description": "Council member exposes budget priorities misaligned with constituent needs",
+  "content": "Scenario: Council member exposes budget priorities misaligned with constituent needs\n    Given the politician suspects budget doesn't reflect community priorities\n    When the Observer analyzes municipal spending patterns\n    Then they see infrastructure investment concentrated in affluent neighborhoods\n    And identify underinvestment in working-class areas\n    And calculate service delivery disparities by district\n    And present evidence-based budget amendments\n    And advocate for equitable resource distribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,journalist,developer_interests,board_member",
+    "related_layers:community,district,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,constituent_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

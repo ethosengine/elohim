@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-participating in neighborhood emergency response",
+  "contentType": "scenario",
+  "title": "Participating in neighborhood emergency response",
+  "description": "Participating in neighborhood emergency response",
+  "content": "Scenario: Participating in neighborhood emergency response\n    Given neighborhoods need mutual aid during emergencies\n    When crisis occurs and I am not working\n    Then the protocol should help me contribute to emergency response\n    And coordinate with neighbors for mutual support\n    And recognize my contribution to neighborhood resilience\n    And ensure I can also access support during my emergencies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

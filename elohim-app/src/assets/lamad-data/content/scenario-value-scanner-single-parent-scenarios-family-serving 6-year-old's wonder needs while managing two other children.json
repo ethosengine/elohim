@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-family-serving 6-year-old's wonder needs while managing two other children",
+  "contentType": "scenario",
+  "title": "Serving 6-year-old's wonder needs while managing two other children",
+  "description": "Serving 6-year-old's wonder needs while managing two other children",
+  "content": "Scenario: Serving 6-year-old's wonder needs while managing two other children\n    Given her youngest child is at peak wonder and exploration stage\n    And this age needs substantial parental engagement and presence\n    When Maria serves her 6-year-old's developmental needs\n    Then the family_elohim should remind her of age-appropriate activities\n    And it should help her protect wonder time despite other demands\n    And it should prevent youngest from being neglected due to older siblings' needs\n    And it should help her be present for this critical developmental stage\n    And Maria should successfully nurture her youngest despite impossible time constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:family",
+    "related_users:parent,child,young_child,preteen,teen,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

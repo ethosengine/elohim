@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-supporting family members during crisis",
+  "contentType": "scenario",
+  "title": "Supporting family members during crisis",
+  "description": "Supporting family members during crisis",
+  "content": "Scenario: Supporting family members during crisis\n    Given a family member experiences health crisis or emergency\n    When I want to help but have employment obligations\n    Then the protocol should help me assess my options\n    And coordinate with other family members for coverage\n    And help me communicate with my employer about family needs\n    And support me in balancing work demands with family care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

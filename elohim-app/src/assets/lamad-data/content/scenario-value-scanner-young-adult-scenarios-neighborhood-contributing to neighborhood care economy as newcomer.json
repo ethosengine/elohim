@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-contributing to neighborhood care economy as newcomer",
+  "contentType": "scenario",
+  "title": "Contributing to neighborhood care economy as newcomer",
+  "description": "Contributing to neighborhood care economy as newcomer",
+  "content": "Scenario: Contributing to neighborhood care economy as newcomer\n    Given Aisha is new and has few connections\n    And she wants to establish herself in the community\n    When Aisha contributes to neighborhood initiatives\n    Then the neighborhood_elohim should track her contributions\n    And it should make her care work visible to neighbors\n    And it should help her build social capital through care\n    And early contributions should establish her as community participant\n    And the system should help newcomers integrate through care economy\n    And belonging should be earned through reciprocal care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

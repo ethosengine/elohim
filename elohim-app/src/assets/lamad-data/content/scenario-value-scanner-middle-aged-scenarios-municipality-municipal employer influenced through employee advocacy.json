@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal employer influenced through employee advocacy",
+  "contentType": "scenario",
+  "title": "Municipal employer influenced through employee advocacy",
+  "description": "Municipal employer influenced through employee advocacy",
+  "content": "Scenario: Municipal employer influenced through employee advocacy\n    Given municipal government is major employer\n    And Robert may work for municipality or know municipal employees\n    And municipal employment policy sets standards\n    When municipal_elohim supports workplace advocacy\n    Then it should recognize opportunities to influence municipal employment policy\n    And help Robert advocate for municipal employee work-family balance\n    And support municipal adoption of care economy employment practices\n    And demonstrate that municipal government should model care economy principles\n    And build municipal workplace that supports employee caregiving\n    And create demonstration that care-friendly employment is possible\n    And influence broader employment culture through municipal example\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

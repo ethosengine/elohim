@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-siblings learning from student care economy practices",
+  "contentType": "scenario",
+  "title": "Siblings learning from student care economy practices",
+  "description": "Siblings learning from student care economy practices",
+  "content": "Scenario: Siblings learning from student care economy practices\n    Given Kenji has younger siblings who will become students\n    And he's learning valuable care economy skills\n    When the family_elohim tracks knowledge transfer\n    Then it should recognize Kenji mentoring siblings in life skills\n    And it should value his teaching them budgeting, cooking, household management\n    And it should accumulate care tokens for mentorship work\n    And older siblings should be recognized as teachers for younger ones\n    And the system should value peer education within families\n    And Kenji's student experience should benefit future student siblings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

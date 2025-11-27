@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-individual-care token accumulation reflects totality of invisible labor",
+  "contentType": "scenario",
+  "title": "Care token accumulation reflects totality of invisible labor",
+  "description": "Care token accumulation reflects totality of invisible labor",
+  "content": "Scenario: Care token accumulation reflects totality of invisible labor\n    Given Sarah performs mental labor and physical labor continuously\n    And traditional economics renders her household work invisible\n    When the Value Scanner tracks Sarah's care contributions\n    Then care tokens should accumulate for meal planning, not just cooking\n    And tokens should reflect coordinating schedules, managing inventory, teaching values\n    And emotional labor should be valued alongside physical tasks\n    And the full complexity of parenting work should be quantified\n    And Sarah's care token balance should reflect her enormous contributions\n    And invisible care labor should become economically visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:individual",
+    "related_users:adult,worker,child,partner",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

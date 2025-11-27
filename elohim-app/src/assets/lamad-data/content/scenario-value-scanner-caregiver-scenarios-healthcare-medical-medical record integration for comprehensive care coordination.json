@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical record integration for comprehensive care coordination",
+  "contentType": "scenario",
+  "title": "Medical record integration for comprehensive care coordination",
+  "description": "Medical record integration for comprehensive care coordination",
+  "content": "Scenario: Medical record integration for comprehensive care coordination\n    Given David's medical information is scattered across providers\n    And comprehensive view is essential for good care\n    When the healthcare_elohim accesses medical records\n    Then it should integrate information across healthcare systems\n    And James should have complete medical picture\n    And providers should receive comprehensive information\n    And medical record fragmentation should be addressed\n    And care coordination should be supported by integrated data\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

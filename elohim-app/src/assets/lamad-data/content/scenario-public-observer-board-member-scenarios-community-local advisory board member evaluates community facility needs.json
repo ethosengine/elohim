@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-community-local advisory board member evaluates community facility needs",
+  "contentType": "scenario",
+  "title": "Local advisory board member evaluates community facility needs",
+  "description": "Local advisory board member evaluates community facility needs",
+  "content": "Scenario: Local advisory board member evaluates community facility needs\n    Given community center requires major renovations or replacement\n    And advisory board must recommend priorities to city council\n    And board wants to understand diverse community facility needs\n    When the board member seeks community input through Observer\n    Then they receive aggregated data on facility usage patterns\n    And see survey responses from various community demographic groups\n    And access needs assessment comparing current offerings to community priorities\n    And discover seniors, youth, and working families have different needs\n    And community accountability helps board advocate for inclusive facility design\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,community_organizer,politician",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

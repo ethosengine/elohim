@@ -15,20 +15,20 @@ describe('UserAffinity Model', () => {
           'node-1': 0.5,
           'node-2': 0.8
         },
-        lastUpdated: new Date('2025-01-01')
+        lastUpdated: '2025-01-01T00:00:00.000Z'
       };
 
       expect(userAffinity.userId).toBe('user-1');
       expect(userAffinity.affinity['node-1']).toBe(0.5);
       expect(userAffinity.affinity['node-2']).toBe(0.8);
-      expect(userAffinity.lastUpdated).toEqual(new Date('2025-01-01'));
+      expect(userAffinity.lastUpdated).toEqual('2025-01-01T00:00:00.000Z');
     });
 
     it('should accept empty affinity map', () => {
       const userAffinity: UserAffinity = {
         userId: 'user-1',
         affinity: {},
-        lastUpdated: new Date()
+        lastUpdated: '2025-01-01T00:00:00.000Z'
       };
 
       expect(Object.keys(userAffinity.affinity).length).toBe(0);
@@ -42,7 +42,7 @@ describe('UserAffinity Model', () => {
           'node-2': 0.5,
           'node-3': 1.0
         },
-        lastUpdated: new Date()
+        lastUpdated: '2025-01-01T00:00:00.000Z'
       };
 
       expect(userAffinity.affinity['node-1']).toBe(0.0);
@@ -150,13 +150,13 @@ describe('UserAffinity Model', () => {
         nodeId: 'node-1',
         oldValue: 0.5,
         newValue: 0.8,
-        timestamp: new Date('2025-01-01')
+        timestamp: '2025-01-01T00:00:00.000Z'
       };
 
       expect(event.nodeId).toBe('node-1');
       expect(event.oldValue).toBe(0.5);
       expect(event.newValue).toBe(0.8);
-      expect(event.timestamp).toEqual(new Date('2025-01-01'));
+      expect(event.timestamp).toEqual('2025-01-01T00:00:00.000Z');
     });
 
     it('should handle zero to non-zero change', () => {
@@ -164,7 +164,7 @@ describe('UserAffinity Model', () => {
         nodeId: 'node-1',
         oldValue: 0.0,
         newValue: 0.3,
-        timestamp: new Date()
+        timestamp: '2025-01-01T00:00:00.000Z'
       };
 
       expect(event.oldValue).toBe(0.0);
@@ -176,7 +176,7 @@ describe('UserAffinity Model', () => {
         nodeId: 'node-1',
         oldValue: 0.8,
         newValue: 0.4,
-        timestamp: new Date()
+        timestamp: '2025-01-01T00:00:00.000Z'
       };
 
       expect(event.oldValue).toBe(0.8);

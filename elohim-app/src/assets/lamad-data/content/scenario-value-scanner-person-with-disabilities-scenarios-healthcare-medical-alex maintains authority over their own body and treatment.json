@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-alex maintains authority over their own body and treatment",
+  "contentType": "scenario",
+  "title": "Alex maintains authority over their own body and treatment",
+  "description": "Alex maintains authority over their own body and treatment",
+  "content": "Scenario: Alex maintains authority over their own body and treatment\n    Given medical providers often assume they know what's best for disabled patients\n    And Alex has deep expertise about their own body and disability\n    When Alex interacts with medical providers\n    Then the personal_agent should help Alex assert bodily autonomy\n    And it should support Alex in refusing unwanted treatments\n    And it should remind providers that Alex is expert on their own needs\n    And medical decisions should remain under Alex's control\n    And the protocol should structurally defend Alex's medical self-determination\n    And informed consent should be meaningful, not coerced\n    And Alex's authority over their own body should be absolute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-municipal governance evolution through protocol learning",
+  "contentType": "scenario",
+  "title": "Municipal governance evolution through protocol learning",
+  "description": "Municipal governance evolution through protocol learning",
+  "content": "Scenario: Municipal governance evolution through protocol learning\n    Given Riverside has three years implementing protocol\n    And we have learned what works and what doesn't\n    When I reflect on governance transformation\n    Then I see: city council making better-informed decisions\n    And I notice: residents more engaged through transparency\n    And I observe: faster crisis response with better coordination\n    And I acknowledge: challenges with accessibility and occasional controversy\n    And I understand: protocol enhanced but didn't replace democratic governance\n    And I know: community remains in control through sovereignty and calibration\n    And I have become: leader facilitating partnership with AI not commanding it\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

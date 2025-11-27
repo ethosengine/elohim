@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-parental oversight protects young child while honoring agency",
+  "contentType": "scenario",
+  "title": "Parental oversight protects young child while honoring agency",
+  "description": "Parental oversight protects young child while honoring agency",
+  "content": "Scenario: Parental oversight protects young child while honoring agency\n    Given Tommy has genuine autonomy in the scanner\n    And he is only 5 years old\n    When Tommy makes selections\n    Then parental oversight should be supreme\n    And Sarah should have full visibility into Tommy's scanner usage\n    And Sarah should control what data is recorded\n    And Tommy's agency should be preserved within parental boundaries\n    And the balance should protect both safety and autonomy\n    And Sarah should not experience anxiety about granting Tommy freedom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker voice prevents owner burnout and distributes responsibility",
+  "contentType": "scenario",
+  "title": "Farmworker voice prevents owner burnout and distributes responsibility",
+  "description": "Farmworker voice prevents owner burnout and distributes responsibility",
+  "content": "Scenario: Farmworker voice prevents owner burnout and distributes responsibility\n    Given Tom carried full farm responsibility alone causing stress and burnout\n    And sole proprietorship meant he couldn't take breaks without farm crisis\n    When democratic governance distributes responsibility across worker-owners\n    Then Tom (if staying as cooperative member) is freed from sole responsibility burden\n    And farmworkers collectively manage farm reducing individual stress\n    And vacation and health breaks become possible for all including Tom\n    And democratic distribution of responsibility enables sustainable work-life balance\n    And workplace_elohim ensures responsibility distribution is equitable and sustainable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

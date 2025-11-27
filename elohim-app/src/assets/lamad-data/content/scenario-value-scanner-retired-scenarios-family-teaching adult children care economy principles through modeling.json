@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-teaching adult children care economy principles through modeling",
+  "contentType": "scenario",
+  "title": "Teaching adult children care economy principles through modeling",
+  "description": "Teaching adult children care economy principles through modeling",
+  "content": "Scenario: Teaching adult children care economy principles through modeling\n    Given Frank's adult children are watching his care contributions\n    And he's modeling post-employment care economy participation\n    When family_elohim surfaces care patterns\n    Then it should help Frank teach care economy to next generation\n    And adult children should see that contribution continues through retirement\n    And they should learn that care flows across generations\n    And Frank's example should prepare them for their own aging\n    And care reciprocity should be transmitted generationally\n    And family care culture should strengthen through visible modeling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

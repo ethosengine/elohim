@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-learning economic systems through lived experience",
+  "contentType": "scenario",
+  "title": "Learning economic systems through lived experience",
+  "description": "Learning economic systems through lived experience",
+  "content": "Scenario: Learning economic systems through lived experience\n    Given Marcus navigates real economic constraints daily\n    And he experiences market systems, pricing, scarcity directly\n    When Marcus develops economic understanding\n    Then he should learn economics through authentic participation\n    And he should understand supply and demand through shopping\n    And he should grasp market failures through food desert experience\n    And economic theory should be grounded in lived reality\n    And his understanding should be deeper than abstract classroom learning\n    And care economy should provide superior economic education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-participating in industry policy advocacy",
+  "contentType": "scenario",
+  "title": "Participating in industry policy advocacy",
+  "description": "Participating in industry policy advocacy",
+  "content": "Scenario: Participating in industry policy advocacy\n    Given policy changes can transform industry conditions\n    When legislation affecting food service workers is under consideration\n    Then the protocol should alert workers to policy opportunities\n    And facilitate participation in legislative advocacy\n    And coordinate worker testimony and organizing for policy change\n    And build political power for worker-supportive policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

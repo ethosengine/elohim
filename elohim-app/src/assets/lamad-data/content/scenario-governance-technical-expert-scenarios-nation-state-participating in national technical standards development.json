@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-nation-state-participating in national technical standards development",
+  "contentType": "scenario",
+  "title": "Participating in national technical standards development",
+  "description": "Participating in national technical standards development",
+  "content": "Scenario: Participating in national technical standards development\n    Given national protocol standards need technical specification\n    And I serve on standards development committee\n    When I help craft technical requirements\n    Then I ensure: standards serve constitutional principles\n    And I verify: specifications are implementable\n    And I check: for security vulnerabilities in standards\n    And I collaborate: with diverse technical experts\n    And I submit: standards to National Constitutional Council for approval\n    And I demonstrate: technical development serving democratic governance\n    And citizens authorize: technical changes through council oversight\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,researcher,appellant",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

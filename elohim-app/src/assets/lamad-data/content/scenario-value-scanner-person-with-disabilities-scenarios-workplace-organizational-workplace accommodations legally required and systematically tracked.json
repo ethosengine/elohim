@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace accommodations legally required and systematically tracked",
+  "contentType": "scenario",
+  "title": "Workplace accommodations legally required and systematically tracked",
+  "description": "Workplace accommodations legally required and systematically tracked",
+  "content": "Scenario: Workplace accommodations legally required and systematically tracked\n    Given Alex requires specific workplace accommodations\n    And accommodations are legally mandated under ADA\n    When Alex requests workplace accommodations\n    Then the workplace_elohim should help Alex document accommodation requests\n    And it should track whether employer provides required accommodations\n    And it should maintain records of all accommodation-related communications\n    And Alex should have documentation to support legal action if necessary\n    And the protocol should recognize that accommodation is right, not favor\n    And Alex should be supported in asserting legal rights\n    And workplace obligations should be clearly documented\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,young_adult,caregiver",
+    "related_layers:individual,household,community,healthcare_medical",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

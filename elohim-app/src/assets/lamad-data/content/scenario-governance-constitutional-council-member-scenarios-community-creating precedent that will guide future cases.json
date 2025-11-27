@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-creating precedent that will guide future cases",
+  "contentType": "scenario",
+  "title": "Creating precedent that will guide future cases",
+  "description": "Creating precedent that will guide future cases",
+  "content": "Scenario: Creating precedent that will guide future cases\n    Given our council rules on Marcus's mental health intervention appeal\n    And we affirm the agent's decision as constitutionally aligned\n    When we document our reasoning and recommendations\n    Then we explain: why privacy was balanced against care in this case\n    And we recommend: protocol enhancements for pre-specified preferences\n    And we create: precedent that future councils can reference\n    And we document: our deliberation process (anonymized)\n    And we contribute: to evolving constitutional interpretation\n    And our judgment: becomes part of public constitutional record\n    And Marcus's case: makes the protocol better for everyone\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

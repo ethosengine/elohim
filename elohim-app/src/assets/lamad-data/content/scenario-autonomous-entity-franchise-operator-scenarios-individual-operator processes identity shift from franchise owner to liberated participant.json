@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator processes identity shift from franchise owner to liberated participant",
+  "contentType": "scenario",
+  "title": "Operator processes identity shift from franchise owner to liberated participant",
+  "description": "Operator processes identity shift from franchise owner to liberated participant",
+  "content": "Scenario: Operator processes identity shift from franchise owner to liberated participant\n    Given James's identity was tied to franchise ownership despite its burden\n    And exit could trigger identity crisis and sense of failure\n    When EAE provides transition support for psychological and social adjustment\n    Then James accesses peer counseling with other converted franchise operators\n    And new identity emerges: operator who chose workers and community over corporate servitude\n    And he discovers purpose beyond ownership\u2014contribution without extraction\n    And transition is honored as wisdom and courage, not failure\n    And emotional reality of major life change is validated and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

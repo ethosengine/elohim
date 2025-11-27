@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-community-manager facilitates community stakeholder meetings transparently",
+  "contentType": "scenario",
+  "title": "Manager facilitates community stakeholder meetings transparently",
+  "description": "Manager facilitates community stakeholder meetings transparently",
+  "content": "Scenario: Manager facilitates community stakeholder meetings transparently\n    Given community investors and customers want to provide input\n    And workers want community perspective while maintaining autonomy\n    When annual stakeholder meeting occurs\n    Then Marcus facilitates meeting ensuring all voices are heard\n    And Marcus presents operational updates transparently\n    And Marcus helps translate community input into actionable worker proposals\n    But Marcus doesn't filter or control community input\n    And workers make final decisions on community suggestions\n    And community_elohim ensures facilitation doesn't manipulate outcomes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,worker]",
+    "related_layers:[workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

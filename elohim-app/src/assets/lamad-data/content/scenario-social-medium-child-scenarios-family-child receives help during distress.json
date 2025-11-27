@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-family-child receives help during distress",
+  "contentType": "scenario",
+  "title": "Child receives help during distress",
+  "description": "Child receives help during distress",
+  "content": "Scenario: Child receives help during distress\n    Given Emma is upset about something that happened at school\n    When she creates a contribution expressing her distress\n    And the guardian agent detects emotional crisis indicators\n    Then her parents are immediately notified with sensitivity\n    And age-appropriate support resources are surfaced\n    And family members can provide comfort and guidance\n    And if needed, connection to counseling resources is offered\n    And Emma experiences the system as safe space to express feelings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-family",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

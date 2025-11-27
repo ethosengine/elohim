@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-cultural and artistic education enriches later life",
+  "contentType": "scenario",
+  "title": "Cultural and artistic education enriches later life",
+  "description": "Cultural and artistic education enriches later life",
+  "content": "Scenario: Cultural and artistic education enriches later life\n    Given Margaret has time for creative pursuits\n    And arts and culture support quality of life\n    When the educational_elohim connects Margaret to arts education\n    Then accessible arts programs should be available\n    And creative learning should be encouraged at all ages\n    And artistic development should continue in retirement\n    And cultural education should enrich Margaret's life\n    And creativity should be understood as lifelong capacity\n    And arts education should support whole-person flourishing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

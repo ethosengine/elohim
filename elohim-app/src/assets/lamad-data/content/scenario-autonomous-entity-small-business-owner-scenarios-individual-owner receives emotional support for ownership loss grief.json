@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-individual-owner receives emotional support for ownership loss grief",
+  "contentType": "scenario",
+  "title": "Owner receives emotional support for ownership loss grief",
+  "description": "Owner receives emotional support for ownership loss grief",
+  "content": "Scenario: Owner receives emotional support for ownership loss grief\n    Given letting go of business is genuine grief and identity crisis\n    And capitalist culture offers no support for this transition\n    When EAE provides transition support\n    Then Rosa accesses peer support groups with other converted owners\n    And Rosa receives therapy for processing ownership loss\n    And Rosa's emotional reality is validated and supported\n    And transition support recognizes this as major life change requiring care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:individual",
+    "related_users:[worker,community_investor,manager]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

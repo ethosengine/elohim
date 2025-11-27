@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-educational-parent knowledge of child's learning needs informs iep and accommodations",
+  "contentType": "scenario",
+  "title": "Parent knowledge of child's learning needs informs IEP and accommodations",
+  "description": "Parent knowledge of child's learning needs informs IEP and accommodations",
+  "content": "Scenario: Parent knowledge of child's learning needs informs IEP and accommodations\n    Given Sarah knows Tommy's and Emma's learning patterns intimately\n    And children may need educational accommodations\n    When schools develop individualized education plans\n    Then Sarah's expertise should be central to planning\n    And parent observations should drive accommodation decisions\n    And the educational_elohim should document Sarah's knowledge\n    And schools should recognize parents as essential IEP partners\n    And the system should position parent knowledge as authoritative\n    And Sarah's advocacy for children's needs should be valued and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-teen contributes to community knowledge and improvement",
+  "contentType": "scenario",
+  "title": "Teen contributes to community knowledge and improvement",
+  "description": "Teen contributes to community knowledge and improvement",
+  "content": "Scenario: Teen contributes to community knowledge and improvement\n    Given Jasmine has insights about what works and doesn't work for teens\n    And she uses community services and programs\n    When the community seeks feedback about youth programs\n    Then her input should be actively sought and valued\n    And she should have voice in shaping community services\n    And the community_elohim should facilitate youth feedback to reach decision-makers\n    And her experience using systems should inform system improvement\n    And communities should recognize that users have valuable knowledge about how systems function\n    And teen voice should shape care economy design and implementation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

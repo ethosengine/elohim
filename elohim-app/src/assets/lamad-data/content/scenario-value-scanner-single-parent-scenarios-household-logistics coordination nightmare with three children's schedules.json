@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-logistics coordination nightmare with three children's schedules",
+  "contentType": "scenario",
+  "title": "Logistics coordination nightmare with three children's schedules",
+  "description": "Logistics coordination nightmare with three children's schedules",
+  "content": "Scenario: Logistics coordination nightmare with three children's schedules\n    Given Maria coordinates school, after-school care, activities, appointments for three children\n    And she manages this alone while working full-time\n    When daily logistics need coordination\n    Then the household_elohim should integrate all schedules\n    And it should identify conflicts before they become crises\n    And it should suggest solutions for impossible timing situations\n    And it should coordinate with other parents for pickup/dropoff sharing\n    And Maria should have AI co-parent for logistical complexity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

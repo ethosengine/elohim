@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-individual-maintaining hope and forward vision despite overwhelming present",
+  "contentType": "scenario",
+  "title": "Maintaining hope and forward vision despite overwhelming present",
+  "description": "Maintaining hope and forward vision despite overwhelming present",
+  "content": "Scenario: Maintaining hope and forward vision despite overwhelming present\n    Given Maria's daily reality is exhausting and relentless\n    And it's easy to lose hope when drowning in impossible demands\n    When the personal_agent provides long-term perspective\n    Then it should help Maria see beyond today's crisis\n    And it should remind her that children grow and demands will eventually shift\n    And it should celebrate progress and acknowledge her endurance\n    And it should maintain realistic hope without minimizing current struggles\n    And Maria should be supported in keeping vision of a sustainable future\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:individual",
+    "related_users:parent,adult,worker,caregiver",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

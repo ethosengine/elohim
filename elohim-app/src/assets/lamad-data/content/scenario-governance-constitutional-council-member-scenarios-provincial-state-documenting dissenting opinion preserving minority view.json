@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-provincial-state-documenting dissenting opinion preserving minority view",
+  "contentType": "scenario",
+  "title": "Documenting dissenting opinion preserving minority view",
+  "description": "Documenting dissenting opinion preserving minority view",
+  "content": "Scenario: Documenting dissenting opinion preserving minority view\n    Given our council reaches majority decision on appeal\n    And I disagree with the majority interpretation\n    When we document the precedent\n    Then my dissenting opinion: is included with full reasoning\n    And I explain: alternative constitutional reading\n    And I articulate: why majority may have missed important considerations\n    And future councils: can reference both majority and dissent\n    And constitutional evolution: can draw on minority wisdom later\n    And my disagreement: is honored as legitimate democratic deliberation\n    And precedent reflects: richness of constitutional debate\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:provincial_state",
+    "related_users:appellant,technical_expert,policy_maker,researcher,community_leader",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

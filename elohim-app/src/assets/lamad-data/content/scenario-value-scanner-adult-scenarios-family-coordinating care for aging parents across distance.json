@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-coordinating care for aging parents across distance",
+  "contentType": "scenario",
+  "title": "Coordinating care for aging parents across distance",
+  "description": "Coordinating care for aging parents across distance",
+  "content": "Scenario: Coordinating care for aging parents across distance\n    Given Sarah's parents are in their 60s\n    And they live in a different location\n    And they're beginning to need support\n    When Sarah provides care to her parents\n    Then the family_elohim should track care contributions across distance\n    And it should coordinate with siblings if present\n    And it should help Sarah balance care for parents with care for children\n    And elder care should be recognized as substantial care work\n    And Sarah should not be overwhelmed by competing family demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

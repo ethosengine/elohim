@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-neighborhood-teen identifies neighborhood needs and initiates responses",
+  "contentType": "scenario",
+  "title": "Teen identifies neighborhood needs and initiates responses",
+  "description": "Teen identifies neighborhood needs and initiates responses",
+  "content": "Scenario: Teen identifies neighborhood needs and initiates responses\n    Given Jasmine notices the neighborhood lacks safe spaces for younger children\n    And she has capacity and interest to address this need\n    When she proposes organizing a neighborhood play supervision rotation\n    Then the neighborhood_elohim should support her initiative\n    And facilitate coordination with other neighbors\n    And recognize her leadership and care contribution\n    And provide tools for organizing collective action\n    And demonstrate that teens can initiate community improvements\n    And build her capability for civic leadership and community organizing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:neighborhood",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

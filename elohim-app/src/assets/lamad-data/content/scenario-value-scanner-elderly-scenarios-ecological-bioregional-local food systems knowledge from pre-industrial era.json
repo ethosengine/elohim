@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-local food systems knowledge from pre-industrial era",
+  "contentType": "scenario",
+  "title": "Local food systems knowledge from pre-industrial era",
+  "description": "Local food systems knowledge from pre-industrial era",
+  "content": "Scenario: Local food systems knowledge from pre-industrial era\n    Given Helen remembers more localized food systems\n    And she knows seasonal availability and regional food traditions\n    When Helen contributes to local food system planning\n    Then her knowledge should inform food sovereignty efforts\n    And bioregional food systems should learn from her memory\n    And traditional food preservation should be taught by those who practiced it\n    And Helen should be recognized as expert in local food culture\n    And the protocol should preserve pre-globalization food knowledge\n    And sustainable food systems should incorporate elder wisdom\n    And Helen's knowledge should reduce dependence on industrial food systems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_member,environmental_steward,young_adult",
+    "related_layers:community,educational,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

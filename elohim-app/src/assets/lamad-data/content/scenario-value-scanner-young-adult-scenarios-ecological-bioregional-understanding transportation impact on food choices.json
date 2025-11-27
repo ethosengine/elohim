@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding transportation impact on food choices",
+  "contentType": "scenario",
+  "title": "Understanding transportation impact on food choices",
+  "description": "Understanding transportation impact on food choices",
+  "content": "Scenario: Understanding transportation impact on food choices\n    Given transportation contributes to food's environmental footprint\n    And Aisha lives in an urban area\n    When the bioregional_elohim analyzes her shopping patterns\n    Then it should consider transportation in environmental impact\n    And it should suggest efficient shopping routes\n    And it should help her minimize transportation emissions\n    And the full ecological cost including transport should be visible\n    And bioregional analysis should inform sustainable choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-appeal contributes to constitutional evolution",
+  "contentType": "scenario",
+  "title": "Appeal contributes to constitutional evolution",
+  "description": "Appeal contributes to constitutional evolution",
+  "content": "Scenario: Appeal contributes to constitutional evolution\n    Given my appeal revealed a fundamental gap in the constitutional framework\n    And the Constitutional Council identified this as a recurring issue\n    When the council documents recommendations for protocol improvement\n    Then my case becomes input for the next 7-year Constitutional Convention\n    And My lived experience of feeling violated despite life-saving intervention\n    And This helps shape how care and autonomy are balanced at constitutional level\n    And I can see the long-term impact of my appeal beyond my individual case\n    And My suffering wasn't wasted\u2014it made the system better for everyone\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual",
+    "related_users:constitutional_council_member,technical_expert,community_leader",
+    "related_layers:family,community",
+    "elohim_agents:family_elohim,individual_support_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

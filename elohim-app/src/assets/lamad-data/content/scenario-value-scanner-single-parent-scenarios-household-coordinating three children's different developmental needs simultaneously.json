@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-household-coordinating three children's different developmental needs simultaneously",
+  "contentType": "scenario",
+  "title": "Coordinating three children's different developmental needs simultaneously",
+  "description": "Coordinating three children's different developmental needs simultaneously",
+  "content": "Scenario: Coordinating three children's different developmental needs simultaneously\n    Given Maria parents a 6-year-old, 9-year-old, and 14-year-old alone\n    And each child has completely different needs, schedules, and emotional requirements\n    When Maria manages children's needs\n    Then the household_elohim should help her track each child's developmental stage\n    And it should coordinate different school schedules and activities\n    And it should remind her of each child's unique needs\n    And it should prevent younger children from being neglected due to teen's demands\n    And Maria should have AI support for impossible multi-child coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:household",
+    "related_users:parent,child,young_child,preteen,teen",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

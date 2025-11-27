@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-family cultural and value transmission across generations",
+  "contentType": "scenario",
+  "title": "Family cultural and value transmission across generations",
+  "description": "Family cultural and value transmission across generations",
+  "content": "Scenario: Family cultural and value transmission across generations\n    Given Kenji learned family values and culture growing up\n    And he is now interpreting these in young adult context\n    When Kenji participates in family cultural practices\n    Then the family_elohim should recognize his work maintaining culture\n    And it should value his adaptation of family traditions to college life\n    And it should support intergenerational transmission of family values\n    And cultural work should be recognized as family care labor\n    And the system should value students as culture carriers\n    And family identity should persist across geographic separation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

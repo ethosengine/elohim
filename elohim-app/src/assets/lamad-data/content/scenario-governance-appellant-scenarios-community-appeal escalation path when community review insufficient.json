@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-appeal escalation path when community review insufficient",
+  "contentType": "scenario",
+  "title": "Appeal escalation path when community review insufficient",
+  "description": "Appeal escalation path when community review insufficient",
+  "content": "Scenario: Appeal escalation path when community review insufficient\n    Given Community Elohim review upheld the original decision\n    And I remain convinced my constitutional rights were violated\n    When I choose to escalate beyond community layer\n    Then I can request peer agent review (three Family Elohim from other families)\n    And If still unsatisfied, I can escalate to Regional Constitutional Council\n    And Each layer brings fresh perspective and greater scrutiny\n    And The escalation path is accessible without legal expertise\n    And Timelines are maintained (peer review within 1 week, regional within 1 month)\n    And Higher layers don't just rubber-stamp lower decisions\n    And Genuine independent review happens at each escalation level\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

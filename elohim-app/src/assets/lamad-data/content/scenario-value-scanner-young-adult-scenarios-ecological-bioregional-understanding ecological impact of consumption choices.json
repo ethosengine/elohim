@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding ecological impact of consumption choices",
+  "contentType": "scenario",
+  "title": "Understanding ecological impact of consumption choices",
+  "description": "Understanding ecological impact of consumption choices",
+  "content": "Scenario: Understanding ecological impact of consumption choices\n    Given Aisha's food choices affect environmental systems\n    And she wants to minimize negative impacts\n    When Aisha selects items in the Value Scanner\n    Then the bioregional_elohim should show environmental impact\n    And it should explain ecological consequences of different options\n    And it should make invisible environmental costs visible\n    And she should understand how consumption affects ecosystems\n    And ecological literacy should inform decision-making\n    And environmental impact should be transparent\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

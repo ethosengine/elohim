@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-professional expertise shared as valuable teaching contribution",
+  "contentType": "scenario",
+  "title": "Professional expertise shared as valuable teaching contribution",
+  "description": "Professional expertise shared as valuable teaching contribution",
+  "content": "Scenario: Professional expertise shared as valuable teaching contribution\n    Given Margaret has 40+ years of nursing knowledge\n    And her expertise could benefit nursing students and community\n    When the educational_elohim identifies teaching opportunities\n    Then Margaret should be connected to mentoring and teaching roles\n    And her professional knowledge should be valued as educational resource\n    And teaching labor should be recognized and possibly compensated\n    And expertise should continue to serve community after retirement\n    And Margaret's knowledge should be transmitted to next generation\n    And professional skills should be treated as community asset\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

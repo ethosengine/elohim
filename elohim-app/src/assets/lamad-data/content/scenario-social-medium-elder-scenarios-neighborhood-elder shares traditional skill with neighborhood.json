@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-neighborhood-elder shares traditional skill with neighborhood",
+  "contentType": "scenario",
+  "title": "Elder shares traditional skill with neighborhood",
+  "description": "Elder shares traditional skill with neighborhood",
+  "content": "Scenario: Elder shares traditional skill with neighborhood\n    Given Rose is an expert seamstress with 60 years experience\n    When she offers to teach mending and sewing skills\n    And she creates a contribution proposing weekly sewing circles\n    Then the contribution reaches her neighborhood\n    And community members interested in learning can respond\n    And a neighborhood sewing circle forms with Rose as mentor\n    And Rose experiences being valued for her knowledge\n    And traditional skills are preserved and transmitted\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:neighborhood",
+    "related_users:community_moderator,content_creator,child",
+    "related_layers:family,community",
+    "elohim_agents:guardian_agent,coordination_agent,wisdom_surfacing_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-neighborhood",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-neighborhood",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.188597",
+  "updatedAt": "2025-11-21T18:54:29.188597"
+}

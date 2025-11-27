@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-community-citizen discovers coalition around shared community concern",
+  "contentType": "scenario",
+  "title": "Citizen discovers coalition around shared community concern",
+  "description": "Citizen discovers coalition around shared community concern",
+  "content": "Scenario: Citizen discovers coalition around shared community concern\n    Given 14 neighbors are concerned about playground safety\n    And the citizen has reported the same concern\n    When the Public Observer detects the alignment pattern\n    Then the citizen receives an opt-in coalition notification\n    And they can coordinate with other concerned residents\n    And they see aggregated data on playground conditions\n    And they can participate in coordinated advocacy\n    And isolation becomes collective action\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:community",
+    "related_users:parent,activist,community_organizer,journalist",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

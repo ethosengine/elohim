@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-resolving household care conflicts",
+  "contentType": "scenario",
+  "title": "Resolving household care conflicts",
+  "description": "Resolving household care conflicts",
+  "content": "Scenario: Resolving household care conflicts\n    Given household care distribution may become imbalanced\n    When conflicts arise about who is contributing fairly\n    Then the protocol should provide objective contribution data\n    And facilitate conversations about fairness and capacity\n    And help us identify solutions that work for everyone\n    And support negotiation toward sustainable arrangements\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

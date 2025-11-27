@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-former owner's community standing shifts from business owner to honored elder",
+  "contentType": "scenario",
+  "title": "Former owner's community standing shifts from business owner to honored elder",
+  "description": "Former owner's community standing shifts from business owner to honored elder",
+  "content": "Scenario: Former owner's community standing shifts from business owner to honored elder\n    Given Rosa was known as \"business owner\" for 15 years\n    And her community identity was tied to entrepreneurial success\n    When ownership transitions to workers\n    Then Rosa's community standing becomes \"founder of democratic institution\"\n    And neighbors honor her choice to prioritize community over maximum profit\n    And her wisdom is sought as elder who facilitated transformation\n    And community respects her continued participation as resident, not owner\n    And community_elohim documents her transition as model for other small business owners\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

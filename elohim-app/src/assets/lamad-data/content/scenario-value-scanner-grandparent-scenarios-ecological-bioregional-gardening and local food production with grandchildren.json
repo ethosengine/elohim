@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-gardening and local food production with grandchildren",
+  "contentType": "scenario",
+  "title": "Gardening and local food production with grandchildren",
+  "description": "Gardening and local food production with grandchildren",
+  "content": "Scenario: Gardening and local food production with grandchildren\n    Given Margaret gardens and teaches grandchildren about growing food\n    And they learn where food comes from and how to nurture plants\n    When the bioregional_elohim tracks food production activities\n    Then it should recognize gardening as ecological care work\n    And it should value teaching food production as essential education\n    And it should track local food growing and knowledge transmission\n    And gardening should accumulate care tokens\n    And Margaret's teaching should support food sovereignty\n    And intergenerational food knowledge should be preserved\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,child,parent,community_member,environmental_steward",
+    "related_layers:community,family,educational,neighborhood",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

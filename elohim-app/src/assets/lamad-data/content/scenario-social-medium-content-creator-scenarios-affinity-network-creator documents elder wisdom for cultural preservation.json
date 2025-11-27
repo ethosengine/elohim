@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-affinity-network-creator documents elder wisdom for cultural preservation",
+  "contentType": "scenario",
+  "title": "Creator documents elder wisdom for cultural preservation",
+  "description": "Creator documents elder wisdom for cultural preservation",
+  "content": "Scenario: Creator documents elder wisdom for cultural preservation\n    Given Jordan collaborates with elder traditional knowledge keepers\n    When Jordan creates content documenting traditional ecological knowledge\n    And the elders approve the content and its use\n    Then the content is shared with appropriate cultural communities\n    And attribution and respect for knowledge sources is maintained\n    And younger generations learn traditional wisdom\n    And the elders receive recognition and value for their knowledge\n    And cultural preservation happens through respectful documentation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:affinity_network",
+    "related_users:child,elder,activist,community_moderator",
+    "related_layers:community,global,educational",
+    "elohim_agents:verification_agent,value_recognition_agent,distribution_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

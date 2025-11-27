@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-creating household care agreements",
+  "contentType": "scenario",
+  "title": "Creating household care agreements",
+  "description": "Creating household care agreements",
+  "content": "Scenario: Creating household care agreements\n    Given household members need clear expectations\n    When we establish how we'll manage shared living\n    Then the protocol should help us create care agreements\n    And document who does what and when\n    And include flexibility for my irregular schedule\n    And provide framework for fair and sustainable cooperation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

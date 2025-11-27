@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-municipality-activist exposes politician voting record inconsistency",
+  "contentType": "scenario",
+  "title": "Activist exposes politician voting record inconsistency",
+  "description": "Activist exposes politician voting record inconsistency",
+  "content": "Scenario: Activist exposes politician voting record inconsistency\n    Given a council member claims affordable housing support\n    But the activist suspects performative politics\n    When the Observer tracks five years of voting records\n    Then the activist sees votes against transit funding 5 times\n    And approvals of luxury development tax breaks\n    And budget votes defunding affordable housing programs\n    And patterns reveal rhetoric vs action divergence\n    And accountability campaigns gain evidentiary backbone\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:municipality",
+    "related_users:community_organizer,politician,citizen,journalist",
+    "related_layers:community,provincial_state,county_regional",
+    "elohim_agents:public_observer,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

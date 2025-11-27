@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-community-community economic support recognizes parenting as work",
+  "contentType": "scenario",
+  "title": "Community economic support recognizes parenting as work",
+  "description": "Community economic support recognizes parenting as work",
+  "content": "Scenario: Community economic support recognizes parenting as work\n    Given Sarah performs enormous care labor essential to community\n    And traditional economy renders this work unpaid\n    When the community implements care economy principles\n    Then parenting should be recognized as valuable economic contribution\n    And care tokens could translate to community currency or benefits\n    And Sarah should have economic support for her care work\n    And the community should invest in parents as essential workers\n    And care economy should provide material support, not just recognition\n    And the system should enable economic justice for caregivers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:parent,child,teacher,community_organizer,citizen",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-ecological-politician evaluates climate adaptation investments with equity focus",
+  "contentType": "scenario",
+  "title": "Politician evaluates climate adaptation investments with equity focus",
+  "description": "Politician evaluates climate adaptation investments with equity focus",
+  "content": "Scenario: Politician evaluates climate adaptation investments with equity focus\n    Given climate change requires infrastructure resilience investments\n    And limited resources force priority-setting across neighborhoods\n    When the Observer analyzes climate vulnerability and adaptation patterns\n    Then they see flood risk concentrated in low-income neighborhoods\n    And identify heat island effects in communities lacking tree canopy\n    And understand which populations most vulnerable to climate impacts\n    And ensure resilience investments prioritize environmental justice\n    And allocate climate adaptation funding equitably\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace care economy network provides peer support",
+  "contentType": "scenario",
+  "title": "Workplace care economy network provides peer support",
+  "description": "Workplace care economy network provides peer support",
+  "content": "Scenario: Workplace care economy network provides peer support\n    Given Sarah and colleagues all balance work with care responsibilities\n    And peer support improves well-being and effectiveness\n    When workplace adopts care economy principles\n    Then the workplace_elohim should facilitate peer support networks\n    And workers should share care economy strategies\n    And Sarah should connect with others managing similar challenges\n    And workplace community should strengthen through care economy\n    And collective support should reduce individual burden\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

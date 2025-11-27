@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-business legacy transforms from individual ownership to community institution",
+  "contentType": "scenario",
+  "title": "Business legacy transforms from individual ownership to community institution",
+  "description": "Business legacy transforms from individual ownership to community institution",
+  "content": "Scenario: Business legacy transforms from individual ownership to community institution\n    Given Rosa built more than business\u2014she created community institution\n    And neighbors trust her shop because they trust her personally\n    When conversion to democratic ownership formalizes community commitment\n    Then Rosa's 15 years of community stewardship is honored and documented\n    And sponsorships (youth soccer, school fundraisers) continue under democratic governance\n    And informal credit for struggling families becomes formalized support program\n    And community institution is preserved beyond Rosa's personal involvement\n    And legacy becomes \"founder who chose community over individual wealth\"\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

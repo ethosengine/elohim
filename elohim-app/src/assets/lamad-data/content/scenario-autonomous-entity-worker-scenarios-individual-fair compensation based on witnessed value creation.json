@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-individual-fair compensation based on witnessed value creation",
+  "contentType": "scenario",
+  "title": "Fair compensation based on witnessed value creation",
+  "description": "Fair compensation based on witnessed value creation",
+  "content": "Scenario: Fair compensation based on witnessed value creation\n    Given Maria's 8 years of invisible contributions are now documented\n    And her REA profile shows training, conflict prevention, and optimization work\n    When the democratic workplace calculates compensation\n    Then Maria receives $28/hour instead of previous $11/hour\n    And her training contributions (47 hours) are compensated\n    And her conflict resolution (12 incidents prevented) generates recognized value\n    And her efficiency gains (2.3 hours daily saved) benefit her, not just corporate\n    And transparent algorithms show exactly how her compensation is calculated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:individual",
+    "related_users:[manager,customer,supplier,community_investor]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

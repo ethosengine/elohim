@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-coordinating family support without infantilization",
+  "contentType": "scenario",
+  "title": "Coordinating family support without infantilization",
+  "description": "Coordinating family support without infantilization",
+  "content": "Scenario: Coordinating family support without infantilization\n    Given Jordan sometimes needs family help with complex tasks\n    And Jordan's mother tends to be over-protective\n    When Jordan requests help with a medical appointment\n    Then the personal_agent sends the help request to family\n    And the family_elohim reminds parents about supported decision-making\n    And Jordan's mother helps Jordan understand options\n    But Jordan makes the final decision with support\n    And Jordan's adult autonomy is preserved through the interaction\n    And the family learns to support without taking over\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

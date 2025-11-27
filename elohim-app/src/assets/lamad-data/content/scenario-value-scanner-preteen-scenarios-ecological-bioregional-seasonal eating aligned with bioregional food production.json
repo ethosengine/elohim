@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-seasonal eating aligned with bioregional food production",
+  "contentType": "scenario",
+  "title": "Seasonal eating aligned with bioregional food production",
+  "description": "Seasonal eating aligned with bioregional food production",
+  "content": "Scenario: Seasonal eating aligned with bioregional food production\n    Given seasonal local food is often more affordable\n    And Marcus needs to maximize his limited budget\n    When Marcus plans meals\n    Then the personal_agent should highlight seasonal options\n    And it should explain what grows locally in current season\n    And it should help him choose foods aligned with bioregional production\n    And economic and ecological goals should align\n    And he should learn that eating seasonally reduces costs and environmental impact\n    And bioregional awareness should develop through practical benefit\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "value-scanner-organizations-kolibri-a-free-open-source-education-for-all-learning-equality-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "[Description to be added]",
+  "content": "---\nnode_type: organization\norg_id: kolibri_a_free_open_source_education_for_all_learning_equality\nname: \"Kolibri : A Free, Open Source Education for All | Learning Equality\"\nurl: \"https://learningequality.org/kolibri/\"\ngem_id: \"tpPaBPtMslwRwxyXKL2q\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [social_medium]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How Kolibri : A Free, Open Source Education for All | Learning Equality inspires the value_scanner epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Kolibri : A Free, Open Source Education for All | Learning Equality inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Kolibri : A Free, Open Source Education for All | Learning Equality\n\n## Description\n\n[Description to be added]\n\n**Publisher:** Toggle navigation About Us Learning Equality Core Values Team Board of Directors Supporters and Friends Press Jobs Kolibri About Download Demo Documentation Hardware Grant Kolibri Content Library Catalog Community Help translate\nRead our blog\nSubscribe to newsletter\nJoin the forums\nShare your story\nFAQ & Contact Us Donate KA Lite\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how Kolibri : A Free, Open Source Education for All | Learning Equality relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: social_medium\n\n[How Kolibri : A Free, Open Source Education for All | Learning Equality also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://learningequality.org/kolibri/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "value-scanner"
+  ],
+  "sourcePath": "value_scanner/organizations/kolibri_a_free_open_source_education_for_all_learning_equality/README.md",
+  "relatedNodeIds": [
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "related_epics": [
+      "social_medium"
+    ],
+    "primary_epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.193597",
+  "updatedAt": "2025-11-21T18:54:29.193597"
+}

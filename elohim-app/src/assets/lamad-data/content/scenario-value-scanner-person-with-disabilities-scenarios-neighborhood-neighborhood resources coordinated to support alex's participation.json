@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-neighborhood resources coordinated to support alex's participation",
+  "contentType": "scenario",
+  "title": "Neighborhood resources coordinated to support Alex's participation",
+  "description": "Neighborhood resources coordinated to support Alex's participation",
+  "content": "Scenario: Neighborhood resources coordinated to support Alex's participation\n    Given Alex may need specific support to participate in neighborhood activities\n    And neighborhood has resources that could help\n    When Alex wants to engage in neighborhood events or projects\n    Then the neighborhood_elohim should coordinate needed support\n    And neighbors might provide transportation, physical assistance, or other help\n    And support should be reciprocal within mutual aid framework\n    And Alex should not experience this as charity or burden\n    And resource coordination should enable participation\n    And the protocol should facilitate Alex's full neighborhood engagement\n    And access barriers should be solved collectively, not individually\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:neighborhood",
+    "related_users:adult,elderly,parent,child,caregiver",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

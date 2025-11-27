@@ -1,0 +1,11 @@
+.gherkin-container {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+pre {
+  margin: 0;
+  font-family: 'Courier New', Courier, monospace;
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-industry quality standards improve through democratic governance demonstration",
+  "contentType": "scenario",
+  "title": "Industry quality standards improve through democratic governance demonstration",
+  "description": "Industry quality standards improve through democratic governance demonstration",
+  "content": "Scenario: Industry quality standards improve through democratic governance demonstration\n    Given franchise standardization claimed to ensure quality but often degraded it\n    And profit maximization pressured operators to cut quality whenever possible\n    When democratic locations demonstrate higher quality through worker ownership\n    Then industry benchmarks shift toward democratic quality standards\n    And customers learn to expect better quality from democratically-operated establishments\n    And competitive pressure forces remaining franchises to improve quality\n    And sector reputation improves through democratic operations raising standards\n    And industry_sector_elohim documents quality improvements and best practices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

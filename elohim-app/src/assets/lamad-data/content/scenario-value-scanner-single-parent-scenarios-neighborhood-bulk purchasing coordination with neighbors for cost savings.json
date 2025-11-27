@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-bulk purchasing coordination with neighbors for cost savings",
+  "contentType": "scenario",
+  "title": "Bulk purchasing coordination with neighbors for cost savings",
+  "description": "Bulk purchasing coordination with neighbors for cost savings",
+  "content": "Scenario: Bulk purchasing coordination with neighbors for cost savings\n    Given Maria operates on severe budget constraints\n    And bulk purchasing saves money but requires coordination\n    When neighbors organize bulk buying cooperatives\n    Then the neighborhood_elohim should coordinate collective purchasing\n    And it should help Maria access wholesale prices through group orders\n    And it should facilitate cost-sharing and distribution logistics\n    And bulk buying should reduce Maria's grocery costs meaningfully\n    And neighborhood economic cooperation should help single-parent resource constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

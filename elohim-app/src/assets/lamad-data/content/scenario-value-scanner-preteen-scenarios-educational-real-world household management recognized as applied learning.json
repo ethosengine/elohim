@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-real-world household management recognized as applied learning",
+  "contentType": "scenario",
+  "title": "Real-world household management recognized as applied learning",
+  "description": "Real-world household management recognized as applied learning",
+  "content": "Scenario: Real-world household management recognized as applied learning\n    Given Marcus manages complex household operations\n    And he applies math, nutrition science, planning, and resource management\n    When Marcus's scanner usage is analyzed educationally\n    Then his applied skills should be recognized as sophisticated learning\n    And the educational system should value real-world capability\n    And his household work should qualify for academic recognition\n    And applied learning should be weighted alongside traditional academics\n    And his competencies should be documented and credentialed\n    And practical stewardship should have educational value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

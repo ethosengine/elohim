@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-participating in global protocol security threat assessment",
+  "contentType": "scenario",
+  "title": "Participating in global protocol security threat assessment",
+  "description": "Participating in global protocol security threat assessment",
+  "content": "Scenario: Participating in global protocol security threat assessment\n    Given authoritarian regimes and corporations might attack protocol\n    And global security coordination is needed\n    When I work with international expert network on threat assessment\n    Then we identify: attack vectors across different contexts\n    And we share: vulnerability information securely\n    And we coordinate: defense mechanisms globally\n    And we avoid: creating centralized attack surface\n    And we enable: resilience through distributed architecture\n    And we serve: democratic governance security worldwide\n    And we demonstrate: global technical cooperation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

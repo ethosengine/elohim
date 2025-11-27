@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer demonstrates regional housing contribution",
+  "contentType": "scenario",
+  "title": "Responsible developer demonstrates regional housing contribution",
+  "description": "Responsible developer demonstrates regional housing contribution",
+  "content": "Scenario: Responsible developer demonstrates regional housing contribution\n    Given a developer builds affordable housing across the region\n    And wants regional approval bodies to recognize consistent track record\n    When the Observer surfaces regional development patterns\n    Then the developer shows: 600 affordable units built across five municipalities\n    And demonstrates 85% occupancy by local workforce\n    And proves commitment to regional affordability not just luxury development\n    And regional reputation supports new project approvals\n    And consistent value creation becomes visible at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

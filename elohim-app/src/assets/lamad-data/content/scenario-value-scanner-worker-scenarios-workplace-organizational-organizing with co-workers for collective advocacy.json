@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-organizing with co-workers for collective advocacy",
+  "contentType": "scenario",
+  "title": "Organizing with co-workers for collective advocacy",
+  "description": "Organizing with co-workers for collective advocacy",
+  "content": "Scenario: Organizing with co-workers for collective advocacy\n    Given individual workers have limited power\n    And collective action is more effective for workplace change\n    When I want to organize with co-workers for better conditions\n    Then the protocol should help me connect with co-workers safely\n    And facilitate coordination for collective advocacy\n    And provide information about organizing rights and strategies\n    And support building worker solidarity and collective power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

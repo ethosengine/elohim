@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-employment board member tracks implementation of living wage policy",
+  "contentType": "scenario",
+  "title": "Employment board member tracks implementation of living wage policy",
+  "description": "Employment board member tracks implementation of living wage policy",
+  "content": "Scenario: Employment board member tracks implementation of living wage policy\n    Given board approved living wage requirement for city contractors two years ago\n    And staff reports successful implementation and compliance\n    And community advocates report ongoing wage violations by contractors\n    When the board member uses Observer implementation tracking\n    Then they see contractor wage data showing compliance rates over time\n    And discover enforcement gaps allowing violations to persist\n    And find workers at some contractors still earning below living wage\n    And access comparison to peer cities with stronger enforcement mechanisms\n    And impact tracking reveals gap between policy adoption and actual outcomes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:workplace_organizational",
+    "related_users:citizen,politician,activist,community_organizer,worker",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

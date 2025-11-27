@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-municipality-activist monitors multiple municipal bodies simultaneously",
+  "contentType": "scenario",
+  "title": "Activist monitors multiple municipal bodies simultaneously",
+  "description": "Activist monitors multiple municipal bodies simultaneously",
+  "content": "Scenario: Activist monitors multiple municipal bodies simultaneously\n    Given the activist's issue spans city council, planning commission, and housing authority\n    And attending all meetings is physically impossible\n    When the Observer monitors all civic bodies\n    Then the activist receives alerts for relevant agenda items\n    And sees summaries of decisions across all bodies\n    And identifies coordination opportunities across agencies\n    And sustainable multi-body surveillance becomes possible\n    And activist capacity multiplies through automation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:municipality",
+    "related_users:community_organizer,politician,citizen,journalist",
+    "related_layers:community,provincial_state,county_regional",
+    "elohim_agents:public_observer,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

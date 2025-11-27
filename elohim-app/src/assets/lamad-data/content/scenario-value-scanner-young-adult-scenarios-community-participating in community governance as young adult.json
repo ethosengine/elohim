@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-community-participating in community governance as young adult",
+  "contentType": "scenario",
+  "title": "Participating in community governance as young adult",
+  "description": "Participating in community governance as young adult",
+  "content": "Scenario: Participating in community governance as young adult\n    Given the community makes collective decisions\n    And Aisha is establishing her adult voice\n    When community governance processes occur\n    Then the community_elohim should facilitate her participation\n    And her voice should count in community decisions\n    And her contributions should give her legitimate standing\n    And the system should help her learn community governance\n    And young adults should be included as full community participants\n    And care economy should enable democratic participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:community",
+    "related_users:adult,worker,student,volunteer",
+    "related_layers:neighborhood,workplace_organizational,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

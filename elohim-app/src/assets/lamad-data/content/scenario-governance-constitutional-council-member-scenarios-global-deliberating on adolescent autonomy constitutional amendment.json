@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-deliberating on adolescent autonomy constitutional amendment",
+  "contentType": "scenario",
+  "title": "Deliberating on adolescent autonomy constitutional amendment",
+  "description": "Deliberating on adolescent autonomy constitutional amendment",
+  "content": "Scenario: Deliberating on adolescent autonomy constitutional amendment\n    Given many national councils identified adolescent autonomy tension\n    And amendment proposal came from accumulated appeal precedents\n    When we deliberate whether \"developing autonomy is itself constitutional value\"\n    Then we hear: testimony from youth, parents, developmental experts\n    And we examine: how different cultures understand adolescent autonomy\n    And we consider: implications for millions of families globally\n    And we discuss: in small groups with translation support\n    And we grapple: with balancing protection and independence\n    And we vote: on amendment after extensive deliberation\n    And we create: constitutional evolution responsive to lived experience\n    And we demonstrate: citizens can govern profound questions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

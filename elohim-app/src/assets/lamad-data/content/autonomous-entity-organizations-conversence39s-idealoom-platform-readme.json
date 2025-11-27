@@ -1,0 +1,27 @@
+{
+  "id": "autonomous-entity-organizations-conversence39s-idealoom-platform-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "IdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation through conversations on&nbsp;...",
+  "content": "---\nnode_type: organization\norg_id: conversence39s_idealoom_platform\nname: \"Conversence&#39;s IdeaLoom platform\"\nurl: \"https://www.conversence.com/pages/idealoom.html\"\ngem_id: \"FtgGAKWPaLx87R8tuU6z\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: autonomous_entity\nrelated_epics: [governance, social_medium]\n\nepic_relationships:\n  autonomous_entity:\n    inspiration: \"[How Conversence&#39;s IdeaLoom platform inspires the autonomous_entity epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How Conversence&#39;s IdeaLoom platform inspires the governance epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Conversence&#39;s IdeaLoom platform inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Conversence&#39;s IdeaLoom platform\n\n## Description\n\nIdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation through conversations on&nbsp;...\n\n**Publisher:** Conversence\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: autonomous_entity\n\n[Detailed explanation of how Conversence&#39;s IdeaLoom platform relates to and inspires the autonomous_entity epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: governance\n\n[How Conversence&#39;s IdeaLoom platform also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: social_medium\n\n[How Conversence&#39;s IdeaLoom platform also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.conversence.com/pages/idealoom.html\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `autonomous_entity` - Primary focus and location\n- `governance` - [Connection description]\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "autonomous-entity"
+  ],
+  "sourcePath": "autonomous_entity/organizations/conversence39s_idealoom_platform/README.md",
+  "relatedNodeIds": [
+    "governance-epic",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "related_epics": [
+      "governance",
+      "social_medium"
+    ],
+    "primary_epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

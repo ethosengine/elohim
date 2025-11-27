@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor builds direct relationships with workers her capital supports",
+  "contentType": "scenario",
+  "title": "Investor builds direct relationships with workers her capital supports",
+  "description": "Investor builds direct relationships with workers her capital supports",
+  "content": "Scenario: Investor builds direct relationships with workers her capital supports\n    Given stock market investment is anonymous and extractive\n    And Patricia never met workers her capital exploited\n    When community investment creates relationship opportunities\n    Then she knows Maria, DeShawn, Emma\u2014workers her investment helped liberate\n    And attends stakeholder meetings learning about challenges and successes\n    And workers appreciate her support without surrendering governance autonomy\n    And relationship is asymmetric but not extractive (she has capital, they create value, both benefit fairly)\n    And community_elohim facilitates investor-worker relationships protecting democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:community",
+    "related_users:[worker,small_business_owner,franchise_operator,customer]",
+    "related_layers:[municipality,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.165597",
+  "updatedAt": "2025-11-21T18:54:29.165597"
+}

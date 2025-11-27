@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-owner exits gracefully with community gratitude after transition completes",
+  "contentType": "scenario",
+  "title": "Owner exits gracefully with community gratitude after transition completes",
+  "description": "Owner exits gracefully with community gratitude after transition completes",
+  "content": "Scenario: Owner exits gracefully with community gratitude after transition completes\n    Given Rosa has completed two-year transition steward commitment\n    And workers are confidently governing the business democratically\n    When Rosa's transition steward role concludes\n    Then workers celebrate her choice to enable democratic ownership\n    And community honors her as founder who chose workers over individual wealth\n    And Rosa exits with consulting income and profound sense of legacy preserved\n    And business continues thriving under worker governance\n    And workplace_elohim documents successful transition as model for future conversions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-neighborhood-privacy preserved while participating in neighborhood networks",
+  "contentType": "scenario",
+  "title": "Privacy preserved while participating in neighborhood networks",
+  "description": "Privacy preserved while participating in neighborhood networks",
+  "content": "Scenario: Privacy preserved while participating in neighborhood networks\n    Given Marcus's household circumstances are sensitive\n    And participation in neighborhood networks requires some visibility\n    When Marcus's data contributes to neighborhood coordination\n    Then his specific situation must remain private\n    And only anonymized aggregate data should be used\n    And neighborhood support should flow without stigmatizing exposure\n    And his dignity should be protected while receiving benefits\n    And privacy should be balanced with community participation\n    And the protocol should enable solidarity without surveillance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:neighborhood",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,community,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

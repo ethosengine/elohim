@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-contributing to aging parent care from distance",
+  "contentType": "scenario",
+  "title": "Contributing to aging parent care from distance",
+  "description": "Contributing to aging parent care from distance",
+  "content": "Scenario: Contributing to aging parent care from distance\n    Given my parents are aging and need increasing support\n    And I work full-time with unpredictable schedule\n    And I cannot provide hands-on daily care\n    When the family coordinates parent care\n    Then the protocol should help me contribute within my capacity\n    And identify non-time-intensive ways I can support\n    And coordinate with siblings who may have different availability\n    And recognize my contributions even when limited by employment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

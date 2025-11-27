@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician monitors special education compliance and outcomes",
+  "contentType": "scenario",
+  "title": "Politician monitors special education compliance and outcomes",
+  "description": "Politician monitors special education compliance and outcomes",
+  "content": "Scenario: Politician monitors special education compliance and outcomes\n    Given the politician has legal obligation to serve students with disabilities\n    And families report barriers to appropriate services\n    When the Observer tracks special education implementation\n    Then they see evaluation and IEP compliance rates by school\n    And identify which students wait longest for evaluations\n    And understand resource allocation for special education services\n    And learn where families face pushback on service requests\n    And ensure legal obligations and student needs are met\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

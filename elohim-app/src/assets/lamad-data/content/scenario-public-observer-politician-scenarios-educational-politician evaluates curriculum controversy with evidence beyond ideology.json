@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician evaluates curriculum controversy with evidence beyond ideology",
+  "contentType": "scenario",
+  "title": "Politician evaluates curriculum controversy with evidence beyond ideology",
+  "description": "Politician evaluates curriculum controversy with evidence beyond ideology",
+  "content": "Scenario: Politician evaluates curriculum controversy with evidence beyond ideology\n    Given vocal activists demand curriculum changes on ideological grounds\n    And both sides present culture war framing\n    When the Observer provides evidence-based curriculum analysis\n    Then they see what's actually taught in classrooms versus political claims\n    And review curriculum outcomes in student learning and engagement\n    And identify teacher and parent perspectives beyond activist voices\n    And compare curriculum to best practices in high-performing districts\n    And make decision based on educational merit not political pressure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

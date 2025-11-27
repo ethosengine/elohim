@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-student mutual aid networks as care economy foundation",
+  "contentType": "scenario",
+  "title": "Student mutual aid networks as care economy foundation",
+  "description": "Student mutual aid networks as care economy foundation",
+  "content": "Scenario: Student mutual aid networks as care economy foundation\n    Given Kenji participates in student mutual aid group\n    And students share resources, knowledge, and support\n    When the community_elohim tracks mutual aid participation\n    Then it should recognize meal sharing as care contribution\n    And it should value textbook lending, note sharing, and skill exchange\n    And it should accumulate care tokens for helping other students\n    And mutual aid should be understood as care economy practice\n    And the system should make reciprocal support visible\n    And student mutual aid should be recognized as community building\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

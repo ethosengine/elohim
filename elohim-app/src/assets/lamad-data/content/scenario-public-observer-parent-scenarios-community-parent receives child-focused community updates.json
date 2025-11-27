@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent receives child-focused community updates",
+  "contentType": "scenario",
+  "title": "Parent receives child-focused community updates",
+  "description": "Parent receives child-focused community updates",
+  "content": "Scenario: Parent receives child-focused community updates\n    Given the parent works shifts and has 15 minutes during lunch\n    And community decisions were made last night about parks and safety\n    When the parent checks their morning brief\n    Then they see only decisions affecting their children's bus stops, parks, and routes\n    And the summary takes 3 minutes to read\n    And jargon is translated to real impacts (\"longer walk,\" \"no crossing guard\")\n    And the parent can submit feedback during their break\n    And civic engagement fits into a working parent's schedule\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

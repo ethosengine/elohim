@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-building adult financial capability through practice",
+  "contentType": "scenario",
+  "title": "Building adult financial capability through practice",
+  "description": "Building adult financial capability through practice",
+  "content": "Scenario: Building adult financial capability through practice\n    Given Jasmine manages portions of her household budget\n    And she has responsibility for weekly grocery shopping\n    And her family has allocated $100/week for her to manage\n    When Jasmine makes purchasing decisions\n    Then her personal_agent should track spending against budget\n    And provide analysis of value optimization\n    And highlight patterns: \"You've stayed within budget 7 of 8 weeks\"\n    And surface learning opportunities: \"Buying bulk rice saved $12 this month\"\n    And build sophisticated financial literacy through real practice\n    And scaffold her capability without removing decision-making authority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

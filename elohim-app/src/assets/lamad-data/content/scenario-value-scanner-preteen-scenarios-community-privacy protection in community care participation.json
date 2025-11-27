@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-privacy protection in community care participation",
+  "contentType": "scenario",
+  "title": "Privacy protection in community care participation",
+  "description": "Privacy protection in community care participation",
+  "content": "Scenario: Privacy protection in community care participation\n    Given Marcus participates in community care economy\n    And his family's specific circumstances are sensitive\n    When community resource coordination occurs\n    Then Marcus's privacy must be absolutely protected\n    And only anonymized data should be visible to community coordinators\n    And his specific situation should not be broadcast\n    And community support should flow without exposing private struggles\n    And dignity requires privacy even while participating in networks\n    And the protocol should enable solidarity without surveillance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

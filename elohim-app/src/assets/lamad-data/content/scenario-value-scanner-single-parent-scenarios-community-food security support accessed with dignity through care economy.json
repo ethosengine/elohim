@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-food security support accessed with dignity through care economy",
+  "contentType": "scenario",
+  "title": "Food security support accessed with dignity through care economy",
+  "description": "Food security support accessed with dignity through care economy",
+  "content": "Scenario: Food security support accessed with dignity through care economy\n    Given Maria's $175/week grocery budget for four people is severely constrained\n    And food security is essential for family well-being\n    When Maria's economic status qualifies her for food support\n    Then the community_elohim should connect her to food assistance programs\n    And support should be framed as care economy reciprocity, not charity\n    And Maria should access help without stigmatizing means-testing processes\n    And her massive care contributions should be recognized as qualifying her for support\n    And food assistance should be dignified and adequate for family needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

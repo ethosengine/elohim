@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-participating in community decision-making processes",
+  "contentType": "scenario",
+  "title": "Participating in community decision-making processes",
+  "description": "Participating in community decision-making processes",
+  "content": "Scenario: Participating in community decision-making processes\n    Given the city is planning a new accessible park\n    And community input is being gathered\n    When Jordan participates in the planning process\n    Then the personal_agent helps Jordan access the input process\n    And Jordan's preferences about park features are gathered accessibly\n    And Jordan's input is valued equally with other community members\n    And the community_elohim ensures Jordan's voice is heard\n    And park design reflects input from diverse community members including IDD\n    And Jordan experiences being an active citizen shaping community\n    And Jordan's participation strengthens democratic processes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

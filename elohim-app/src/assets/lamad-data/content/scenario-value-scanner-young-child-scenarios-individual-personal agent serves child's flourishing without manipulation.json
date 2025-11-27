@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-individual-personal agent serves child's flourishing without manipulation",
+  "contentType": "scenario",
+  "title": "Personal agent serves child's flourishing without manipulation",
+  "description": "Personal agent serves child's flourishing without manipulation",
+  "content": "Scenario: Personal agent serves child's flourishing without manipulation\n    Given Tommy's personal_agent has AI capabilities\n    And Tommy is highly vulnerable to manipulation\n    When the personal_agent interacts with Tommy\n    Then it must never manipulate through guilt or shame\n    And it must never extract data for commercial purposes\n    And it must never train Tommy toward consumption patterns\n    And it must serve only Tommy's dignity and flourishing\n    And it must preserve Tommy's natural generosity from corruption\n    And it must set Tommy's baseline expectation that technology serves humans\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:individual",
+    "related_users:parent,child,grandparent",
+    "related_layers:family,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.199597",
+  "updatedAt": "2025-11-21T18:54:29.199597"
+}

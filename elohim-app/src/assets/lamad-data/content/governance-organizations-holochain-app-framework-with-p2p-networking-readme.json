@@ -1,0 +1,27 @@
+{
+  "id": "governance-organizations-holochain-app-framework-with-p2p-networking-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Holochain delivers beyond the promises of blockchain by providing a lightweight, secure and versatile framework for everyday distributed apps.",
+  "content": "---\nnode_type: organization\norg_id: holochain_app_framework_with_p2p_networking\nname: \"Holochain | App framework with P2P networking\"\nurl: \"https://www.holochain.org\"\ngem_id: \"AXkc5eOPMKKoEPJoU8Z2\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: [value_scanner, social_medium]\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Holochain | App framework with P2P networking inspires the governance epic]\"\n    parallel_work: []\n  value_scanner:\n    inspiration: \"[How Holochain | App framework with P2P networking inspires the value_scanner epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Holochain | App framework with P2P networking inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Holochain | App framework with P2P networking\n\n## Description\n\nHolochain delivers beyond the promises of blockchain by providing a lightweight, secure and versatile framework for everyday distributed apps.\n\n**Publisher:** HOLO\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Holochain | App framework with P2P networking relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: value_scanner\n\n[How Holochain | App framework with P2P networking also inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: social_medium\n\n[How Holochain | App framework with P2P networking also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.holochain.org\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n- `value_scanner` - [Connection description]\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/holochain_app_framework_with_p2p_networking/README.md",
+  "relatedNodeIds": [
+    "value-scanner-epic",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [
+      "value_scanner",
+      "social_medium"
+    ],
+    "primary_epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.171597",
+  "updatedAt": "2025-11-21T18:54:29.171597"
+}

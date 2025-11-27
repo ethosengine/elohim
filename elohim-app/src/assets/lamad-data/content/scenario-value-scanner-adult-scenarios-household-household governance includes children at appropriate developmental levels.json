@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-household governance includes children at appropriate developmental levels",
+  "contentType": "scenario",
+  "title": "Household governance includes children at appropriate developmental levels",
+  "description": "Household governance includes children at appropriate developmental levels",
+  "content": "Scenario: Household governance includes children at appropriate developmental levels\n    Given Tommy (5) and Emma (8) are household members\n    And they contribute care labor at age-appropriate levels\n    When household decisions are made\n    Then children should have voice appropriate to their development\n    And Emma should have more input than Tommy\n    And both should experience participating in household governance\n    And the household_elohim should coordinate different permission levels\n    And family democracy should be practiced, not just taught\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

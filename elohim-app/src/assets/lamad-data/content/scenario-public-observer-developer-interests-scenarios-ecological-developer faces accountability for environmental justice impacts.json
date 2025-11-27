@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-ecological-developer faces accountability for environmental justice impacts",
+  "contentType": "scenario",
+  "title": "Developer faces accountability for environmental justice impacts",
+  "description": "Developer faces accountability for environmental justice impacts",
+  "content": "Scenario: Developer faces accountability for environmental justice impacts\n    Given a developer's projects concentrate in communities of color\n    And environmental impacts burden already over-polluted neighborhoods\n    When the Observer analyzes environmental justice patterns\n    Then analysis shows: development increases pollution in Black neighborhoods\n    And environmental benefits (parks, trees) go to white affluent areas\n    And cumulative environmental burden violates environmental justice principles\n    And pattern reveals extraction from vulnerable communities\n    And environmental justice analysis demands equitable development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,ecological_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

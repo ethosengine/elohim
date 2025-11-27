@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-accessing family support during work crisis",
+  "contentType": "scenario",
+  "title": "Accessing family support during work crisis",
+  "description": "Accessing family support during work crisis",
+  "content": "Scenario: Accessing family support during work crisis\n    Given my work demands sometimes become overwhelming\n    When I need family support during difficult work periods\n    Then the protocol should help me ask for help\n    And coordinate family support when I am struggling\n    And enable reciprocity when my situation improves\n    And recognize that care flows both ways in family systems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

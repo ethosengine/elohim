@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-provincial-state-deliberating multi-community coordination case",
+  "contentType": "scenario",
+  "title": "Deliberating multi-community coordination case",
+  "description": "Deliberating multi-community coordination case",
+  "content": "Scenario: Deliberating multi-community coordination case\n    Given an appeal involves agent decisions across several communities\n    And different communities have conflicting local calibrations\n    When our regional council reviews the inter-community conflict\n    Then we evaluate: how subsidiarity applies across boundaries\n    And we examine: if regional coordination is constitutionally required\n    And we consider: if local diversity should be harmonized or preserved\n    And we consult: community leaders about local context\n    And we establish: regional minimums while respecting variation\n    And we create: precedent for multi-layer governance coherence\n    And our judgment: enables communities to coordinate democratically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:provincial_state",
+    "related_users:appellant,technical_expert,policy_maker,researcher,community_leader",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

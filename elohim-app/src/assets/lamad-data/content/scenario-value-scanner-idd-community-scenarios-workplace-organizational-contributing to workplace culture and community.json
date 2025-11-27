@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-contributing to workplace culture and community",
+  "contentType": "scenario",
+  "title": "Contributing to workplace culture and community",
+  "description": "Contributing to workplace culture and community",
+  "content": "Scenario: Contributing to workplace culture and community\n    Given Jordan brings joy and positivity to the workplace\n    And Jordan's presence affects workplace atmosphere\n    When Jordan greets patrons and helps create welcoming environment\n    Then Jordan's emotional labor and care contribution is recognized\n    And the Value Scanner records Jordan's culture-building work\n    And Jordan accumulates care tokens for workplace care contributions\n    And colleagues appreciate Jordan's positive impact\n    And Jordan's unique contributions to workplace are celebrated\n    And Jordan experiences being valued for authentic self\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

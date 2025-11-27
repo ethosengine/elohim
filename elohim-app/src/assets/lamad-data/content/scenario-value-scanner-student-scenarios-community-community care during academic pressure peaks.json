@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-community care during academic pressure peaks",
+  "contentType": "scenario",
+  "title": "Community care during academic pressure peaks",
+  "description": "Community care during academic pressure peaks",
+  "content": "Scenario: Community care during academic pressure peaks\n    Given exam periods create intense stress across student community\n    And everyone is struggling simultaneously\n    When student community provides collective support during finals\n    Then the community_elohim should coordinate mutual care\n    And it should recognize study space hosting, meal provision, emotional support\n    And it should value care work that helps community through crisis period\n    And collective survival should be recognized as care economy\n    And the system should support community resilience\n    And students should learn that community carries each other through hard times\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

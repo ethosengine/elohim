@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-educational-schools challenge single-parent deficit narratives through care economy data",
+  "contentType": "scenario",
+  "title": "Schools challenge single-parent deficit narratives through care economy data",
+  "description": "Schools challenge single-parent deficit narratives through care economy data",
+  "content": "Scenario: Schools challenge single-parent deficit narratives through care economy data\n    Given society often views single-parent families as inherently problematic\n    And this stigma affects how teachers and administrators view Maria's children\n    When schools engage with single-parent families\n    Then the educational_elohim should provide care economy data showing single parents' contributions\n    And schools should recognize single parents as providing extraordinary care\n    And deficit narratives about single-parent families should be challenged with evidence\n    And Maria and her children should be treated with respect, not pity\n    And educational systems should support single-parent family thriving, not assume deficiency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:educational",
+    "related_users:parent,child,young_child,preteen,teen,educator,school_administrator",
+    "related_layers:family,household,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

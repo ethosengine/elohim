@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-healthcare costs managed through community care economy",
+  "contentType": "scenario",
+  "title": "Healthcare costs managed through community care economy",
+  "description": "Healthcare costs managed through community care economy",
+  "content": "Scenario: Healthcare costs managed through community care economy\n    Given Helen faces overwhelming healthcare expenses\n    And medical debt threatens her housing stability\n    When healthcare costs are tracked\n    Then the community_elohim should help navigate cost assistance\n    And community care economy should supplement inadequate insurance\n    And medical care should not require choosing between health and housing\n    And Helen's contributions should create claims on community health resources\n    And the protocol should address the healthcare affordability crisis for elderly\n    And community networks should provide economic buffer against medical costs\n    And care economy should demonstrate healthcare as community responsibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

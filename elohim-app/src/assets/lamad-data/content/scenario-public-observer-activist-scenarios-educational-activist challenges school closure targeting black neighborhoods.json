@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-educational-activist challenges school closure targeting black neighborhoods",
+  "contentType": "scenario",
+  "title": "Activist challenges school closure targeting Black neighborhoods",
+  "description": "Activist challenges school closure targeting Black neighborhoods",
+  "content": "Scenario: Activist challenges school closure targeting Black neighborhoods\n    Given the district proposes closing schools for \"efficiency\"\n    And the activist suspects racial targeting\n    When the Observer analyzes closure patterns across time\n    Then the activist sees schools in Black neighborhoods systematically closed\n    And white neighborhood schools remain open despite similar enrollment\n    And \"efficiency\" rationale masks structural racism\n    And community organizes opposition with documented evidence\n    And racist policy becomes undeniable and challengeable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

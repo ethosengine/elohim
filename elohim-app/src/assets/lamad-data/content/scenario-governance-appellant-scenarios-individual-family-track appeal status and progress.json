@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-family-track appeal status and progress",
+  "contentType": "scenario",
+  "title": "Track appeal status and progress",
+  "description": "Track appeal status and progress",
+  "content": "Scenario: Track appeal status and progress\n    Given Marcus has submitted an appeal\n    When Marcus checks his appeal status\n    Then he sees current review stage clearly displayed\n    And he sees estimated timeline for each stage\n    And he receives notifications at key milestones\n    And he can compare his case to similar anonymized appeals\n    And he can access precedent cases involving mental health interventions\n    And the tracking interface is accessible on all his devices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual_family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:community,provincial_state",
+    "elohim_agents:family_elohim,individual_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual_family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual-family",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-equipment and facilities knowledge prevents operational failures",
+  "contentType": "scenario",
+  "title": "Equipment and facilities knowledge prevents operational failures",
+  "description": "Equipment and facilities knowledge prevents operational failures",
+  "content": "Scenario: Equipment and facilities knowledge prevents operational failures\n    Given Rosa knows every quirk of equipment and building systems\n    And this tacit knowledge prevents costly breakdowns and delays\n    When facilities knowledge transfer is prioritized\n    Then Rosa documents equipment maintenance schedules and troubleshooting\n    And workers learn which compressor sounds indicate problems\n    And building system knowledge (electrical, plumbing, HVAC) is shared\n    And maintenance protocols are established preventing future failures\n    And institutional knowledge replaces individual expertise\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

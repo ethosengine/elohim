@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood youth gain apprenticeship and ownership pathways",
+  "contentType": "scenario",
+  "title": "Neighborhood youth gain apprenticeship and ownership pathways",
+  "description": "Neighborhood youth gain apprenticeship and ownership pathways",
+  "content": "Scenario: Neighborhood youth gain apprenticeship and ownership pathways\n    Given community lacks skilled trades training and economic opportunity for youth\n    And Rosa's expertise could benefit next generation but individual ownership prevents scaling\n    When democratic governance creates youth apprenticeship program\n    Then neighborhood youth learn auto repair skills with paid training\n    And apprentices can become worker-owners after demonstrating competency\n    And economic opportunity stays in community, not extracting to corporate chains\n    And intergenerational knowledge transfer strengthens community resilience\n    And community_elohim documents youth pathways from apprenticeship to ownership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

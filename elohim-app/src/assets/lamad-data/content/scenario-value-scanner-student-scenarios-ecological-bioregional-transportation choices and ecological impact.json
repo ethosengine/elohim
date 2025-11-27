@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-transportation choices and ecological impact",
+  "contentType": "scenario",
+  "title": "Transportation choices and ecological impact",
+  "description": "Transportation choices and ecological impact",
+  "content": "Scenario: Transportation choices and ecological impact\n    Given Kenji walks most places due to lack of car\n    And walking has minimal ecological impact\n    When the bioregional_elohim tracks transportation\n    Then it should recognize walking as ecological care contribution\n    And it should accumulate care tokens for low-impact transportation\n    And it should show \"Walking instead of driving prevented X carbon emissions\"\n    And it should validate that poverty can align with ecological values\n    And the system should recognize low-impact mobility as care work\n    And Kenji should see his car-free life as ecological stewardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:ecological_bioregional",
+    "related_users:environmental_scientist,activist,community_member,resident",
+    "related_layers:community,neighborhood,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-connecting academic learning to care economy values",
+  "contentType": "scenario",
+  "title": "Connecting academic learning to care economy values",
+  "description": "Connecting academic learning to care economy values",
+  "content": "Scenario: Connecting academic learning to care economy values\n    Given Kenji studies environmental science\n    And his field directly relates to planetary care economy\n    When the educational_elohim connects learning to care principles\n    Then it should help Kenji see environmental science as care work\n    And it should link his academic study to ecological stewardship\n    And it should show how his education prepares him for care contributions\n    And learning should be framed as developing capacity to serve flourishing\n    And the system should integrate academic work with care economy purpose\n    And Kenji should understand his education as care economy investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

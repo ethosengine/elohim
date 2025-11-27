@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-housing and energy use optimized for sustainability",
+  "contentType": "scenario",
+  "title": "Housing and energy use optimized for sustainability",
+  "description": "Housing and energy use optimized for sustainability",
+  "content": "Scenario: Housing and energy use optimized for sustainability\n    Given Robert's household uses energy for heating, cooling, and power\n    And housing energy use significantly affects ecological impact\n    And household improvements can reduce ecological footprint\n    When bioregional_elohim supports energy optimization\n    Then it should analyze household energy consumption patterns\n    And suggest improvements: insulation, renewable energy, efficiency upgrades\n    And connect energy reduction to cost savings that support care economy participation\n    And help Robert prioritize improvements within household budget\n    And recognize that sustainable housing serves current and future generations\n    And demonstrate that ecological stewardship is long-term care\n    And build household infrastructure that reduces bioregional impact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

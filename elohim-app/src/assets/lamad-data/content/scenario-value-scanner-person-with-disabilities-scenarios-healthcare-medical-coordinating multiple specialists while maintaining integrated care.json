@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-coordinating multiple specialists while maintaining integrated care",
+  "contentType": "scenario",
+  "title": "Coordinating multiple specialists while maintaining integrated care",
+  "description": "Coordinating multiple specialists while maintaining integrated care",
+  "content": "Scenario: Coordinating multiple specialists while maintaining integrated care\n    Given Alex sees multiple medical specialists\n    And specialists often don't communicate with each other\n    When Alex navigates specialist care\n    Then the personal_agent should help Alex coordinate across providers\n    And it should maintain integrated medical history across specialties\n    And it should help Alex communicate between providers\n    And it should identify care gaps or contradictions\n    And Alex should experience coherent care despite system fragmentation\n    And the protocol should serve as Alex's medical coordination hub\n    And integrated perspective should be maintained by Alex, not system\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

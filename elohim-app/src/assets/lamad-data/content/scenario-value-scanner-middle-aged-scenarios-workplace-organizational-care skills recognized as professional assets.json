@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-care skills recognized as professional assets",
+  "contentType": "scenario",
+  "title": "Care skills recognized as professional assets",
+  "description": "Care skills recognized as professional assets",
+  "content": "Scenario: Care skills recognized as professional assets\n    Given Robert has developed sophisticated coordination, resource management, and emotional intelligence through care work\n    And these skills directly enhance his professional capability\n    And traditional workplaces don't recognize care skills as professional qualifications\n    When workplace_elohim analyzes Robert's professional capabilities\n    Then it should make visible how care work develops professional skills\n    And recognize that coordinating multigenerational care builds management capability\n    And surface: \"Your care coordination skills enhance your project management effectiveness\"\n    And help Robert articulate care skills in professional contexts\n    And advocate that care experience should be valued in performance reviews\n    And demonstrate that care responsibilities enhance rather than diminish professional capability\n    And build workplace culture that recognizes care as skill development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,household,family,industry_sector",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

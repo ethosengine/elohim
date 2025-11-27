@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-community-creator produces age-appropriate content for local youth",
+  "contentType": "scenario",
+  "title": "Creator produces age-appropriate content for local youth",
+  "description": "Creator produces age-appropriate content for local youth",
+  "content": "Scenario: Creator produces age-appropriate content for local youth\n    Given Sam creates content about neighborhood nature exploration\n    And the content is designed for children aged 8-12\n    When Sam contributes the content to educational spaces\n    Then the guardian agent verifies age-appropriateness\n    And local children can access the content safely\n    And parents can review and approve their children's participation\n    And Sam helps children learn about their local environment\n    And community benefits from quality youth programming\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:community",
+    "related_users:community_moderator,elder,child",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:verification_agent,community_value_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

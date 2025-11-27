@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent participates without attending evening meetings",
+  "contentType": "scenario",
+  "title": "Parent participates without attending evening meetings",
+  "description": "Parent participates without attending evening meetings",
+  "content": "Scenario: Parent participates without attending evening meetings\n    Given the parent has evening work shifts and bedtime routines\n    And cannot attend 7 PM community meetings in person\n    When decisions about afterschool programs are being made\n    Then the parent reviews 5-minute summaries during lunch break\n    And submits questions and positions via mobile app\n    And receives alerts if live intervention would be high-impact\n    And gets post-meeting summary with next action steps\n    And democracy respects that raising children is the priority job\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

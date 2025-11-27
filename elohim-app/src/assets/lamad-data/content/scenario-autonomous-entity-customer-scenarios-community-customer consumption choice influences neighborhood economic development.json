@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-community-customer consumption choice influences neighborhood economic development",
+  "contentType": "scenario",
+  "title": "Customer consumption choice influences neighborhood economic development",
+  "description": "Customer consumption choice influences neighborhood economic development",
+  "content": "Scenario: Customer consumption choice influences neighborhood economic development\n    Given community economic development typically means corporate recruitment with subsidies\n    And Ms. Johnson's consumption patterns seemed economically insignificant\n    When democratic businesses demonstrate customer support builds alternative economy\n    Then her choice to support democratic business over corporate chain matters politically\n    And aggregate customer choices determine which business models thrive\n    And consumption becomes vote for economic democracy vs. extraction\n    And neighborhood economy transforms through collective customer choices\n    And community_elohim helps customers understand collective impact of consumption\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:community",
+    "related_users:[worker,supplier,community_investor,small_business_owner]",
+    "related_layers:[individual]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

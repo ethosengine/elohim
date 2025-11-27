@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-sarah's care contributions give her voice in municipal decisions",
+  "contentType": "scenario",
+  "title": "Sarah's care contributions give her voice in municipal decisions",
+  "description": "Sarah's care contributions give her voice in municipal decisions",
+  "content": "Scenario: Sarah's care contributions give her voice in municipal decisions\n    Given Sarah has accumulated substantial care tokens through community work\n    And municipal governance affects her family's well-being\n    When municipal decisions are being made\n    Then Sarah's care contributions should give her legitimate standing\n    And her voice should carry weight based on demonstrated care\n    And municipal democracy should recognize care work as civic participation\n    And those who contribute to community should influence community governance\n    And care economy should create accountable municipal leadership\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

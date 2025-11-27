@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member evaluates workforce development program",
+  "contentType": "scenario",
+  "title": "Economic development board member evaluates workforce development program",
+  "description": "Economic development board member evaluates workforce development program",
+  "content": "Scenario: Economic development board member evaluates workforce development program\n    Given board considers funding proposal for job training program\n    And program providers present enrollment projections and success stories\n    And board wants evidence that program will effectively serve unemployed workers\n    When the board member requests Observer workforce program analysis\n    Then they receive outcome data from similar programs including job placement and wages\n    And see analysis of whether program serves populations with greatest need\n    And discover some training programs have poor employment outcomes despite good marketing\n    And access best practices from effective workforce development initiatives\n    And evidence-based analysis helps board invest in programs that actually work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:workplace_organizational",
+    "related_users:citizen,politician,activist,community_organizer,worker",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

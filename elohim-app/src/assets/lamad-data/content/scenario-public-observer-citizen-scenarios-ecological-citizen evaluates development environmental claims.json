@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-citizen-scenarios-ecological-citizen evaluates development environmental claims",
+  "contentType": "scenario",
+  "title": "Citizen evaluates development environmental claims",
+  "description": "Citizen evaluates development environmental claims",
+  "content": "Scenario: Citizen evaluates development environmental claims\n    Given a developer claims their project is environmentally sustainable\n    And uses terms like \"green building\" and \"eco-friendly\"\n    When the Observer fact-checks environmental claims\n    Then the citizen sees actual environmental review data\n    And views the developer's environmental track record\n    And understands real impacts on habitat, pollution, resources\n    And can distinguish genuine sustainability from greenwashing\n    And environmental accountability becomes measurable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:ecological_bioregional",
+    "related_users:activist,community_organizer,politician",
+    "related_layers:municipality,community,county_regional",
+    "elohim_agents:public_observer,community_elohim,ecological_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-citizen-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-citizen-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician builds coalition for education funding increase",
+  "contentType": "scenario",
+  "title": "Politician builds coalition for education funding increase",
+  "description": "Politician builds coalition for education funding increase",
+  "content": "Scenario: Politician builds coalition for education funding increase\n    Given the politician champions education investment\n    And needs public support for tax increase\n    When the Observer identifies coalition building opportunities\n    Then they see parents across political spectrum support smaller class sizes\n    And identify business community concern about workforce preparation\n    And connect with educators who can explain funding impacts\n    And facilitate coalition across traditional political divides\n    And build broad-based campaign for education investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

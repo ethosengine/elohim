@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-drafting community ai infrastructure act for national funding",
+  "contentType": "scenario",
+  "title": "Drafting Community AI Infrastructure Act for national funding",
+  "description": "Drafting Community AI Infrastructure Act for national funding",
+  "content": "Scenario: Drafting Community AI Infrastructure Act for national funding\n    Given poor communities nationwide need infrastructure support\n    And I want equitable protocol access\n    When I draft national funding legislation\n    Then I provide: grants for community nodes and maintenance\n    And I fund: research evaluating protocol outcomes\n    And I support: technical assistance for poor communities\n    And I establish: sliding scale and cross-subsidization\n    And I treat: democratic AI governance as public infrastructure\n    And I defend: against claims of \"picking winners\"\n    And I argue: this enables democracy not market manipulation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

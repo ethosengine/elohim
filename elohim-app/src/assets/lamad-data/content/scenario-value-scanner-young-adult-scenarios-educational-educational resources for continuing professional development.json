@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-educational-educational resources for continuing professional development",
+  "contentType": "scenario",
+  "title": "Educational resources for continuing professional development",
+  "description": "Educational resources for continuing professional development",
+  "content": "Scenario: Educational resources for continuing professional development\n    Given adult learning is lifelong\n    And Aisha wants professional skill development\n    When Aisha seeks professional education\n    Then the personal_agent should surface relevant learning resources\n    And it should connect her to workshops, courses, or certifications\n    And it should help her plan skill development trajectory\n    And professional education should be accessible and affordable\n    And the system should support continuous capability building\n    And career growth should be facilitated through education access\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:educational",
+    "related_users:student,adult,worker,mentor",
+    "related_layers:individual,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

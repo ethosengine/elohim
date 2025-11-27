@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-family-family respite coordination to prevent james's burnout",
+  "contentType": "scenario",
+  "title": "Family respite coordination to prevent James's burnout",
+  "description": "Family respite coordination to prevent James's burnout",
+  "content": "Scenario: Family respite coordination to prevent James's burnout\n    Given James needs regular respite or he will collapse\n    And family members could provide some respite care\n    When the family_elohim coordinates respite\n    Then it should identify family members who could help\n    And it should schedule regular respite periods\n    And it should ensure James gets breaks from intensive care\n    And family should actively provide respite, not just sympathy\n    And respite coordination should be systematic, not ad hoc\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:family",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

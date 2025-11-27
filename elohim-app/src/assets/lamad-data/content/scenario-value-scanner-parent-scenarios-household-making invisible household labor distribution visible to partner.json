@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-household-making invisible household labor distribution visible to partner",
+  "contentType": "scenario",
+  "title": "Making invisible household labor distribution visible to partner",
+  "description": "Making invisible household labor distribution visible to partner",
+  "content": "Scenario: Making invisible household labor distribution visible to partner\n    Given Sarah performs 75% of household care labor\n    And her partner believes he \"helps around the house\"\n    When the household_elohim generates labor distribution report\n    Then it should show precise breakdown of who does what\n    And it should quantify \"Sarah: 75%, Partner: 25%\"\n    And the data should be undeniable and specific\n    And the partner should see his contribution is not equitable\n    And visibility should enable reality-based conversation\n    And the system should make invisible labor undeniably visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:household",
+    "related_users:partner,child,adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

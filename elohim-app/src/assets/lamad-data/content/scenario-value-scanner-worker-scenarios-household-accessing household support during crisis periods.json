@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-accessing household support during crisis periods",
+  "contentType": "scenario",
+  "title": "Accessing household support during crisis periods",
+  "description": "Accessing household support during crisis periods",
+  "content": "Scenario: Accessing household support during crisis periods\n    Given work demands sometimes become overwhelming\n    When I am working double shifts or experiencing crisis\n    Then the protocol should facilitate household mutual aid\n    And help roommates understand my temporary extra needs\n    And suggest how others can support me during difficult periods\n    And enable reciprocity when my situation improves\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

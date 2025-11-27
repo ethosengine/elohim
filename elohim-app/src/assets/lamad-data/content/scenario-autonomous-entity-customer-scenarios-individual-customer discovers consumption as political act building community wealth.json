@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer discovers consumption as political act building community wealth",
+  "contentType": "scenario",
+  "title": "Customer discovers consumption as political act building community wealth",
+  "description": "Customer discovers consumption as political act building community wealth",
+  "content": "Scenario: Customer discovers consumption as political act building community wealth\n    Given corporate consumption felt powerless and alienating\n    And Ms. Johnson didn't think her spending mattered politically\n    When democratic business makes consumption politically meaningful\n    Then her modest annual spending ($900) supports worker ownership and living wages\n    And money circulates in community rather than extracting to distant shareholders\n    And consumption choice builds democratic economy infrastructure\n    And she understands individual actions aggregate into systemic transformation\n    And community_elohim helps customers see collective impact of consumption choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

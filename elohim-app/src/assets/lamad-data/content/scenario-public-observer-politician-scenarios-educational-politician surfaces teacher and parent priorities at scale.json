@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician surfaces teacher and parent priorities at scale",
+  "contentType": "scenario",
+  "title": "Politician surfaces teacher and parent priorities at scale",
+  "description": "Politician surfaces teacher and parent priorities at scale",
+  "content": "Scenario: Politician surfaces teacher and parent priorities at scale\n    Given the politician hears from organized advocacy groups\n    But suspects classroom realities differ from political narratives\n    When the Observer aggregates teacher and parent input\n    Then they see teachers prioritize classroom resources and planning time\n    And learn parents want smaller class sizes and mental health support\n    And identify disconnect between political fights and family priorities\n    And understand professional educator perspectives on policy proposals\n    And align education policy with teaching and learning needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

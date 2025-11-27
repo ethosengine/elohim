@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-receiving family financial support with dignity",
+  "contentType": "scenario",
+  "title": "Receiving family financial support with dignity",
+  "description": "Receiving family financial support with dignity",
+  "content": "Scenario: Receiving family financial support with dignity\n    Given Kenji receives some financial support from family\n    And traditional economics treats this as dependency or charity\n    When the family_elohim tracks family resource flows\n    Then it should frame financial support as family care investment\n    And it should recognize that families invest in young members' development\n    And it should help Kenji receive support without shame\n    And it should track this as reciprocal care economy, not dependency\n    And the system should value family investment in student development\n    And receiving family support should be dignified participation in family economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

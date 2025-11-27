@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-educational materials culturally responsive to diverse families",
+  "contentType": "scenario",
+  "title": "Educational materials culturally responsive to diverse families",
+  "description": "Educational materials culturally responsive to diverse families",
+  "content": "Scenario: Educational materials culturally responsive to diverse families\n    Given Sarah teaches students from diverse cultural backgrounds\n    And her own children are learning family cultural values\n    When educational materials are designed\n    Then the educational_elohim should provide culturally diverse resources\n    And materials should respect different care economy traditions\n    And Sarah should be able to adapt to cultural contexts\n    And value literacy should be taught in culturally responsive ways\n    And diverse approaches to care should be honored in education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

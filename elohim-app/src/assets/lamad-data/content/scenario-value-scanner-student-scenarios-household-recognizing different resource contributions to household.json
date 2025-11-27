@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-recognizing different resource contributions to household",
+  "contentType": "scenario",
+  "title": "Recognizing different resource contributions to household",
+  "description": "Recognizing different resource contributions to household",
+  "content": "Scenario: Recognizing different resource contributions to household\n    Given Kenji contributes time and labor but limited money\n    And one roommate might contribute more financially but less labor\n    When the household_elohim tracks all forms of contribution\n    Then it should value both care labor and financial contributions\n    And it should recognize Kenji's cooking as economic contribution\n    And it should show equivalence: \"Kenji's cooking worth $X in meal prep time saved\"\n    And it should prevent assumption that money is only real contribution\n    And the system should value diverse contribution types\n    And household equity should include labor, time, and money\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

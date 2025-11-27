@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-sustainable living adapted for disability access",
+  "contentType": "scenario",
+  "title": "Sustainable living adapted for disability access",
+  "description": "Sustainable living adapted for disability access",
+  "content": "Scenario: Sustainable living adapted for disability access\n    Given sustainable practices are often designed without disability consideration\n    And inaccessible sustainability excludes disabled people\n    When sustainable living practices are promoted\n    Then the bioregional_elohim should ensure practices are disability-accessible\n    And composting, gardening, conservation should be adaptable for various capabilities\n    And Alex should be able to participate in ecological practices\n    And sustainable living should work for diverse bodies and minds\n    And the protocol should advocate for inclusive environmental practices\n    And disability expertise should improve sustainability design\n    And Alex's participation should be welcomed and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

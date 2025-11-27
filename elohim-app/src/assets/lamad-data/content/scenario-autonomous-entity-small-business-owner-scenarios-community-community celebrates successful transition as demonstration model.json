@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-community celebrates successful transition as demonstration model",
+  "contentType": "scenario",
+  "title": "Community celebrates successful transition as demonstration model",
+  "description": "Community celebrates successful transition as demonstration model",
+  "content": "Scenario: Community celebrates successful transition as demonstration model\n    Given neighborhood watched Rosa's difficult decision and graceful transition\n    And other small business owners face similar ownership burden challenges\n    When transition proves successful for all stakeholders\n    Then community honors Rosa at public celebration of democratic conversion\n    And her story becomes model encouraging other small business owners to consider conversion\n    And neighborhood gains confidence in democratic ownership as viable alternative\n    And successful transition demonstrates community can support democratic economy\n    And community_elohim shares transition story to inspire broader movement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

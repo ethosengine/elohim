@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-community-multiple appellants challenge same community decision",
+  "contentType": "scenario",
+  "title": "Multiple appellants challenge same community decision",
+  "description": "Multiple appellants challenge same community decision",
+  "content": "Scenario: Multiple appellants challenge same community decision\n    Given several community members appeal the same Community Elohim decision\n    And we all believe a community resource decision was unjust\n    When Constitutional Council reviews the multiple related appeals\n    Then they treat this as collective concern requiring community deliberation\n    And They evaluate if the decision violated community consensus\n    And They examine if community participation in the decision was adequate\n    And They may convene community assembly to deliberate the issue\n    And The appeals trigger democratic engagement not just individual recourse\n    And Community governance evolves through collective voice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,community_leader,technical_expert",
+    "related_layers:family,district,municipality",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

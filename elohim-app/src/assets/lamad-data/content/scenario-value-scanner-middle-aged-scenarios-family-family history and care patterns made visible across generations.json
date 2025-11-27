@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-family history and care patterns made visible across generations",
+  "contentType": "scenario",
+  "title": "Family history and care patterns made visible across generations",
+  "description": "Family history and care patterns made visible across generations",
+  "content": "Scenario: Family history and care patterns made visible across generations\n    Given care patterns often repeat across generations\n    And Robert learned care from his parents' care for their parents\n    And he's modeling care for the next generation\n    When family_elohim surfaces family care history\n    Then it should help Robert see multigenerational care patterns\n    And recognize: \"Your parents provided similar care for your grandparents\"\n    And surface how his current care teaches his children\n    And connect past care received to present care given to future care needed\n    And help family understand care as lifecycle reciprocity\n    And validate that Robert's care continues family care traditions\n    And prepare next generation to provide care when Robert needs it\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

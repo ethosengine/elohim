@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-building relationships with disability-competent providers",
+  "contentType": "scenario",
+  "title": "Building relationships with disability-competent providers",
+  "description": "Building relationships with disability-competent providers",
+  "content": "Scenario: Building relationships with disability-competent providers\n    Given finding good disability-competent providers is challenging\n    And quality provider relationships are essential for good care\n    When Alex seeks new providers\n    Then the personal_agent should help Alex identify disability-competent providers\n    And it should maintain provider ratings from disability community\n    And it should help Alex interview potential providers about disability approach\n    And it should support Alex in building strong therapeutic relationships\n    And Alex should be able to find providers who respect disabled expertise\n    And the protocol should facilitate connection to good care\n    And disability community knowledge should be leveraged to find competent providers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

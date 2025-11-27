@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-individual-right to disconnect and data sovereignty maintained",
+  "contentType": "scenario",
+  "title": "Right to disconnect and data sovereignty maintained",
+  "description": "Right to disconnect and data sovereignty maintained",
+  "content": "Scenario: Right to disconnect and data sovereignty maintained\n    Given Marcus uses the system for critical household functions\n    And constitutional constraints apply at all governance layers\n    When Marcus or his family choose to disconnect\n    Then the system must honor disconnection immediately\n    And alternative methods for household management must remain viable\n    And no dependency should be created that makes disconnection harmful\n    And data sovereignty must be preserved\n    And Marcus's right to not participate must be absolute\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:individual",
+    "related_users:child,teen,parent,student",
+    "related_layers:family,neighborhood,community,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

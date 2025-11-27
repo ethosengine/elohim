@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical provider education about caregiver as care partner",
+  "contentType": "scenario",
+  "title": "Medical provider education about caregiver as care partner",
+  "description": "Medical provider education about caregiver as care partner",
+  "content": "Scenario: Medical provider education about caregiver as care partner\n    Given some providers dismiss or ignore family caregivers\n    And this undermines care quality and caregiver well-being\n    When the healthcare_elohim advocates for caregiver role\n    Then it should educate providers about caregiver expertise\n    And it should demonstrate caregivers improve care outcomes\n    And it should advocate for caregiver partnership in care teams\n    And providers should be trained to work with family caregivers\n    And healthcare culture should recognize caregivers as essential partners\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

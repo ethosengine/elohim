@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-manager-scenarios-individual-manager derives legitimacy from consent rather than hierarchical appointment",
+  "contentType": "scenario",
+  "title": "Manager derives legitimacy from consent rather than hierarchical appointment",
+  "description": "Manager derives legitimacy from consent rather than hierarchical appointment",
+  "content": "Scenario: Manager derives legitimacy from consent rather than hierarchical appointment\n    Given Marcus was previously appointed by corporate, not chosen by workers\n    And workers resented his authority as imposed\n    When democratic governance structures are established\n    Then Marcus's coordinator role requires ongoing worker consent\n    And workers evaluate his facilitation effectiveness quarterly\n    And workers can democratically recall him if he fails to serve collective interests\n    And his legitimacy is earned through effective service, not imposed through hierarchy\n    And workplace_elohim ensures fair evaluation process\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:individual",
+    "related_users:[worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-manager-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-manager-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

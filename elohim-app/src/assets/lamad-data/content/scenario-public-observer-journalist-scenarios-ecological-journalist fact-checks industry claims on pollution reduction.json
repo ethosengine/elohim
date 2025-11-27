@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-ecological-journalist fact-checks industry claims on pollution reduction",
+  "contentType": "scenario",
+  "title": "Journalist fact-checks industry claims on pollution reduction",
+  "description": "Journalist fact-checks industry claims on pollution reduction",
+  "content": "Scenario: Journalist fact-checks industry claims on pollution reduction\n    Given a corporation claims environmental leadership\n    And the journalist investigates actual environmental record\n    When the Observer analyzes company's violations and emissions\n    Then the journalist finds 23 violations in past 5 years\n    And verifies emissions increased despite efficiency claims\n    And shows company lobbied against stronger pollution regulations\n    And identifies millions in fines that were never paid\n    And publishes investigation exposing greenwashing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:ecological",
+    "related_users:activist,citizen,scientist,politician",
+    "related_layers:municipality,county_regional,provincial_state,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

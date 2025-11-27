@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-owner processes identity shift from sole owner to transition supporter",
+  "contentType": "scenario",
+  "title": "Owner processes identity shift from sole owner to transition supporter",
+  "description": "Owner processes identity shift from sole owner to transition supporter",
+  "content": "Scenario: Owner processes identity shift from sole owner to transition supporter\n    Given Rosa's identity was tied to business ownership for 15 years\n    And letting go triggers real grief and identity crisis\n    When EAE provides transition support including peer counseling\n    Then Rosa accesses support groups with other converted owners\n    And she processes ownership loss with validation and care\n    And new identity emerges: founder who chose community over extraction\n    And her purpose shifts from ownership burden to legacy stewardship\n    And emotional reality is honored throughout transition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

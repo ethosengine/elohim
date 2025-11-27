@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-global-testifying about technical feasibility of constitutional minimums",
+  "contentType": "scenario",
+  "title": "Testifying about technical feasibility of constitutional minimums",
+  "description": "Testifying about technical feasibility of constitutional minimums",
+  "content": "Scenario: Testifying about technical feasibility of constitutional minimums\n    Given delegates establish universal constitutional minimums\n    And technical implementation varies by context\n    When I assess whether minimums are technically achievable globally\n    Then I evaluate: what infrastructure different minimums require\n    And I identify: barriers in low-resource contexts\n    And I explore: how to enable universal implementation\n    And I avoid: either blocking good governance or ignoring challenges\n    And I provide: honest assessment of feasibility\n    And I enable: delegates to set minimums wisely\n    And I serve: global justice through technical honesty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,researcher,policy_maker",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

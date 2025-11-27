@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-civic education and community organizing skills",
+  "contentType": "scenario",
+  "title": "Civic education and community organizing skills",
+  "description": "Civic education and community organizing skills",
+  "content": "Scenario: Civic education and community organizing skills\n    Given Margaret participates in civic life and advocacy\n    And organizing skills enhance civic effectiveness\n    When the educational_elohim provides civic education\n    Then Margaret should access community organizing training\n    And education should empower political participation\n    And skills for advocacy and policy influence should be taught\n    And civic literacy should strengthen senior voice in governance\n    And education should support senior political power\n    And organizing should be understood as learnable skill\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

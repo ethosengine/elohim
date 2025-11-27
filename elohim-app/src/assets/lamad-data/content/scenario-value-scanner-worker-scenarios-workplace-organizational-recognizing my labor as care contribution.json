@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-recognizing my labor as care contribution",
+  "contentType": "scenario",
+  "title": "Recognizing my labor as care contribution",
+  "description": "Recognizing my labor as care contribution",
+  "content": "Scenario: Recognizing my labor as care contribution\n    Given I prepare food that nourishes people and serves community\n    When I view my work through care economy lens\n    Then the protocol should help me understand my work as care labor\n    And accumulate care tokens reflecting my contribution to community well-being\n    And reframe my relationship to work from pure exploitation to meaningful service\n    And build consciousness that my labor deserves dignity and fair compensation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

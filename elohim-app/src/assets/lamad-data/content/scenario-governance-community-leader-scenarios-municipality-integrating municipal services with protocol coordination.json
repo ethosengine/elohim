@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipality-integrating municipal services with protocol coordination",
+  "contentType": "scenario",
+  "title": "Integrating municipal services with protocol coordination",
+  "description": "Integrating municipal services with protocol coordination",
+  "content": "Scenario: Integrating municipal services with protocol coordination\n    Given city provides services (water, waste, transit, parks)\n    And these need coordination with protocol resource flows\n    When I integrate municipal services with Elohim coordination\n    Then city departments: share data with agents appropriately\n    And Municipal Elohim: helps optimize service delivery\n    And environmental services: coordinate with Ecosystem Elohim\n    And social services: work with Community Elohim for crisis response\n    And integration respects: department professional judgment\n    And agents augment: not replace city workers\n    And public services improve: through better coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipality",
+    "related_users:constitutional_council_member,community_leader,policy_maker,technical_expert",
+    "related_layers:community,county_regional",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipality",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipality",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

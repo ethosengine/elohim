@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-nation-state-coordinating with international counterparts on ai governance",
+  "contentType": "scenario",
+  "title": "Coordinating with international counterparts on AI governance",
+  "description": "Coordinating with international counterparts on AI governance",
+  "content": "Scenario: Coordinating with international counterparts on AI governance\n    Given AI governance is global challenge\n    And national policies affect each other\n    When I work with international policy makers\n    Then we share: legislative approaches and evidence\n    And we coordinate: to resist regulatory arbitrage\n    And we establish: democratic governance norms\n    And we resist: race-to-bottom dynamics\n    And we protect: protocol sovereignty internationally\n    And we support: global democratic AI development\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,researcher,technical_expert,community_leader",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

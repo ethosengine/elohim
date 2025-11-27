@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-educational-participating in financial literacy education",
+  "contentType": "scenario",
+  "title": "Participating in financial literacy education",
+  "description": "Participating in financial literacy education",
+  "content": "Scenario: Participating in financial literacy education\n    Given Jordan is learning to manage money independently\n    And the support organization offers financial skills classes\n    When Jordan attends financial literacy sessions\n    Then concepts are taught using concrete examples and visual aids\n    And Jordan practices skills with real-world simulations\n    And the personal_agent reinforces learning in daily situations\n    And Jordan's financial understanding grows over time\n    And Jordan gains confidence in money management\n    And Jordan's increasing financial autonomy is supported through education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

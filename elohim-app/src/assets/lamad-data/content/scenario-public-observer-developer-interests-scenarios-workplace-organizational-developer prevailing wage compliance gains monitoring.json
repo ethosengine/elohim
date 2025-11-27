@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer prevailing wage compliance gains monitoring",
+  "contentType": "scenario",
+  "title": "Developer prevailing wage compliance gains monitoring",
+  "description": "Developer prevailing wage compliance gains monitoring",
+  "content": "Scenario: Developer prevailing wage compliance gains monitoring\n    Given a developer receives public subsidy requiring prevailing wage\n    And claims compliance with wage requirements\n    When the Observer monitors wage compliance\n    Then analysis shows: certified payroll reports show prevailing wage\n    But worker interviews reveal unpaid overtime and deductions\n    And actual take-home pay is below prevailing wage requirements\n    And compliance on paper differs from worker reality\n    And enforcement mechanisms need worker-centered monitoring\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,activist,community_organizer,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

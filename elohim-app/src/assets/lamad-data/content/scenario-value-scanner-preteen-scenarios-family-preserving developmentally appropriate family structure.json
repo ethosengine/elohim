@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-preserving developmentally appropriate family structure",
+  "contentType": "scenario",
+  "title": "Preserving developmentally appropriate family structure",
+  "description": "Preserving developmentally appropriate family structure",
+  "content": "Scenario: Preserving developmentally appropriate family structure\n    Given Marcus has adult-level responsibilities\n    And he is still a 12-year-old child\n    When family dynamics are shaped by care economy\n    Then the family_elohim should work to preserve appropriate boundaries\n    And Marcus should not become de facto parent\n    And Sarah should remain ultimate authority and protector\n    And age-appropriate childhood should be preserved where possible\n    And the protocol should prevent role reversal damage\n    And family structure should remain as healthy as circumstances allow\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

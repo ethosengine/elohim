@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-community accountability mechanisms ensure democratic governance serves neighborhood",
+  "contentType": "scenario",
+  "title": "Community accountability mechanisms ensure democratic governance serves neighborhood",
+  "description": "Community accountability mechanisms ensure democratic governance serves neighborhood",
+  "content": "Scenario: Community accountability mechanisms ensure democratic governance serves neighborhood\n    Given business operates in and depends on community\n    And community has legitimate interest in business practices and impacts\n    When community governance structures enable neighborhood voice\n    Then community stakeholder meetings provide input on business direction\n    And neighbors can raise concerns about environmental impacts or labor practices\n    And workers consider community feedback in democratic decision-making\n    And accountability is transparent and bidirectional (community and workers both accountable)\n    And community_elohim facilitates stakeholder participation while protecting worker autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

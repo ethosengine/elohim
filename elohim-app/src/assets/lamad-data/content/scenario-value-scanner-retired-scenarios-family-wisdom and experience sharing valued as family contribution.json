@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-wisdom and experience sharing valued as family contribution",
+  "contentType": "scenario",
+  "title": "Wisdom and experience sharing valued as family contribution",
+  "description": "Wisdom and experience sharing valued as family contribution",
+  "content": "Scenario: Wisdom and experience sharing valued as family contribution\n    Given Frank has 70 years of life experience and decades of construction expertise\n    And his knowledge is valuable family resource\n    When family_elohim tracks knowledge sharing\n    Then Frank's guidance to adult children should be recognized\n    And teaching grandchildren life and practical skills should be valued\n    And sharing construction knowledge should be quantified\n    And wisdom transmission should count as care contribution\n    And family should experience Frank as source of valuable knowledge\n    And his expertise should be actively utilized, not patronized\n    And knowledge sharing should be reciprocal across generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-household-transitioning household when roommate moves out",
+  "contentType": "scenario",
+  "title": "Transitioning household when roommate moves out",
+  "description": "Transitioning household when roommate moves out",
+  "content": "Scenario: Transitioning household when roommate moves out\n    Given Aisha's roommate is moving out\n    And household responsibilities need redistribution\n    When the household composition changes\n    Then the household_elohim should help manage the transition\n    And it should recalculate resource allocations\n    And it should settle care token balances fairly\n    And it should help Aisha adjust to changed circumstances\n    And household transitions should be supported systematically\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:household",
+    "related_users:adult,roommate,partner",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood care contributions visible across households",
+  "contentType": "scenario",
+  "title": "Neighborhood care contributions visible across households",
+  "description": "Neighborhood care contributions visible across households",
+  "content": "Scenario: Neighborhood care contributions visible across households\n    Given Sarah contributes to neighborhood care economy\n    And neighbors also contribute in various ways\n    When neighborhood care patterns are tracked\n    Then the neighborhood_elohim should make contributions visible\n    And it should show who's contributing what\n    And it should identify imbalances in participation\n    And it should prompt recognition of neighbors' care work\n    And visibility should enable fair neighborhood participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

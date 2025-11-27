@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-individual-quantifying grandparent care contributions at individual level",
+  "contentType": "scenario",
+  "title": "Quantifying grandparent care contributions at individual level",
+  "description": "Quantifying grandparent care contributions at individual level",
+  "content": "Scenario: Quantifying grandparent care contributions at individual level\n    Given Margaret provides 25 hours/week of active childcare\n    And market rate for professional childcare is ~$1,500/month\n    When the personal_agent tracks Margaret's care labor\n    Then it should quantify all hours spent in active childcare\n    And it should calculate economic value of her contributions\n    And it should accumulate care tokens for her labor\n    And it should recognize developmental benefits beyond market value\n    And Margaret should see that her work is substantial and valuable\n    And the data should counter narrative of \"just spending time with grandkids\"\n    And her contributions should be visible and quantified\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:individual",
+    "related_users:senior,middle_aged,parent,child,elderly",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-elder knowledge of historical building techniques and materials",
+  "contentType": "scenario",
+  "title": "Elder knowledge of historical building techniques and materials",
+  "description": "Elder knowledge of historical building techniques and materials",
+  "content": "Scenario: Elder knowledge of historical building techniques and materials\n    Given Frank has decades of construction experience\n    And traditional building techniques are often more sustainable\n    When the bioregional_elohim coordinates building knowledge\n    Then it should value Frank's knowledge of traditional techniques\n    And facilitate teaching historical building methods\n    And recognize that older practices may be more ecological\n    And connect past building wisdom to contemporary sustainability\n    And Frank's experience should inform bioregional building culture\n    And elder knowledge should guide sustainable building revival\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

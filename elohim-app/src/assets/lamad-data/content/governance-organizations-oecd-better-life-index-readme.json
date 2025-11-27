@@ -1,0 +1,21 @@
+{
+  "id": "governance-organizations-oecd-better-life-index-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "[Description to be added]",
+  "content": "---\nnode_type: organization\norg_id: oecd_better_life_index\nname: \"OECD Better Life Index\"\nurl: \"https://www.oecdbetterlifeindex.org/\"\ngem_id: \"l21cgCzfbvqc1Geahh2D\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How OECD Better Life Index inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# OECD Better Life Index\n\n## Description\n\n[Description to be added]\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how OECD Better Life Index relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.oecdbetterlifeindex.org/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/oecd_better_life_index/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.172597",
+  "updatedAt": "2025-11-21T18:54:29.172597"
+}

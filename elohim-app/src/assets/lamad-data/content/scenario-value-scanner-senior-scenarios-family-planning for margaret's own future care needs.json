@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-planning for margaret's own future care needs",
+  "contentType": "scenario",
+  "title": "Planning for Margaret's own future care needs",
+  "description": "Planning for Margaret's own future care needs",
+  "content": "Scenario: Planning for Margaret's own future care needs\n    Given Margaret is providing care now but will need care eventually\n    And she's watching her mother's care requirements\n    When the family_elohim facilitates future care planning\n    Then Margaret's current care contributions should build future care security\n    And family should understand reciprocal care obligations\n    And Margaret's care tokens should represent future care resources\n    And conversations about her eventual needs should be normalized\n    And family should prepare for role reversal\n    And Margaret should have agency in planning her own future care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

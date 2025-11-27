@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-nation-state-appellant testimony influences national policy legislation",
+  "contentType": "scenario",
+  "title": "Appellant testimony influences national policy legislation",
+  "description": "Appellant testimony influences national policy legislation",
+  "content": "Scenario: Appellant testimony influences national policy legislation\n    Given my appeal established important national constitutional precedent\n    And Senator Ruiz is drafting national AI governance legislation\n    When she invites me to testify about my appeal experience\n    Then I share lived experience of exercising constitutional recourse\n    And I explain how appeal process protected my dignity\n    And I describe remaining gaps and needed improvements\n    And My testimony humanizes abstract constitutional principles\n    And Policy makers understand governance through appellant eyes\n    And Legislation better serves actual people because of my voice\n    And Democratic policy making includes those most affected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:nation_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

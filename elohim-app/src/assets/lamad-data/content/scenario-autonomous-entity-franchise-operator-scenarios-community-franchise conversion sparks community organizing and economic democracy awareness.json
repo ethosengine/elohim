@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-franchise conversion sparks community organizing and economic democracy awareness",
+  "contentType": "scenario",
+  "title": "Franchise conversion sparks community organizing and economic democracy awareness",
+  "description": "Franchise conversion sparks community organizing and economic democracy awareness",
+  "content": "Scenario: Franchise conversion sparks community organizing and economic democracy awareness\n    Given successful conversion demonstrates economic democracy is possible locally\n    And community members didn't know democratic alternatives to corporate extraction existed\n    When neighborhoods celebrate successful conversion and its benefits\n    Then community organizing emerges advocating for more democratic conversions\n    And residents learn they can influence local economy through supporting democratic businesses\n    And economic democracy becomes part of neighborhood political consciousness\n    And conversion inspires broader community action for economic justice\n    And community_elohim supports emerging community organizing around economic democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

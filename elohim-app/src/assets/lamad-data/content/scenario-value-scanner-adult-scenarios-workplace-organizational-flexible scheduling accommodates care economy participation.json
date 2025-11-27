@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-flexible scheduling accommodates care economy participation",
+  "contentType": "scenario",
+  "title": "Flexible scheduling accommodates care economy participation",
+  "description": "Flexible scheduling accommodates care economy participation",
+  "content": "Scenario: Flexible scheduling accommodates care economy participation\n    Given Sarah needs to manage children's schedules, parent appointments, household tasks\n    And rigid work schedules create impossible conflicts\n    When Sarah's work schedule is determined\n    Then the workplace_elohim should coordinate with personal_agent\n    And flexible scheduling should accommodate care responsibilities\n    And Sarah should be able to handle family emergencies without job risk\n    And workplace should enable sustainable work-care balance\n    And flexibility should be policy, not personal favor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

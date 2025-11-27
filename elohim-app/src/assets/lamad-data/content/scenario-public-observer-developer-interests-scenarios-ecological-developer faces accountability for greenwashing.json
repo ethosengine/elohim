@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-ecological-developer faces accountability for greenwashing",
+  "contentType": "scenario",
+  "title": "Developer faces accountability for greenwashing",
+  "description": "Developer faces accountability for greenwashing",
+  "content": "Scenario: Developer faces accountability for greenwashing\n    Given a developer claims \"sustainable development\" in marketing materials\n    But environmental review shows minimal actual sustainability\n    When the Observer compares sustainability claims to actual practices\n    Then analysis reveals: LEED certification was \"certified\" not \"platinum\"\n    And green features are minimal required by code not additional commitment\n    And environmental impact study understated habitat destruction\n    And sustainability marketing exceeds actual environmental performance\n    And greenwashing faces uncomfortable transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,board_member",
+    "related_layers:municipality,county_regional,provincial_state",
+    "elohim_agents:public_observer,ecological_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

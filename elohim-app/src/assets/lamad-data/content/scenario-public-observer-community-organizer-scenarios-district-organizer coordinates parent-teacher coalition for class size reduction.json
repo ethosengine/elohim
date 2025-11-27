@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-district-organizer coordinates parent-teacher coalition for class size reduction",
+  "contentType": "scenario",
+  "title": "Organizer coordinates parent-teacher coalition for class size reduction",
+  "description": "Organizer coordinates parent-teacher coalition for class size reduction",
+  "content": "Scenario: Organizer coordinates parent-teacher coalition for class size reduction\n    Given teachers union supports smaller class sizes\n    And parents see crowded classrooms affecting their children\n    When the organizer builds coalition using Observer coordination tools\n    Then teachers and parents access shared data on class size impacts\n    And coordinate testimony combining professional and family perspectives\n    And track which board members support class size reduction\n    And organize joint mobilization for board meeting\n    And teacher expertise combines with parent power for policy change\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:district",
+    "related_users:parent,citizen,activist,board_member",
+    "related_layers:municipality,educational,community",
+    "elohim_agents:public_observer,district_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-district",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

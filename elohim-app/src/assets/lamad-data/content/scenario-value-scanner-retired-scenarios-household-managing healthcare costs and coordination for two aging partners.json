@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-household-managing healthcare costs and coordination for two aging partners",
+  "contentType": "scenario",
+  "title": "Managing healthcare costs and coordination for two aging partners",
+  "description": "Managing healthcare costs and coordination for two aging partners",
+  "content": "Scenario: Managing healthcare costs and coordination for two aging partners\n    Given Frank and his wife both have aging-related healthcare needs\n    And healthcare costs are significant on fixed income\n    And medication management becomes more complex with age\n    When the household_elohim coordinates healthcare\n    Then it should track both partners' medical appointments and needs\n    And it should help manage medication schedules and interactions\n    And it should coordinate healthcare spending with household budget\n    And it should support both partners in advocating for each other\n    And healthcare navigation should be simplified and supported\n    And household should maintain health within economic constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:household",
+    "related_users:senior,spouse,partner,elderly",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

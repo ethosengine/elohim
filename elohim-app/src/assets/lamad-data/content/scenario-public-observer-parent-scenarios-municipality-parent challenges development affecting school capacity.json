@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent challenges development affecting school capacity",
+  "contentType": "scenario",
+  "title": "Parent challenges development affecting school capacity",
+  "description": "Parent challenges development affecting school capacity",
+  "content": "Scenario: Parent challenges development affecting school capacity\n    Given a developer proposes 300-unit residential development\n    And claims it will \"strengthen the community and tax base\"\n    When the parent reviews Observer's school capacity analysis\n    Then they see 180 new students projected from the development\n    And learn the nearest elementary school is already over capacity\n    And understand no new school facilities are planned\n    And view developer's track record on past school impact promises\n    And can challenge development approval with child-impact data\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-coordinating household care during schedule conflicts",
+  "contentType": "scenario",
+  "title": "Coordinating household care during schedule conflicts",
+  "description": "Coordinating household care during schedule conflicts",
+  "content": "Scenario: Coordinating household care during schedule conflicts\n    Given my work schedule conflicts with household needs\n    When household tasks need completion and I am working\n    Then the protocol should help coordinate coverage\n    And enable roommates to handle urgent needs\n    And track that I contribute when available\n    And maintain fairness over time despite schedule conflicts\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

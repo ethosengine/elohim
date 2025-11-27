@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-developer subsidy accountability reveals actual outcomes",
+  "contentType": "scenario",
+  "title": "Developer subsidy accountability reveals actual outcomes",
+  "description": "Developer subsidy accountability reveals actual outcomes",
+  "content": "Scenario: Developer subsidy accountability reveals actual outcomes\n    Given a developer received $10M state tax credit for \"affordable housing\"\n    And claimed it would produce 200 affordable units\n    When the Observer tracks subsidy outcomes\n    Then analysis shows: only 35 units meet affordability criteria\n    And most units are market-rate generating developer profit\n    And state subsidy mostly subsidized luxury development\n    And taxpayers see poor return on public investment\n    And accountability creates pressure for subsidy reform\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:provincial_state",
+    "related_users:politician,board_member,citizen,activist",
+    "related_layers:municipality,county_regional,ecological",
+    "elohim_agents:public_observer,state_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

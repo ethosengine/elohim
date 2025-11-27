@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-elder care coordination with spouse for mother-in-law",
+  "contentType": "scenario",
+  "title": "Elder care coordination with spouse for mother-in-law",
+  "description": "Elder care coordination with spouse for mother-in-law",
+  "content": "Scenario: Elder care coordination with spouse for mother-in-law\n    Given Frank and his wife help maintain Frank's mother-in-law's home\n    And they provide transportation and advocacy support\n    And elder care is substantial and skilled labor\n    When family_elohim tracks elder care contributions\n    Then Frank's home maintenance support should be recognized\n    And transportation and medical advocacy should be valued\n    And his construction skills applied to elder care should be quantified\n    And care burden should be monitored for sustainability\n    And family should see Frank's elder care contributions\n    And his care work should accumulate family care tokens\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

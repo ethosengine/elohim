@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-protecting disability community from institutional harm",
+  "contentType": "scenario",
+  "title": "Protecting disability community from institutional harm",
+  "description": "Protecting disability community from institutional harm",
+  "content": "Scenario: Protecting disability community from institutional harm\n    Given institutions often harm disabled people systematically\n    And Alex advocates against institutional ableism\n    When Alex works to protect disability community from harm\n    Then this protective advocacy should be recognized as care work\n    And the community_elohim should track Alex's watchdog activities\n    And preventing harm is as valuable as providing support\n    And Alex's work defending community rights should accumulate tokens\n    And the protocol should value both defensive and generative care work\n    And Alex's advocacy prevents suffering at scale\n    And community protection should be appropriately compensated\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

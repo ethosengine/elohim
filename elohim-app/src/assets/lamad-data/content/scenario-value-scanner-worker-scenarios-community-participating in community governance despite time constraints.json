@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-participating in community governance despite time constraints",
+  "contentType": "scenario",
+  "title": "Participating in community governance despite time constraints",
+  "description": "Participating in community governance despite time constraints",
+  "content": "Scenario: Participating in community governance despite time constraints\n    Given community makes decisions affecting workers' lives\n    And my work schedule limits participation in governance\n    When the community needs worker perspectives in decision-making\n    Then the protocol should help me participate when possible\n    And amplify worker voices in community governance\n    And advocate for accessible participation structures for workers\n    And ensure community decisions account for workers' needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

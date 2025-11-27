@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-developing abstract thinking through real economic complexity",
+  "contentType": "scenario",
+  "title": "Developing abstract thinking through real economic complexity",
+  "description": "Developing abstract thinking through real economic complexity",
+  "content": "Scenario: Developing abstract thinking through real economic complexity\n    Given Marcus is in developmental phase of emerging abstract thought\n    And he manages genuinely complex resource coordination\n    When Marcus plans meals and budgets across time\n    Then he should be developing advanced cognitive capabilities\n    And abstract concepts like opportunity cost should be learned through application\n    And systems thinking should develop through real experience\n    And the personal_agent should support abstract reasoning development\n    And complex adult work should accelerate cognitive maturation\n    And educational scaffolding should support his emerging abstraction\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

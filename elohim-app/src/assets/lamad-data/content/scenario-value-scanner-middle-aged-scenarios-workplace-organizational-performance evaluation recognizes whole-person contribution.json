@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-performance evaluation recognizes whole-person contribution",
+  "contentType": "scenario",
+  "title": "Performance evaluation recognizes whole-person contribution",
+  "description": "Performance evaluation recognizes whole-person contribution",
+  "content": "Scenario: Performance evaluation recognizes whole-person contribution\n    Given Robert's professional performance should be evaluated fairly\n    And care responsibilities shouldn't be seen as professional liability\n    And his care skills enhance his professional effectiveness\n    When workplace_elohim supports performance evaluation\n    Then it should advocate for evaluation that recognizes whole-person contribution\n    And help Robert articulate how care responsibilities develop professional capability\n    And surface when evaluation processes penalize caregiving\n    And support him in documenting productivity and value creation\n    And build evaluation frameworks that value care skills\n    And prevent caregivers from being passed over for advancement\n    And demonstrate that fair evaluation includes care economy perspective\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:workplace_organizational",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,household,family,industry_sector",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

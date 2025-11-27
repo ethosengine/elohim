@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-climate-displaced community maintains cohesion across distance",
+  "contentType": "scenario",
+  "title": "Climate-displaced community maintains cohesion across distance",
+  "description": "Climate-displaced community maintains cohesion across distance",
+  "content": "Scenario: Climate-displaced community maintains cohesion across distance\n    Given a coastal town is gradually becoming uninhabitable due to flooding\n    And families are relocating to various inland communities over several years\n    When displaced community members use Elohim to stay connected\n    And they create a diaspora community space for their town\n    Then families scattered across multiple cities maintain relationships\n    And community memory and culture are preserved\n    And mutual aid flows between dispersed community members\n    And collective decision-making continues about remaining community assets\n    And the community maintains identity despite geographic dispersal\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:displaced_person",
+    "governance_layer:ecological_bioregional",
+    "related_users:activist,elder,community_moderator",
+    "related_layers:community,district,nation_state",
+    "elohim_agents:pattern_recognition_agent,coordination_agent,resource_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/displaced_person/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

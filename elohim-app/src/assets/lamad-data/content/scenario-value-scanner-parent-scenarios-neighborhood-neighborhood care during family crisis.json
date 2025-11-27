@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood care during family crisis",
+  "contentType": "scenario",
+  "title": "Neighborhood care during family crisis",
+  "description": "Neighborhood care during family crisis",
+  "content": "Scenario: Neighborhood care during family crisis\n    Given families sometimes face crisis (illness, job loss, emergency)\n    And neighbors can provide crucial support during crisis\n    When a neighborhood family faces crisis\n    Then the neighborhood_elohim should coordinate mutual aid\n    And it should identify who has capacity to help\n    And it should organize meal trains, childcare, practical support\n    And crisis care should be specially recognized and valued\n    And neighborhood resilience should be built through mutual aid\n    And the system should enable rapid community response\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,child,neighbor,community_member",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

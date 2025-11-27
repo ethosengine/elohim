@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-preventing sarah's burnout through family care coordination",
+  "contentType": "scenario",
+  "title": "Preventing Sarah's burnout through family care coordination",
+  "description": "Preventing Sarah's burnout through family care coordination",
+  "content": "Scenario: Preventing Sarah's burnout through family care coordination\n    Given Sarah is at high risk for caregiver burnout\n    And she tends to sacrifice herself for family needs\n    When the family_elohim monitors care patterns\n    Then it should detect when Sarah is giving unsustainably\n    And it should surface imbalances before crisis\n    And it should prompt other family members to contribute more\n    And it should connect Sarah to family support resources\n    And the protocol should protect Sarah's capacity to care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

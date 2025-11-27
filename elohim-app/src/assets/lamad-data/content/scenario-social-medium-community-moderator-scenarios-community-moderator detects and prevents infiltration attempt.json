@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-community-moderator-scenarios-community-moderator detects and prevents infiltration attempt",
+  "contentType": "scenario",
+  "title": "Moderator detects and prevents infiltration attempt",
+  "description": "Moderator detects and prevents infiltration attempt",
+  "content": "Scenario: Moderator detects and prevents infiltration attempt\n    Given the housing justice organizing space has active membership\n    When the pattern detection agent identifies suspicious new member\n    And the new member exhibits patterns of infiltrator behavior\n    Then Alex receives alert with evidence of concerning patterns\n    And Alex can see the member lacks community trust connections\n    And Alex reviews their contribution patterns and tactics\n    And Alex prevents the infiltrator from disrupting organizing\n    And the space remains safe for genuine organizing work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:community_moderator",
+    "governance_layer:community",
+    "related_users:activist,content_creator,child,elder",
+    "related_layers:neighborhood,district,affinity_network",
+    "elohim_agents:moderation_agent,pattern_detection_agent,restorative_justice_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/community_moderator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-community-moderator-scenarios-community",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-community-moderator-scenarios-community",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

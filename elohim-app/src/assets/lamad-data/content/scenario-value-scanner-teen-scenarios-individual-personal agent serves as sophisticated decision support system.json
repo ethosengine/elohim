@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-personal agent serves as sophisticated decision support system",
+  "contentType": "scenario",
+  "title": "Personal agent serves as sophisticated decision support system",
+  "description": "Personal agent serves as sophisticated decision support system",
+  "content": "Scenario: Personal agent serves as sophisticated decision support system\n    Given Jasmine has complex scheduling and coordination needs\n    And she balances school, work, family responsibilities, and social life\n    When Jasmine uses her personal_agent for planning\n    Then the agent should function as financial advisor, schedule coordinator, and career counselor\n    And provide information, analysis, and memory support\n    And help her see connections: \"Your work schedule affects family dinner planning\"\n    And surface opportunities: \"Your community volunteering builds skills for your intended career\"\n    And never make decisions for her\n    And model healthy AI-human partnership where AI amplifies human capability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

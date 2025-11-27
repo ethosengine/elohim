@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-family-family decision making includes preteen's substantial input",
+  "contentType": "scenario",
+  "title": "Family decision making includes preteen's substantial input",
+  "description": "Family decision making includes preteen's substantial input",
+  "content": "Scenario: Family decision making includes preteen's substantial input\n    Given Marcus has real knowledge of household needs and constraints\n    And he manages daily household operations\n    When family decisions about resources are made\n    Then Marcus's input should carry genuine weight\n    And his knowledge should inform family planning\n    And the family_elohim should surface his insights to Sarah\n    And his voice should be respected as informed perspective\n    And family governance should reflect that he has legitimate standing\n    And his participation should be meaningful, not token\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:family",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,neighborhood,community,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

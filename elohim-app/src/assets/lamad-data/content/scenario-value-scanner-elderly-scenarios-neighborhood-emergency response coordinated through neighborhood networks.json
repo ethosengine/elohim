@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-emergency response coordinated through neighborhood networks",
+  "contentType": "scenario",
+  "title": "Emergency response coordinated through neighborhood networks",
+  "description": "Emergency response coordinated through neighborhood networks",
+  "content": "Scenario: Emergency response coordinated through neighborhood networks\n    Given emergencies may occur when Helen is alone\n    And rapid response requires nearby support\n    When emergency alert is triggered\n    Then the neighborhood_elohim should contact nearby neighbors immediately\n    And neighbors should be briefed on Helen's health conditions\n    And her advance directives should guide neighbor response\n    And network should be activated before or alongside 911\n    And Helen should feel safe knowing neighbors will respond\n    And the protocol should leverage proximity for emergency care\n    And neighborhood networks should provide safety infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

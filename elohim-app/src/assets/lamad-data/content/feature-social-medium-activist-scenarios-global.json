@@ -1,0 +1,33 @@
+{
+  "id": "feature-social-medium-activist-scenarios-global",
+  "contentType": "feature",
+  "title": "International Solidarity and Global Coordination for Activist",
+  "description": "As an activist in the social_medium system Operating at the global governance layer I want to coordinate across borders and build international movements So that humanity can address planetary-scale challenges through solidarity",
+  "content": "@epic:social_medium\n@user_type:activist\n@governance_layer:global\n@related_users:refugee,displaced_person,activist,content_creator\n@related_layers:nation_state,continental,affinity_network,cultural_linguistic\n@elohim_agents:translation_agent,verification_agent,pattern_recognition_agent,protection_agent\n\nFeature: International Solidarity and Global Coordination for Activist\n  As an activist in the social_medium system\n  Operating at the global governance layer\n  I want to coordinate across borders and build international movements\n  So that humanity can address planetary-scale challenges through solidarity\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the global governance context is active\n    And activists operate across multiple nation-states and cultures\n\n  Scenario: Activist builds cross-border solidarity network\n    Given labor activists in 15 countries face similar corporate exploitation\n    And they want to coordinate against multinational corporation practices\n    When they form a global labor solidarity network\n    And they establish protocols respecting different legal contexts\n    And translation agents enable communication across 12 languages\n    Then the global network creates shared understanding of corporate tactics\n    And each national group maintains autonomy over local strategy\n    And pattern recognition surfaces successful resistance campaigns\n    And coordination happens through verified trust relationships\n    And legal risks are minimized through jurisdictional awareness\n\n  Scenario: Activist shares evidence across borders under repression\n    Given an activist documents human rights violations in their country\n    And sharing this evidence locally would endanger them and their community\n    When they contribute documentation to international human rights network\n    And the evidence is verified through multiple independent sources\n    Then the evidence reaches international solidarity organizations\n    And it bypasses national censorship through distributed architecture\n    And the activist's identity is protected through cryptographic anonymity\n    And international pressure can be mobilized while protecting sources\n    And the network coordinates advocacy at UN and regional bodies\n    And documentation is preserved for future accountability processes\n\n  Scenario: Activist coordinates planetary climate strike\n    Given youth activists worldwide demand emergency climate action\n    And they want coordinated strikes across all continents\n    When the network establishes a coordinated action date\n    And local groups plan context-appropriate actions\n    And the coordination respects different hemispheres, cultures, and capacities\n    Then each community organizes autonomously within global framework\n    And the translation agents enable real-time cross-language coordination\n    And traditional media amplification is earned through demonstrated scale\n    And the collective action maintains coherence without centralized control\n    And impact is measured through network-wide participation tracking\n    And the strike demonstrates viable model for global coordination\n\n  Scenario: Activist prevents extraction by powerful institutions\n    Given major foundations want to \"support\" the climate movement\n    And they offer funding that would create dependency and moderate demands\n    When the network evaluates the funding opportunity\n    Then historical patterns of movement capture surface for consideration\n    And communities who worked with these funders share experiences\n    And the network collectively evaluates risks and benefits\n    And alternative solidarity economy models are proposed\n    And the movement maintains independence while building sustainable support\n    And extractive relationships are refused through collective accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:global",
+    "related_users:refugee,displaced_person,activist,content_creator",
+    "related_layers:nation_state,continental,affinity_network,cultural_linguistic",
+    "elohim_agents:translation_agent,verification_agent,pattern_recognition_agent,protection_agent",
+    "social-medium",
+    "feature"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "scenario-social-medium-activist-scenarios-global-activist builds cross-border solidarity network",
+    "scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+    "scenario-social-medium-activist-scenarios-global-activist coordinates planetary climate strike",
+    "scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "scenarioCount": 4
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

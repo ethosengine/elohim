@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-connecting retired residents to volunteer opportunities matching their skills",
+  "contentType": "scenario",
+  "title": "Connecting retired residents to volunteer opportunities matching their skills",
+  "description": "Connecting retired residents to volunteer opportunities matching their skills",
+  "content": "Scenario: Connecting retired residents to volunteer opportunities matching their skills\n    Given Frank has construction expertise\n    And community has diverse volunteer needs\n    When the community_elohim matches volunteers to opportunities\n    Then it should identify opportunities utilizing Frank's specific skills\n    And surface construction-related needs beyond Habitat\n    And coordinate with organizations seeking skilled volunteers\n    And help Frank find meaningful work aligned with expertise\n    And maximize community benefit from his particular capabilities\n    And enable Frank to contribute at highest skill level\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

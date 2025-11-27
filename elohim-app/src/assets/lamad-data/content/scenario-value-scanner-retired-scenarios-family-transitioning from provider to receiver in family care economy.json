@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-family-transitioning from provider to receiver in family care economy",
+  "contentType": "scenario",
+  "title": "Transitioning from provider to receiver in family care economy",
+  "description": "Transitioning from provider to receiver in family care economy",
+  "content": "Scenario: Transitioning from provider to receiver in family care economy\n    Given Frank has been primary provider throughout his working life\n    And he's now transitioning to more mutual reciprocity\n    And he'll eventually need more care than he provides\n    When family_elohim tracks the transition\n    Then it should recognize Frank continues substantial provision\n    And it should help him accept receiving care without shame\n    And it should show adult children how to reciprocate care\n    And Frank's lifetime of provision should create legitimate claims\n    And the transition should preserve his dignity and agency\n    And family should prepare for his increasing future needs\n    And care reciprocity across lifecycle should be normalized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:family",
+    "related_users:grandparent,senior,adult,parent,elderly",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood childcare coordination supports working parents",
+  "contentType": "scenario",
+  "title": "Neighborhood childcare coordination supports working parents",
+  "description": "Neighborhood childcare coordination supports working parents",
+  "content": "Scenario: Neighborhood childcare coordination supports working parents\n    Given Sarah works full-time as a teacher\n    And childcare is expensive and inflexible\n    When neighborhood coordinates childcare sharing\n    Then the neighborhood_elohim should match schedules and needs\n    And it should track reciprocal childcare exchanges\n    And it should help parents like Sarah support each other\n    And childcare costs should be reduced through cooperation\n    And quality care should be accessible to working families\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,worker,caregiver,young_child",
+    "related_layers:household,community,family",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

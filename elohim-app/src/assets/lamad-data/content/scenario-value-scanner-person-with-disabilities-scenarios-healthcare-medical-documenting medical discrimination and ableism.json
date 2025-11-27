@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-documenting medical discrimination and ableism",
+  "contentType": "scenario",
+  "title": "Documenting medical discrimination and ableism",
+  "description": "Documenting medical discrimination and ableism",
+  "content": "Scenario: Documenting medical discrimination and ableism\n    Given medical systems frequently discriminate against disabled people\n    And ableism in healthcare can be life-threatening\n    When Alex experiences medical discrimination\n    Then the personal_agent should help Alex document discriminatory incidents\n    And it should identify patterns of discriminatory treatment\n    And it should connect Alex to legal resources and advocacy organizations\n    And documentation should support complaints to licensing boards\n    And the protocol should take medical discrimination seriously\n    And Alex should have tools to protect themselves from medical harm\n    And systemic patterns should be made visible for accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

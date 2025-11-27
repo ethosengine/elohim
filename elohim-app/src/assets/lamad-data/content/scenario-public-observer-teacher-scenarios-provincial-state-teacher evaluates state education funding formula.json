@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher evaluates state education funding formula",
+  "contentType": "scenario",
+  "title": "Teacher evaluates state education funding formula",
+  "description": "Teacher evaluates state education funding formula",
+  "content": "Scenario: Teacher evaluates state education funding formula\n    Given state funding formula determines district resources\n    And formula appears complex and technical\n    When the Observer analyzes state funding impacts\n    Then teachers see their district gets $8,500 per student\n    And neighboring district gets $12,000 per student from same formula\n    And understand which formula factors create disparities\n    And learn which legislators champion funding equity\n    And coordinate with underfunded districts for reform coalition\n    And education funding becomes teacher advocacy priority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

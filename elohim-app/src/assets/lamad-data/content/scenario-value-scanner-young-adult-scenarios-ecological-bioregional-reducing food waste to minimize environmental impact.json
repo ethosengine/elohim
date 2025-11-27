@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-reducing food waste to minimize environmental impact",
+  "contentType": "scenario",
+  "title": "Reducing food waste to minimize environmental impact",
+  "description": "Reducing food waste to minimize environmental impact",
+  "content": "Scenario: Reducing food waste to minimize environmental impact\n    Given food waste has significant ecological costs\n    And Aisha sometimes buys more than she can use\n    When the personal_agent tracks waste patterns\n    Then it should identify environmental impact of waste\n    And it should suggest waste reduction strategies\n    And it should help her buy appropriate quantities\n    And waste reduction should be framed as environmental care\n    And the system should help her minimize ecological harm\n    And practical waste reduction should be taught\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

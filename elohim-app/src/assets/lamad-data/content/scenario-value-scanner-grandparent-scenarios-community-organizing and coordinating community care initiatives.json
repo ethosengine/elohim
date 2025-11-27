@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-organizing and coordinating community care initiatives",
+  "contentType": "scenario",
+  "title": "Organizing and coordinating community care initiatives",
+  "description": "Organizing and coordinating community care initiatives",
+  "content": "Scenario: Organizing and coordinating community care initiatives\n    Given Margaret has organizational skills and community connections\n    And community care initiatives need coordination\n    When Margaret helps organize mutual aid, care networks, or community programs\n    Then the community_elohim should recognize organizational labor\n    And it should value coordination work as essential care\n    And it should support Margaret in community organizing\n    And organizational leadership should accumulate care tokens\n    And community should benefit from her coordination skills\n    And care infrastructure should be built and maintained\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

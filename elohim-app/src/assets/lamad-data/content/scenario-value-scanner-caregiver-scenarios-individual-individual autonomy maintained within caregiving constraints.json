@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-individual-individual autonomy maintained within caregiving constraints",
+  "contentType": "scenario",
+  "title": "Individual autonomy maintained within caregiving constraints",
+  "description": "Individual autonomy maintained within caregiving constraints",
+  "content": "Scenario: Individual autonomy maintained within caregiving constraints\n    Given caregiving severely limits James's choices\n    And he cannot leave David for extended periods\n    And his schedule revolves entirely around care needs\n    When James makes personal decisions\n    Then the personal_agent should protect his autonomy\n    And it should identify opportunities for individual agency\n    And it should help James maintain some life beyond caregiving\n    And constraints should be acknowledged but not completely controlling\n    And James should retain some sphere of personal freedom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:individual",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

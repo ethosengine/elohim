@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-ecological-organizer documents environmental justice disparities for campaign",
+  "contentType": "scenario",
+  "title": "Organizer documents environmental justice disparities for campaign",
+  "description": "Organizer documents environmental justice disparities for campaign",
+  "content": "Scenario: Organizer documents environmental justice disparities for campaign\n    Given industrial pollution concentrates in low-income neighborhoods of color\n    While parks and trees concentrate in wealthy white areas\n    When the Observer provides environmental equity data\n    Then the organizer sees pollution sources mapped by neighborhood demographics\n    And views park access and tree canopy distribution\n    And calculates health impact disparities from environmental conditions\n    And identifies affected communities for organizing base\n    And environmental racism becomes documented and actionable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,parent,politician",
+    "related_layers:community,municipality,bioregional",
+    "elohim_agents:public_observer,ecological_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

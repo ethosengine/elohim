@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-household-seasonal household adjustments for health and budget",
+  "contentType": "scenario",
+  "title": "Seasonal household adjustments for health and budget",
+  "description": "Seasonal household adjustments for health and budget",
+  "content": "Scenario: Seasonal household adjustments for health and budget\n    Given Margaret's health needs change with seasons\n    And seasonal weather affects household costs\n    When the household_elohim plans for seasonal transitions\n    Then it should help Margaret prepare for winter heating costs\n    And it should suggest summer cooling strategies on budget\n    And it should adjust meal planning for seasonal produce\n    And household should be optimized for each season\n    And Margaret should maintain comfort year-round\n    And seasonal planning should prevent budget crises\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:household",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver,spouse",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

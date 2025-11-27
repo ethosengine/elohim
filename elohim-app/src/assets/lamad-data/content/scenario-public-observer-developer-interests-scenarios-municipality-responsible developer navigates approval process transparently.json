@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-municipality-responsible developer navigates approval process transparently",
+  "contentType": "scenario",
+  "title": "Responsible developer navigates approval process transparently",
+  "description": "Responsible developer navigates approval process transparently",
+  "content": "Scenario: Responsible developer navigates approval process transparently\n    Given a developer is proposing affordable housing project\n    And wants to understand complete approval pathway\n    When the Observer provides civic process navigation\n    Then the developer sees required steps: zoning review, planning commission, city council\n    And receives timeline estimates and submission requirements\n    And identifies relevant regulations and precedents\n    And connects to appropriate civic contacts\n    And navigates process efficiently without buying insider access\n    And transparent process reduces corruption opportunities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:municipality",
+    "related_users:politician,board_member,citizen,community_organizer,activist",
+    "related_layers:county_regional,provincial_state,ecological",
+    "elohim_agents:public_observer,municipal_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

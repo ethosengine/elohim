@@ -1,0 +1,21 @@
+{
+  "id": "governance-books-finite-and-infinite-games-readme",
+  "contentType": "book-chapter",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "\u201cThere are at least two kinds of games,\u201d states James P. Carse as he begins this extraordinary book. \u201cOne could be called finite; the other infinite. A finite game is played for the purpose of winning, an infinite game for the purpose of continuing the play.\u201dFinite games are the familiar contests of\u2026",
+  "content": "---\nnode_type: book\norg_id: finite_and_infinite_games\nname: \"Finite and Infinite Games\"\nurl: \"https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd\"\ngem_id: \"Mh4DOAfmPZlWbXRvRqrd\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Finite and Infinite Games inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Finite and Infinite Games\n\n## Description\n\n\u201cThere are at least two kinds of games,\u201d states James P. Carse as he begins this extraordinary book. \u201cOne could be called finite; the other infinite. A finite game is played for the purpose of winning, an infinite game for the purpose of continuing the play.\u201dFinite games are the familiar contests of\u2026\n\n**Publisher:** Google Books\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Finite and Infinite Games relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "governance",
+    "book-chapter"
+  ],
+  "sourcePath": "governance/books/finite_and_infinite_games/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

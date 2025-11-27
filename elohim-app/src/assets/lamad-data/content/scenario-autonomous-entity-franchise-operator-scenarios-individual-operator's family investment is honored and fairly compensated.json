@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator's family investment is honored and fairly compensated",
+  "contentType": "scenario",
+  "title": "Operator's family investment is honored and fairly compensated",
+  "description": "Operator's family investment is honored and fairly compensated",
+  "content": "Scenario: Operator's family investment is honored and fairly compensated\n    Given James's family invested $400K supporting his franchise dream\n    And they took real risk and deserve fair treatment\n    When acquisition provides $150K return after debt repayment\n    Then family receives back substantial portion of investment\n    And return reflects their risk and support over five years\n    And family can choose to reinvest in community investment pool if desired\n    And family investors appreciate dignified resolution protecting workers and James\n    And workplace_elohim ensures family investor treatment is transparent and fair\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:individual",
+    "related_users:[worker,manager,small_business_owner,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

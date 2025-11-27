@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-participating in global public education through convention",
+  "contentType": "scenario",
+  "title": "Participating in global public education through convention",
+  "description": "Participating in global public education through convention",
+  "content": "Scenario: Participating in global public education through convention\n    Given convention proceedings are globally broadcast and accessible\n    And billions of people watch our deliberations\n    When I participate in constitutional debate\n    Then public sees: ordinary citizens grappling with profound questions\n    And they witness: democratic deliberation across radical diversity\n    And they learn: about constitutional governance of AI\n    And they understand: sortition democracy in action\n    And they feel: connected to global democratic project\n    And my participation: educates humanity about self-governance\n    And I demonstrate: that democracy is not just for elites\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

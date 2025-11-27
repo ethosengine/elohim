@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-contributing to neighborhood safety and care",
+  "contentType": "scenario",
+  "title": "Contributing to neighborhood safety and care",
+  "description": "Contributing to neighborhood safety and care",
+  "content": "Scenario: Contributing to neighborhood safety and care\n    Given Jordan notices a neighbor's package left in the rain\n    And Jordan knows the neighbor from previous interactions\n    When Jordan alerts their support worker to the situation\n    Then the support worker helps Jordan address the concern\n    And the neighbor's package is protected from damage\n    And Jordan's observant care contribution is recognized\n    And the neighborhood_elohim records Jordan's care action\n    And Jordan accumulates care tokens for neighborhood care\n    And Jordan experiences being a contributing community member\n    And neighbors recognize Jordan as someone who looks out for others\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

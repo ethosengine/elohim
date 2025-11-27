@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-preventing roommate conflict through proactive visibility",
+  "contentType": "scenario",
+  "title": "Preventing roommate conflict through proactive visibility",
+  "description": "Preventing roommate conflict through proactive visibility",
+  "content": "Scenario: Preventing roommate conflict through proactive visibility\n    Given household labor imbalances breed resentment\n    And students often avoid difficult conversations\n    When the household_elohim detects emerging conflict patterns\n    Then it should surface issues before they become conflicts\n    And it should show data: \"Jordan hasn't contributed household labor in 3 weeks\"\n    And it should facilitate constructive conversation with neutral framing\n    And it should help roommates renegotiate responsibilities\n    And preventive intervention should maintain household harmony\n    And the system should support healthy household dynamics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

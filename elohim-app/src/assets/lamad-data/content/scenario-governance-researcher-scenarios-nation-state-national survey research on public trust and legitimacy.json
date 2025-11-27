@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-nation-state-national survey research on public trust and legitimacy",
+  "contentType": "scenario",
+  "title": "National survey research on public trust and legitimacy",
+  "description": "National survey research on public trust and legitimacy",
+  "content": "Scenario: National survey research on public trust and legitimacy\n    Given I need to understand population-wide attitudes toward protocol\n    And survey data provides breadth that case studies cannot\n    When I conduct nationally representative survey on protocol governance\n    Then I measure: trust in agents vs trust in traditional institutions\n    And I assess: perceived legitimacy of Constitutional Councils\n    And I explore: what predicts individual support or opposition\n    And I examine: demographic patterns in trust and participation\n    And I track: opinion changes over time as protocol matures\n    And I identify: sources of resistance and paths to broader acceptance\n    And My research informs: public engagement and communication strategies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:nation_state",
+    "related_users:policy_maker,constitutional_council_member,technical_expert,researcher",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/nation_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-nation-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-nation-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

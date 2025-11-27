@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-garden and plant knowledge shared with community",
+  "contentType": "scenario",
+  "title": "Garden and plant knowledge shared with community",
+  "description": "Garden and plant knowledge shared with community",
+  "content": "Scenario: Garden and plant knowledge shared with community\n    Given Helen has decades of gardening experience\n    And she knows local plants, soil conditions, and growing patterns\n    When Helen shares gardening and plant knowledge\n    Then her expertise should be recognized as ecological contribution\n    And community gardens should benefit from elder expertise\n    And traditional plant knowledge should be preserved\n    And care tokens should reflect her environmental teaching\n    And the protocol should connect elder plant experts with community gardens\n    And bioregional food sovereignty should be supported by elder knowledge\n    And Helen's experience should enable local food production\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:ecological_bioregional",
+    "related_users:community_member,environmental_steward,young_adult",
+    "related_layers:community,educational,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.190597",
+  "updatedAt": "2025-11-21T18:54:29.190597"
+}

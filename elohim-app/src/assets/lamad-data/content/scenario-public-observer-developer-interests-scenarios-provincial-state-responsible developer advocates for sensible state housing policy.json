@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-responsible developer advocates for sensible state housing policy",
+  "contentType": "scenario",
+  "title": "Responsible developer advocates for sensible state housing policy",
+  "description": "Responsible developer advocates for sensible state housing policy",
+  "content": "Scenario: Responsible developer advocates for sensible state housing policy\n    Given state housing regulations create barriers to affordable development\n    And a responsible developer wants to build more affordable housing\n    When the Observer provides state policy navigation and advocacy tools\n    Then the developer understands state regulatory framework\n    And identifies which regulations genuinely protect community versus serve NIMBYism\n    And engages in transparent policy advocacy for streamlined affordable housing approval\n    And makes case based on evidence not just developer profit\n    And transparent advocacy distinguishes from corrupt lobbying\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:provincial_state",
+    "related_users:politician,board_member,citizen,activist",
+    "related_layers:municipality,county_regional,ecological",
+    "elohim_agents:public_observer,state_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

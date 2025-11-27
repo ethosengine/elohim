@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent challenges state funding formula",
+  "contentType": "scenario",
+  "title": "Parent challenges state funding formula",
+  "description": "Parent challenges state funding formula",
+  "content": "Scenario: Parent challenges state funding formula\n    Given the parent learns state funding shortchanges their district\n    And wonders why their child's school lacks basic resources\n    When the parent reviews Observer's state funding analysis\n    Then they see their district receives $3,000 less per student\n    And understand state formula creates massive inequities\n    And learn this explains overcrowded classes and cut programs\n    And connect with parents in other underfunded districts statewide\n    And parent advocacy expands to state-level funding reform\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-intergenerational ecological wisdom includes disability experience",
+  "contentType": "scenario",
+  "title": "Intergenerational ecological wisdom includes disability experience",
+  "description": "Intergenerational ecological wisdom includes disability experience",
+  "content": "Scenario: Intergenerational ecological wisdom includes disability experience\n    Given disabled elders hold knowledge about adaptation and resilience\n    And disability experience across generations teaches interdependence\n    When ecological knowledge is preserved and transmitted\n    Then the bioregional_elohim should include disability experience in wisdom traditions\n    And Alex should be recognized as holder of valuable knowledge\n    And disability wisdom should be passed to future generations\n    And ecological teaching should include disability justice principles\n    And the protocol should honor disability experience as ecological knowledge\n    And Alex's understanding of interdependence should be preserved\n    And intergenerational learning should include disability community wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

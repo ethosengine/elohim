@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood supports work-life balance for middle-aged adults",
+  "contentType": "scenario",
+  "title": "Neighborhood supports work-life balance for middle-aged adults",
+  "description": "Neighborhood supports work-life balance for middle-aged adults",
+  "content": "Scenario: Neighborhood supports work-life balance for middle-aged adults\n    Given Robert manages intense work and care demands\n    And neighborhood support could ease his burden\n    And he can also provide flexibility support to neighbors\n    When neighborhood_elohim coordinates flexible support\n    Then it should connect neighbors who can provide backup care\n    And help Robert find local support for care emergencies\n    And recognize his contributions when he helps neighbors\n    And build mutual support networks for managing work-life balance\n    And reduce isolation of managing demands alone\n    And demonstrate that neighborhoods can support balanced lives\n    And strengthen community through practical mutual aid\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:neighborhood",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,community,family,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-advocating for industry-wide living wage standards",
+  "contentType": "scenario",
+  "title": "Advocating for industry-wide living wage standards",
+  "description": "Advocating for industry-wide living wage standards",
+  "content": "Scenario: Advocating for industry-wide living wage standards\n    Given current food service wages are systematically too low to live on\n    When workers organize for living wage campaigns\n    Then the protocol should support industry-wide living wage advocacy\n    And provide evidence of inadequate current wages\n    And help workers coordinate collective demands\n    And build movement for mandatory living wage in food service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

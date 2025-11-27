@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent exposes school resource inequities",
+  "contentType": "scenario",
+  "title": "Parent exposes school resource inequities",
+  "description": "Parent exposes school resource inequities",
+  "content": "Scenario: Parent exposes school resource inequities\n    Given the parent suspects their child's school gets fewer resources\n    And neighboring school seems to have more programs and facilities\n    When the parent reviews Observer's district equity analysis\n    Then they see per-student spending varies by thousands of dollars\n    And westside schools have gifted programs and experienced teachers\n    And their child's school lacks arts, music, and advanced courses\n    And systematic inequity pattern becomes documented evidence\n    And parent advocacy shifts to structural equity demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.185597",
+  "updatedAt": "2025-11-21T18:54:29.185597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-individual-right to disconnect maintained despite complex commitments",
+  "contentType": "scenario",
+  "title": "Right to disconnect maintained despite complex commitments",
+  "description": "Right to disconnect maintained despite complex commitments",
+  "content": "Scenario: Right to disconnect maintained despite complex commitments\n    Given Robert has extensive care economy commitments\n    And many people depend on his coordination\n    And constitutional constraints protect his agency\n    When Robert chooses to disconnect from the system\n    Then the disconnection must be honored immediately\n    And no manipulative patterns to retain usage should be employed\n    And his care contributions should be exportable in standard format\n    And alternative coordination support should be surfaced for those who depend on him\n    And his right to not participate must be respected\n    And he should maintain full control over his participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:individual",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

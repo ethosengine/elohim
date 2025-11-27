@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-household privacy protected from external surveillance",
+  "contentType": "scenario",
+  "title": "Household privacy protected from external surveillance",
+  "description": "Household privacy protected from external surveillance",
+  "content": "Scenario: Household privacy protected from external surveillance\n    Given household care economy generates detailed family data\n    And this data reveals intimate household patterns\n    When household data is collected\n    Then it must remain under household members' control\n    And no external entities should access household data without consent\n    And workplace should never see household care patterns\n    And community should only see what household chooses to share\n    And household privacy should be absolutely protected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

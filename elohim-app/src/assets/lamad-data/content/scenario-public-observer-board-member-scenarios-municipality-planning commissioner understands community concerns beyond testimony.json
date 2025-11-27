@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-municipality-planning commissioner understands community concerns beyond testimony",
+  "contentType": "scenario",
+  "title": "Planning commissioner understands community concerns beyond testimony",
+  "description": "Planning commissioner understands community concerns beyond testimony",
+  "content": "Scenario: Planning commissioner understands community concerns beyond testimony\n    Given commission considers rezoning to allow commercial development in residential area\n    And supporters include business owners and economic development advocates who testified\n    And only 8 residents attended meeting to oppose\n    When the commissioner seeks community accountability data from Observer\n    Then they see survey data from neighborhood residents showing strong opposition\n    And discover working families couldn't attend evening meeting to testify\n    And access analysis showing traffic and noise impacts on residential area\n    And understand broader community concerns beyond who had time to testify\n    And community accountability helps commissioner serve constituent interests\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:municipality",
+    "related_users:citizen,developer_interests,politician,activist,community_organizer",
+    "related_layers:district,community,ecological",
+    "elohim_agents:public_observer,domain_elohim,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

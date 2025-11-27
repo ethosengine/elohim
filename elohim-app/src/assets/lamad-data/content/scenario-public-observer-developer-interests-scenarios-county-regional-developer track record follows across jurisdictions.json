@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-developer track record follows across jurisdictions",
+  "contentType": "scenario",
+  "title": "Developer track record follows across jurisdictions",
+  "description": "Developer track record follows across jurisdictions",
+  "content": "Scenario: Developer track record follows across jurisdictions\n    Given a developer broke promises in one municipality\n    And now seeks approval in neighboring jurisdiction\n    When the Observer provides cross-jurisdictional track record\n    Then planning commission sees: developer promised 150 jobs, delivered 18\n    And community benefits agreement was not honored\n    And pattern shows developer moves to new jurisdiction after burning bridges\n    And regional transparency prevents serial extraction\n    And developers can't escape accountability through relocation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

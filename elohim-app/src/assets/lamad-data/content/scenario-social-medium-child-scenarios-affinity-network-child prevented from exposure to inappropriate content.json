@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+  "contentType": "scenario",
+  "title": "Child prevented from exposure to inappropriate content",
+  "description": "Child prevented from exposure to inappropriate content",
+  "content": "Scenario: Child prevented from exposure to inappropriate content\n    Given Emma participates in the manga community\n    When an older teen posts art with mature themes\n    And the content is not appropriate for younger members\n    Then the guardian agent prevents Emma from seeing the mature content\n    And the moderator is notified to evaluate the post\n    And age-appropriate content guidelines are reinforced\n    And Emma's experience remains safe and appropriate to her development\n    And the older teen receives guidance about age-appropriate spaces\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,community_moderator,child",
+    "related_layers:educational,neighborhood,family",
+    "elohim_agents:guardian_agent,matching_agent,moderation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-fair compensation accounting for care work burden",
+  "contentType": "scenario",
+  "title": "Fair compensation accounting for care work burden",
+  "description": "Fair compensation accounting for care work burden",
+  "content": "Scenario: Fair compensation accounting for care work burden\n    Given Sarah performs enormous unpaid care labor\n    And this work subsidizes employer by enabling her professional work\n    When Sarah negotiates compensation\n    Then the workplace_elohim should help her articulate fair pay\n    And it should recognize that low wages force families into poverty\n    And it should support advocacy for family-sustaining compensation\n    And the system should help Sarah argue that fair pay enables family care\n    And workplace should pay wages that support household flourishing\n    And compensation should reflect total value of human labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

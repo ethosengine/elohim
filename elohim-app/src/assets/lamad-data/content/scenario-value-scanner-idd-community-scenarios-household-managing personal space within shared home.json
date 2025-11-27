@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-managing personal space within shared home",
+  "contentType": "scenario",
+  "title": "Managing personal space within shared home",
+  "description": "Managing personal space within shared home",
+  "content": "Scenario: Managing personal space within shared home\n    Given Jordan has their own bedroom in the group home\n    And personal space is important for privacy and autonomy\n    When Jordan wants to decorate their room\n    Then Jordan can choose decorations within household guidelines\n    And the personal_agent helps Jordan shop for items in budget\n    And support workers respect Jordan's room as their private space\n    And Jordan's choices about their space are honored\n    And Jordan experiences having a home, not just a placement\n    And privacy boundaries around Jordan's room are maintained\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

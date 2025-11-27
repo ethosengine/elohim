@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal elder care policy informed by caregiver experience",
+  "contentType": "scenario",
+  "title": "Municipal elder care policy informed by caregiver experience",
+  "description": "Municipal elder care policy informed by caregiver experience",
+  "content": "Scenario: Municipal elder care policy informed by caregiver experience\n    Given Robert coordinates care for parents ages 78 and 75\n    And he's navigated municipal elder care systems\n    And he understands what works and what's missing\n    When municipal_elohim connects his experience to policy development\n    Then it should channel his feedback to municipal elder care planning\n    And surface his expertise to municipal aging services\n    And help him advocate for caregiver support programs\n    And connect him to municipal boards and advisory committees\n    And ensure municipal policy reflects actual caregiver needs\n    And recognize that users of systems should shape policy\n    And build elder care infrastructure based on lived experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:municipality",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:community,neighborhood,workplace_organizational,family",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

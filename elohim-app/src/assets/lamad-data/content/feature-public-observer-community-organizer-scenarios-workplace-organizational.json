@@ -1,0 +1,34 @@
+{
+  "id": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
+  "contentType": "feature",
+  "title": "Labor and Worker Organizing for Community Organizer",
+  "description": "As a community organizer in the public_observer system Operating at the workplace_organizational functional layer I want to build worker power and worker-community coalitions for economic justice So that civic policy prioritizes living wages, workplace protections, and worker voice",
+  "content": "@epic:public_observer\n@user_type:community_organizer\n@governance_layer:workplace_organizational\n@related_users:activist,citizen,politician,journalist\n@related_layers:municipality,industry_sector,community\n@elohim_agents:public_observer,workplace_elohim,economic_elohim,coalition_elohim\n\nFeature: Labor and Worker Organizing for Community Organizer\n  As a community organizer in the public_observer system\n  Operating at the workplace_organizational functional layer\n  I want to build worker power and worker-community coalitions for economic justice\n  So that civic policy prioritizes living wages, workplace protections, and worker voice\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_organizer user is registered in the system\n    And the workplace_organizational governance context is active\n\n  Scenario: Organizer identifies living wage campaign opportunity\n    Given city council will consider minimum wage ordinance\n    And workers struggle with poverty wages despite full-time work\n    When the Observer surfaces the organizing opportunity\n    Then the organizer sees local wage patterns and living wage gap\n    And identifies which workers and communities are most affected\n    And gets analysis showing public subsidies to low-wage employers\n    And receives alert early enough to organize worker-community coalition\n    And municipal wage policy becomes organizing opportunity\n\n  Scenario: Organizer builds worker-community coalition for living wage\n    Given workers can't afford housing in city where they work\n    And residents care about economic stability of their communities\n    When the organizer uses Observer to build coalition\n    Then they connect low-wage workers with community advocates\n    And show how poverty wages harm both workers and neighborhoods\n    And coordinate testimony combining worker lived experience and community impact\n    And facilitate coalition across four languages and multiple industries\n    And labor organizing becomes community economic justice campaign\n\n  Scenario: Organizer creates accessible materials on community benefits agreement\n    Given developer seeks public subsidy for major project\n    And promises to \"create jobs\" but history shows otherwise\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of community benefits agreements\n    And see developer's labor track record from past projects\n    And get template for CBA with binding labor standards\n    And access wage and hiring data to counter developer claims\n    And complex economic development becomes community organizing opportunity\n\n  Scenario: Organizer develops worker leaders for city council testimony\n    Given restaurant workers face wage theft and unsafe conditions\n    And most have never engaged in civic advocacy\n    When the organizer supports leadership development via Observer\n    Then workers receive accessible data on wage theft patterns\n    And get testimony framework they can personalize with their stories\n    And see labor protection policies from other cities\n    And practice addressing council member questions\n    And workers become powerful advocates for their own interests\n\n  Scenario: Organizer tracks accountability for paid sick leave implementation\n    Given city passed paid sick leave ordinance\n    And the organizer's worker-community coalition won the policy\n    When the Observer tracks implementation and enforcement\n    Then the organizer monitors employer compliance rates\n    And sees enforcement actions and penalties for violations\n    And identifies industries with systematic non-compliance\n    And documents workers actually receiving sick leave\n    And policy victory leads to implementation accountability ensuring real impact\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:workplace_organizational",
+    "related_users:activist,citizen,politician,journalist",
+    "related_layers:municipality,industry_sector,community",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim,coalition_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer identifies living wage campaign opportunity",
+    "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer builds worker-community coalition for living wage",
+    "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer creates accessible materials on community benefits agreement",
+    "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer develops worker leaders for city council testimony",
+    "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer tracks accountability for paid sick leave implementation",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

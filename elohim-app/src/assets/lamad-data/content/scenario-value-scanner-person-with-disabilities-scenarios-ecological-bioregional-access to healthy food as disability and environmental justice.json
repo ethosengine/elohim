@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-access to healthy food as disability and environmental justice",
+  "contentType": "scenario",
+  "title": "Access to healthy food as disability and environmental justice",
+  "description": "Access to healthy food as disability and environmental justice",
+  "content": "Scenario: Access to healthy food as disability and environmental justice\n    Given food systems often fail disabled people and harm environment\n    And Alex navigates both food access barriers and ecological concerns\n    When food systems are reformed\n    Then the bioregional_elohim should connect food justice to disability access\n    And sustainable food should be accessible to disabled people\n    And Alex should be able to participate in local food systems\n    And accessibility should be integrated into food justice work\n    And the protocol should recognize food as both disability and ecological issue\n    And Alex's perspective should inform food system design\n    And local food networks should include disabled people\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

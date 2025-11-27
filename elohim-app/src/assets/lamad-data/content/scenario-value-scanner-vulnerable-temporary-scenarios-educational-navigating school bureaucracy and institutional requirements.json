@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-navigating school bureaucracy and institutional requirements",
+  "contentType": "scenario",
+  "title": "Navigating school bureaucracy and institutional requirements",
+  "description": "Navigating school bureaucracy and institutional requirements",
+  "content": "Scenario: Navigating school bureaucracy and institutional requirements\n    Given schools require forms, meetings, documentation, and coordination\n    And school bureaucracy can be overwhelming during crisis\n    When I manage school institutional requirements\n    Then the Value Scanner tracks all school deadlines and requirements\n    And helps me gather necessary documentation efficiently\n    And prepares me for required school meetings (IEP, parent-teacher conferences)\n    And ensures nothing falls through cracks despite my overwhelm\n    And my personal_agent reminds me of upcoming school obligations\n    And recognizes school bureaucracy navigation as cognitive labor\n    And validates that school demands are significant amid crisis\n    And prevents school requirements from overwhelming me\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

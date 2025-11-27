@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-presenting competing technical interpretations to council",
+  "contentType": "scenario",
+  "title": "Presenting competing technical interpretations to council",
+  "description": "Presenting competing technical interpretations to council",
+  "content": "Scenario: Presenting competing technical interpretations to council\n    Given technical experts disagree about transparency method adequacy\n    And council needs to understand the disagreement\n    When I present both my view and Dr. Chen's alternative\n    Then I explain: his argument fairly and completely\n    And I articulate: where we agree and where we differ\n    And I present: his evidence alongside mine\n    And I avoid: dismissing his perspective unfairly\n    And I let: council judge which interpretation is more constitutionally aligned\n    And I demonstrate: intellectual humility and respect for disagreement\n    And council sees: that expertise involves uncertainty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.174597",
+  "updatedAt": "2025-11-21T18:54:29.174597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-coordinating family visits and holiday logistics",
+  "contentType": "scenario",
+  "title": "Coordinating family visits and holiday logistics",
+  "description": "Coordinating family visits and holiday logistics",
+  "content": "Scenario: Coordinating family visits and holiday logistics\n    Given Kenji returns home for holidays and breaks\n    And visit logistics require coordination and resources\n    When the family_elohim manages visit planning\n    Then it should coordinate schedules across family members\n    And it should help plan transportation, meals, and household logistics\n    And it should recognize labor involved in maintaining connection across distance\n    And it should value family members' work hosting and traveling\n    And the system should reduce friction in cross-distance family coordination\n    And maintaining family connection should be recognized as work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

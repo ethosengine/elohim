@@ -1,4 +1,52 @@
-import { FeatureNode, ScenarioNode, GherkinStep, GherkinBackground, ScenarioExamples, NodeType } from '../models';
+import { ContentNode, ContentType } from '../models/content-node.model';
+
+/**
+ * Gherkin step (Given/When/Then/And/But)
+ */
+export interface GherkinStep {
+  keyword: string;
+  text: string;
+  docString?: string;
+  dataTable?: string[][];
+}
+
+/**
+ * Background section
+ */
+export interface GherkinBackground {
+  steps: GherkinStep[];
+}
+
+/**
+ * Examples table for Scenario Outline
+ */
+export interface ScenarioExamples {
+  headers: string[];
+  rows: string[][];
+}
+
+/**
+ * Parsed Feature (extends ContentNode)
+ */
+export interface FeatureNode extends ContentNode {
+  category: string;
+  epicIds: string[];
+  scenarioIds: string[];
+  featureDescription: string;
+  background?: GherkinBackground;
+  gherkinContent: string;
+}
+
+/**
+ * Parsed Scenario (extends ContentNode)
+ */
+export interface ScenarioNode extends ContentNode {
+  featureId: string;
+  epicIds: string[];
+  scenarioType: 'scenario' | 'scenario_outline';
+  steps: GherkinStep[];
+  examples?: ScenarioExamples[];
+}
 
 /**
  * Parser for Gherkin .feature files
@@ -24,12 +72,13 @@ export class GherkinParser {
 
     const feature: FeatureNode = {
       id: featureId,
-      type: NodeType.FEATURE,
+      contentType: 'feature' as ContentType,
       title: featureTitle,
       description: descriptionLines.join(' '),
       tags,
       sourcePath,
       content: content,
+      contentFormat: 'gherkin',
       relatedNodeIds: [...scenarios.map(s => s.id), ...epicIds],
       metadata: {},
       category,
@@ -140,17 +189,18 @@ export class GherkinParser {
 
     return {
       id: scenarioId,
-      type: NodeType.SCENARIO,
+      contentType: 'scenario' as ContentType,
       title: scenarioTitle,
       description: scenarioTitle,
       tags: scenarioTags.concat(featureTags),
       sourcePath,
       content: scenarioTitle,
+      contentFormat: 'gherkin',
       relatedNodeIds: [featureId, ...epicIds],
       metadata: {},
       featureId,
       epicIds,
-      scenarioType,
+      scenarioType: scenarioType as 'scenario' | 'scenario_outline',
       steps,
       examples
     };

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-community accountability ensures democratic locations serve neighborhood needs",
+  "contentType": "scenario",
+  "title": "Community accountability ensures democratic locations serve neighborhood needs",
+  "description": "Community accountability ensures democratic locations serve neighborhood needs",
+  "content": "Scenario: Community accountability ensures democratic locations serve neighborhood needs\n    Given franchise corporate ignored community needs in pursuit of profit maximization\n    And locations had no mechanism for community input on operations\n    When democratic governance includes community stakeholder participation\n    Then neighborhood residents can attend stakeholder meetings and provide input\n    And community concerns about impacts (environmental, traffic, employment) are heard\n    And workers consider community feedback in democratic decision-making\n    And accountability flows both ways (community and workers mutually accountable)\n    And community_elohim facilitates stakeholder participation protecting worker autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

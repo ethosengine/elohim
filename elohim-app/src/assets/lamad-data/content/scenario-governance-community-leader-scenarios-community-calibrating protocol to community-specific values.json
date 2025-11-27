@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-calibrating protocol to community-specific values",
+  "contentType": "scenario",
+  "title": "Calibrating protocol to community-specific values",
+  "description": "Calibrating protocol to community-specific values",
+  "content": "Scenario: Calibrating protocol to community-specific values\n    Given Riverside has distinct cultural values and history\n    And we want protocol to reflect our community identity\n    When we engage in community calibration process\n    Then we deliberate: about privacy thresholds (we value privacy highly)\n    And we discuss: resource sharing norms (indigenous heritage influences us)\n    And we consider: how our history affects trust (government betrayal in past)\n    And we vote: on calibrations within constitutional bounds\n    And we implement: community-specific settings\n    And protocol respects: local sovereignty and cultural specificity\n    And we exercise: meaningful self-governance within shared principles\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-value formation through autonomous exploration",
+  "contentType": "scenario",
+  "title": "Value formation through autonomous exploration",
+  "description": "Value formation through autonomous exploration",
+  "content": "Scenario: Value formation through autonomous exploration\n    Given Jasmine is consciously forming her personal values\n    And she tests values through real economic decisions\n    When Jasmine makes purchasing choices reflecting her values\n    Then her personal_agent should help her track alignment between values and actions\n    And surface patterns: \"You've prioritized local/sustainable products 12 of 15 purchases\"\n    And support her value exploration without imposing external values\n    And recognize that she's developing adult value framework\n    And protect her space for individual identity development\n    And acknowledge her increasing moral sophistication\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

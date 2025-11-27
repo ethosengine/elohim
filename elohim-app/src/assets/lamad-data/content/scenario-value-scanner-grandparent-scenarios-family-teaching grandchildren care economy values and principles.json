@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-teaching grandchildren care economy values and principles",
+  "contentType": "scenario",
+  "title": "Teaching grandchildren care economy values and principles",
+  "description": "Teaching grandchildren care economy values and principles",
+  "content": "Scenario: Teaching grandchildren care economy values and principles\n    Given Margaret is modeling care economy through her actions\n    And Tommy and Emma are learning from her example\n    When Margaret provides care and teaches family values\n    Then the family_elohim should support intergenerational value transmission\n    And children should learn that care creates value\n    And they should see that elders have wisdom and worth\n    And they should understand families are reciprocal care networks\n    And Margaret's care teaching should be recognized as developmental work\n    And next generation should internalize care economy principles\n    And family culture should be transformed through children's learning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

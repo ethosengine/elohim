@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-workplace privacy maintained from personal life",
+  "contentType": "scenario",
+  "title": "Workplace privacy maintained from personal life",
+  "description": "Workplace privacy maintained from personal life",
+  "content": "Scenario: Workplace privacy maintained from personal life\n    Given Aisha's workplace should not access personal data\n    And she has full privacy rights\n    When workplace and personal systems interact\n    Then strict privacy boundaries must be enforced\n    And workplace should have zero access to personal life data\n    And personal_agent should protect her information\n    And workplace_elohim should respect privacy completely\n    And the system should prevent workplace surveillance\n    And professional and personal spheres should remain separate\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,adult,employer,colleague",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

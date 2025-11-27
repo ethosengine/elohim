@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-building household community through shared care",
+  "contentType": "scenario",
+  "title": "Building household community through shared care",
+  "description": "Building household community through shared care",
+  "content": "Scenario: Building household community through shared care\n    Given Kenji and roommates are temporarily living together\n    And they could just be strangers sharing space\n    When the household_elohim fosters care economy culture\n    Then it should help them build genuine community\n    And it should recognize shared meals as community building\n    And it should value emotional support among roommates\n    And it should show how care contributions create belonging\n    And the system should help transform roommates into household family\n    And student households should be recognized as temporary but real communities\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

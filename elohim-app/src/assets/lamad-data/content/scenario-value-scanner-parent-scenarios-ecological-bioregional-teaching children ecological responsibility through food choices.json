@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children ecological responsibility through food choices",
+  "contentType": "scenario",
+  "title": "Teaching children ecological responsibility through food choices",
+  "description": "Teaching children ecological responsibility through food choices",
+  "content": "Scenario: Teaching children ecological responsibility through food choices\n    Given Sarah manages family food system\n    And food has enormous environmental impact\n    When Sarah teaches Tommy and Emma about food ecology\n    Then the educational_elohim should recognize ecological education\n    And teaching about local food, seasonal eating, food waste should be valued\n    And Sarah's work to build children's food literacy should accumulate tokens\n    And the system should recognize ecological food education as care work\n    And next generation should learn food as ecological relationship\n    And Sarah's teaching should be valued as environmental stewardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

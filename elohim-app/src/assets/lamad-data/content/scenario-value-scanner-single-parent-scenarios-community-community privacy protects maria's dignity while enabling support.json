@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-community privacy protects maria's dignity while enabling support",
+  "contentType": "scenario",
+  "title": "Community privacy protects Maria's dignity while enabling support",
+  "description": "Community privacy protects Maria's dignity while enabling support",
+  "content": "Scenario: Community privacy protects Maria's dignity while enabling support\n    Given Maria needs community support but also privacy protection\n    And some aspects of her situation are sensitive and personal\n    When Maria participates in community care economy\n    Then the community_elohim should only share what Maria consents to\n    And her household details should remain private unless she chooses to disclose\n    And support access should not require invasive disclosure\n    And privacy should be protected even while receiving community assistance\n    And Maria should maintain dignity and control over personal information\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist coordinates regional investigation across 15 municipalities",
+  "contentType": "scenario",
+  "title": "Journalist coordinates regional investigation across 15 municipalities",
+  "description": "Journalist coordinates regional investigation across 15 municipalities",
+  "content": "Scenario: Journalist coordinates regional investigation across 15 municipalities\n    Given affordable housing crisis affects entire metropolitan region\n    And the journalist collaborates with reporters in neighboring coverage areas\n    When the Observer provides civic surveillance across all municipalities\n    Then journalists access comprehensive data from all 15 cities\n    And identify common patterns in zoning and development approval\n    And compare policy approaches and housing production outcomes\n    And publish coordinated regional investigation\n    And local stories reveal regional systemic failure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:county_regional",
+    "related_users:journalist,activist,politician,citizen",
+    "related_layers:municipality,provincial_state,community",
+    "elohim_agents:public_observer,regional_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.184597",
+  "updatedAt": "2025-11-21T18:54:29.184597"
+}

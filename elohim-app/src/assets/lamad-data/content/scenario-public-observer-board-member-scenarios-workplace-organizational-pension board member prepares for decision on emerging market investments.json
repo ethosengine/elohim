@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-pension board member prepares for decision on emerging market investments",
+  "contentType": "scenario",
+  "title": "Pension board member prepares for decision on emerging market investments",
+  "description": "Pension board member prepares for decision on emerging market investments",
+  "content": "Scenario: Pension board member prepares for decision on emerging market investments\n    Given investment staff recommends increasing allocation to emerging markets\n    And recommendation includes complex analysis of risk-adjusted returns\n    And board member wants to make informed fiduciary decision but lacks investment expertise\n    When the board member uses Observer decision support\n    Then they receive executive summary of emerging market investment considerations\n    And see performance and volatility data from peer pension funds' allocations\n    And access key questions to ask investment staff about risk management\n    And understand how proposed allocation fits pension fund's overall strategy\n    And accessible expertise enables informed fiduciary judgment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:workplace_organizational",
+    "related_users:citizen,politician,activist,community_organizer,worker",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,domain_elohim,accountability_elohim,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.183597",
+  "updatedAt": "2025-11-21T18:54:29.183597"
+}

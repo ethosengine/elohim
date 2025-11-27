@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-seeing patterns across multiple appeals inform community calibration",
+  "contentType": "scenario",
+  "title": "Seeing patterns across multiple appeals inform community calibration",
+  "description": "Seeing patterns across multiple appeals inform community calibration",
+  "content": "Scenario: Seeing patterns across multiple appeals inform community calibration\n    Given our council has reviewed 50 appeals over two months\n    And I notice recurring themes and tensions\n    When I observe patterns in appeal types and outcomes\n    Then I see: many adolescent autonomy conflicts emerging\n    And I notice: three business loan denials with similar criteria\n    And I identify: recurring privacy threshold concerns\n    And I share: these observations with community leader\n    And community can: consider local protocol calibration\n    And my service: informs democratic governance beyond individual cases\n    And patterns reveal: community-wide issues requiring deliberation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

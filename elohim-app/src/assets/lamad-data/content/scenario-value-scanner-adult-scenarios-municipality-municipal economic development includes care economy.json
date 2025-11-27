@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal economic development includes care economy",
+  "contentType": "scenario",
+  "title": "Municipal economic development includes care economy",
+  "description": "Municipal economic development includes care economy",
+  "content": "Scenario: Municipal economic development includes care economy\n    Given traditional economic development ignores care work\n    And Sarah's care contributions create substantial value\n    When municipal economic development is planned\n    Then care economy should be recognized as economic sector\n    And care work should be counted in municipal GDP calculations\n    And economic development should support care economy infrastructure\n    And municipal prosperity should reflect care creates value\n    And economic planning should include invisible care labor\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.189597",
+  "updatedAt": "2025-11-21T18:54:29.189597"
+}

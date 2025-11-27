@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-senior employment and income supplementation programs",
+  "contentType": "scenario",
+  "title": "Senior employment and income supplementation programs",
+  "description": "Senior employment and income supplementation programs",
+  "content": "Scenario: Senior employment and income supplementation programs\n    Given Margaret's fixed income is limited\n    And some seniors want/need supplemental income\n    When the municipality_elohim provides employment information\n    Then senior-appropriate employment opportunities should be available\n    And part-time work that doesn't jeopardize benefits should be possible\n    And income supplementation programs should be accessible\n    And Margaret should have options to increase resources if she chooses\n    And employment should be optional, not mandatory for survival\n    And municipal programs should support senior economic security\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

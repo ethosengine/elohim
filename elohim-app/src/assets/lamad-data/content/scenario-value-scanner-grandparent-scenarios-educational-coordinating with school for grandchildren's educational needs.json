@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-educational-coordinating with school for grandchildren's educational needs",
+  "contentType": "scenario",
+  "title": "Coordinating with school for grandchildren's educational needs",
+  "description": "Coordinating with school for grandchildren's educational needs",
+  "content": "Scenario: Coordinating with school for grandchildren's educational needs\n    Given Margaret is involved in grandchildren's education\n    And she sometimes attends school events or communicates with teachers\n    When the educational_elohim coordinates school involvement\n    Then it should recognize Margaret's educational engagement\n    And it should facilitate communication between grandparent and school\n    And it should value her participation in children's formal education\n    And school involvement should accumulate care tokens\n    And Margaret should be recognized as part of children's educational support network\n    And grandparent participation should be welcomed and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:educational",
+    "related_users:child,preteen,parent,teacher,educator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.191597",
+  "updatedAt": "2025-11-21T18:54:29.191597"
+}

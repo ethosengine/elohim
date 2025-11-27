@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-accessing community healthcare and support services",
+  "contentType": "scenario",
+  "title": "Accessing community healthcare and support services",
+  "description": "Accessing community healthcare and support services",
+  "content": "Scenario: Accessing community healthcare and support services\n    Given my low wages make healthcare and services unaffordable\n    And community provides sliding-scale or care-economy-based services\n    When I need healthcare, mental health support, or other services\n    Then the protocol should connect me to accessible community resources\n    And facilitate payment based on my care economy participation\n    And recognize that workers deserve healthcare regardless of income\n    And support building community care infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+  "contentType": "scenario",
+  "title": "Child learns from elder mentor in safe context",
+  "description": "Child learns from elder mentor in safe context",
+  "content": "Scenario: Child learns from elder mentor in safe context\n    Given Emma has been active in the manga community for 6 months\n    And she shows dedication and growing skill\n    When an elder community artist offers mentorship\n    Then the matching agent verifies the elder's background and trustworthiness\n    And the mentorship is structured with appropriate boundaries\n    And Emma's parents are notified and can approve the arrangement\n    And mentorship interactions are visible to community moderators\n    And Emma receives valuable guidance in a safe learning relationship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,community_moderator,child",
+    "related_layers:educational,neighborhood,family",
+    "elohim_agents:guardian_agent,matching_agent,moderation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/child/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-child-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-child-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.187597",
+  "updatedAt": "2025-11-21T18:54:29.187597"
+}

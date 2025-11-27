@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-my healthcare amendment proposal passes convention",
+  "contentType": "scenario",
+  "title": "My healthcare amendment proposal passes convention",
+  "description": "My healthcare amendment proposal passes convention",
+  "content": "Scenario: My healthcare amendment proposal passes convention\n    Given my nursing experience revealed healthcare as dignity issue\n    And I proposed amendment recognizing healthcare as constitutional right\n    When convention deliberates my proposal\n    Then delegates hear: my testimony about dignity in healthcare\n    And they discuss: healthcare across diverse economic contexts\n    And they debate: what healthcare dignity requires constitutionally\n    And they refine: language to work across cultures and nations\n    And they vote: and my amendment passes\n    And I have: shaped constitution for human-AI partnership\n    And I know: ordinary nurse from small town helped write law for humanity\n    And I embody: democratic possibility that anyone can govern\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.169597",
+  "updatedAt": "2025-11-21T18:54:29.169597"
+}

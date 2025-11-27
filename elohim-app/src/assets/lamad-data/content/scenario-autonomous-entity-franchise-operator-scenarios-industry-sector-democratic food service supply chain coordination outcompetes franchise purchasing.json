@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-democratic food service supply chain coordination outcompetes franchise purchasing",
+  "contentType": "scenario",
+  "title": "Democratic food service supply chain coordination outcompetes franchise purchasing",
+  "description": "Democratic food service supply chain coordination outcompetes franchise purchasing",
+  "content": "Scenario: Democratic food service supply chain coordination outcompetes franchise purchasing\n    Given franchise mandatory purchasing extracts through 30% markup on supplies\n    And individual democratic locations lack volume purchasing power\n    When EAE network coordinates purchasing across converted franchise locations\n    Then volume purchasing power matches or exceeds franchise corporate leverage\n    And democratic coordination eliminates markup (suppliers paid fairly, buyers pay less)\n    And supply chain becomes transparent partnership, not extractive mandate\n    And food service sector learns democratic coordination provides efficiency without extraction\n    And industry_sector_elohim coordinates democratic supply chain across network\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

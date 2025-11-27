@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood beautification and common space maintenance",
+  "contentType": "scenario",
+  "title": "Neighborhood beautification and common space maintenance",
+  "description": "Neighborhood beautification and common space maintenance",
+  "content": "Scenario: Neighborhood beautification and common space maintenance\n    Given Frank has time and skills to contribute to neighborhood spaces\n    And common spaces require ongoing care and maintenance\n    When the neighborhood_elohim coordinates common space work\n    Then it should facilitate Frank's participation in beautification\n    And coordinate neighborhood workdays utilizing his skills\n    And recognize landscaping, repair, and maintenance as care labor\n    And value his contributions to neighborhood quality of life\n    And enable collective ownership of neighborhood commons\n    And Frank should experience meaningful contribution to place\n    And neighborhood should benefit from retired residents' time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

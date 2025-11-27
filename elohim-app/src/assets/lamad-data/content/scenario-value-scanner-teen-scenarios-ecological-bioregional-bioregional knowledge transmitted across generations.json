@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-ecological-bioregional-bioregional knowledge transmitted across generations",
+  "contentType": "scenario",
+  "title": "Bioregional knowledge transmitted across generations",
+  "description": "Bioregional knowledge transmitted across generations",
+  "content": "Scenario: Bioregional knowledge transmitted across generations\n    Given Jasmine learns from elders about local ecology and seasonal patterns\n    And indigenous and long-term residents hold bioregional knowledge\n    When she engages with bioregional wisdom holders\n    Then bioregional_elohim should recognize knowledge transmission\n    And value elder teaching as care work for ecological literacy\n    And support intergenerational ecological knowledge sharing\n    And help her understand that bioregional care includes cultural practices\n    And connect her to deep knowledge about living in her specific place\n    And demonstrate that care economy includes indigenous wisdom and ecological tradition\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:ecological_bioregional",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

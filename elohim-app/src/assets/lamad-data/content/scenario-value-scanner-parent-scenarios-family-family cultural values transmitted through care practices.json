@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-family cultural values transmitted through care practices",
+  "contentType": "scenario",
+  "title": "Family cultural values transmitted through care practices",
+  "description": "Family cultural values transmitted through care practices",
+  "content": "Scenario: Family cultural values transmitted through care practices\n    Given Sarah's family has specific cultural traditions\n    And she wants children to learn their cultural heritage\n    When Sarah practices culturally-specific care\n    Then the family_elohim should recognize cultural value transmission\n    And it should support culturally-appropriate care practices\n    And it should value the work of maintaining cultural identity\n    And cultural education should be recognized as care labor\n    And diverse family cultures should be respected and supported\n    And care economy should serve families' chosen cultural frameworks\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}

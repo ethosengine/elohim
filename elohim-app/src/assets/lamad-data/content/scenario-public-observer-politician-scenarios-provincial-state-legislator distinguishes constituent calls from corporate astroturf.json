@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-provincial-state-legislator distinguishes constituent calls from corporate astroturf",
+  "contentType": "scenario",
+  "title": "Legislator distinguishes constituent calls from corporate astroturf",
+  "description": "Legislator distinguishes constituent calls from corporate astroturf",
+  "content": "Scenario: Legislator distinguishes constituent calls from corporate astroturf\n    Given the politician's office receives 500 calls opposing regulation\n    And callers claim to be concerned constituents\n    When the Observer analyzes campaign origins\n    Then they see calls coordinated by corporate lobbying firm\n    And identify script language and coordinated timing\n    And distinguish 12 genuine constituent concerns from 488 manufactured contacts\n    And understand industry opposition versus authentic community sentiment\n    And vote based on constituent interests not manufactured pressure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:provincial_state",
+    "related_users:citizen,activist,community_organizer,journalist,lobbyist",
+    "related_layers:municipality,district,county_regional,educational,ecological,workplace",
+    "elohim_agents:public_observer,regional_elohim,constituent_elohim,legislative_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.186597",
+  "updatedAt": "2025-11-21T18:54:29.186597"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-municipality-activist identifies developer's cross-jurisdiction pattern",
+  "contentType": "scenario",
+  "title": "Activist identifies developer's cross-jurisdiction pattern",
+  "description": "Activist identifies developer's cross-jurisdiction pattern",
+  "content": "Scenario: Activist identifies developer's cross-jurisdiction pattern\n    Given a developer is proposing controversial project\n    And uses familiar tactics from other campaigns\n    When the Observer tracks developer across municipalities\n    Then the activist sees the same firm using identical playbook in 8 cities\n    And views track record of community promises vs delivery\n    And identifies political relationships and campaign donations\n    And systematic exploitation becomes undeniable\n    And activists coordinate across jurisdictions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:municipality",
+    "related_users:community_organizer,politician,citizen,journalist",
+    "related_layers:community,provincial_state,county_regional",
+    "elohim_agents:public_observer,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "createdAt": "2025-11-21T18:54:29.182597",
+  "updatedAt": "2025-11-21T18:54:29.182597"
+}

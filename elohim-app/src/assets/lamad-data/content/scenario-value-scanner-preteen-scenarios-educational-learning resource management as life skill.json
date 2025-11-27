@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-educational-learning resource management as life skill",
+  "contentType": "scenario",
+  "title": "Learning resource management as life skill",
+  "description": "Learning resource management as life skill",
+  "content": "Scenario: Learning resource management as life skill\n    Given Marcus manages complex household resources\n    And resource stewardship is critical life skill\n    When Marcus practices resource management\n    Then he should be learning sophisticated stewardship\n    And he should understand budgeting, planning, optimization\n    And he should develop skills most people don't learn until adulthood\n    And his education should include practical life competencies\n    And resource management should be recognized as valuable learning\n    And care economy should teach skills for thriving under constraint\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:educational",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.195597",
+  "updatedAt": "2025-11-21T18:54:29.195597"
+}

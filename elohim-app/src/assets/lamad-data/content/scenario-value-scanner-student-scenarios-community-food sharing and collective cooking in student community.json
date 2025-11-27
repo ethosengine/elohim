@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-food sharing and collective cooking in student community",
+  "contentType": "scenario",
+  "title": "Food sharing and collective cooking in student community",
+  "description": "Food sharing and collective cooking in student community",
+  "content": "Scenario: Food sharing and collective cooking in student community\n    Given many students face food insecurity\n    And collective meals reduce individual costs\n    When Kenji participates in community meal sharing\n    Then the community_elohim should recognize communal feeding as care work\n    And it should value both cooking for others and hosting shared meals\n    And it should track \"Kenji cooked dinner for 8 people in study group\"\n    And food sharing should be core care economy practice\n    And the system should make nutrition care visible and valued\n    And collective eating should build community bonds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

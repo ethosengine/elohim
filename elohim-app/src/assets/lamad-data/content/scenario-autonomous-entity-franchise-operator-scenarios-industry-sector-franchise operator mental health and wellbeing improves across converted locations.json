@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator mental health and wellbeing improves across converted locations",
+  "contentType": "scenario",
+  "title": "Franchise operator mental health and wellbeing improves across converted locations",
+  "description": "Franchise operator mental health and wellbeing improves across converted locations",
+  "content": "Scenario: Franchise operator mental health and wellbeing improves across converted locations\n    Given franchise operation causes severe stress from dual extraction and moral injury\n    And operators suffer isolation, anxiety, and health problems from franchise burden\n    When conversions liberate operators from extraction trap\n    Then operator mental health improves measurably (reduced anxiety, better sleep, lower stress)\n    And peer support network among converted operators provides community\n    And health outcomes are documented showing franchise model's human cost\n    And sector awareness grows about franchise operation's psychological toll\n    And industry_sector_elohim documents wellbeing improvements advocating for conversion support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:industry_sector",
+    "related_users:[supplier,worker,small_business_owner,franchise_operator]",
+    "related_layers:[workplace_organizational,community]",
+    "elohim_agents:[industry_sector_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

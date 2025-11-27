@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-family-contributing care work to family despite being student",
+  "contentType": "scenario",
+  "title": "Contributing care work to family despite being student",
+  "description": "Contributing care work to family despite being student",
+  "content": "Scenario: Contributing care work to family despite being student\n    Given Kenji provides emotional support to stressed parents\n    And he helps younger siblings with homework and advice remotely\n    When the family_elohim tracks Kenji's care contributions to family\n    Then it should recognize emotional labor supporting family members\n    And it should value advice and mentorship provided to siblings\n    And it should accumulate care tokens for family support work\n    And students should be recognized as care contributors, not just recipients\n    And the system should make Kenji's family contributions visible\n    And reciprocal care should be recognized even when receiving financial support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:family",
+    "related_users:parent,adult,young_adult,sibling",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

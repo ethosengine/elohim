@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-researcher-scenarios-provincial-state-longitudinal study of constitutional council member development",
+  "contentType": "scenario",
+  "title": "Longitudinal study of Constitutional Council member development",
+  "description": "Longitudinal study of Constitutional Council member development",
+  "content": "Scenario: Longitudinal study of Constitutional Council member development\n    Given I am tracking council members like Sarah over time\n    And I want to understand how service affects them\n    When I study council members before, during, and after service\n    Then I measure: constitutional literacy development\n    And I assess: deliberative skill acquisition\n    And I examine: civic confidence and participation changes\n    And I track: whether capabilities persist after service ends\n    And I explore: whether service affects children's civic development\n    And I analyze: whether sortition creates democratic capacity at population scale\n    And My research tests: whether citizen governance transforms citizens\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,community_leader",
+    "related_layers:community,nation_state,global",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.173597",
+  "updatedAt": "2025-11-21T18:54:29.173597"
+}

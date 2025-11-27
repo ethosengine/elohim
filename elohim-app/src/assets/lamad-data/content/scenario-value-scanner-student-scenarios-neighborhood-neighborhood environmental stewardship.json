@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-neighborhood-neighborhood environmental stewardship",
+  "contentType": "scenario",
+  "title": "Neighborhood environmental stewardship",
+  "description": "Neighborhood environmental stewardship",
+  "content": "Scenario: Neighborhood environmental stewardship\n    Given Kenji is studying environmental science\n    And neighborhoods are environmental governance units\n    When Kenji participates in neighborhood environmental care\n    Then the neighborhood_elohim should recognize his stewardship work\n    And it should value his participation in neighborhood cleanup\n    And it should recognize his knowledge contributions about sustainability\n    And environmental care should accumulate care tokens\n    And the system should connect academic learning to neighborhood action\n    And students should contribute environmental expertise to neighborhoods\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:neighborhood",
+    "related_users:resident,adult,young_adult,worker",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.196597",
+  "updatedAt": "2025-11-21T18:54:29.196597"
+}

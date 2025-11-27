@@ -1,0 +1,23 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-community-connecting with community mutual aid networks",
+  "contentType": "scenario",
+  "title": "Connecting with community mutual aid networks",
+  "description": "Connecting with community mutual aid networks",
+  "content": "Scenario: Connecting with community mutual aid networks\n    Given workers need mutual aid during economic precarity\n    And community has mutual aid organizing\n    When I participate in mutual aid networks\n    Then the protocol should connect me to appropriate networks\n    And facilitate giving and receiving support\n    And recognize that mutual aid is care economy practice\n    And support building community resilience beyond market systems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-community",
+    "epic": null
+  },
+  "createdAt": "2025-11-21T18:54:29.198597",
+  "updatedAt": "2025-11-21T18:54:29.198597"
+}

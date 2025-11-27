@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-franchise locations become community gathering spaces beyond commercial function",
+  "contentType": "scenario",
+  "title": "Franchise locations become community gathering spaces beyond commercial function",
+  "description": "Franchise locations become community gathering spaces beyond commercial function",
+  "content": "Scenario: Franchise locations become community gathering spaces beyond commercial function\n    Given corporate franchise design optimized for transaction speed, not community connection\n    And neighborhoods lacked accessible gathering spaces for organizing\n    When democratic governance considers community space usage\n    Then locations offer meeting space for neighborhood organizing after business hours\n    And community bulletin boards share local information and mutual aid opportunities\n    And youth employment programs connect young people to food service work with dignity\n    And spaces become community hubs serving social needs beyond food service\n    And community_elohim facilitates community programming in democratic business spaces\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:franchise_operator",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,supplier]",
+    "related_layers:[individual,workplace_organizational,industry_sector]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/franchise_operator/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.166597",
+  "updatedAt": "2025-11-21T18:54:29.166597"
+}

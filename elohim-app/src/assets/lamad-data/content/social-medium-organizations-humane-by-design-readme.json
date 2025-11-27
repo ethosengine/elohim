@@ -1,0 +1,21 @@
+{
+  "id": "social-medium-organizations-humane-by-design-readme",
+  "contentType": "organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "A resource that provides guidance for designing ethically humane digital products through patterns focused on user well-being.",
+  "content": "---\nnode_type: organization\norg_id: humane_by_design\nname: \"Humane by Design\"\nurl: \"https://humanebydesign.com\"\ngem_id: \"apMozvCFFosPw2leDmkY\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: social_medium\nrelated_epics: []\n\nepic_relationships:\n  social_medium:\n    inspiration: \"[How Humane by Design inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Humane by Design\n\n## Description\n\nA resource that provides guidance for designing ethically humane digital products through patterns focused on user well-being.\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: social_medium\n\n[Detailed explanation of how Humane by Design relates to and inspires the social_medium epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://humanebydesign.com\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `social_medium` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "social-medium"
+  ],
+  "sourcePath": "social_medium/organizations/humane_by_design/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "social-medium",
+    "related_epics": [],
+    "primary_epic": "social_medium"
+  },
+  "createdAt": "2025-11-21T18:54:29.188597",
+  "updatedAt": "2025-11-21T18:54:29.188597"
+}

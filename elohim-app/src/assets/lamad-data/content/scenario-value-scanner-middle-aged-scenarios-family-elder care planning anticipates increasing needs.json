@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-elder care planning anticipates increasing needs",
+  "contentType": "scenario",
+  "title": "Elder care planning anticipates increasing needs",
+  "description": "Elder care planning anticipates increasing needs",
+  "content": "Scenario: Elder care planning anticipates increasing needs\n    Given Robert's parents are ages 78 and 75\n    And their care needs will likely increase\n    And family should plan proactively rather than react to crises\n    When family_elohim supports elder care planning\n    Then it should help family anticipate future care needs\n    And surface: \"Medical patterns suggest increased care needs likely within 2-3 years\"\n    And support family in discussing long-term care options\n    And help siblings plan for potential crisis scenarios\n    And ensure parents are included in planning with dignity\n    And coordinate financial, medical, and housing planning\n    And prevent family crisis from lack of preparation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.192597",
+  "updatedAt": "2025-11-21T18:54:29.192597"
+}

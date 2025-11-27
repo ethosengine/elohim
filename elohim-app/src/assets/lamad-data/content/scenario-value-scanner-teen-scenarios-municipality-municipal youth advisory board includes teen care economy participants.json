@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-municipal youth advisory board includes teen care economy participants",
+  "contentType": "scenario",
+  "title": "Municipal youth advisory board includes teen care economy participants",
+  "description": "Municipal youth advisory board includes teen care economy participants",
+  "content": "Scenario: Municipal youth advisory board includes teen care economy participants\n    Given the municipality is establishing youth civic engagement structures\n    And Jasmine has demonstrated leadership through care contributions\n    When the municipal_elohim identifies candidates for youth advisory board\n    Then Jasmine should be surfaced as a potential participant\n    And her care economy track record should demonstrate her capability\n    And selection should be based on demonstrated contribution, not just academic achievement\n    And diverse youth voices should be included in municipal governance\n    And teens should participate in decisions that affect their lives\n    And youth advisory structures should have real power, not just token representation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.197598",
+  "updatedAt": "2025-11-21T18:54:29.197598"
+}

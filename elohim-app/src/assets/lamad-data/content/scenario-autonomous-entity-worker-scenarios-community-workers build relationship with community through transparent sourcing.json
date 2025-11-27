@@ -1,0 +1,30 @@
+{
+  "id": "scenario-autonomous-entity-worker-scenarios-community-workers build relationship with community through transparent sourcing",
+  "contentType": "scenario",
+  "title": "Workers build relationship with community through transparent sourcing",
+  "description": "Workers build relationship with community through transparent sourcing",
+  "content": "Scenario: Workers build relationship with community through transparent sourcing\n    Given workers source produce from Johnson Farm\n    And community values local food systems and sustainability\n    When workers communicate sourcing practices publicly\n    Then customers learn their food comes from regenerative local farm\n    And community_elohim creates farm-to-table transparency dashboard\n    And customers appreciate supporting local farmer and farm workers\n    And workers invite community to visit Johnson Farm during harvest\n    And community connection deepens through transparent supply chains\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:worker",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,supplier,small_business_owner]",
+    "related_layers:[workplace_organizational,individual,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/worker/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-worker-scenarios-community",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-worker-scenarios-community",
+    "epic": "autonomous_entity"
+  },
+  "createdAt": "2025-11-21T18:54:29.167597",
+  "updatedAt": "2025-11-21T18:54:29.167597"
+}

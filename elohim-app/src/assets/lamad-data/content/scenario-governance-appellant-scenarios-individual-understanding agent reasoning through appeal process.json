@@ -1,0 +1,30 @@
+{
+  "id": "scenario-governance-appellant-scenarios-individual-understanding agent reasoning through appeal process",
+  "contentType": "scenario",
+  "title": "Understanding agent reasoning through appeal process",
+  "description": "Understanding agent reasoning through appeal process",
+  "content": "Scenario: Understanding agent reasoning through appeal process\n    Given I have filed an appeal against a Family Elohim decision\n    And I don't understand why the agent made its choice\n    When I request detailed explanation through the appeal interface\n    Then I receive layered explanations from plain language to technical detail\n    And I can see the constitutional principles the agent applied\n    And I can view counterfactual scenarios showing what would change the outcome\n    And I can access the cryptographic proof trail\n    And Technical experts are available to explain complex aspects if needed\n    And all explanations are in accessible language without jargon\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:individual",
+    "related_users:constitutional_council_member,technical_expert,community_leader",
+    "related_layers:family,community",
+    "elohim_agents:family_elohim,individual_support_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-individual",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-individual",
+    "epic": "governance"
+  },
+  "createdAt": "2025-11-21T18:54:29.168597",
+  "updatedAt": "2025-11-21T18:54:29.168597"
+}

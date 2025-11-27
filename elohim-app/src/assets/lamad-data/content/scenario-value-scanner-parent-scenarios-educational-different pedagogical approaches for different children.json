@@ -1,0 +1,30 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-educational-different pedagogical approaches for different children",
+  "contentType": "scenario",
+  "title": "Different pedagogical approaches for different children",
+  "description": "Different pedagogical approaches for different children",
+  "content": "Scenario: Different pedagogical approaches for different children\n    Given Tommy (5) needs wonder-preservation pedagogy\n    And Emma (8) needs autonomy-building instruction\n    When Sarah teaches her children with different approaches\n    Then the educational_elohim should recognize pedagogical sophistication\n    And it should value Sarah's ability to differentiate instruction\n    And teaching multiple children at different stages should be recognized as complex\n    And Sarah's educational expertise should be documented\n    And the system should recognize professional-grade teaching capability\n    And differentiated instruction should be valued as advanced skill\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "createdAt": "2025-11-21T18:54:29.194597",
+  "updatedAt": "2025-11-21T18:54:29.194597"
+}
