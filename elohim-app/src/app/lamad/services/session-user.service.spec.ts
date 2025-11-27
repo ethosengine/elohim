@@ -149,7 +149,7 @@ describe('SessionUserService', () => {
       const activities = service.getActivityHistory();
       expect(activities.length).toBe(1);
       expect(activities[0].type).toBe('affinity');
-      expect(activities[0].metadata?.value).toBe(0.5);
+      expect(activities[0].metadata?.['value']).toBe(0.5);
     });
 
     it('should record path started', () => {
@@ -168,7 +168,7 @@ describe('SessionUserService', () => {
       expect(session?.stats.stepsCompleted).toBe(1);
 
       const activities = service.getActivityHistory();
-      expect(activities[0].metadata?.stepIndex).toBe(2);
+      expect(activities[0].metadata?.['stepIndex']).toBe(2);
     });
 
     it('should record path completed', () => {
@@ -323,9 +323,11 @@ describe('SessionUserService', () => {
       const progress: SessionPathProgress = {
         pathId: 'path-1',
         currentStepIndex: 2,
-        completedSteps: [0, 1],
+        completedStepIndices: [0, 1],
+        stepAffinity: {},
+        stepNotes: {},
         startedAt: '2025-01-01T00:00:00.000Z',
-        lastAccessedAt: '2025-01-02T00:00:00.000Z',
+        lastActivityAt: '2025-01-02T00:00:00.000Z'
       };
       service.savePathProgress(progress);
 
