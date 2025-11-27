@@ -209,9 +209,18 @@ describe('AgentService', () => {
   });
 
   describe('completeStep', () => {
-    it('should mark step as completed', (done) => {
-      dataLoaderSpy.getAgentProgress.and.returnValue(of(mockProgress));
+    beforeEach(() => {
+      service.clearProgressCache();
+      dataLoaderSpy.getAgentProgress.calls.reset();
+      dataLoaderSpy.saveAgentProgress.calls.reset();
+      // Return a fresh copy of mockProgress to avoid mutation between tests
+      dataLoaderSpy.getAgentProgress.and.returnValue(of({
+        ...mockProgress,
+        completedStepIndices: [...mockProgress.completedStepIndices]
+      }));
+    });
 
+    it('should mark step as completed', (done) => {
       service.completeStep('test-path', 2).subscribe(() => {
         expect(dataLoaderSpy.saveAgentProgress).toHaveBeenCalled();
         const savedProgress = dataLoaderSpy.saveAgentProgress.calls.mostRecent().args[0];
