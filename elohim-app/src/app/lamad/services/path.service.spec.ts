@@ -57,8 +57,17 @@ describe('PathService', () => {
       {
         order: 3,
         resourceId: 'content-4',
-        stepTitle: 'Step 4 (Attestation Required)',
+        stepTitle: 'Step 4',
         stepNarrative: 'Fourth step',
+        learningObjectives: [],
+        optional: false,
+        completionCriteria: []
+      },
+      {
+        order: 4,
+        resourceId: 'content-5',
+        stepTitle: 'Step 5 (Attestation Required)',
+        stepNarrative: 'Fifth step',
         learningObjectives: [],
         optional: false,
         completionCriteria: [],
@@ -294,23 +303,23 @@ describe('PathService', () => {
     });
 
     it('should deny access if attestation required but not present', () => {
-      const progressAtStep3: AgentProgress = {
+      const progressAtStep4: AgentProgress = {
         ...mockProgress,
-        currentStepIndex: 3,
-        completedStepIndices: [0, 1, 2]
+        currentStepIndex: 4,
+        completedStepIndices: [0, 1, 2, 3]
       };
-      const result = service.isStepAccessible(mockPath, 3, progressAtStep3, []);
+      const result = service.isStepAccessible(mockPath, 4, progressAtStep4, []);
       expect(result.accessible).toBe(false);
       expect(result.reason).toContain('Requires attestation');
     });
 
     it('should allow access if attestation required and present', () => {
-      const progressAtStep3: AgentProgress = {
+      const progressAtStep4: AgentProgress = {
         ...mockProgress,
-        currentStepIndex: 3,
-        completedStepIndices: [0, 1, 2]
+        currentStepIndex: 4,
+        completedStepIndices: [0, 1, 2, 3]
       };
-      const result = service.isStepAccessible(mockPath, 3, progressAtStep3, ['test-attestation']);
+      const result = service.isStepAccessible(mockPath, 4, progressAtStep4, ['test-attestation']);
       expect(result.accessible).toBe(true);
     });
   });
@@ -353,13 +362,13 @@ describe('PathService', () => {
     it('should include step with attestation if agent has it', (done) => {
       const fullProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 1, 2]
+        completedStepIndices: [0, 1, 2, 3]
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(fullProgress));
       agentServiceSpy.getAttestations.and.returnValue(['test-attestation']);
 
       service.getAccessibleSteps('test-path').subscribe(steps => {
-        expect(steps).toEqual([0, 1, 2, 3]);
+        expect(steps).toEqual([0, 1, 2, 3, 4]);
         done();
       });
     });
@@ -367,13 +376,13 @@ describe('PathService', () => {
     it('should exclude step with attestation if agent lacks it', (done) => {
       const fullProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 1, 2]
+        completedStepIndices: [0, 1, 2, 3]
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(fullProgress));
       agentServiceSpy.getAttestations.and.returnValue([]);
 
       service.getAccessibleSteps('test-path').subscribe(steps => {
-        expect(steps).toEqual([0, 1, 2]);
+        expect(steps).toEqual([0, 1, 2, 3]);
         done();
       });
     });
@@ -382,7 +391,7 @@ describe('PathService', () => {
   describe('getStepCount', () => {
     it('should return total number of steps', (done) => {
       service.getStepCount('test-path').subscribe(count => {
-        expect(count).toBe(4);
+        expect(count).toBe(5);
         done();
       });
     });
@@ -391,8 +400,8 @@ describe('PathService', () => {
   describe('getCompletionPercentage', () => {
     it('should calculate completion percentage', (done) => {
       service.getCompletionPercentage('test-path').subscribe(percentage => {
-        // 1 completed out of 3 required steps (step 2 is optional) = 33%
-        expect(percentage).toBe(33);
+        // 1 completed out of 4 required steps (step 2 is optional) = 25%
+        expect(percentage).toBe(25);
         done();
       });
     });
@@ -409,7 +418,7 @@ describe('PathService', () => {
     it('should return 100 when all required steps completed', (done) => {
       const completeProgress: AgentProgress = {
         ...mockProgress,
-        completedStepIndices: [0, 1, 3]  // All required steps (excluding optional step 2)
+        completedStepIndices: [0, 1, 3, 4]  // All required steps (excluding optional step 2)
       };
       agentServiceSpy.getProgressForPath.and.returnValue(of(completeProgress));
 

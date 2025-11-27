@@ -82,10 +82,6 @@ describe('AgentService', () => {
       const keys = Object.keys(localStorageMock);
       return keys[index] || null;
     });
-    Object.defineProperty(localStorage, 'length', {
-      get: () => Object.keys(localStorageMock).length,
-      configurable: true
-    });
 
     TestBed.configureTestingModule({
       providers: [
