@@ -10,31 +10,24 @@ import {
 describe('SessionUserService', () => {
   let service: SessionUserService;
   let localStorageMock: { [key: string]: string };
+  let mockStorage: Storage;
 
   beforeEach(() => {
     // Mock localStorage
     localStorageMock = {};
 
-    spyOn(localStorage, 'getItem').and.callFake((key: string) => {
-      return localStorageMock[key] || null;
-    });
+    // Create a complete Storage mock
+    mockStorage = {
+      getItem: (key: string) => localStorageMock[key] || null,
+      setItem: (key: string, value: string) => { localStorageMock[key] = value; },
+      removeItem: (key: string) => { delete localStorageMock[key]; },
+      key: (index: number) => Object.keys(localStorageMock)[index] || null,
+      get length() { return Object.keys(localStorageMock).length; },
+      clear: () => { localStorageMock = {}; }
+    };
 
-    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
-      localStorageMock[key] = value;
-    });
-
-    spyOn(localStorage, 'removeItem').and.callFake((key: string) => {
-      delete localStorageMock[key];
-    });
-
-    spyOn(localStorage, 'key').and.callFake((index: number) => {
-      const keys = Object.keys(localStorageMock);
-      return keys[index] || null;
-    });
-
-    spyOnProperty(localStorage, 'length', 'get').and.callFake(() => {
-      return Object.keys(localStorageMock).length;
-    });
+    // Replace global localStorage with our mock
+    spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
 
     TestBed.configureTestingModule({});
     service = TestBed.inject(SessionUserService);
