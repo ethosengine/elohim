@@ -290,5 +290,57 @@ describe('ContentService', () => {
         done();
       });
     });
+
+    it('should handle empty content index', (done) => {
+      const emptyIndex = { nodes: [] };
+      dataLoaderSpy.getContentIndex.and.returnValue(of(emptyIndex));
+
+      service.getContentByType('concept').subscribe(results => {
+        expect(results.length).toBe(0);
+        done();
+      });
+    });
+  });
+
+  describe('additional edge cases', () => {
+    it('should handle missing description in search', (done) => {
+      const indexWithNoDescription = {
+        nodes: [
+          {
+            id: 'content-1',
+            title: 'Test',
+            description: undefined as any,
+            contentType: 'concept' as ContentType,
+            tags: []
+          }
+        ]
+      };
+      dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithNoDescription));
+
+      service.searchContent('Test').subscribe(results => {
+        expect(results.length).toBe(1);
+        done();
+      });
+    });
+
+    it('should handle missing tags in search', (done) => {
+      const indexWithNoTags = {
+        nodes: [
+          {
+            id: 'content-1',
+            title: 'Test',
+            description: 'A test',
+            contentType: 'concept' as ContentType,
+            tags: undefined as any
+          }
+        ]
+      };
+      dataLoaderSpy.getContentIndex.and.returnValue(of(indexWithNoTags));
+
+      service.searchContent('Test').subscribe(results => {
+        expect(results.length).toBe(1);
+        done();
+      });
+    });
   });
 });

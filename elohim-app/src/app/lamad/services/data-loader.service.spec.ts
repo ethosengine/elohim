@@ -169,15 +169,15 @@ describe('DataLoaderService', () => {
       req.flush(mockPathIndex);
     });
 
-    it('should cache path index', (done) => {
-      service.getPathIndex().subscribe();
+    it('should handle path index load error', (done) => {
       service.getPathIndex().subscribe(index => {
-        expect(index).toEqual(mockPathIndex);
+        expect(index.paths).toEqual([]);
+        expect(index.totalCount).toBe(0);
         done();
       });
 
       const req = httpMock.expectOne(`${basePath}/paths/index.json`);
-      req.flush(mockPathIndex);
+      req.error(new ProgressEvent('error'), { status: 500 });
     });
   });
 
@@ -191,6 +191,16 @@ describe('DataLoaderService', () => {
 
       const req = httpMock.expectOne(`${basePath}/content/index.json`);
       req.flush(mockIndex);
+    });
+
+    it('should handle content index load error', (done) => {
+      service.getContentIndex().subscribe(index => {
+        expect(index.nodes).toEqual([]);
+        done();
+      });
+
+      const req = httpMock.expectOne(`${basePath}/content/index.json`);
+      req.error(new ProgressEvent('error'), { status: 500 });
     });
   });
 
