@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-james-1-27",
+  "contentType": "bible-verse",
+  "title": "James 1:27",
+  "description": "Scripture reference used in FCT Module 9",
+  "content": {
+    "reference": "James 1:27",
+    "book": "James",
+    "chapter": 1,
+    "verseStart": 27,
+    "verseEnd": null,
+    "contextInModule": "James 1:27 ASV\n27 Pure religion and undefiled before our God and Father is this, to visit the fatherless and widows in their affliction, and to keep oneself unspotted from the world.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 9 - Centering Values - Metrics are Not Neutral, Centering the Fruits of the Spirit.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "james",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-09-fruits-of-spirit"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-09-fruits-of-spirit",
+    "thematicContext": "Centering Values: Fruits of the Spirit"
+  },
+  "createdAt": "2025-11-28T02:53:21.875745",
+  "updatedAt": "2025-11-28T02:53:21.875746"
+}

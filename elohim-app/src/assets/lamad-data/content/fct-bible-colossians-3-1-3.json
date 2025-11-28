@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-colossians-3-1-3",
+  "contentType": "bible-verse",
+  "title": "Colossians 3:1-3",
+  "description": "Scripture reference used in FCT Module 5",
+  "content": {
+    "reference": "Colossians 3:1-3",
+    "book": "Colossians",
+    "chapter": 3,
+    "verseStart": 1,
+    "verseEnd": 3,
+    "contextInModule": "\"Note what we set our sites on things above, but this is not just a mindset, but the embodiment of this in the world\". Colossians 3:1-3, 12-13 ESV\n\\[1\\] If then you have been raised with Christ, seek the things that are above, where Christ is, seated at the right hand of God. \\[2\\] Set your minds on things that are above, not on things that are on earth. \\[3\\] For you have died, and your life is hidden with Christ in God.\n\\[12\\] Put on then, as God\u2019s chosen ones, holy and beloved, compassionate hearts, kindness, humility, meekness, and patience, \\[13\\] bearing with one another and, if one has a complaint against another, forgiving each other; as the Lord has forgiven you, so you also must forgive.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "colossians",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-05-respecting-human-nature",
+    "thematicContext": "Respecting Human Nature"
+  },
+  "createdAt": "2025-11-28T02:53:21.854957",
+  "updatedAt": "2025-11-28T02:53:21.854958"
+}

@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-26T12:00:00.000Z",
-  "totalCount": 3,
+  "lastUpdated": "2025-11-28T00:09:03.482643",
+  "totalCount": 5,
   "maps": [
     {
       "id": "map-domain-elohim-protocol",
@@ -37,6 +37,20 @@
       "overallAffinity": 0.9,
       "nodeCount": 5,
       "updatedAt": "2025-11-26T12:00:00.000Z"
+    },
+    {
+      "id": "map-self-demo-learner",
+      "mapType": "self",
+      "title": "My Self-Knowledge Map",
+      "ownerId": "demo-learner",
+      "visibility": "private"
+    },
+    {
+      "id": "map-person-template",
+      "mapType": "person",
+      "title": "Person Map Template",
+      "ownerId": "demo-learner",
+      "visibility": "private"
     }
   ]
 }

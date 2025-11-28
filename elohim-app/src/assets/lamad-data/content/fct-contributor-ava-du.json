@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-ava-du",
+  "contentType": "contributor",
+  "title": "Ava Du",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Ava Du",
+    "role": "author",
+    "works": [
+      "directed"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice",
+    "fct-media-11-book-directed"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-12-fairness-justice"
+  },
+  "createdAt": "2025-11-28T02:53:21.893041",
+  "updatedAt": "2025-11-28T02:53:21.893042"
+}

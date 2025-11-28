@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-5-13-16",
+  "contentType": "bible-verse",
+  "title": "Matthew 5:13-16",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Matthew 5:13-16",
+    "book": "Matthew",
+    "chapter": 5,
+    "verseStart": 13,
+    "verseEnd": 16,
+    "contextInModule": "Matthew 5:13-16 \\- Salt and light of the world",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901680",
+  "updatedAt": "2025-11-28T02:53:21.901682"
+}

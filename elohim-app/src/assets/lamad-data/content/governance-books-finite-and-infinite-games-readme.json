@@ -14,7 +14,22 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://www.google.com/books/edition/_/s_pxNAEACAAJ?sa=X&ved=2ahUKEwikrua8ovj1AhWfknIEHY4EDB0Qre8FegQIKBAd",
+    "name": "Finite and Infinite Games",
+    "org_id": "finite_and_infinite_games",
+    "gem_id": "Mh4DOAfmPZlWbXRvRqrd",
+    "node_type": "book",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Google Books",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Finite and Infinite Games inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.168597",
   "updatedAt": "2025-11-21T18:54:29.168597"

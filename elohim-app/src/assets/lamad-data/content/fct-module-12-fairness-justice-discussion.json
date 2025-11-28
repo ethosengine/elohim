@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-12-fairness-justice-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Supporting Fairness and Justice",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "\"Let's reflect on our daily lives. Consider your morning routine: the coffee you drink, the car you drive to work, the neighborhood you live in. Now think about the homeless person you passed on your way here. How do our lifestyle choices \\- where we live, how we commute, what we consume \\- contribute to the economic systems that lead to homelessness? In what ways might our feelings of generosity when we donate to church programs actually insulate us from confronting the real impact of our daily decisions? How can we move beyond 'feeling good' about occasional charity to make choices that promote justice in our everyday lives?\"  \nThis question aims to:\n\nGround the discussion in familiar, everyday experiences (morning routines, commutes, consumer choices).  \nDirectly link personal lifestyle choices to broader systemic issues like homelessness.  \nChallenge the notion that church donations alone are sufficient to address injustice.  \nEncourage critical self-reflection on how our comfortable lifestyles might perpetuate injustice.  \nPrompt consideration of how 'feeling good' about charity can sometimes prevent deeper engagement with issues of justice.  \nInvite participants to think about concrete ways they can promote justice through their daily choices, not just through church activities.  \nEmphasize personal responsibility within systemic injustice, moving away from an 'us vs. them' mentality.\n\nThis framing should help participants see themselves as active participants in systems of injustice or justice, rather than passive observers or occasional charitable givers. It challenges them to consider how their everyday choices, not just their church involvement, impact issues of justice in their community.",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.896241",
+  "updatedAt": "2025-11-28T02:53:21.896243"
+}

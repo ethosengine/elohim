@@ -2,15 +2,15 @@ import { TestBed } from '@angular/core/testing';
 import { of, BehaviorSubject } from 'rxjs';
 import { AgentService } from './agent.service';
 import { DataLoaderService } from './data-loader.service';
-import { SessionUserService } from './session-user.service';
+import { SessionHumanService } from './session-human.service';
 import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
-import { SessionUser } from '../models/session-user.model';
+import { SessionUser } from '../models/session-human.model';
 import { AccessLevel, ContentAccessMetadata } from '../models/content-access.model';
 
 describe('AgentService', () => {
   let service: AgentService;
   let dataLoaderSpy: jasmine.SpyObj<DataLoaderService>;
-  let sessionUserServiceSpy: jasmine.SpyObj<SessionUserService>;
+  let sessionHumanServiceSpy: jasmine.SpyObj<SessionHumanService>;
   let localStorageMock: { [key: string]: string };
   let mockStorage: Storage;
 
@@ -62,7 +62,7 @@ describe('AgentService', () => {
       'getLocalProgress',
       'saveAgentProgress'
     ]);
-    const sessionUserServiceSpyObj = jasmine.createSpyObj('SessionUserService', [
+    const sessionHumanServiceSpyObj = jasmine.createSpyObj('SessionHumanService', [
       'getSessionId',
       'getAccessLevel',
       'checkContentAccess',
@@ -91,21 +91,21 @@ describe('AgentService', () => {
       providers: [
         AgentService,
         { provide: DataLoaderService, useValue: dataLoaderSpyObj },
-        { provide: SessionUserService, useValue: sessionUserServiceSpyObj }
+        { provide: SessionHumanService, useValue: sessionHumanServiceSpyObj }
       ]
     });
 
     dataLoaderSpy = TestBed.inject(DataLoaderService) as jasmine.SpyObj<DataLoaderService>;
-    sessionUserServiceSpy = TestBed.inject(SessionUserService) as jasmine.SpyObj<SessionUserService>;
+    sessionHumanServiceSpy = TestBed.inject(SessionHumanService) as jasmine.SpyObj<SessionHumanService>;
 
     // Default spy return values
     const sessionSubject = new BehaviorSubject<SessionUser | null>(mockSessionUser);
-    Object.defineProperty(sessionUserServiceSpy, 'session$', {
+    Object.defineProperty(sessionHumanServiceSpy, 'session$', {
       get: () => sessionSubject.asObservable()
     });
-    sessionUserServiceSpy.getSessionId.and.returnValue('session-123');
-    sessionUserServiceSpy.getAccessLevel.and.returnValue('visitor');
-    sessionUserServiceSpy.checkContentAccess.and.returnValue({ canAccess: true });
+    sessionHumanServiceSpy.getSessionId.and.returnValue('session-123');
+    sessionHumanServiceSpy.getAccessLevel.and.returnValue('visitor');
+    sessionHumanServiceSpy.checkContentAccess.and.returnValue({ canAccess: true });
     dataLoaderSpy.getAgent.and.returnValue(of(mockAgent));
     dataLoaderSpy.getAgentProgress.and.returnValue(of(mockProgress));
     dataLoaderSpy.getLocalProgress.and.returnValue(null);
@@ -144,7 +144,7 @@ describe('AgentService', () => {
     it('should get access level from session service', () => {
       const level = service.getAccessLevel();
       expect(level).toBe('visitor');
-      expect(sessionUserServiceSpy.getAccessLevel).toHaveBeenCalled();
+      expect(sessionHumanServiceSpy.getAccessLevel).toHaveBeenCalled();
     });
 
     it('should check content access via session service', () => {
@@ -153,7 +153,7 @@ describe('AgentService', () => {
         requirements: { minLevel: 'member' }
       };
       const result = service.checkContentAccess(metadata);
-      expect(sessionUserServiceSpy.checkContentAccess).toHaveBeenCalledWith(metadata);
+      expect(sessionHumanServiceSpy.checkContentAccess).toHaveBeenCalledWith(metadata);
     });
   });
 
@@ -263,14 +263,14 @@ describe('AgentService', () => {
       dataLoaderSpy.getLocalProgress.and.returnValue(null);
 
       service.completeStep('new-path', 0).subscribe(() => {
-        expect(sessionUserServiceSpy.recordPathStarted).toHaveBeenCalledWith('new-path');
+        expect(sessionHumanServiceSpy.recordPathStarted).toHaveBeenCalledWith('new-path');
         done();
       });
     });
 
     it('should record step completed in session', (done) => {
       service.completeStep('test-path', 1).subscribe(() => {
-        expect(sessionUserServiceSpy.recordStepCompleted).toHaveBeenCalledWith('test-path', 1);
+        expect(sessionHumanServiceSpy.recordStepCompleted).toHaveBeenCalledWith('test-path', 1);
         done();
       });
     });
@@ -373,7 +373,7 @@ describe('AgentService', () => {
 
     it('should record notes saved in session', (done) => {
       service.saveStepNotes('test-path', 1, 'Notes').subscribe(() => {
-        expect(sessionUserServiceSpy.recordNotesSaved).toHaveBeenCalledWith('test-path', 1);
+        expect(sessionHumanServiceSpy.recordNotesSaved).toHaveBeenCalledWith('test-path', 1);
         done();
       });
     });

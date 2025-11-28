@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-5-17",
+  "contentType": "bible-verse",
+  "title": "Matthew 5:17",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Matthew 5:17",
+    "book": "Matthew",
+    "chapter": 5,
+    "verseStart": 17,
+    "verseEnd": null,
+    "contextInModule": "Matthew 5:17\nDo not think that I have come to abolish the Law or the Prophets. I have not come to abolish them, but to fulfill them.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870588",
+  "updatedAt": "2025-11-28T02:53:21.870589"
+}

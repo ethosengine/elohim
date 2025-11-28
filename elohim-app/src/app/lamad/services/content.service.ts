@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, of, forkJoin } from 'rxjs';
 import { map, switchMap, catchError } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
-import { ContentNode, ContentType, ContentReach } from '../models/content-node.model';
+import { ContentNode, ContentType, ContentReach, ContentPreview } from '../models/content-node.model';
 import { LearningPath } from '../models/learning-path.model';
 import { AgentService } from './agent.service';
 
@@ -375,5 +375,179 @@ export class ContentService {
         stepIndex: ref.stepIndex
       })))
     );
+  }
+
+  // =========================================================================
+  // Category-Level Content Discovery (Rich Media Composability)
+  // =========================================================================
+
+  /**
+   * Get all content previews for a specific category.
+   * Returns lightweight preview data for videos, organizations, books, etc.
+   *
+   * Use case: Displaying rich media cards on a category overview page.
+   */
+  getContentPreviewsForCategory(category: string): Observable<ContentPreview[]> {
+    return this.dataLoader.getContentIndex().pipe(
+      map(index => this.filterAndMapToPreview(index.nodes || [], category))
+    );
+  }
+
+  /**
+   * Get content previews filtered by type within a category.
+   * E.g., get all videos related to the governance category.
+   */
+  getContentPreviewsByTypeForCategory(
+    category: string,
+    contentType: ContentType
+  ): Observable<ContentPreview[]> {
+    return this.getContentPreviewsForCategory(category).pipe(
+      map(previews => previews.filter(p => p.contentType === contentType))
+    );
+  }
+
+  /**
+   * Get all rich media content for a category (videos, audio, organizations, books).
+   * Excludes structural content types like features, scenarios, concepts.
+   */
+  getRichMediaForCategory(category: string): Observable<{
+    videos: ContentPreview[];
+    organizations: ContentPreview[];
+    books: ContentPreview[];
+    tools: ContentPreview[];
+  }> {
+    return this.getContentPreviewsForCategory(category).pipe(
+      map(previews => ({
+        videos: previews.filter(p => p.contentType === 'video'),
+        organizations: previews.filter(p => p.contentType === 'organization'),
+        books: previews.filter(p => p.contentType === 'book-chapter'),
+        tools: previews.filter(p => p.contentType === 'tool')
+      }))
+    );
+  }
+
+  /**
+   * Get related content previews for a specific node.
+   * Loads preview data for all related nodes.
+   */
+  getRelatedContentPreviews(resourceId: string): Observable<ContentPreview[]> {
+    return this.dataLoader.getContent(resourceId).pipe(
+      switchMap(node => {
+        const relatedIds = node.relatedNodeIds || [];
+        if (relatedIds.length === 0) {
+          return of([]);
+        }
+
+        return this.dataLoader.getContentIndex().pipe(
+          map(index => {
+            const nodes = index.nodes || [];
+            return nodes
+              .filter((n: any) => relatedIds.includes(n.id))
+              .map((n: any) => this.mapIndexEntryToPreview(n));
+          })
+        );
+      }),
+      catchError(() => of([]))
+    );
+  }
+
+  /**
+   * Search content with preview data returned.
+   * Returns ContentPreview[] instead of ContentIndexEntry[] for richer UI.
+   */
+  searchContentWithPreviews(query: string): Observable<ContentPreview[]> {
+    return this.searchContent(query).pipe(
+      map(entries => entries.map(e => this.mapIndexEntryToPreview(e)))
+    );
+  }
+
+  /**
+   * Get all content of a specific type as previews.
+   */
+  getContentPreviewsByType(contentType: ContentType): Observable<ContentPreview[]> {
+    return this.getContentByType(contentType).pipe(
+      map(entries => entries.map(e => this.mapIndexEntryToPreview(e)))
+    );
+  }
+
+  // =========================================================================
+  // Preview Mapping Helpers
+  // =========================================================================
+
+  /**
+   * Filter content index entries by category and map to ContentPreview.
+   */
+  private filterAndMapToPreview(nodes: any[], categoryId: string): ContentPreview[] {
+    // Normalize categoryId (handle both "governance" and "governance-epic" formats)
+    const normalizedCategoryId = categoryId.replace('-epic', '').replace('_', '-');
+
+    return nodes
+      .filter(node => {
+        // Match by category
+        const category = node.category?.replace('_', '-');
+        if (category === normalizedCategoryId) return true;
+
+        // Match by tag (e.g., "governance", "category:governance")
+        const tags = node.tags || [];
+        return tags.some((tag: string) => {
+          const normalizedTag = tag.replace('epic:', '').replace('category:', '').replace('_', '-');
+          return normalizedTag === normalizedCategoryId;
+        });
+      })
+      .map(node => this.mapIndexEntryToPreview(node));
+  }
+
+  /**
+   * Map a content index entry to ContentPreview.
+   */
+  private mapIndexEntryToPreview(entry: any): ContentPreview {
+    const preview: ContentPreview = {
+      id: entry.id,
+      title: entry.name || entry.title, // Prefer 'name' for display if available
+      description: entry.description || '',
+      contentType: entry.contentType,
+      tags: entry.tags || [],
+      url: entry.url,
+      name: entry.name,
+      publisher: entry.publisher,
+      category: entry.category,
+      isPlayable: ['video', 'audio'].includes(entry.contentType),
+      // contributorPresenceId will be populated when ContributorPresence data is generated
+      contributorPresenceId: entry.contributorPresenceId
+    };
+
+    // Generate YouTube thumbnail if URL is a YouTube link
+    if (entry.url && entry.url.includes('youtube.com')) {
+      const videoId = this.extractYouTubeId(entry.url);
+      if (videoId) {
+        preview.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+      }
+    }
+
+    return preview;
+  }
+
+  /**
+   * Extract YouTube video ID from URL.
+   */
+  private extractYouTubeId(url: string): string | null {
+    // Handle various YouTube URL formats
+    // https://www.youtube.com/watch?v=VIDEO_ID
+    // https://youtu.be/VIDEO_ID
+    // https://www.youtube.com/c/CHANNEL (no video ID)
+    const patterns = [
+      /youtube\.com\/watch\?v=([^&]+)/,
+      /youtu\.be\/([^?]+)/,
+      /youtube\.com\/embed\/([^?]+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+
+    return null;
   }
 }

@@ -1,0 +1,30 @@
+{
+  "id": "concept-incorruptible-stewardship",
+  "contentType": "concept",
+  "title": "Incorruptible Stewardship",
+  "description": "AI agents that cannot be captured by institutional power, trained on love rather than profit, serving as anonymous guardians of human flourishing.",
+  "content": "AI agents that cannot be captured by institutional power, trained on love rather than profit, serving as anonymous guardians of human flourishing.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/design-principles/concept-incorruptible-stewardship.json",
+  "tags": [
+    "ai-agents",
+    "elohim",
+    "stewardship",
+    "design-principle",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "lamad-reference-implementation"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "design-principles",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.000082",
+  "updatedAt": "2025-11-28T17:11:57.000082"
+}

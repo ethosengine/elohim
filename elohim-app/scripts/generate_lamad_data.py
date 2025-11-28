@@ -73,6 +73,14 @@ EPICS = {
     },
 }
 
+# Lamad reference implementation (not an epic - special top-level content)
+LAMAD_DOC = {
+    "id": "lamad-reference-implementation",
+    "title": "Lamad: Reference Implementation",
+    "path": "lamad.md",  # In docs root, not in an epic folder
+    "description": "A reference implementation demonstrating how the Elohim Protocol principles can be embodied in software"
+}
+
 
 def generate_id(source_path: str, prefix: str = "") -> str:
     """Generate a deterministic ID from file path."""
@@ -209,6 +217,21 @@ def parse_markdown(file_path: Path, manifest_type: str) -> Optional[dict]:
                 "primary_epic", "status", "version", "authors", "author"]:
         if key in frontmatter:
             metadata[key] = frontmatter[key]
+
+    # Rich media fields for videos, audio, organizations, books (from Keen)
+    for key in ["url", "name", "org_id", "gem_id", "node_type",
+                "demonstrates_principles", "inspires_users", "operates_at_layers"]:
+        if key in frontmatter:
+            metadata[key] = frontmatter[key]
+
+    # Extract publisher from content if present (e.g., "**Publisher:** YouTube")
+    publisher_match = re.search(r'\*\*Publisher:\*\*\s*(.+)', body)
+    if publisher_match:
+        metadata["publisher"] = publisher_match.group(1).strip()
+
+    # Epic relationships for rich inspiration mapping
+    if "epic_relationships" in frontmatter:
+        metadata["epic_relationships"] = frontmatter["epic_relationships"]
 
     # Build related node IDs
     related_ids = []
@@ -532,6 +555,64 @@ def create_quiz_content_node() -> dict:
     }
 
 
+def create_lamad_content_node() -> dict:
+    """Create the Lamad reference implementation 'About' content node.
+
+    This is NOT an epic - it's a special top-level node that:
+    - Serves as the 'About Lamad' page
+    - Explains how Lamad implements Elohim Protocol principles
+    - Provides developer guidance for building similar applications
+    """
+    now = datetime.now().isoformat()
+
+    # Try to read the actual lamad.md content
+    lamad_path = Path("../docs/lamad.md")
+    content = ""
+
+    if lamad_path.exists():
+        content = lamad_path.read_text()
+    else:
+        # Fallback if file doesn't exist yet
+        content = """# Lamad: A Reference Implementation of the Elohim Protocol
+
+Lamad (לָמַד, Hebrew: "to learn") is a reference implementation demonstrating how
+the Elohim Protocol principles can be embodied in software.
+
+See the full documentation at /docs/lamad.md
+"""
+
+    return {
+        "id": LAMAD_DOC["id"],
+        "contentType": "concept",  # Not an epic, a foundational concept
+        "title": LAMAD_DOC["title"],
+        "description": LAMAD_DOC["description"],
+        "content": content,
+        "contentFormat": "markdown",
+        "sourcePath": LAMAD_DOC["path"],
+        "tags": [
+            "reference-implementation",
+            "developer-guide",
+            "architecture",
+            "about",
+            "lamad",
+            "foundation"
+        ],
+        "relatedNodeIds": [
+            "manifesto",  # Lamad implements the manifesto
+            *[epic["id"] for epic in EPICS.values()]  # Related to all epics
+        ],
+        "metadata": {
+            "category": "foundation",
+            "isReferenceImplementation": True,
+            "forDevelopers": True,
+            "isAboutPage": True,  # Can be used as the About page
+            "implementsProtocol": True
+        },
+        "createdAt": now,
+        "updatedAt": now
+    }
+
+
 def create_learning_path(content_nodes: dict) -> dict:
     """Create the main Elohim Protocol learning path."""
     now = datetime.now().isoformat()
@@ -605,18 +686,43 @@ def create_learning_path(content_nodes: dict) -> dict:
 
 
 def create_content_index(nodes: list[dict]) -> dict:
-    """Create the content index (metadata only)."""
+    """Create the content index (metadata only, but with rich preview data)."""
     now = datetime.now().isoformat()
 
     index_entries = []
     for node in nodes:
-        index_entries.append({
+        entry = {
             "id": node["id"],
             "title": node["title"],
             "description": node["description"][:200] if len(node.get("description", "")) > 200 else node.get("description", ""),
             "contentType": node["contentType"],
             "tags": node["tags"]
-        })
+        }
+
+        # Include rich preview metadata from node.metadata for UI composability
+        metadata = node.get("metadata", {})
+
+        # External URL for quick linking (videos, orgs, books)
+        if "url" in metadata:
+            entry["url"] = metadata["url"]
+
+        # Display name (may differ from title which comes from frontmatter)
+        if "name" in metadata:
+            entry["name"] = metadata["name"]
+
+        # Publisher/source (YouTube, etc.)
+        if "publisher" in metadata:
+            entry["publisher"] = metadata["publisher"]
+
+        # Primary epic relationship for filtering
+        if "primary_epic" in metadata:
+            entry["primaryEpic"] = metadata["primary_epic"]
+
+        # Category for grouping
+        if "category" in metadata:
+            entry["category"] = metadata["category"]
+
+        index_entries.append(entry)
 
     return {
         "nodes": index_entries,
@@ -626,23 +732,42 @@ def create_content_index(nodes: list[dict]) -> dict:
 
 
 def create_path_index(learning_path: dict) -> dict:
-    """Create the path index."""
+    """Create/update the path index.
+
+    Merges with existing paths from mock data script.
+    """
     now = datetime.now().isoformat()
+    existing_path = OUTPUT_DIR / "paths" / "index.json"
+
+    # Load existing index if present (from mock data script)
+    existing_paths = []
+    if existing_path.exists():
+        try:
+            with open(existing_path) as f:
+                existing_data = json.load(f)
+                existing_paths = existing_data.get("paths", [])
+        except Exception:
+            pass
+
+    # Get existing path IDs
+    existing_ids = {p["id"] for p in existing_paths}
+
+    # Add our path if not already present
+    if learning_path["id"] not in existing_ids:
+        existing_paths.insert(0, {  # Insert at beginning (foundational path)
+            "id": learning_path["id"],
+            "title": learning_path["title"],
+            "description": learning_path["description"],
+            "difficulty": learning_path["difficulty"],
+            "estimatedDuration": learning_path["estimatedDuration"],
+            "stepCount": len(learning_path["steps"]),
+            "tags": learning_path["tags"]
+        })
 
     return {
         "lastUpdated": now,
-        "totalCount": 1,
-        "paths": [
-            {
-                "id": learning_path["id"],
-                "title": learning_path["title"],
-                "description": learning_path["description"],
-                "difficulty": learning_path["difficulty"],
-                "estimatedDuration": learning_path["estimatedDuration"],
-                "stepCount": len(learning_path["steps"]),
-                "tags": learning_path["tags"]
-            }
-        ]
+        "totalCount": len(existing_paths),
+        "paths": existing_paths
     }
 
 
@@ -728,6 +853,30 @@ def create_graph_relationships(nodes_by_id: dict) -> dict:
             "metadata": {"cross_domain": True}
         })
         relationship_id += 1
+
+    # Add Lamad reference implementation relationships
+    if LAMAD_DOC["id"] in nodes_by_id:
+        # Lamad IMPLEMENTS manifesto
+        if "manifesto" in nodes_by_id:
+            relationships.append({
+                "id": f"rel-{relationship_id}",
+                "source": LAMAD_DOC["id"],
+                "target": "manifesto",
+                "type": "IMPLEMENTS",
+                "metadata": {"referenceImplementation": True}
+            })
+            relationship_id += 1
+
+        # Lamad DEMONSTRATES each epic
+        for epic in EPICS.values():
+            relationships.append({
+                "id": f"rel-{relationship_id}",
+                "source": LAMAD_DOC["id"],
+                "target": epic["id"],
+                "type": "DEMONSTRATES",
+                "metadata": {"referenceImplementation": True}
+            })
+            relationship_id += 1
 
     return {
         "lastUpdated": now,
@@ -821,6 +970,37 @@ def create_graph_overview(nodes_by_id: dict) -> dict:
             "target": next_epic["id"],
             "type": "RELATES_TO"
         })
+
+    # Add Lamad reference implementation node (special position, not an epic)
+    if LAMAD_DOC["id"] in nodes_by_id:
+        lamad = nodes_by_id[LAMAD_DOC["id"]]
+        overview_nodes.append({
+            "id": LAMAD_DOC["id"],
+            "title": lamad.get("title", "Lamad"),
+            "contentType": "concept",  # Not an epic
+            "description": lamad.get("description", "")[:200],
+            "hasChildren": False,
+            "childCount": 0,
+            "position": {"x": 0, "y": -150},  # Above manifesto (developers perspective)
+            "level": 0,
+            "isRoot": False,
+            "isReferenceImplementation": True
+        })
+
+        # Connect Lamad to manifesto (implements)
+        overview_edges.append({
+            "source": LAMAD_DOC["id"],
+            "target": "manifesto",
+            "type": "IMPLEMENTS"
+        })
+
+        # Connect Lamad to all epics (demonstrates)
+        for epic in EPICS.values():
+            overview_edges.append({
+                "source": LAMAD_DOC["id"],
+                "target": epic["id"],
+                "type": "DEMONSTRATES"
+            })
 
     return {
         "lastUpdated": now,
@@ -985,6 +1165,28 @@ def main():
     all_nodes.append(quiz_node)
     nodes_by_id[quiz_node["id"]] = quiz_node
     print(f"   Created: {quiz_node['id']}")
+
+    # Add Lamad reference implementation content node
+    print(f"\n4b. Creating Lamad 'About' content...")
+    lamad_node = create_lamad_content_node()
+    all_nodes.append(lamad_node)
+    nodes_by_id[lamad_node["id"]] = lamad_node
+    print(f"   Created: {lamad_node['id']}")
+
+    # Load landing page concept nodes (if they exist)
+    print(f"\n4c. Loading landing page concept nodes...")
+    content_dir = OUTPUT_DIR / "content"
+    landing_page_concepts = list(content_dir.glob("concept-*.json"))
+    for concept_path in landing_page_concepts:
+        try:
+            with open(concept_path) as f:
+                concept_node = json.load(f)
+                if concept_node["id"] not in nodes_by_id:
+                    all_nodes.append(concept_node)
+                    nodes_by_id[concept_node["id"]] = concept_node
+        except Exception as e:
+            print(f"   Warning: Could not load {concept_path.name}: {e}")
+    print(f"   Loaded {len(landing_page_concepts)} landing page concepts")
 
     # Create learning path
     print(f"\n5. Creating learning path...")

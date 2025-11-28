@@ -6,15 +6,30 @@
   "content": "---\nnode_type: organization\norg_id: the_regenerates_regenesis_institute_for_regenerative_practice\nname: \"The Regenerates | Regenesis Institute for Regenerative Practice\"\nurl: \"https://www.regenerat.es/\"\ngem_id: \"7hKI9AQsWvFOitKZFxkx\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: []\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How The Regenerates | Regenesis Institute for Regenerative Practice inspires the value_scanner epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# The Regenerates | Regenesis Institute for Regenerative Practice\n\n## Description\n\n[Description to be added]\n\n**Publisher:** The Regenerates\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how The Regenerates | Regenesis Institute for Regenerative Practice relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.regenerat.es/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "value-scanner"
+    "value-scanner",
+    "organization"
   ],
   "sourcePath": "value_scanner/organizations/the_regenerates_regenesis_institute_for_regenerative_practice/README.md",
   "relatedNodeIds": [],
   "metadata": {
     "category": "value-scanner",
     "related_epics": [],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://www.regenerat.es/",
+    "name": "The Regenerates | Regenesis Institute for Regenerative Practice",
+    "org_id": "the_regenerates_regenesis_institute_for_regenerative_practice",
+    "gem_id": "7hKI9AQsWvFOitKZFxkx",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "The Regenerates",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How The Regenerates | Regenesis Institute for Regenerative Practice inspires the value_scanner epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.193597",
   "updatedAt": "2025-11-21T18:54:29.193597"

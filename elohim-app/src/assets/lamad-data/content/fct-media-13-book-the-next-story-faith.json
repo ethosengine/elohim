@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-13-book-the-next-story-faith",
+  "contentType": "book",
+  "title": "The Next Story: Faith, Friends, Family, and the Digital World",
+  "description": "Book by Tim Challies",
+  "content": {
+    "title": "The Next Story: Faith, Friends, Family, and the Digital World",
+    "author": "Tim Challies",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "mediaType": "book",
+    "author": "Tim Challies"
+  },
+  "_contributor": "Tim Challies",
+  "createdAt": "2025-11-28T02:53:21.902098",
+  "updatedAt": "2025-11-28T02:53:21.902099"
+}

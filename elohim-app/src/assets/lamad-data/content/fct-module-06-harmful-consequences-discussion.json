@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-06-harmful-consequences-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Minimizing Harmful Consequences",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "Identifying Externalities Worksheet",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.866678",
+  "updatedAt": "2025-11-28T02:53:21.866680"
+}

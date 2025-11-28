@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-zechariah-4-10",
+  "contentType": "bible-verse",
+  "title": "Zechariah 4:10",
+  "description": "Scripture reference used in FCT Module 2",
+  "content": {
+    "reference": "Zechariah 4:10",
+    "book": "Zechariah",
+    "chapter": 4,
+    "verseStart": 10,
+    "verseEnd": null,
+    "contextInModule": "Scriptural Basis: Zechariah 4:10 \\- \"Do not despise these small beginnings, for the Lord rejoices to see the work begin.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "zechariah",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "thematicContext": "Systems Thinking"
+  },
+  "createdAt": "2025-11-28T02:53:21.848806",
+  "updatedAt": "2025-11-28T02:53:21.848807"
+}

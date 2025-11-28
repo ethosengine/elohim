@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-john-10-10",
+  "contentType": "bible-verse",
+  "title": "John 10:10",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "John 10:10",
+    "book": "John",
+    "chapter": 10,
+    "verseStart": 10,
+    "verseEnd": null,
+    "contextInModule": "John 10:10 \\- \"I came that they may have life and have it abundantly.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "john",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.898998",
+  "updatedAt": "2025-11-28T02:53:21.899000"
+}

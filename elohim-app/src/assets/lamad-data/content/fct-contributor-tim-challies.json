@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-tim-challies",
+  "contentType": "contributor",
+  "title": "Tim Challies",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Tim Challies",
+    "role": "author",
+    "works": [
+      "The Next Story: Faith, Friends, Family, and the Digital World"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act",
+    "fct-media-13-book-the-next-story-faith"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-14-ready-to-act"
+  },
+  "createdAt": "2025-11-28T02:53:21.902108",
+  "updatedAt": "2025-11-28T02:53:21.902110"
+}

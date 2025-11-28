@@ -12,7 +12,21 @@
  * - "Civic Organizer Level 2" (proven community contribution)
  * - "Trauma Support Capacity" (emotional maturity)
  *
- * Future implementation for progressive revelation and earned content access.
+ * W3C VERIFIABLE CREDENTIALS ALIGNMENT:
+ * This structure is compatible with W3C Verifiable Credentials (VC) spec.
+ * Existing fields map to VC format as follows:
+ * - id → vc.id
+ * - earnedAt → vc.issuanceDate
+ * - expiresAt → vc.expirationDate
+ * - issuedBy → vc.issuer (will become DID format)
+ * - (agent receiving attestation) → vc.credentialSubject.id
+ * - journey → vc.credentialSubject.journey (proof of learning)
+ * - proof → vc.proof.proofValue (placeholder, will use Holochain signatures)
+ *
+ * Future: Can serialize to VC format without model changes.
+ * See verifiable-credential.model.ts for the W3C structure.
+ *
+ * Reference: https://www.w3.org/TR/vc-data-model/
  */
 
 /**

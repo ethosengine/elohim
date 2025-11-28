@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-galatians-5-14",
+  "contentType": "bible-verse",
+  "title": "Galatians 5:14",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Galatians 5:14",
+    "book": "Galatians",
+    "chapter": 5,
+    "verseStart": 14,
+    "verseEnd": null,
+    "contextInModule": "Galatians 5:14\nThe entire law is fulfilled in a single decree: \"Love your neighbor as yourself.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "galatians",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870670",
+  "updatedAt": "2025-11-28T02:53:21.870671"
+}

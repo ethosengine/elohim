@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-the-knowledge-illusi",
+  "contentType": "book",
+  "title": "The Knowledge Illusion",
+  "description": "Book by Steven Sloman",
+  "content": {
+    "title": "The Knowledge Illusion",
+    "author": "Steven Sloman",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "knowledge-systems",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Steven Sloman"
+  },
+  "_contributor": "Steven Sloman",
+  "createdAt": "2025-11-28T02:53:21.847966",
+  "updatedAt": "2025-11-28T02:53:21.847967"
+}

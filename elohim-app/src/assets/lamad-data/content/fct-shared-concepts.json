@@ -1,0 +1,147 @@
+{
+  "lastUpdated": "2025-11-28T02:53:22.265244",
+  "description": "Conceptual bridges between FCT and Elohim Protocol",
+  "concepts": [
+    {
+      "id": "attention-economy",
+      "label": "Attention Economy & Sacred Attention",
+      "fctRelevance": "The race for human attention - central theme in CHT and FCT Module 1, 3, 5",
+      "elohimNodes": [
+        "social-medium-epic"
+      ],
+      "fctModules": [
+        "fct-module-01-church-dilemma",
+        "fct-module-03-problem-well-stated",
+        "fct-module-05-respecting-human-nature"
+      ]
+    },
+    {
+      "id": "systems-thinking",
+      "label": "Systems Thinking",
+      "fctRelevance": "FCT Module 2 - Systems Thinking, Complex vs Complicated",
+      "elohimNodes": [
+        "governance-epic",
+        "public-observer-epic"
+      ],
+      "fctModules": [
+        "fct-module-02-systems-thinking",
+        "fct-module-04-scaling-wisdom"
+      ]
+    },
+    {
+      "id": "metacrisis",
+      "label": "Metacrisis & Polycrisis",
+      "fctRelevance": "FCT Module 3 - Problem Well Stated, Exponential Technology",
+      "elohimNodes": [
+        "manifesto",
+        "governance-epic"
+      ],
+      "fctModules": [
+        "fct-module-01-church-dilemma",
+        "fct-module-03-problem-well-stated"
+      ]
+    },
+    {
+      "id": "trust-evolution",
+      "label": "Trust & Coordination",
+      "fctRelevance": "FCT Module 4 - Evolution of Trust, Game Theory",
+      "elohimNodes": [
+        "governance-epic",
+        "social-medium-epic"
+      ],
+      "fctModules": [
+        "fct-module-04-scaling-wisdom"
+      ]
+    },
+    {
+      "id": "human-dignity",
+      "label": "Human Dignity & Imago Dei",
+      "fctRelevance": "FCT Module 5 - Respecting Human Nature, Sacred Attention",
+      "elohimNodes": [
+        "manifesto",
+        "social-medium-epic",
+        "value-scanner-epic"
+      ],
+      "fctModules": [
+        "fct-module-05-respecting-human-nature"
+      ]
+    },
+    {
+      "id": "externalities",
+      "label": "Externalities & Commons",
+      "fctRelevance": "FCT Module 6 - Harmful Consequences, Tragedy of Commons",
+      "elohimNodes": [
+        "economic-coordination-epic",
+        "public-observer-epic"
+      ],
+      "fctModules": [
+        "fct-module-06-harmful-consequences"
+      ]
+    },
+    {
+      "id": "regeneration",
+      "label": "Regenerative Systems",
+      "fctRelevance": "FCT Module 7 - Regeneration and Reconciliation",
+      "elohimNodes": [
+        "autonomous-entity-epic",
+        "economic-coordination-epic"
+      ],
+      "fctModules": [
+        "fct-module-07-regeneration"
+      ]
+    },
+    {
+      "id": "values-centered",
+      "label": "Values-Centered Design",
+      "fctRelevance": "FCT Module 8, 9 - Centering Values, Love, Fruits of Spirit",
+      "elohimNodes": [
+        "value-scanner-epic",
+        "manifesto"
+      ],
+      "fctModules": [
+        "fct-module-08-centering-love",
+        "fct-module-09-fruits-of-spirit",
+        "fct-module-14-ready-to-act"
+      ]
+    },
+    {
+      "id": "shared-understanding",
+      "label": "Collective Sensemaking",
+      "fctRelevance": "FCT Module 10, 11 - Sensemaking, Collaboration",
+      "elohimNodes": [
+        "governance-epic",
+        "social-medium-epic"
+      ],
+      "fctModules": [
+        "fct-module-10-recognize-distortions",
+        "fct-module-11-collaboration-sensemaking"
+      ]
+    },
+    {
+      "id": "justice-fairness",
+      "label": "Justice & Fairness",
+      "fctRelevance": "FCT Module 12 - Supporting Fairness and Justice",
+      "elohimNodes": [
+        "governance-epic",
+        "autonomous-entity-epic"
+      ],
+      "fctModules": [
+        "fct-module-12-fairness-justice"
+      ]
+    },
+    {
+      "id": "human-flourishing",
+      "label": "Human Flourishing",
+      "fctRelevance": "FCT Module 13 - Helping People Thrive",
+      "elohimNodes": [
+        "manifesto",
+        "value-scanner-epic"
+      ],
+      "fctModules": [
+        "fct-module-13-helping-thrive",
+        "fct-module-14-ready-to-act",
+        "fct-module-15-retrospective"
+      ]
+    }
+  ]
+}

@@ -70,6 +70,15 @@ export type {
 } from './content-node.model';
 export { ContentRelationshipType } from './content-node.model';
 
+// Open Graph models (Platform-agnostic social sharing metadata)
+export * from './open-graph.model';
+
+// JSON-LD models (Linked Data structure alignment for semantic web)
+export * from './json-ld.model';
+
+// Verifiable Credentials models (W3C VC structure alignment for attestations)
+export * from './verifiable-credential.model';
+
 // Content Attestation models (Trust credentials granted TO content)
 // Determines ContentReach: private → invited → local → community → federated → commons
 export * from './content-attestation.model';
@@ -103,8 +112,8 @@ export * from './trust-badge.model';
 // Search models (enhanced search with scoring and facets)
 export * from './search.model';
 
-// Session User models (MVP temporary identity)
-export * from './session-user.model';
+// Session Human models (MVP temporary identity)
+export * from './session-human.model';
 
 // Content Access models (visitor/member/attested tiers)
 // ContentAccessRequirement: What access level is required for content

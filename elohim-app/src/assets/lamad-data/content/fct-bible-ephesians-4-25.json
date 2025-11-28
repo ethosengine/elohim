@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-ephesians-4-25",
+  "contentType": "bible-verse",
+  "title": "Ephesians 4:25",
+  "description": "Scripture reference used in FCT Module 10",
+  "content": {
+    "reference": "Ephesians 4:25",
+    "book": "Ephesians",
+    "chapter": 4,
+    "verseStart": 25,
+    "verseEnd": null,
+    "contextInModule": "Ephesians 4:25 \\- \"Therefore, having put away falsehood, let each one of you speak the truth with his neighbor, for we are members one of another.\"\nThese verses underscore the importance of truth, the joy found in truthfulness, and the serious spiritual and social consequences of falsehood, which are highly relevant to our current digital information landscape.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "ephesians",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-10-recognize-distortions"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-10-recognize-distortions",
+    "thematicContext": "Creating Shared Understanding: Recognize Distortions"
+  },
+  "createdAt": "2025-11-28T02:53:21.878491",
+  "updatedAt": "2025-11-28T02:53:21.878492"
+}

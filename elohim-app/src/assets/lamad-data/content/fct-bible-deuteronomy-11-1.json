@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-deuteronomy-11-1",
+  "contentType": "bible-verse",
+  "title": "Deuteronomy 11:1",
+  "description": "Scripture reference used in FCT Module 5",
+  "content": {
+    "reference": "Deuteronomy 11:1",
+    "book": "Deuteronomy",
+    "chapter": 11,
+    "verseStart": 1,
+    "verseEnd": null,
+    "contextInModule": "Deuteronomy 11: \"lay up these words of mine in your heart and in your soul, and you shall bind them as a sign on your hand, and they shall be as frontlets between your eyes. \"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "deuteronomy",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-05-respecting-human-nature",
+    "thematicContext": "Respecting Human Nature"
+  },
+  "createdAt": "2025-11-28T02:53:21.854899",
+  "updatedAt": "2025-11-28T02:53:21.854901"
+}

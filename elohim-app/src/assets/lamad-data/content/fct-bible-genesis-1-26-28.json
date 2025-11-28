@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-genesis-1-26-28",
+  "contentType": "bible-verse",
+  "title": "Genesis 1:26-28",
+  "description": "Scripture reference used in FCT Module 11",
+  "content": {
+    "reference": "Genesis 1:26-28",
+    "book": "Genesis",
+    "chapter": 1,
+    "verseStart": 26,
+    "verseEnd": 28,
+    "contextInModule": "Genesis 1:26-28 \\- Humans created in God's image and given stewardship",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 11 - Create Shared Understanding - Collaboration and Sensemaking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "genesis",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-11-collaboration-sensemaking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-11-collaboration-sensemaking",
+    "thematicContext": "Creating Shared Understanding: Collaboration"
+  },
+  "createdAt": "2025-11-28T02:53:21.884559",
+  "updatedAt": "2025-11-28T02:53:21.884560"
+}

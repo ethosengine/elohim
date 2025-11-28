@@ -1,0 +1,29 @@
+{
+  "id": "concept-currency-concentrate-not-circulate",
+  "contentType": "concept",
+  "title": "Concentrate rather than circulate",
+  "description": "Exponential returns to capital while linear returns to labor",
+  "content": "Exponential returns to capital while linear returns to labor",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/crisis-economic/concept-currency-concentrate-not-circulate.json",
+  "tags": [
+    "crisis",
+    "economics",
+    "inequality",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "economic-coordination-epic",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-economic",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.000498",
+  "updatedAt": "2025-11-28T17:11:57.000498"
+}

@@ -6,8 +6,8 @@
   "content": "---\nnode_type: organization\norg_id: blockchaingov\nname: \"BlockchainGov\"\nurl: \"https://blockchaingov.eu\"\ngem_id: \"QSeWM1877GM1uifq7OWi\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: public_observer\nrelated_epics: [governance]\n\nepic_relationships:\n  public_observer:\n    inspiration: \"[How BlockchainGov inspires the public_observer epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How BlockchainGov inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# BlockchainGov\n\n## Description\n\n<p>Blockchain-powered distributed governancefor communities, institutions and the world.We are a 5-year long, transdisciplinary research effort aimed at restoring trust in institutions at the community and global levels, by promoting better [\u2026]</p>\\n\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: public_observer\n\n[Detailed explanation of how BlockchainGov relates to and inspires the public_observer epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: governance\n\n[How BlockchainGov also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://blockchaingov.eu\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `public_observer` - Primary focus and location\n- `governance` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "public-observer"
+    "public-observer",
+    "organization"
   ],
   "sourcePath": "public_observer/organizations/blockchaingov/README.md",
   "relatedNodeIds": [
@@ -18,7 +18,26 @@
     "related_epics": [
       "governance"
     ],
-    "primary_epic": "public_observer"
+    "primary_epic": "public_observer",
+    "url": "https://blockchaingov.eu",
+    "name": "BlockchainGov",
+    "org_id": "blockchaingov",
+    "gem_id": "QSeWM1877GM1uifq7OWi",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "N/A",
+    "epic_relationships": {
+      "public_observer": {
+        "inspiration": "[How BlockchainGov inspires the public_observer epic]",
+        "parallel_work": []
+      },
+      "governance": {
+        "inspiration": "[How BlockchainGov inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.184597",
   "updatedAt": "2025-11-21T18:54:29.184597"

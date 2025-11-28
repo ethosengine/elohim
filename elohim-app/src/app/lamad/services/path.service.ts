@@ -237,4 +237,13 @@ export class PathService {
       })
     );
   }
+
+  /**
+   * Check if a path is fully completed.
+   */
+  isPathCompleted(pathId: string): Observable<boolean> {
+    return this.getCompletionPercentage(pathId).pipe(
+      map(percentage => percentage === 100)
+    );
+  }
 }

@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-01-book-antifragility-strong",
+  "contentType": "book",
+  "title": "Antifragility: Strong Towns supports building systems that thrive under stress, inspired",
+  "description": "Book by Nassim Taleb",
+  "content": {
+    "title": "Antifragility: Strong Towns supports building systems that thrive under stress, inspired",
+    "author": "Nassim Taleb",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "deep-thinking",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "mediaType": "book",
+    "author": "Nassim Taleb"
+  },
+  "_contributor": "Nassim Taleb",
+  "createdAt": "2025-11-28T02:53:21.849661",
+  "updatedAt": "2025-11-28T02:53:21.849662"
+}

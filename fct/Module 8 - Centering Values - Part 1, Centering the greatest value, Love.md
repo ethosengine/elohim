@@ -1,0 +1,176 @@
+
+
+## Centering Values \- Part 1, Centering the greatest value, Love
+
+### Day
+
+6.0
+
+### Objective
+
+4.0
+
+### Foundations of Humane Tech Concepts Review
+
+Centering Values  Part 1: Understanding the Myth of Neutrality and Value-Driven Technology
+
+The Myth of Technological Neutrality  
+\- Technology is not and cannot be neutral  
+\- How human values and societal conditions shape technology  
+\- The reciprocal relationship between technology and human behavior
+
+Human Influence on Technology  
+\- How personal experiences and values affect technology design  
+\- The difference between stated and demonstrated values in tech companies  
+\- The importance of understanding one's own biases and conditions
+
+Societal Influence on Technology  
+\- Impact of financial pressures, social dynamics, and cultural norms  
+\- How technology can reinforce or challenge existing power structures  
+\- The need for vigilance in upholding values within complex social systems
+
+The Limitations of Metrics  
+\- How over-reliance on metrics can mask harm and create unintended consequences  
+\- The dangers of confusing quantitative objectivity with ethical neutrality  
+\- Goodhart's Law: "When a measure becomes a target, it ceases to be a good measure"
+
+### Size
+
+31.0
+
+### Foundations of Christians and Technology Learning Objectives
+
+Centering the Greatest Commandment \- Love
+
+Examine the concept of love as defined in Matthew 22:36-40 and John 13:34-35, exploring its implications for technological design and use in both Christian communities and broader society.  
+Analyze how the Christian understanding of loving God and neighbor can inform the values embedded in technology, challenging current practices in both tech industry and church contexts.  
+Evaluate current technological practices and metrics in Christian settings (e.g., church attendance, online engagement) in light of Jesus' command to love, identifying areas of alignment and conflict.  
+Develop a framework for technology design and use that prioritizes love for God and neighbor over quantitative metrics or engagement, applicable to both Christian ministry and secular tech development.  
+Investigate the role of Christian ethics in addressing the myth of technological neutrality, recognizing how love should shape our approach to tech design and use.  
+Create strategies for implementing love-centered approaches in technology development and use, considering impact on individual spiritual formation, community relationships, and societal well-being.  
+Reflect on how a Christian understanding of love challenges and enhances concepts like integrity, competency, accountability, and education in both tech development and church practices.  
+Discuss how love as the greatest command can inform a Christian approach to data collection, user privacy, and algorithmic decision-making, critiquing current practices in both secular and religious contexts.  
+Develop a Christian critique of tech industry and church practices that prioritize metrics over human well-being and relational values, proposing alternatives that better align with Jesus' teachings on love.
+
+These objectives now integrate the focus on Jesus' command to love with critical self-examination of Christian practices, while still addressing broader technological issues. This approach should help students recognize gaps between their professed values and actual practices, encouraging a more authentic alignment with Christ's teachings in their engagement with technology.
+
+### Introduction
+
+On Christ The Solid Rock I Stand (hymn)
+
+The larger and more profitable a technology company is, the greater the cost of taking responsibility for the harms of its products—so these companies often create arguments about technological neutrality to justify their behavior.  
+The reality is that technology is not, and can never be, neutral.  
+This will become clear throughout this module, as we examine:  
+\* The conditions that shape technology, including our own values  
+\* How all choices humans make are expressions of their values  
+\* The role of metrics in the myth of neutrality  
+\* How values must guide humane technology
+
+### Bible Reference(s)
+
+The Greatest Command \-   
+Ephesians 4:15-16 "Grow to Become in every respect the mature body of him who is the head, that is Christ."
+
+Matthew 5:17  
+Do not think that I have come to abolish the Law or the Prophets. I have not come to abolish them, but to fulfill them.
+
+Matthew 22:36-40 (ESV)  
+36 “Teacher, which is the great commandment in the Law?” 37 And he said to him, “You shall love the Lord your God with all your heart and with all your soul and with all your mind. 38 This is the great and first commandment. 39 And a second is like it: You shall love your neighbor as yourself. 40 On these two commandments depend all the Law and the Prophets.”
+
+John 13:34-35 (ESV)  
+34 A new commandment I give to you, that you love one another: just as I have loved you, you also are to love one another. 35 By this all people will know that you are my disciples, if you have love for one another.”
+
+Luke 6:31  
+Do to others as you would have them do to you.
+
+Romans 13:8  
+Be indebted to no one, except to one another in love. For he who loves his neighbor has fulfilled the law.
+
+Romans 13:10  
+Love does no wrong to its neighbor. Therefore love is the fulfillment of the law.
+
+Galatians 5:14  
+The entire law is fulfilled in a single decree: "Love your neighbor as yourself."
+
+James 2:8  
+If you really fulfill the royal law stated in Scripture, "Love your neighbor as yourself," you are doing well.
+
+Micah 6:7-8 ESV (limitations of metrics) note the explcit warning in using metrics of wealth, preceeding the better known verse that we're familiar with.   
+Would the LORD be pleased with thousands of rams, with ten thousand rivers of oil? Shall I present my firstborn for my transgression, the fruit of my body for the sin of my soul? , He has told you, O man, what is good; and what does the LORD require of you but to do justice, and to love kindness, and to walk humbly with your God?
+
+### Story 
+
+There are such things as bad victories if you are a Christian, there's a way of seeming to win in exchange for giving up your soul.  
+There's a way of gaining power, there's a way of gaining material security that will ruin you.  That's not because political power is bad, it's not that material security is bad, it's because the MEANS you use to aquire these things is not neutral. 
+
+If you have a choice between behaving viciously and gaining security and power, and behaving righteously and having a chance at losing, for Christians it is better to lose. 
+
+Jesus meant it when he said, “If anyone would come after me, let him deny himself and take up his cross and follow me. 25 For whoever would save his life\[g\] will lose it, but whoever loses his life for my sake will find it. 26 For what will it profit a man if he gains the whole world and forfeits his soul? Or what shall a man give in return for his soul? 27 For the Son of Man is going to come with his angels in the glory of his Father, and then he will repay each person according to what he has done.“If anyone would come after me, let him deny himself and take up his cross and follow me. 25 For whoever would save his life\[g\] will lose it, but whoever loses his life for my sake will find it. 26 For what will it profit a man if he gains the whole world and forfeits his soul? Or what shall a man give in return for his soul? 27 For the Son of Man is going to come with his angels in the glory of his Father, and then he will repay each person according to what he has done. Matthew 16: 25-27
+
+### Discussion Question or Activity
+
+Reflect on your daily technology use and answer the following:
+
+Identify three specific ways you currently use technology that may not fully align with Jesus' command to love God and neighbor.  
+How could you practically modify or replace these practices to better embody this commandment?  
+Brainstorm a new technology, system, or lifestyle change that would help you better love God and neighbor. Be as specific and practical as possible in your proposal."
+
+This three-part question now:
+
+Encourages critical self-examination of current habits  
+Prompts practical thinking about immediate changes  
+Fosters creativity in imagining new, love-centered approaches to technology  
+Balances critique with constructive problem-solving  
+Allows for a range of responses, from simple habit changes to complex technological innovations  
+Directly applies the module's concepts to personal life and potential future developments  
+Bridges individual behavior with broader systemic thinking
+
+This comprehensive approach should lead to a rich discussion that covers personal reflection, practical changes, and innovative thinking, all centered on the greatest commandment.
+
+### Conclusion
+
+As we conclude this first part of our module on Centering Values, we've focused intensely on what Jesus called the greatest commandment: to love God with all our heart, soul, and mind, and to love our neighbor as ourselves. This exploration has taken on new urgency in our age of exponential technological growth.  
+Daniel Schmachtenberger poignantly observes: "If we are gaining the power of gods, then without the love and wisdom of gods, we self-destruct." As Christians, we are uniquely positioned \- and indeed, called \- to bring God's love to bear in our stewardship of technology.  
+We've seen that technology is never neutral, but always embeds and expresses values. This realization challenges us to ensure that the value of love is central in both our use and development of technology. We've grappled with how our current technological practices align \- or misalign \- with Christ's command to love, and how we might need to change our habits, designs, and metrics of success to better embody this love.  
+Our exploration has led us to reconsider not just our personal tech habits, but also our church practices and the broader tech industry. We're called to move beyond surface-level engagement or mere lip service to love, towards a deeper, more authentic embodiment of Christ's love in our digital lives.  
+As we move forward, let's carry with us this central question: How can we ensure that love for God and neighbor is the driving force behind our technological choices and creations? In a world gaining godlike technological power, we must cultivate and share godlike love and wisdom.  
+This isn't about rejecting technology, but about aligning it more fully with the greatest commandment. As we steward these powerful tools, let us do so with the love that Christ modeled for us \- a love that puts others first, that seeks the good of all, and that reflects the very nature of God.  
+In our next session, we'll build on this foundation as we explore how to discern and cultivate the Fruits of the Spirit in our technological landscape. But for now, I encourage you to continue reflecting on how you can center love more fully in your engagement with technology. Remember, it's through this love that the world will know we are Christ's disciples, and it may well be through this love that we navigate the challenges of our technological age.
+
+### Application 
+
+Identify three specific ways you currently use technology that may not fully align with Jesus' command to love God and neighbor:
+
+a) Excessive use of social media, often leading to comparison, envy, and disconnection from real-world relationships.  
+b) Overreliance on streaming services for entertainment, resulting in less time for prayer, Bible study, and community engagement.  
+c) Online shopping habits that prioritize convenience and low prices over ethical considerations of labor practices and environmental impact.
+
+How could you practically modify or replace these practices to better embody this commandment?
+
+a) Implement strict time limits on social media use. Use the freed-up time to engage in face-to-face conversations with family, neighbors, and church members. Start a prayer journal to redirect focus to God.  
+b) Replace one hour of daily streaming with dedicated Bible study or volunteering in the community. Choose media that encourages spiritual growth and empathy for others.  
+c) Research and switch to ethical, sustainable alternatives for frequently purchased items. Commit to buying locally when possible, even if it's less convenient or more expensive.
+
+Brainstorm a new technology, system, or lifestyle change that would help you better love God and neighbor:
+
+Proposal: Create a church-wide "Love Your Neighbor" app and program
+
+The app connects church members with local needs (elderly needing assistance, single parents needing childcare, immigrants needing language practice, etc.).  
+Members input their skills, availability, and resources they're willing to share.  
+The app matches needs with volunteers, facilitating direct, practical love for neighbors.  
+It includes a carbon footprint tracker to help members reduce their environmental impact, loving global neighbors through creation care.  
+Regular challenges encourage members to declutter and donate, simplifying lifestyles and redirecting resources to those in need.  
+The app integrates with local businesses, promoting ethical consumption and supporting the local economy.  
+It includes a daily scripture and reflection prompt focused on loving God and neighbor, helping members center their day on this commandment.  
+Monthly community events are organized through the app, bringing people together for service projects, shared meals, and relationship building.
+
+This system would help the church community actively practice loving God and neighbor, moving beyond passive church attendance to engaged, everyday discipleship. It challenges consumerist habits, encourages simplicity, promotes direct service, and fosters genuine community connections. By leveraging technology to facilitate real-world relationships and service, it embodies a more Christ-centered approach to both technology use and suburban lifestyle.
+
+### Other Media / Go Deeper / Class Maps
+
+"Poverty, Inc." (2014 documentary) \- Challenges the entire paradigm of Western aid and charity, potentially upending how suburban Christians view their mission trips and donation practices.
+
+"13th" (2016 documentary) \- Explores the intersection of race, justice, and mass incarceration in the United States. This could deeply challenge suburban views on law enforcement and systemic racism.
+
+How Norway designed a more humane prison, Vox, Youtube 4:31 https://www.youtube.com/watch?v=5v13wrVEQ2M   
+ 

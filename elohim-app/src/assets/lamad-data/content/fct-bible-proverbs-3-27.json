@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-proverbs-3-27",
+  "contentType": "bible-verse",
+  "title": "Proverbs 3:27",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Proverbs 3:27",
+    "book": "Proverbs",
+    "chapter": 3,
+    "verseStart": 27,
+    "verseEnd": null,
+    "contextInModule": "Proverbs 3:27 \\- Do not withhold good when it is in your power to act",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "proverbs",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901717",
+  "updatedAt": "2025-11-28T02:53:21.901719"
+}

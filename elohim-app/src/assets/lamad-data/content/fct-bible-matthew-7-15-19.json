@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-7-15-19",
+  "contentType": "bible-verse",
+  "title": "Matthew 7:15-19",
+  "description": "Scripture reference used in FCT Module 9",
+  "content": {
+    "reference": "Matthew 7:15-19",
+    "book": "Matthew",
+    "chapter": 7,
+    "verseStart": 15,
+    "verseEnd": 19,
+    "contextInModule": "Matthew 7:15-19 \u201cWatch out for false prophets. They come to you in sheep\u2019s clothing, but inwardly they are ferocious wolves. 16 By their fruit you will recognize them. Do people pick grapes from thornbushes, or figs from thistles? 17 Likewise, every good tree bears good fruit, but a bad tree bears bad fruit. 18 A good tree cannot bear bad fruit, and a bad tree cannot bear good fruit. 19 Every tree that does not bear good fruit is cut down and thrown into the fire. 20 Thus, by their fruit you will recognize them.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 9 - Centering Values - Metrics are Not Neutral, Centering the Fruits of the Spirit.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-09-fruits-of-spirit"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-09-fruits-of-spirit",
+    "thematicContext": "Centering Values: Fruits of the Spirit"
+  },
+  "createdAt": "2025-11-28T02:53:21.875728",
+  "updatedAt": "2025-11-28T02:53:21.875731"
+}

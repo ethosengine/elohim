@@ -1,0 +1,32 @@
+{
+  "id": "fct-media-00-documentary-the-social-dilemma",
+  "contentType": "documentary",
+  "title": "The Social Dilemma",
+  "description": "The Social Dilemma (2020)",
+  "content": {
+    "title": "The Social Dilemma",
+    "year": 2020,
+    "platform": "Netflix",
+    "duration": "1:34:00",
+    "format": "documentary"
+  },
+  "contentFormat": "documentary",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "documentary",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "attention-economy",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "documentary",
+    "year": "2020"
+  },
+  "_organization": "Netflix",
+  "createdAt": "2025-11-28T02:53:21.846899",
+  "updatedAt": "2025-11-28T02:53:21.846901"
+}

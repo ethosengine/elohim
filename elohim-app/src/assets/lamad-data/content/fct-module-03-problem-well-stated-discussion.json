@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-03-problem-well-stated-discussion",
+  "contentType": "activity",
+  "title": "Discussion: A Problem Well Stated",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "What are you asking for of \"church\" and the leaders who run this institution?   \nWhat expectations are you setting for yourself as a part of the body of christ?",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.854023",
+  "updatedAt": "2025-11-28T02:53:21.854025"
+}

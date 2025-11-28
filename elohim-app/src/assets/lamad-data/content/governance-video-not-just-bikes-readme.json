@@ -14,7 +14,22 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://www.youtube.com/c/notjustbikes",
+    "name": "Not Just Bikes",
+    "org_id": "not_just_bikes",
+    "gem_id": "RUCapCsCIvKnykbjdI9y",
+    "node_type": "video",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "YouTube",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Not Just Bikes inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.174597",
   "updatedAt": "2025-11-21T18:54:29.174597"

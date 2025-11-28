@@ -1,0 +1,32 @@
+{
+  "id": "fct-media-07-documentary-poverty-inc",
+  "contentType": "documentary",
+  "title": "Poverty, Inc.",
+  "description": "Poverty, Inc. (2014)",
+  "content": {
+    "title": "Poverty, Inc.",
+    "year": 2014,
+    "platform": null,
+    "duration": null,
+    "format": "documentary"
+  },
+  "contentFormat": "documentary",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "documentary",
+    "fct",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-08-centering-love",
+    "mediaType": "documentary",
+    "year": "2014"
+  },
+  "_organization": null,
+  "createdAt": "2025-11-28T02:53:21.871337",
+  "updatedAt": "2025-11-28T02:53:21.871339"
+}

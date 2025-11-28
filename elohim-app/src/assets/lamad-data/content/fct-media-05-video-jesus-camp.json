@@ -1,0 +1,32 @@
+{
+  "id": "fct-media-05-video-jesus-camp",
+  "contentType": "video",
+  "title": "Jesus Camp",
+  "description": "Jesus Camp (2006)",
+  "content": {
+    "title": "Jesus Camp",
+    "year": 2006,
+    "platform": null,
+    "duration": null,
+    "format": "video"
+  },
+  "contentFormat": "video",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "video",
+    "fct",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "mediaType": "video",
+    "year": "2006"
+  },
+  "_organization": null,
+  "createdAt": "2025-11-28T02:53:21.861356",
+  "updatedAt": "2025-11-28T02:53:21.861358"
+}

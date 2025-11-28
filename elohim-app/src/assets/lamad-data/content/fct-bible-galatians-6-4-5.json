@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-galatians-6-4-5",
+  "contentType": "bible-verse",
+  "title": "Galatians 6:4-5",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Galatians 6:4-5",
+    "book": "Galatians",
+    "chapter": 6,
+    "verseStart": 4,
+    "verseEnd": 5,
+    "contextInModule": "Galatians 6:4-5 \\- \"But let each one test his own work, and then his reason to boast will be in himself alone and not in his neighbor.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "galatians",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899103",
+  "updatedAt": "2025-11-28T02:53:21.899104"
+}

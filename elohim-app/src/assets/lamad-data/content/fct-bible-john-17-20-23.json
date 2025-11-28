@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-john-17-20-23",
+  "contentType": "bible-verse",
+  "title": "John 17:20-23",
+  "description": "Scripture reference used in FCT Module 11",
+  "content": {
+    "reference": "John 17:20-23",
+    "book": "John",
+    "chapter": 17,
+    "verseStart": 20,
+    "verseEnd": 23,
+    "contextInModule": "John 17:20-23 \\- Jesus' prayer for unity among believers",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 11 - Create Shared Understanding - Collaboration and Sensemaking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "john",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-11-collaboration-sensemaking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-11-collaboration-sensemaking",
+    "thematicContext": "Creating Shared Understanding: Collaboration"
+  },
+  "createdAt": "2025-11-28T02:53:21.884499",
+  "updatedAt": "2025-11-28T02:53:21.884501"
+}

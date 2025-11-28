@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-deep-work",
+  "contentType": "book",
+  "title": "Deep Work",
+  "description": "Book by Cal Newport",
+  "content": {
+    "title": "Deep Work",
+    "author": "Cal Newport",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "deep-thinking",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Cal Newport"
+  },
+  "_contributor": "Cal Newport",
+  "createdAt": "2025-11-28T02:53:21.848125",
+  "updatedAt": "2025-11-28T02:53:21.848126"
+}

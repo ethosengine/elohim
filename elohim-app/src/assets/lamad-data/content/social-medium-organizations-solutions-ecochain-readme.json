@@ -6,15 +6,30 @@
   "content": "---\nnode_type: organization\norg_id: solutions_ecochain\nname: \"Solutions - Ecochain\"\nurl: \"https://ecochain.com/solutions/\"\ngem_id: \"L9bzgHQa9ZT7pW3Ssm7L\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: social_medium\nrelated_epics: []\n\nepic_relationships:\n  social_medium:\n    inspiration: \"[How Solutions - Ecochain inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Solutions - Ecochain\n\n## Description\n\nLCA software used to give you one footprint at a time. With our Environmental Intelligence Platform, you can generate hundreds. Try out now.\n\n**Publisher:** Ecochain\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: social_medium\n\n[Detailed explanation of how Solutions - Ecochain relates to and inspires the social_medium epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://ecochain.com/solutions/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `social_medium` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "social-medium"
+    "social-medium",
+    "organization"
   ],
   "sourcePath": "social_medium/organizations/solutions_ecochain/README.md",
   "relatedNodeIds": [],
   "metadata": {
     "category": "social-medium",
     "related_epics": [],
-    "primary_epic": "social_medium"
+    "primary_epic": "social_medium",
+    "url": "https://ecochain.com/solutions/",
+    "name": "Solutions - Ecochain",
+    "org_id": "solutions_ecochain",
+    "gem_id": "L9bzgHQa9ZT7pW3Ssm7L",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Ecochain",
+    "epic_relationships": {
+      "social_medium": {
+        "inspiration": "[How Solutions - Ecochain inspires the social_medium epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.188597",
   "updatedAt": "2025-11-21T18:54:29.188597"

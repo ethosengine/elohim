@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-10-book-everything-you-think",
+  "contentType": "book",
+  "title": "Everything you think you know about addiction is wrong",
+  "description": "Book by Johann Hari",
+  "content": {
+    "title": "Everything you think you know about addiction is wrong",
+    "author": "Johann Hari",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 11 - Create Shared Understanding - Collaboration and Sensemaking.md",
+  "tags": [
+    "book",
+    "fct",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-11-collaboration-sensemaking"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-11-collaboration-sensemaking",
+    "mediaType": "book",
+    "author": "Johann Hari"
+  },
+  "_contributor": "Johann Hari",
+  "createdAt": "2025-11-28T02:53:21.884965",
+  "updatedAt": "2025-11-28T02:53:21.884967"
+}

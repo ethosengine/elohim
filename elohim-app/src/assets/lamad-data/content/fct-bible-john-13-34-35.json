@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-john-13-34-35",
+  "contentType": "bible-verse",
+  "title": "John 13:34-35",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "John 13:34-35",
+    "book": "John",
+    "chapter": 13,
+    "verseStart": 34,
+    "verseEnd": 35,
+    "contextInModule": "John 13:34-35 (ESV)\n34 A new commandment I give to you, that you love one another: just as I have loved you, you also are to love one another. 35 By this all people will know that you are my disciples, if you have love for one another.\u201d",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "john",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870631",
+  "updatedAt": "2025-11-28T02:53:21.870632"
+}

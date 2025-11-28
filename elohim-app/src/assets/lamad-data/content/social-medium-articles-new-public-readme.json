@@ -14,7 +14,22 @@
   "metadata": {
     "category": "social-medium",
     "related_epics": [],
-    "primary_epic": "social_medium"
+    "primary_epic": "social_medium",
+    "url": "https://newpublic.substack.com/",
+    "name": "New_ Public",
+    "org_id": "new__public",
+    "gem_id": "DxQNBtCrd9MWKWx0Wmb1",
+    "node_type": "article",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "newpublic.substack.com",
+    "epic_relationships": {
+      "social_medium": {
+        "inspiration": "[How New_ Public inspires the social_medium epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.187597",
   "updatedAt": "2025-11-21T18:54:29.187597"

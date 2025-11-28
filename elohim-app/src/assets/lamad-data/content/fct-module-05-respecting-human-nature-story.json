@@ -1,0 +1,28 @@
+{
+  "id": "fct-module-05-respecting-human-nature-story",
+  "contentType": "narrative",
+  "title": "Biblical Example of Sacred Attention: Mary and Martha",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": {
+    "narrative": "Biblical Example of Sacred Attention: Mary and Martha  \nThe story of Mary and Martha, found in Luke 10:38-42, provides a powerful illustration of the importance of giving our attention to what truly matters:\n\nAs Jesus and his disciples were on their way, he came to a village where a woman named Martha opened her home to him. She had a sister called Mary, who sat at the Lord's feet listening to what he said. But Martha was distracted by all the preparations that had to be made. She came to him and asked, \"Lord, don't you care that my sister has left me to do the work by myself? Tell her to help me\\!\"  \n\"Martha, Martha,\" the Lord answered, \"you are worried and upset about many things, but few things are needed\u2014or indeed only one. Mary has chosen what is better, and it will not be taken away from her.\"\n\nAnalysis\n\nFocused Attention: Mary demonstrates the value of giving undivided attention to what's most important. In this case, she focuses on Jesus' teachings, recognizing the rare opportunity to learn from him directly.  \nResisting Distractions: While Martha becomes \"distracted by all the preparations,\" Mary resists the pull of these seemingly important tasks to focus on something of greater value.  \nPrioritizing Spiritual Growth: Mary's choice to sit at Jesus' feet and listen shows her prioritization of spiritual growth and relationship over mundane tasks.  \nJesus' Affirmation: Jesus affirms Mary's choice, stating that she \"has chosen what is better.\" This divine endorsement underscores the importance of giving our attention to spiritual matters.  \nLong-term Perspective: Jesus notes that what Mary has chosen \"will not be taken away from her,\" highlighting the lasting value of attention given to spiritual truths.\n\nRelevance to Sacred Attention  \nThis story beautifully illustrates the concept of attention as sacred. In our modern context, we are constantly pulled in multiple directions by various tasks, notifications, and demands on our time \\- much like Martha was distracted by her many preparations. However, this story reminds us of the importance of intentionally directing our attention to what truly matters.  \nFor Christians working in technology, this story serves as a powerful reminder to design systems that respect the sacredness of human attention. It encourages us to create technologies that help users focus on what's truly important, rather than constantly distracting them with the digital equivalent of \"many preparations.\"",
+    "narrativeType": "biblical-example"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-05-respecting-human-nature"
+  },
+  "createdAt": "2025-11-28T02:53:21.858600",
+  "updatedAt": "2025-11-28T02:53:21.858601"
+}

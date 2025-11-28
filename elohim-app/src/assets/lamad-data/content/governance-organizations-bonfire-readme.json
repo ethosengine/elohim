@@ -6,8 +6,8 @@
   "content": "---\nnode_type: organization\norg_id: bonfire\nname: \"Bonfire\"\nurl: \"https://bonfirenetworks.org\"\ngem_id: \"gcRkSP2lItMCXJWeJLuu\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: [social_medium, value_scanner]\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Bonfire inspires the governance epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Bonfire inspires the social_medium epic]\"\n    parallel_work: []\n  value_scanner:\n    inspiration: \"[How Bonfire inspires the value_scanner epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Bonfire\n\n## Description\n\nA federated social network for individuals and communities to design, operate and control their own digital lives.\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Bonfire relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: social_medium\n\n[How Bonfire also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: value_scanner\n\n[How Bonfire also inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://bonfirenetworks.org\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n- `social_medium` - [Connection description]\n- `value_scanner` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "governance"
+    "governance",
+    "organization"
   ],
   "sourcePath": "governance/organizations/bonfire/README.md",
   "relatedNodeIds": [
@@ -20,7 +20,30 @@
       "social_medium",
       "value_scanner"
     ],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://bonfirenetworks.org",
+    "name": "Bonfire",
+    "org_id": "bonfire",
+    "gem_id": "gcRkSP2lItMCXJWeJLuu",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "N/A",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Bonfire inspires the governance epic]",
+        "parallel_work": []
+      },
+      "social_medium": {
+        "inspiration": "[How Bonfire inspires the social_medium epic]",
+        "parallel_work": []
+      },
+      "value_scanner": {
+        "inspiration": "[How Bonfire inspires the value_scanner epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.169597",
   "updatedAt": "2025-11-21T18:54:29.169597"

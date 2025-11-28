@@ -14,7 +14,22 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA",
+    "name": "Future Thinkers - Daniel Schmachtenberger - The Existential Game",
+    "org_id": "future_thinkers_daniel_schmachtenberger_the_existential_game",
+    "gem_id": "cJfrbjpKw7dvOeBQ6ELX",
+    "node_type": "audio",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Google Podcasts",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Future Thinkers - Daniel Schmachtenberger - The Existential Game inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.168597",
   "updatedAt": "2025-11-21T18:54:29.168597"

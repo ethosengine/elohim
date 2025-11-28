@@ -6,15 +6,30 @@
   "content": "---\nnode_type: organization\norg_id: p2p_lab_research_collective\nname: \"P2P Lab \u2190 research collective\"\nurl: \"https://www.p2plab.gr/en/\"\ngem_id: \"8dRoLlSJxNNDbTsGOtXa\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: []\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How P2P Lab \u2190 research collective inspires the value_scanner epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# P2P Lab \u2190 research collective\n\n## Description\n\n[Description to be added]\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how P2P Lab \u2190 research collective relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.p2plab.gr/en/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "value-scanner"
+    "value-scanner",
+    "organization"
   ],
   "sourcePath": "value_scanner/organizations/p2p_lab_research_collective/README.md",
   "relatedNodeIds": [],
   "metadata": {
     "category": "value-scanner",
     "related_epics": [],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://www.p2plab.gr/en/",
+    "name": "P2P Lab \u2190 research collective",
+    "org_id": "p2p_lab_research_collective",
+    "gem_id": "8dRoLlSJxNNDbTsGOtXa",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "N/A",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How P2P Lab \u2190 research collective inspires the value_scanner epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.193597",
   "updatedAt": "2025-11-21T18:54:29.193597"

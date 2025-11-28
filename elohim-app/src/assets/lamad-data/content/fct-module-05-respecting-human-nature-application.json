@@ -1,0 +1,27 @@
+{
+  "id": "fct-module-05-respecting-human-nature-application",
+  "contentType": "practice",
+  "title": "Application: Respecting Human Nature",
+  "description": "Practical application and action steps",
+  "content": {
+    "instructions": "\\*The Messages we get on a Sunday are filtered through what we the audience want to hear, Preachers are subject to audience capture, conflict of interest, and bias. Consider balancing career-preaching with traveling ministers of the Word, who can have independence from our congregation to be honest with our community when we need to hear hard truths existentially important to our successful formation of a faith community.   \n\n\\* The Structure of our Church collaborations should respect the Dunbar Number for each individual member to optimize for our capacity for relationship:  \n\\--150 Aquaintances  \n\\-- 50 Casual   \n\\-- 15 Close  \n\\-- 5 Intimate",
+    "practiceType": "application"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "application",
+    "practice",
+    "fct",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "fct-practice",
+    "sourceModule": "fct-module-05-respecting-human-nature"
+  },
+  "createdAt": "2025-11-28T02:53:21.858604",
+  "updatedAt": "2025-11-28T02:53:21.858605"
+}

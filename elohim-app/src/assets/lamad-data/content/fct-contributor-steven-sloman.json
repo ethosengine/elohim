@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-steven-sloman",
+  "contentType": "contributor",
+  "title": "Steven Sloman",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Steven Sloman",
+    "role": "author",
+    "works": [
+      "The Knowledge Illusion"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-book-the-knowledge-illusi"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T02:53:21.847974",
+  "updatedAt": "2025-11-28T02:53:21.847975"
+}

@@ -2,7 +2,7 @@ import { Injectable, Optional } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { map, tap, switchMap, take } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
-import { SessionUserService } from './session-user.service';
+import { SessionHumanService } from './session-human.service';
 import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
 import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../models/content-access.model';
 
@@ -10,7 +10,7 @@ import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../models
  * AgentService - Manages the current agent (session or authenticated).
  *
  * Architecture:
- * - Session users: Delegated to SessionUserService
+ * - Session users: Delegated to SessionHumanService
  * - Authenticated users: Holochain conductor (future)
  *
  * Holochain migration:
@@ -19,7 +19,7 @@ import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../models
  * - Attestations are verifiable credentials
  *
  * MVP behavior:
- * - Session users get temporary identity via SessionUserService
+ * - Session users get temporary identity via SessionHumanService
  * - Progress stored in localStorage (session-scoped)
  * - Attestations tracked in session
  */
@@ -36,7 +36,7 @@ export class AgentService {
 
   constructor(
     private dataLoader: DataLoaderService,
-    @Optional() private sessionUserService: SessionUserService | null
+    @Optional() private sessionHumanService: SessionHumanService | null
   ) {
     this.initializeAgent();
   }
@@ -46,9 +46,9 @@ export class AgentService {
    * For MVP, creates a session-based agent.
    */
   private initializeAgent(): void {
-    if (this.sessionUserService) {
+    if (this.sessionHumanService) {
       // Create agent from session
-      this.sessionUserService.session$.subscribe(session => {
+      this.sessionHumanService.session$.subscribe(session => {
         if (session) {
           const agent: Agent = {
             id: session.sessionId,
@@ -122,8 +122,8 @@ export class AgentService {
    * Get the current agent ID (synchronous, for cache keys).
    */
   getCurrentAgentId(): string {
-    if (this.sessionUserService) {
-      return this.sessionUserService.getSessionId();
+    if (this.sessionHumanService) {
+      return this.sessionHumanService.getSessionId();
     }
     return this.agentSubject.value?.id || 'anonymous';
   }
@@ -132,15 +132,15 @@ export class AgentService {
    * Check if user is a session user (vs authenticated Holochain user).
    */
   isSessionUser(): boolean {
-    return this.sessionUserService !== null;
+    return this.sessionHumanService !== null;
   }
 
   /**
    * Get the current access level.
    */
   getAccessLevel(): AccessLevel {
-    if (this.sessionUserService) {
-      return this.sessionUserService.getAccessLevel();
+    if (this.sessionHumanService) {
+      return this.sessionHumanService.getAccessLevel();
     }
     // Future: check Holochain attestations
     return 'visitor';
@@ -150,8 +150,8 @@ export class AgentService {
    * Check if user can access content.
    */
   checkContentAccess(accessMetadata?: ContentAccessMetadata): AccessCheckResult {
-    if (this.sessionUserService) {
-      return this.sessionUserService.checkContentAccess(accessMetadata);
+    if (this.sessionHumanService) {
+      return this.sessionHumanService.checkContentAccess(accessMetadata);
     }
     // Default: allow (no access metadata = open)
     return { canAccess: true };
@@ -228,11 +228,11 @@ export class AgentService {
         this.progressCache.set(pathId, progress);
 
         // Record activity in session
-        if (this.sessionUserService) {
+        if (this.sessionHumanService) {
           if (isNewPath) {
-            this.sessionUserService.recordPathStarted(pathId);
+            this.sessionHumanService.recordPathStarted(pathId);
           }
-          this.sessionUserService.recordStepCompleted(pathId, stepIndex);
+          this.sessionHumanService.recordStepCompleted(pathId, stepIndex);
         }
 
         return this.dataLoader.saveAgentProgress(progress);
@@ -291,8 +291,8 @@ export class AgentService {
         this.progressCache.set(pathId, progress);
 
         // Record notes saved in session (triggers upgrade prompt)
-        if (this.sessionUserService) {
-          this.sessionUserService.recordNotesSaved(pathId, stepIndex);
+        if (this.sessionHumanService) {
+          this.sessionHumanService.recordNotesSaved(pathId, stepIndex);
         }
 
         return this.dataLoader.saveAgentProgress(progress);

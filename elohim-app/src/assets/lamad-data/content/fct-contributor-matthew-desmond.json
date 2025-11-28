@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-matthew-desmond",
+  "contentType": "contributor",
+  "title": "Matthew Desmond",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Matthew Desmond",
+    "role": "author",
+    "works": [
+      "Poverty, by America"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice",
+    "fct-media-11-book-poverty-by-america"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-12-fairness-justice"
+  },
+  "createdAt": "2025-11-28T02:53:21.892536",
+  "updatedAt": "2025-11-28T02:53:21.892538"
+}

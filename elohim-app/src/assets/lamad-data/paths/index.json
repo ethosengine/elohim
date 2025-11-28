@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-27T06:01:59.174132",
-  "totalCount": 1,
+  "lastUpdated": "2025-11-28T17:14:13.696839",
+  "totalCount": 2,
   "paths": [
     {
       "id": "elohim-protocol",
@@ -14,6 +14,25 @@
         "protocol",
         "onboarding"
       ]
+    },
+    {
+      "id": "foundations-christian-technology",
+      "title": "Foundations for Christian Technology",
+      "description": "A course equipping Christians to navigate and shape the digital age with wisdom, integrating Center for Humane Technology principles with biblical foundations.",
+      "difficulty": "intermediate",
+      "estimatedDuration": "10-15 hours",
+      "stepCount": 15,
+      "chapterCount": 6,
+      "pathType": "expedition",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "ethics",
+        "discipleship",
+        "church"
+      ],
+      "category": "fct"
     }
   ]
 }

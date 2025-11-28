@@ -6,10 +6,31 @@
  * - id becomes AgentPubKey
  * - Profile data published to DHT if visibility allows
  *
+ * W3C DECENTRALIZED IDENTIFIERS (DID) ALIGNMENT:
+ * The `id` field remains human-friendly for routing and file paths.
+ * The optional `did` field provides cryptographic identity.
+ *
+ * Separation rationale:
+ * - id: Human-friendly routing ("user123", "alice-smith")
+ * - did: Cryptographic identity ("did:web:elohim.host:agents:user123")
+ *
+ * This separation prevents:
+ * - Breaking URLs (/lamad/resource/:id uses clean IDs)
+ * - Breaking file paths (content/{id}.json on Windows doesn't allow colons)
+ * - Ugly user-facing identifiers in localStorage keys
+ *
+ * Migration path for `did` field:
+ * 1. Current: Optional, not yet populated
+ * 2. Phase 2: did:web:elohim.host:agents:{id}
+ * 3. Holochain: did:holochain:{AgentPubKey}
+ *
+ * W3C DID Spec: https://www.w3.org/TR/did-core/
+ * DID Format: did:<method>:<method-specific-id>
+ *
  * For Elohim agents, additional properties are available.
  */
 export interface Agent {
-  id: string;  // AgentPubKey in Holochain
+  id: string;  // Future: DID or AgentPubKey in Holochain
   displayName: string;
   type: 'human' | 'organization' | 'ai-agent' | 'elohim';
 
@@ -22,6 +43,31 @@ export interface Agent {
   // Timestamps
   createdAt: string;
   updatedAt: string;
+
+  /**
+   * ActivityPub Actor type for federated social web.
+   *
+   * Maps to ActivityStreams vocabulary:
+   * - type='human' → 'Person'
+   * - type='organization' → 'Organization'
+   * - type='ai-agent' → 'Service'
+   * - type='elohim' → 'Service' (with constitutional binding metadata)
+   *
+   * Reference: https://www.w3.org/TR/activitystreams-vocabulary/#actor-types
+   */
+  activityPubType?: 'Person' | 'Organization' | 'Service' | 'Application' | 'Group';
+
+  /**
+   * Decentralized Identifier (DID) for cryptographic identity.
+   *
+   * Separate from `id` to maintain human-friendly URLs and filenames.
+   * The `id` field remains the primary routing identifier.
+   *
+   * Example: "did:web:elohim.host:agents:user123"
+   *
+   * Reference: https://www.w3.org/TR/did-core/
+   */
+  did?: string;
 
   // Elohim-specific properties (optional, only present for type: 'elohim')
   layer?: string;

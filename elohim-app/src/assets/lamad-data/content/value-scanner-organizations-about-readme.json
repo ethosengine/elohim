@@ -6,8 +6,8 @@
   "content": "---\nnode_type: organization\norg_id: about\nname: \"About\"\nurl: \"https://www.prosocial.world/about\"\ngem_id: \"fwXajnzIdApkemj0KQCG\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [autonomous_entity]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How About inspires the value_scanner epic]\"\n    parallel_work: []\n  autonomous_entity:\n    inspiration: \"[How About inspires the autonomous_entity epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# About\n\n## Description\n\n[Description to be added]\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how About relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: autonomous_entity\n\n[How About also inspires the autonomous_entity epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.prosocial.world/about\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `autonomous_entity` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "value-scanner"
+    "value-scanner",
+    "organization"
   ],
   "sourcePath": "value_scanner/organizations/about/README.md",
   "relatedNodeIds": [
@@ -18,7 +18,26 @@
     "related_epics": [
       "autonomous_entity"
     ],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://www.prosocial.world/about",
+    "name": "About",
+    "org_id": "about",
+    "gem_id": "fwXajnzIdApkemj0KQCG",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "N/A",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How About inspires the value_scanner epic]",
+        "parallel_work": []
+      },
+      "autonomous_entity": {
+        "inspiration": "[How About inspires the autonomous_entity epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.192597",
   "updatedAt": "2025-11-21T18:54:29.192597"

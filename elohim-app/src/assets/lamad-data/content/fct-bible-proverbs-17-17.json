@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-proverbs-17-17",
+  "contentType": "bible-verse",
+  "title": "Proverbs 17:17",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Proverbs 17:17",
+    "book": "Proverbs",
+    "chapter": 17,
+    "verseStart": 17,
+    "verseEnd": null,
+    "contextInModule": "Proverbs 17:17 \\- \"A friend loves at all times, and a brother is born for adversity.\"\nMinimizing Regret and Living True to Oneself:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "proverbs",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899096",
+  "updatedAt": "2025-11-28T02:53:21.899097"
+}

@@ -6,15 +6,30 @@
   "content": "---\nnode_type: organization\norg_id: international_idea\nname: \"International IDEA\"\nurl: \"https://www.idea.int/\"\ngem_id: \"ThW6LR1Y7KK745TDmhlY\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: public_observer\nrelated_epics: []\n\nepic_relationships:\n  public_observer:\n    inspiration: \"[How International IDEA inspires the public_observer epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# International IDEA\n\n## Description\n\nOur objective is to promote and advance sustainable democracy and to ... International Institute for Democracy and Electoral Assistance (International IDEA )\n\n**Publisher:** www.idea.int\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: public_observer\n\n[Detailed explanation of how International IDEA relates to and inspires the public_observer epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.idea.int/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `public_observer` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "public-observer"
+    "public-observer",
+    "organization"
   ],
   "sourcePath": "public_observer/organizations/international_idea/README.md",
   "relatedNodeIds": [],
   "metadata": {
     "category": "public-observer",
     "related_epics": [],
-    "primary_epic": "public_observer"
+    "primary_epic": "public_observer",
+    "url": "https://www.idea.int/",
+    "name": "International IDEA",
+    "org_id": "international_idea",
+    "gem_id": "ThW6LR1Y7KK745TDmhlY",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "www.idea.int",
+    "epic_relationships": {
+      "public_observer": {
+        "inspiration": "[How International IDEA inspires the public_observer epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.185597",
   "updatedAt": "2025-11-21T18:54:29.185597"

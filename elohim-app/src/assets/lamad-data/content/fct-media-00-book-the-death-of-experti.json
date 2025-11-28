@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-the-death-of-experti",
+  "contentType": "book",
+  "title": "The Death of Expertise",
+  "description": "Book by Tom Nichols",
+  "content": {
+    "title": "The Death of Expertise",
+    "author": "Tom Nichols",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "institutional-collapse",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Tom Nichols"
+  },
+  "_contributor": "Tom Nichols",
+  "createdAt": "2025-11-28T02:53:21.847341",
+  "updatedAt": "2025-11-28T02:53:21.847342"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-11-book-poverty-by-america",
+  "contentType": "book",
+  "title": "Poverty, by America",
+  "description": "Book by Matthew Desmond",
+  "content": {
+    "title": "Poverty, by America",
+    "author": "Matthew Desmond",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "book",
+    "author": "Matthew Desmond"
+  },
+  "_contributor": "Matthew Desmond",
+  "createdAt": "2025-11-28T02:53:21.892527",
+  "updatedAt": "2025-11-28T02:53:21.892528"
+}

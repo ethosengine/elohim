@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-25-14-30",
+  "contentType": "bible-verse",
+  "title": "Matthew 25:14-30",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Matthew 25:14-30",
+    "book": "Matthew",
+    "chapter": 25,
+    "verseStart": 14,
+    "verseEnd": 30,
+    "contextInModule": "Matthew 25:14-30 \\- Parable of the Talents",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901760",
+  "updatedAt": "2025-11-28T02:53:21.901761"
+}

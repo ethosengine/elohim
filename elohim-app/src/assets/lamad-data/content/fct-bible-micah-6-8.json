@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-micah-6-8",
+  "contentType": "bible-verse",
+  "title": "Micah 6:8",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Micah 6:8",
+    "book": "Micah",
+    "chapter": 6,
+    "verseStart": 8,
+    "verseEnd": null,
+    "contextInModule": "Micah 6:8 \\- Act justly, love mercy, walk humbly with your God",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "micah",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901724",
+  "updatedAt": "2025-11-28T02:53:21.901725"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-nassim-taleb",
+  "contentType": "contributor",
+  "title": "Nassim Taleb",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Nassim Taleb",
+    "role": "author",
+    "works": [
+      "Antifragility: Strong Towns supports building systems that thrive under stress, inspired"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking",
+    "fct-media-01-book-antifragility-strong"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-02-systems-thinking"
+  },
+  "createdAt": "2025-11-28T02:53:21.849671",
+  "updatedAt": "2025-11-28T02:53:21.849672"
+}

@@ -6,8 +6,8 @@
   "content": "---\nnode_type: organization\norg_id: international_idea_ace_electoral_knowledge_network\nname: \"International IDEA \u2014 - ACE Electoral Knowledge Network\"\nurl: \"https://aceproject.org/about-en/full-partners/IDEA\"\ngem_id: \"5maRDVsog49m5X1Gk2Og\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: public_observer\nrelated_epics: [governance]\n\nepic_relationships:\n  public_observer:\n    inspiration: \"[How International IDEA \u2014 - ACE Electoral Knowledge Network inspires the public_observer epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How International IDEA \u2014 - ACE Electoral Knowledge Network inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# International IDEA \u2014 - ACE Electoral Knowledge Network\n\n## Description\n\nThe International Institute for Democracy and Electoral Assistance (International IDEA) is an intergovernmental organization with the mandate to promote and\u00a0...\n\n**Publisher:** aceproject.org\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: public_observer\n\n[Detailed explanation of how International IDEA \u2014 - ACE Electoral Knowledge Network relates to and inspires the public_observer epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: governance\n\n[How International IDEA \u2014 - ACE Electoral Knowledge Network also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://aceproject.org/about-en/full-partners/IDEA\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `public_observer` - Primary focus and location\n- `governance` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "public-observer"
+    "public-observer",
+    "organization"
   ],
   "sourcePath": "public_observer/organizations/international_idea_ace_electoral_knowledge_network/README.md",
   "relatedNodeIds": [
@@ -18,7 +18,26 @@
     "related_epics": [
       "governance"
     ],
-    "primary_epic": "public_observer"
+    "primary_epic": "public_observer",
+    "url": "https://aceproject.org/about-en/full-partners/IDEA",
+    "name": "International IDEA \u2014 - ACE Electoral Knowledge Network",
+    "org_id": "international_idea_ace_electoral_knowledge_network",
+    "gem_id": "5maRDVsog49m5X1Gk2Og",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "aceproject.org",
+    "epic_relationships": {
+      "public_observer": {
+        "inspiration": "[How International IDEA \u2014 - ACE Electoral Knowledge Network inspires the public_observer epic]",
+        "parallel_work": []
+      },
+      "governance": {
+        "inspiration": "[How International IDEA \u2014 - ACE Electoral Knowledge Network inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.185597",
   "updatedAt": "2025-11-21T18:54:29.185597"

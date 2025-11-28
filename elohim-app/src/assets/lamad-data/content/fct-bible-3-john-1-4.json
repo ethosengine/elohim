@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-3-john-1-4",
+  "contentType": "bible-verse",
+  "title": "3 John 1:4",
+  "description": "Scripture reference used in FCT Module 10",
+  "content": {
+    "reference": "3 John 1:4",
+    "book": "3 John",
+    "chapter": 1,
+    "verseStart": 4,
+    "verseEnd": null,
+    "contextInModule": "3 John 1:4 \\- \"I have no greater joy than to hear that my children are walking in the truth.\"\nResponsibility to not bear false witness:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "3-john",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-10-recognize-distortions"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-10-recognize-distortions",
+    "thematicContext": "Creating Shared Understanding: Recognize Distortions"
+  },
+  "createdAt": "2025-11-28T02:53:21.878426",
+  "updatedAt": "2025-11-28T02:53:21.878427"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-10-recognize-distortions-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Creating Shared Understanding: Recognize Distortions",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "Think of church \"experiences\" you have worked on, supported, or participated in. Where might they have contributed to or amplified any of these distortions?\n\nWhat design features can increase or combat distortion in our shared understanding?\n\nHow have I contributed to or been affected by the breakdown of shared understanding?  \nWhat steps can I take to foster greater understanding in my digital interactions?\n\nHow can our church/Christian community better leverage technology to create shared understanding?  \nWhat principles should guide our use of social media and other digital platforms?",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-10-recognize-distortions"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-10-recognize-distortions",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.881961",
+  "updatedAt": "2025-11-28T02:53:21.881962"
+}

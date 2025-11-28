@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-proverbs-3-5-6",
+  "contentType": "bible-verse",
+  "title": "Proverbs 3:5-6",
+  "description": "Scripture reference used in FCT Module 3",
+  "content": {
+    "reference": "Proverbs 3:5-6",
+    "book": "Proverbs",
+    "chapter": 3,
+    "verseStart": 5,
+    "verseEnd": 6,
+    "contextInModule": "Proverbs 3:5-6: \"Trust in the Lord with all your heart and lean not on your own understanding; in all your ways submit to him, and he will make your paths straight.\" This passage emphasizes the limitations of human wisdom and the need for divine guidance.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "proverbs",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "thematicContext": "A Problem Well Stated"
+  },
+  "createdAt": "2025-11-28T02:53:21.853486",
+  "updatedAt": "2025-11-28T02:53:21.853488"
+}

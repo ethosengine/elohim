@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-amos-3-7",
+  "contentType": "bible-verse",
+  "title": "Amos 3:7",
+  "description": "Scripture reference used in FCT Module 6",
+  "content": {
+    "reference": "Amos 3:7",
+    "book": "Amos",
+    "chapter": 3,
+    "verseStart": 7,
+    "verseEnd": null,
+    "contextInModule": "Amos 3:7 \\- \"Surely the Sovereign Lord does nothing without revealing his plan to his servants the prophets.\"\nResponsible growth and collaborative community:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "amos",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "thematicContext": "Minimizing Harmful Consequences"
+  },
+  "createdAt": "2025-11-28T02:53:21.861002",
+  "updatedAt": "2025-11-28T02:53:21.861003"
+}

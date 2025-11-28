@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-james-1-5",
+  "contentType": "bible-verse",
+  "title": "James 1:5",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "James 1:5",
+    "book": "James",
+    "chapter": 1,
+    "verseStart": 5,
+    "verseEnd": null,
+    "contextInModule": "James 1:5 \\- \"If any of you lacks wisdom, let him ask God, who gives generously to all without reproach, and it will be given him.\"\nFostering Care, Kindness, and Quality Relationships:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "james",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899068",
+  "updatedAt": "2025-11-28T02:53:21.899069"
+}

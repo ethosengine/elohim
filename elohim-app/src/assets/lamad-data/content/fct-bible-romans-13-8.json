@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-romans-13-8",
+  "contentType": "bible-verse",
+  "title": "Romans 13:8",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Romans 13:8",
+    "book": "Romans",
+    "chapter": 13,
+    "verseStart": 8,
+    "verseEnd": null,
+    "contextInModule": "Romans 13:8\nBe indebted to no one, except to one another in love. For he who loves his neighbor has fulfilled the law.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "romans",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870651",
+  "updatedAt": "2025-11-28T02:53:21.870652"
+}

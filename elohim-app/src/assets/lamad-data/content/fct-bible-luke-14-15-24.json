@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-luke-14-15-24",
+  "contentType": "bible-verse",
+  "title": "Luke 14:15-24",
+  "description": "Scripture reference used in FCT Module 12",
+  "content": {
+    "reference": "Luke 14:15-24",
+    "book": "Luke",
+    "chapter": 14,
+    "verseStart": 15,
+    "verseEnd": 24,
+    "contextInModule": "Luke 14:15-24 \\- The Parable of the Great Banquet\n###### *Key Verse*",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "luke",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "thematicContext": "Supporting Fairness and Justice"
+  },
+  "createdAt": "2025-11-28T02:53:21.891546",
+  "updatedAt": "2025-11-28T02:53:21.891548"
+}

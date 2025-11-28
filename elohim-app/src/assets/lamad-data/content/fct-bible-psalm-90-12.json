@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-psalm-90-12",
+  "contentType": "bible-verse",
+  "title": "Psalm 90:12",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Psalm 90:12",
+    "book": "Psalm",
+    "chapter": 90,
+    "verseStart": 12,
+    "verseEnd": null,
+    "contextInModule": "Psalm 90:12 \\- \"So teach us to number our days that we may get a heart of wisdom.\"\nDesigning for Intentionality and Conscious Choices:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "psalm",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899150",
+  "updatedAt": "2025-11-28T02:53:21.899152"
+}

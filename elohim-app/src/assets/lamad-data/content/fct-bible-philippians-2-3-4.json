@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-philippians-2-3-4",
+  "contentType": "bible-verse",
+  "title": "Philippians 2:3-4",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Philippians 2:3-4",
+    "book": "Philippians",
+    "chapter": 2,
+    "verseStart": 3,
+    "verseEnd": 4,
+    "contextInModule": "Philippians 2:3-4 \\- Look to the interests of others",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "philippians",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901746",
+  "updatedAt": "2025-11-28T02:53:21.901747"
+}

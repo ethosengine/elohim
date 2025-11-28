@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-ephesians-4-15-16",
+  "contentType": "bible-verse",
+  "title": "Ephesians 4:15-16",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Ephesians 4:15-16",
+    "book": "Ephesians",
+    "chapter": 4,
+    "verseStart": 15,
+    "verseEnd": 16,
+    "contextInModule": "Ephesians 4:15-16 \"Grow to Become in every respect the mature body of him who is the head, that is Christ.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "ephesians",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870574",
+  "updatedAt": "2025-11-28T02:53:21.870576"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-genesis-2-15",
+  "contentType": "bible-verse",
+  "title": "Genesis 2:15",
+  "description": "Scripture reference used in FCT Module 6",
+  "content": {
+    "reference": "Genesis 2:15",
+    "book": "Genesis",
+    "chapter": 2,
+    "verseStart": 15,
+    "verseEnd": null,
+    "contextInModule": "Genesis 2:15 \\- \"The Lord God took the man and put him in the Garden of Eden to work it and take care of it.\"\nLoving neighbors and caring for the marginalized:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "genesis",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "thematicContext": "Minimizing Harmful Consequences"
+  },
+  "createdAt": "2025-11-28T02:53:21.860966",
+  "updatedAt": "2025-11-28T02:53:21.860969"
+}

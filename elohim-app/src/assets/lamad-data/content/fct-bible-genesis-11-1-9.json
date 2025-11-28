@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-genesis-11-1-9",
+  "contentType": "bible-verse",
+  "title": "Genesis 11:1-9",
+  "description": "Scripture reference used in FCT Module 3",
+  "content": {
+    "reference": "Genesis 11:1-9",
+    "book": "Genesis",
+    "chapter": 11,
+    "verseStart": 1,
+    "verseEnd": 9,
+    "contextInModule": "Genesis 11:1-9 (The Tower of Babel): Illustrates the hubris of humanity in attempting to elevate themselves to the status of gods, only to be confounded by their own limitations. This story echoes Schmachtenberger's point about the need for wisdom and prudence to accompany power.\nThe Covenant and Moral Evolution:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "genesis",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "thematicContext": "A Problem Well Stated"
+  },
+  "createdAt": "2025-11-28T02:53:21.853498",
+  "updatedAt": "2025-11-28T02:53:21.853499"
+}

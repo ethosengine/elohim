@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-micah-6-7-8",
+  "contentType": "bible-verse",
+  "title": "Micah 6:7-8",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Micah 6:7-8",
+    "book": "Micah",
+    "chapter": 6,
+    "verseStart": 7,
+    "verseEnd": 8,
+    "contextInModule": "Micah 6:7-8 ESV (limitations of metrics) note the explcit warning in using metrics of wealth, preceeding the better known verse that we're familiar with.\nWould the LORD be pleased with thousands of rams, with ten thousand rivers of oil? Shall I present my firstborn for my transgression, the fruit of my body for the sin of my soul? , He has told you, O man, what is good; and what does the LORD require of you but to do justice, and to love kindness, and to walk humbly with your God?",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "micah",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870699",
+  "updatedAt": "2025-11-28T02:53:21.870700"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-12-book-the-new-parish",
+  "contentType": "book",
+  "title": "The New Parish",
+  "description": "Book by Paul Sparks",
+  "content": {
+    "title": "The New Parish",
+    "author": "Paul Sparks",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "mediaType": "book",
+    "author": "Paul Sparks"
+  },
+  "_contributor": "Paul Sparks",
+  "createdAt": "2025-11-28T02:53:21.899372",
+  "updatedAt": "2025-11-28T02:53:21.899374"
+}

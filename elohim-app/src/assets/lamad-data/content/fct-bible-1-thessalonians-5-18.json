@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-1-thessalonians-5-18",
+  "contentType": "bible-verse",
+  "title": "1 Thessalonians 5:18",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "1 Thessalonians 5:18",
+    "book": "1 Thessalonians",
+    "chapter": 5,
+    "verseStart": 18,
+    "verseEnd": null,
+    "contextInModule": "1 Thessalonians 5:18 \\- \"Give thanks in all circumstances; for this is the will of God in Christ Jesus for you.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "1-thessalonians",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899037",
+  "updatedAt": "2025-11-28T02:53:21.899038"
+}

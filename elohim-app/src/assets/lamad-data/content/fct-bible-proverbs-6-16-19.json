@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-proverbs-6-16-19",
+  "contentType": "bible-verse",
+  "title": "Proverbs 6:16-19",
+  "description": "Scripture reference used in FCT Module 10",
+  "content": {
+    "reference": "Proverbs 6:16-19",
+    "book": "Proverbs",
+    "chapter": 6,
+    "verseStart": 16,
+    "verseEnd": 19,
+    "contextInModule": "Proverbs 6:16-19 \\- \"There are six things that the Lord hates, seven that are an abomination to him: haughty eyes, a lying tongue, and hands that shed innocent blood, a heart that devises wicked plans, feet that make haste to run to evil, a false witness who breathes out lies, and one who sows discord among brothers.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "proverbs",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-10-recognize-distortions"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-10-recognize-distortions",
+    "thematicContext": "Creating Shared Understanding: Recognize Distortions"
+  },
+  "createdAt": "2025-11-28T02:53:21.878458",
+  "updatedAt": "2025-11-28T02:53:21.878459"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-daniel-1-8-20",
+  "contentType": "bible-verse",
+  "title": "Daniel 1:8-20",
+  "description": "Scripture reference used in FCT Module 4",
+  "content": {
+    "reference": "Daniel 1:8-20",
+    "book": "Daniel",
+    "chapter": 1,
+    "verseStart": 8,
+    "verseEnd": 20,
+    "contextInModule": "Daniel's Integrity (Daniel 1:8-20; 6:1-28) \\- Daniel's refusal to compromise his values, even in a foreign land, highlights the importance of adhering to ethical standards, a message relevant for Christian technologists facing moral dilemmas.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "daniel",
+    "setting-stage"
+  ],
+  "relatedNodeIds": [
+    "fct-module-04-scaling-wisdom"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-04-scaling-wisdom",
+    "thematicContext": "Setting the Stage: Scaling Wisdom"
+  },
+  "createdAt": "2025-11-28T02:53:21.854462",
+  "updatedAt": "2025-11-28T02:53:21.854463"
+}

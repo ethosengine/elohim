@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-genesis-9-8-17",
+  "contentType": "bible-verse",
+  "title": "Genesis 9:8-17",
+  "description": "Scripture reference used in FCT Module 3",
+  "content": {
+    "reference": "Genesis 9:8-17",
+    "book": "Genesis",
+    "chapter": 9,
+    "verseStart": 8,
+    "verseEnd": 17,
+    "contextInModule": "Genesis 9:8-17 (Noah\u2019s Covenant): Signifies God's promise not to destroy humanity again, setting a precedent for the relationship between divine mercy and human behavior.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "genesis",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "thematicContext": "A Problem Well Stated"
+  },
+  "createdAt": "2025-11-28T02:53:21.853506",
+  "updatedAt": "2025-11-28T02:53:21.853507"
+}

@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-deuteronomy-6-8",
+  "contentType": "bible-verse",
+  "title": "Deuteronomy 6:8",
+  "description": "Scripture reference used in FCT Module 1",
+  "content": {
+    "reference": "Deuteronomy 6:8",
+    "book": "Deuteronomy",
+    "chapter": 6,
+    "verseStart": 8,
+    "verseEnd": null,
+    "contextInModule": "\\- Attention in the Bible:  phylactery, Hebrew tefillin, also spelled tephillin or tfillin, in Jewish religious practice, one of two small black leather cube-shaped cases containing Torah texts written on parchment, which, in accordance with Deuteronomy 6:8 (and similar statements in Deuteronomy 11:18 and Exodus 13:9, 16), are to be worn by male Jews 13 years of age and older as reminders of God and of the obligation to keep the Law during daily life. The name phylactery is derived from the Greek phylakterion, meaning amulet.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "deuteronomy",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "thematicContext": "The Church Dilemma"
+  },
+  "createdAt": "2025-11-28T02:53:21.839395",
+  "updatedAt": "2025-11-28T02:53:21.839396"
+}

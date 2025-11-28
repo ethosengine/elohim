@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-01-church-dilemma-discussion",
+  "contentType": "activity",
+  "title": "Discussion: The Church Dilemma",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "What are some ways that we \"the church\" is reacting to this change?\n\nWhat are some examples of \"god-like\" technology?\n\nWhat are the things churches do which make sense if we look for race for attention?",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.848358",
+  "updatedAt": "2025-11-28T02:53:21.848359"
+}

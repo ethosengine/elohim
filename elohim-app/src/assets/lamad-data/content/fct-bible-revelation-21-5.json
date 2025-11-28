@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-revelation-21-5",
+  "contentType": "bible-verse",
+  "title": "Revelation 21:5",
+  "description": "Scripture reference used in FCT Module 6",
+  "content": {
+    "reference": "Revelation 21:5",
+    "book": "Revelation",
+    "chapter": 21,
+    "verseStart": 5,
+    "verseEnd": null,
+    "contextInModule": "Revelation 21:5 \\- \"He who was seated on the throne said, 'I am making everything new\\!'\"\nProphetic mindset and foresight:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "revelation",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "thematicContext": "Minimizing Harmful Consequences"
+  },
+  "createdAt": "2025-11-28T02:53:21.860994",
+  "updatedAt": "2025-11-28T02:53:21.860995"
+}

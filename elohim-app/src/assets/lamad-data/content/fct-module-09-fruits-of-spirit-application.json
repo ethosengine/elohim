@@ -1,0 +1,27 @@
+{
+  "id": "fct-module-09-fruits-of-spirit-application",
+  "contentType": "practice",
+  "title": "Application: Centering Values: Fruits of the Spirit",
+  "description": "Practical application and action steps",
+  "content": {
+    "instructions": "To implement these measures, the church might:  \nDevelop a \"Fruit of the Spirit\" assessment tool for individual and communal reflection.  \nCreate small groups focused on cultivating specific fruits.  \nImplement a mentoring program pairing mature believers with newer ones.  \nRedesign church programs to intentionally foster these fruits.  \nPartner with local organizations to measure community impact.  \nUse technology to facilitate connection, accountability, and growth in these areas.\n\nThis approach would require a significant shift from typical suburban church metrics, focusing on qualitative growth and community impact rather than numbers and budgets. It would challenge members to live out their faith more intentionally and holistically, addressing the externalities of their lifestyles and consumption habits. The result could be a church that truly embodies the Fruits of the Spirit, making a tangible difference in individual lives and the broader community.",
+    "practiceType": "application"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 9 - Centering Values - Metrics are Not Neutral, Centering the Fruits of the Spirit.md",
+  "tags": [
+    "application",
+    "practice",
+    "fct",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-09-fruits-of-spirit"
+  ],
+  "metadata": {
+    "category": "fct-practice",
+    "sourceModule": "fct-module-09-fruits-of-spirit"
+  },
+  "createdAt": "2025-11-28T02:53:21.876211",
+  "updatedAt": "2025-11-28T02:53:21.876212"
+}

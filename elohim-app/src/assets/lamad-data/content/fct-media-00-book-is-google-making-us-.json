@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-is-google-making-us-",
+  "contentType": "book",
+  "title": "Is Google Making Us Stupid?",
+  "description": "Book by Nicholas Carr",
+  "content": {
+    "title": "Is Google Making Us Stupid?",
+    "author": "Nicholas Carr",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "cognitive-science",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Nicholas Carr"
+  },
+  "_contributor": "Nicholas Carr",
+  "createdAt": "2025-11-28T02:53:21.847511",
+  "updatedAt": "2025-11-28T02:53:21.847512"
+}

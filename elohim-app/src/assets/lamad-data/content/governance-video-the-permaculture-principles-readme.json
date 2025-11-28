@@ -14,7 +14,22 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://youtu.be/0mwRAf3z9ag",
+    "name": "The Permaculture Principles",
+    "org_id": "the_permaculture_principles",
+    "gem_id": "qXY8N5ABHNtFW4BHb43D",
+    "node_type": "video",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "YouTube",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How The Permaculture Principles inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.174597",
   "updatedAt": "2025-11-21T18:54:29.174597"

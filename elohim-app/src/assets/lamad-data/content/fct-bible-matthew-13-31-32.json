@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-13-31-32",
+  "contentType": "bible-verse",
+  "title": "Matthew 13:31-32",
+  "description": "Scripture reference used in FCT Module 2",
+  "content": {
+    "reference": "Matthew 13:31-32",
+    "book": "Matthew",
+    "chapter": 13,
+    "verseStart": 31,
+    "verseEnd": 32,
+    "contextInModule": "Bible Story: The parable of the mustard seed (Matthew 13:31-32).\nDiscussion: Compare the growth of a mustard seed to the development of good habits. Emphasize that small, faithful actions can lead to great outcomes.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "thematicContext": "Systems Thinking"
+  },
+  "createdAt": "2025-11-28T02:53:21.848819",
+  "updatedAt": "2025-11-28T02:53:21.848820"
+}

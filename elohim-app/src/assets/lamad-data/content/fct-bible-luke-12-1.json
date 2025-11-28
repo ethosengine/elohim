@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-luke-12-1",
+  "contentType": "bible-verse",
+  "title": "Luke 12:1",
+  "description": "Scripture reference used in FCT Module 3",
+  "content": {
+    "reference": "Luke 12:1",
+    "book": "Luke",
+    "chapter": 12,
+    "verseStart": 1,
+    "verseEnd": null,
+    "contextInModule": "Luke 12: 48 But the one who did not know, and did what deserved a beating, will receive a light beating. Everyone to whom much was given, of him much will be required, and from him to whom they entrusted much, they will demand the more.\nReconciliation and Renewal:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "luke",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "thematicContext": "A Problem Well Stated"
+  },
+  "createdAt": "2025-11-28T02:53:21.853543",
+  "updatedAt": "2025-11-28T02:53:21.853544"
+}

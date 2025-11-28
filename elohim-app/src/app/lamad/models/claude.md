@@ -42,7 +42,7 @@ Six-Layer Model:
 ├── Traveler (Humans)
 │   ├── agent.model.ts             # Agent, AgentProgress
 │   ├── attestations.model.ts      # Agent attestations
-│   └── user-affinity.model.ts     # Engagement tracking
+│   └── human-affinity.model.ts     # Engagement tracking
 │
 ├── Discovery & Trust
 │   ├── exploration.model.ts       # Graph traversal queries
@@ -52,7 +52,7 @@ Six-Layer Model:
 │   └── elohim-agent.model.ts      # Constitutional AI agents
 │
 ├── Session & Access
-│   ├── session-user.model.ts      # SessionUser, SessionStats, upgrade prompts
+│   ├── session-human.model.ts      # SessionUser, SessionStats, upgrade prompts
 │   └── content-access.model.ts    # Access levels, gated content requirements
 │
 ├── Profile (Imago Dei)
@@ -81,13 +81,13 @@ Six-Layer Model:
 | `path-extension.model.ts` | ✅ Complete | Learner path mutations |
 | `agent.model.ts` | ✅ Complete | Agent, AgentProgress, MasteryLevel |
 | `attestations.model.ts` | ✅ Complete | Agent attestation system |
-| `user-affinity.model.ts` | ✅ Complete | UserAffinity tracking |
+| `human-affinity.model.ts` | ✅ Complete | HumanAffinity tracking |
 | `exploration.model.ts` | ✅ Complete | ExplorationQuery, ExplorationResult |
 | `knowledge-map.model.ts` | ✅ Complete | Four-dimensional maps (domain, self, person, collective) |
 | `trust-badge.model.ts` | ✅ Complete | TrustBadge, TrustIndicator, unified display |
 | `search.model.ts` | ✅ Complete | SearchQuery, SearchResult, SearchFacets |
 | `elohim-agent.model.ts` | ✅ Complete | Constitutional AI guardian models |
-| `session-user.model.ts` | ✅ Complete | SessionUser, SessionStats, upgrade prompts, migration |
+| `session-human.model.ts` | ✅ Complete | SessionUser, SessionStats, upgrade prompts, migration |
 | `content-access.model.ts` | ✅ Complete | AccessLevel, ContentAccessMetadata, gated content |
 | `profile.model.ts` | ✅ Complete | HumanProfile, JourneyStats, TimelineEvent (Imago Dei aligned) |
 | `rea-bridge.model.ts` | ✅ Complete | ValueFlows ontology: REAAgent, EconomicResource, Process, Commitment |

@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-02-systems-thinking-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Systems Thinking",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "Compare and Contrast verses, Complicated vs Complex in scripture, which is the priority?: \n\nMatthew 23:23 \\- Woe to you teachers of the law and Pharisees, you hypocrites\" You give a tenth of your spices \\- mint, dill, and cumin. But you have neglected the more important matters of the law \\- justice, mercy, and faithfulness. You should have practiced the latter, without neglecting the former. \n\nMatthew 22:36-40 \"Teacher, which is the greatest commandment in the Law?\" Jesus replied: \"Love the Lord your God with all your heart and with all your soul and with all your mind. This is the first and greatest commandment. And the second is like it: 'Love your neighbor as yourself.' All the Law and the Prophets hang on these two commandments.\"\n\nHow personal spiritual disciplines (prayer, reading scripture, serving) contribute to the collective well-being and mission of the church.  \nKey Concept: Small, consistent actions lead to significant change.\n\n ... other verses?",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.853168",
+  "updatedAt": "2025-11-28T02:53:21.853169"
+}

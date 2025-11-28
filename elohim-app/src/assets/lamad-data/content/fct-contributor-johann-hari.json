@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-johann-hari",
+  "contentType": "contributor",
+  "title": "Johann Hari",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Johann Hari",
+    "role": "author",
+    "works": [
+      "Everything you think you know about addiction is wrong"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 11 - Create Shared Understanding - Collaboration and Sensemaking.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-11-collaboration-sensemaking",
+    "fct-media-10-book-everything-you-think"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-11-collaboration-sensemaking"
+  },
+  "createdAt": "2025-11-28T02:53:21.884977",
+  "updatedAt": "2025-11-28T02:53:21.884978"
+}

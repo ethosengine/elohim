@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-james-1-22",
+  "contentType": "bible-verse",
+  "title": "James 1:22",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "James 1:22",
+    "book": "James",
+    "chapter": 1,
+    "verseStart": 22,
+    "verseEnd": null,
+    "contextInModule": "James 1:22 \\- Be doers of the word, not hearers only",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "james",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901689",
+  "updatedAt": "2025-11-28T02:53:21.901690"
+}

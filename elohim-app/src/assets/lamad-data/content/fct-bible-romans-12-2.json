@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-romans-12-2",
+  "contentType": "bible-verse",
+  "title": "Romans 12:2",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Romans 12:2",
+    "book": "Romans",
+    "chapter": 12,
+    "verseStart": 2,
+    "verseEnd": null,
+    "contextInModule": "Romans 12:2 \\- Be transformed by the renewing of your mind",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "romans",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901731",
+  "updatedAt": "2025-11-28T02:53:21.901732"
+}

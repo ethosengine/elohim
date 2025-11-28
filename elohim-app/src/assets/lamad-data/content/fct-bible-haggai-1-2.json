@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-haggai-1-2",
+  "contentType": "bible-verse",
+  "title": "Haggai 1:2",
+  "description": "Scripture reference used in FCT Module 7",
+  "content": {
+    "reference": "Haggai 1:2",
+    "book": "Haggai",
+    "chapter": 1,
+    "verseStart": 2,
+    "verseEnd": null,
+    "contextInModule": "Haggai 1:2\u202d-\u202c11 ESV\nhttps://bible.com/bible/59/hag.1.2-11.ESV",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 7 - Regeneration and Reconciliation - Changing the paradim of church success..md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "haggai",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-07-regeneration"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-07-regeneration",
+    "thematicContext": "Regeneration and Reconciliation"
+  },
+  "createdAt": "2025-11-28T02:53:21.869575",
+  "updatedAt": "2025-11-28T02:53:21.869576"
+}

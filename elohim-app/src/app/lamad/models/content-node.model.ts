@@ -19,6 +19,7 @@
  */
 
 import type { GeographicContext, Place } from './place.model';
+import { JsonLdMetadata } from './json-ld.model';
 
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
@@ -154,6 +155,51 @@ export interface ContentNode {
   placeData?: Place;
 
   // =========================================================================
+  // Linked Data / Semantic Web (JSON-LD)
+  // =========================================================================
+
+  /**
+   * Optional JSON-LD metadata for semantic web interoperability.
+   *
+   * When populated, enables this content to be serialized as Linked Data for:
+   * - Schema.org structured data (SEO, rich snippets)
+   * - RDF triple stores and SPARQL queries
+   * - Decentralized knowledge graphs
+   * - Interoperability with other semantic web systems
+   *
+   * Future: Schema.org types like Article, VideoObject, Course, etc.
+   * Prevents tech debt - when we need semantic web export, structure is ready.
+   */
+  linkedData?: JsonLdMetadata;
+
+  /**
+   * ActivityPub Object type for federated social web.
+   *
+   * Maps ContentType to ActivityStreams vocabulary:
+   * - contentType='video' → 'Video'
+   * - contentType='epic'/'feature' → 'Article'
+   * - contentType='book-chapter' → 'Document'
+   * - contentType='simulation' → 'Application'
+   * - contentType='assessment' → 'Question'
+   * - Default → 'Page' (generic web content)
+   *
+   * Reference: https://www.w3.org/TR/activitystreams-vocabulary/#object-types
+   */
+  activityPubType?: 'Note' | 'Article' | 'Video' | 'Document' | 'Page' | 'Question' | 'Application';
+
+  /**
+   * Decentralized Identifier (DID) for cryptographic identity.
+   *
+   * Separate from `id` to maintain human-friendly URLs and filenames.
+   * The `id` field remains the primary routing identifier.
+   *
+   * Example: "did:web:elohim.host:content:policy-maker-readme"
+   *
+   * Reference: https://www.w3.org/TR/did-core/
+   */
+  did?: string;
+
+  // =========================================================================
   // Timestamps
   // =========================================================================
 
@@ -218,7 +264,68 @@ export type ContentFormat =
   | 'epub'
   | 'gherkin'
   | 'html'
-  | 'plaintext';
+  | 'plaintext'
+  | 'assessment-json';
+
+/**
+ * ContentPreview - Lightweight preview data for listing/composing content.
+ *
+ * Used for:
+ * - Epic-level content listings (videos, orgs, books related to an epic)
+ * - Path step previews
+ * - Search results
+ * - Related content suggestions
+ *
+ * Contains enough data to render a preview card and link without loading full content.
+ */
+export interface ContentPreview {
+  /** Unique identifier */
+  id: string;
+
+  /** Display title */
+  title: string;
+
+  /** Short description (truncated to ~200 chars) */
+  description: string;
+
+  /** Content type for icon/styling */
+  contentType: ContentType;
+
+  /** Tags for filtering */
+  tags: string[];
+
+  // =========================================================================
+  // Rich Media Fields (from Keen data)
+  // =========================================================================
+
+  /** External URL for direct linking (YouTube, org website, etc.) */
+  url?: string;
+
+  /** Display name (may differ from title, e.g., "Climate Town") */
+  name?: string;
+
+  /** Publisher/source (YouTube, book publisher, etc.) */
+  publisher?: string;
+
+  /** Category for grouping content */
+  category?: string;
+
+  // =========================================================================
+  // Contributor & UI Rendering Hints
+  // =========================================================================
+
+  /** ContributorPresence ID for the creator/organization (if exists) */
+  contributorPresenceId?: string;
+
+  /** Whether this is playable media (video, audio) */
+  isPlayable?: boolean;
+
+  /** Thumbnail URL for preview (if available) */
+  thumbnailUrl?: string;
+
+  /** Estimated duration for media content */
+  duration?: string;
+}
 
 /**
  * Flexible metadata that can be extended per domain
@@ -265,6 +372,34 @@ export interface ContentMetadata {
     sandbox?: string[];
     csp?: string;
   };
+
+  // =========================================================================
+  // Social Graph / SEO Metadata (Open Graph protocol - platform-agnostic)
+  // =========================================================================
+
+  /** Thumbnail/preview image URL for social sharing (og:image) */
+  thumbnailUrl?: string;
+
+  /** Alt text for thumbnail image (accessibility + SEO) */
+  imageAlt?: string;
+
+  /** Canonical URL - authoritative location of this content (og:url) */
+  canonicalUrl?: string;
+
+  /** Content locale/language (og:locale, e.g., 'en_US', 'es_ES') */
+  locale?: string;
+
+  /** Original publication timestamp (article:published_time, ISO 8601) */
+  publishedTime?: string;
+
+  /** Last modification timestamp (article:modified_time, ISO 8601) */
+  modifiedTime?: string;
+
+  /** Content section/category for article metadata (article:section) */
+  section?: string;
+
+  /** Keywords for SEO and discoverability */
+  keywords?: string[];
 
   /** Custom domain-specific fields */
   [key: string]: any;

@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-psalm-1-3",
+  "contentType": "bible-verse",
+  "title": "Psalm 1:3",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Psalm 1:3",
+    "book": "Psalm",
+    "chapter": 1,
+    "verseStart": 3,
+    "verseEnd": null,
+    "contextInModule": "Psalm 1:3 \\- \"He is like a tree planted by streams of water that yields its fruit in its season, and its leaf does not wither. In all that he does, he prospers.\"\nBalancing Pleasure, Pain, and Meaning:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "psalm",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899011",
+  "updatedAt": "2025-11-28T02:53:21.899012"
+}

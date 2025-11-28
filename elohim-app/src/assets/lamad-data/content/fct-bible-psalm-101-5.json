@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-psalm-101-5",
+  "contentType": "bible-verse",
+  "title": "Psalm 101:5",
+  "description": "Scripture reference used in FCT Module 10",
+  "content": {
+    "reference": "Psalm 101:5",
+    "book": "Psalm",
+    "chapter": 101,
+    "verseStart": 5,
+    "verseEnd": null,
+    "contextInModule": "Psalm 101:5 \\- \"Whoever slanders his neighbor secretly I will destroy. Whoever has a haughty look and an arrogant heart I will not endure.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "psalm",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-10-recognize-distortions"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-10-recognize-distortions",
+    "thematicContext": "Creating Shared Understanding: Recognize Distortions"
+  },
+  "createdAt": "2025-11-28T02:53:21.878466",
+  "updatedAt": "2025-11-28T02:53:21.878467"
+}

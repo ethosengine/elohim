@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-22-39",
+  "contentType": "bible-verse",
+  "title": "Matthew 22:39",
+  "description": "Scripture reference used in FCT Module 6",
+  "content": {
+    "reference": "Matthew 22:39",
+    "book": "Matthew",
+    "chapter": 22,
+    "verseStart": 39,
+    "verseEnd": null,
+    "contextInModule": "Matthew 22:39 \\- \"And the second is like it: 'Love your neighbor as yourself.'\"\nEthical frameworks and discernment:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 6 - Minimizing Harmful Consequences - Externalities, Tragedy of the Commons, and  Arms Races.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-06-harmful-consequences"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-06-harmful-consequences",
+    "thematicContext": "Minimizing Harmful Consequences"
+  },
+  "createdAt": "2025-11-28T02:53:21.860977",
+  "updatedAt": "2025-11-28T02:53:21.860978"
+}

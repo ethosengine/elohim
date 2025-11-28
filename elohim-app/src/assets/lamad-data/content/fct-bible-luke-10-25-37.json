@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-luke-10-25-37",
+  "contentType": "bible-verse",
+  "title": "Luke 10:25-37",
+  "description": "Scripture reference used in FCT Module 4",
+  "content": {
+    "reference": "Luke 10:25-37",
+    "book": "Luke",
+    "chapter": 10,
+    "verseStart": 25,
+    "verseEnd": 37,
+    "contextInModule": "The Good Samaritan (Luke 10:25-37) \\- This story teaches the value of helping others regardless of their background, encouraging Christian technologists to develop technologies that bridge gaps and provide aid across communities.\nPromotion of Justice and Well-being",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "luke",
+    "setting-stage"
+  ],
+  "relatedNodeIds": [
+    "fct-module-04-scaling-wisdom"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-04-scaling-wisdom",
+    "thematicContext": "Setting the Stage: Scaling Wisdom"
+  },
+  "createdAt": "2025-11-28T02:53:21.854418",
+  "updatedAt": "2025-11-28T02:53:21.854419"
+}

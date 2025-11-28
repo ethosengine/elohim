@@ -1,19 +1,19 @@
 import { Injectable, Inject, Optional } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import {
-  UserAffinity,
+  HumanAffinity,
   AffinityStats,
   AffinityChangeEvent,
   CategoryAffinityStats,
   TypeAffinityStats,
-} from '../models/user-affinity.model';
+} from '../models/human-affinity.model';
 import { ContentNode } from '../models/content-node.model';
-import { SessionUserService } from './session-user.service';
+import { SessionHumanService } from './session-human.service';
 
 /**
- * Service for tracking user affinity (relationship strength) to content nodes.
+ * Service for tracking human affinity (relationship strength) to content nodes.
  *
- * Integrates with SessionUserService for session-scoped storage.
+ * Integrates with SessionHumanService for session-scoped storage.
  * Falls back to default storage key if no session.
  * Affinity values range from 0.0 (no connection) to 1.0 (strong connection).
  *
@@ -25,26 +25,26 @@ import { SessionUserService } from './session-user.service';
   providedIn: 'root',
 })
 export class AffinityTrackingService {
-  private readonly DEFAULT_STORAGE_KEY = 'elohim-user-affinity';
+  private readonly DEFAULT_STORAGE_KEY = 'elohim-human-affinity';
   private readonly AUTO_INCREMENT_DELTA = 0.2; // Bump on first view
   private readonly AUTO_INCREMENT_THRESHOLD = 0.01; // Only auto-increment if below this
 
-  private readonly affinitySubject = new BehaviorSubject<UserAffinity>(
+  private readonly affinitySubject = new BehaviorSubject<HumanAffinity>(
     this.loadFromStorage()
   );
   private readonly changeSubject = new BehaviorSubject<AffinityChangeEvent | null>(null);
 
-  public readonly affinity$: Observable<UserAffinity> =
+  public readonly affinity$: Observable<HumanAffinity> =
     this.affinitySubject.asObservable();
   public readonly changes$: Observable<AffinityChangeEvent | null> =
     this.changeSubject.asObservable();
 
   constructor(
-    @Optional() private sessionUserService: SessionUserService | null
+    @Optional() private sessionHumanService: SessionHumanService | null
   ) {
     // Re-load if session changes
-    if (this.sessionUserService) {
-      this.sessionUserService.session$.subscribe(session => {
+    if (this.sessionHumanService) {
+      this.sessionHumanService.session$.subscribe(session => {
         if (session) {
           const loaded = this.loadFromStorage();
           this.affinitySubject.next(loaded);
@@ -57,18 +57,18 @@ export class AffinityTrackingService {
    * Get the storage key based on session context.
    */
   private getStorageKey(): string {
-    if (this.sessionUserService) {
-      return this.sessionUserService.getAffinityStorageKey();
+    if (this.sessionHumanService) {
+      return this.sessionHumanService.getAffinityStorageKey();
     }
     return this.DEFAULT_STORAGE_KEY;
   }
 
   /**
-   * Get the user ID based on session context.
+   * Get the human ID based on session context.
    */
-  private getUserId(): string {
-    if (this.sessionUserService) {
-      return this.sessionUserService.getSessionId() || 'anonymous';
+  private getHumanId(): string {
+    if (this.sessionHumanService) {
+      return this.sessionHumanService.getSessionId() || 'anonymous';
     }
     return 'anonymous';
   }
@@ -97,7 +97,7 @@ export class AffinityTrackingService {
     }
 
     const current = this.affinitySubject.value;
-    const updated: UserAffinity = {
+    const updated: HumanAffinity = {
       ...current,
       affinity: {
         ...current.affinity,
@@ -118,8 +118,8 @@ export class AffinityTrackingService {
     });
 
     // Notify session service of affinity change
-    if (this.sessionUserService) {
-      this.sessionUserService.recordAffinityChange(nodeId, clampedValue);
+    if (this.sessionHumanService) {
+      this.sessionHumanService.recordAffinityChange(nodeId, clampedValue);
     }
   }
 
@@ -134,14 +134,14 @@ export class AffinityTrackingService {
   }
 
   /**
-   * Auto-increment affinity when user views content
+   * Auto-increment affinity when human views content
    * Only increments if current affinity is below threshold
    * @param nodeId The node ID
    */
   trackView(nodeId: string): void {
     // Always record the view in session
-    if (this.sessionUserService) {
-      this.sessionUserService.recordContentView(nodeId);
+    if (this.sessionHumanService) {
+      this.sessionHumanService.recordContentView(nodeId);
     }
 
     const current = this.getAffinity(nodeId);
@@ -247,8 +247,8 @@ export class AffinityTrackingService {
    * Reset all affinity data
    */
   reset(): void {
-    const fresh: UserAffinity = {
-      userId: this.getUserId(),
+    const fresh: HumanAffinity = {
+      humanId: this.getHumanId(),
       affinity: {},
       lastUpdated: new Date().toISOString(),
     };
@@ -259,7 +259,7 @@ export class AffinityTrackingService {
   /**
    * Load affinity data from localStorage
    */
-  private loadFromStorage(): UserAffinity {
+  private loadFromStorage(): HumanAffinity {
     const storageKey = this.getStorageKey();
     try {
       const stored = localStorage.getItem(storageKey);
@@ -269,6 +269,11 @@ export class AffinityTrackingService {
         if (parsed.lastUpdated && typeof parsed.lastUpdated !== 'string') {
           parsed.lastUpdated = new Date(parsed.lastUpdated).toISOString();
         }
+        // Migrate old userId field to humanId
+        if (parsed.userId && !parsed.humanId) {
+          parsed.humanId = parsed.userId;
+          delete parsed.userId;
+        }
         return parsed;
       }
     } catch (error) {
@@ -277,7 +282,7 @@ export class AffinityTrackingService {
 
     // Return default
     return {
-      userId: this.getUserId(),
+      humanId: this.getHumanId(),
       affinity: {},
       lastUpdated: new Date().toISOString(),
     };
@@ -286,7 +291,7 @@ export class AffinityTrackingService {
   /**
    * Save affinity data to localStorage
    */
-  private saveToStorage(affinity: UserAffinity): void {
+  private saveToStorage(affinity: HumanAffinity): void {
     const storageKey = this.getStorageKey();
     try {
       localStorage.setItem(storageKey, JSON.stringify(affinity));

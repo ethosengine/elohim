@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-george-hunsberger",
+  "contentType": "contributor",
+  "title": "George Hunsberger",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "George Hunsberger",
+    "role": "author",
+    "works": [
+      "Ethics in the Age of Technology"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act",
+    "fct-media-13-book-ethics-in-the-age-of"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-14-ready-to-act"
+  },
+  "createdAt": "2025-11-28T02:53:21.902470",
+  "updatedAt": "2025-11-28T02:53:21.902471"
+}

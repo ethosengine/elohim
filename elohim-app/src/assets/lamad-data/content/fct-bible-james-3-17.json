@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-james-3-17",
+  "contentType": "bible-verse",
+  "title": "James 3:17",
+  "description": "Scripture reference used in FCT Module 4",
+  "content": {
+    "reference": "James 3:17",
+    "book": "James",
+    "chapter": 3,
+    "verseStart": 17,
+    "verseEnd": null,
+    "contextInModule": "James 3:17 (CSB)\nBut the **wisdom from above is first pure, then peace-loving,** gentle, compliant, full of mercy and good fruits, unwavering, without pretense.\nStewardship and Ethical Development",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "james",
+    "setting-stage"
+  ],
+  "relatedNodeIds": [
+    "fct-module-04-scaling-wisdom"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-04-scaling-wisdom",
+    "thematicContext": "Setting the Stage: Scaling Wisdom"
+  },
+  "createdAt": "2025-11-28T02:53:21.854382",
+  "updatedAt": "2025-11-28T02:53:21.854383"
+}

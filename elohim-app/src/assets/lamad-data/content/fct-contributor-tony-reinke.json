@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-tony-reinke",
+  "contentType": "contributor",
+  "title": "Tony Reinke",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Tony Reinke",
+    "role": "author",
+    "works": [
+      "12 Ways Your Phone Is Changing You"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act",
+    "fct-media-13-book-12-ways-your-phone-i"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-14-ready-to-act"
+  },
+  "createdAt": "2025-11-28T02:53:21.902424",
+  "updatedAt": "2025-11-28T02:53:21.902425"
+}

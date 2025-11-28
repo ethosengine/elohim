@@ -6,8 +6,8 @@
   "content": "---\nnode_type: organization\norg_id: wij_willen_het_internet_terug_publicspaces\nname: \"Wij willen het internet terug - PublicSpaces\"\nurl: \"https://publicspaces.net\"\ngem_id: \"mYqU9xQNRJ8EzaeXt70P\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [public_observer, social_medium]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How Wij willen het internet terug - PublicSpaces inspires the value_scanner epic]\"\n    parallel_work: []\n  public_observer:\n    inspiration: \"[How Wij willen het internet terug - PublicSpaces inspires the public_observer epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Wij willen het internet terug - PublicSpaces inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Wij willen het internet terug - PublicSpaces\n\n## Description\n\nDoor PublicSpaces zijn in 2026 zijn alle privacy officers en CTO\u2019s van publieke organisaties in Nederland op de hoogte van alternatieve digitale instrumenten gebaseerd op publieke waarden.\n\n**Publisher:** PublicSpaces\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how Wij willen het internet terug - PublicSpaces relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: public_observer\n\n[How Wij willen het internet terug - PublicSpaces also inspires the public_observer epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: social_medium\n\n[How Wij willen het internet terug - PublicSpaces also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://publicspaces.net\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `public_observer` - [Connection description]\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "value-scanner"
+    "value-scanner",
+    "organization"
   ],
   "sourcePath": "value_scanner/organizations/wij_willen_het_internet_terug_publicspaces/README.md",
   "relatedNodeIds": [
@@ -20,7 +20,30 @@
       "public_observer",
       "social_medium"
     ],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://publicspaces.net",
+    "name": "Wij willen het internet terug - PublicSpaces",
+    "org_id": "wij_willen_het_internet_terug_publicspaces",
+    "gem_id": "mYqU9xQNRJ8EzaeXt70P",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "PublicSpaces",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How Wij willen het internet terug - PublicSpaces inspires the value_scanner epic]",
+        "parallel_work": []
+      },
+      "public_observer": {
+        "inspiration": "[How Wij willen het internet terug - PublicSpaces inspires the public_observer epic]",
+        "parallel_work": []
+      },
+      "social_medium": {
+        "inspiration": "[How Wij willen het internet terug - PublicSpaces inspires the social_medium epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.193597",
   "updatedAt": "2025-11-21T18:54:29.193597"

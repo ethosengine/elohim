@@ -123,7 +123,7 @@ We use "human" not "user" throughout the codebase. This aligns with Elohim Proto
 ### Phase 13: Session Human ✅
 Zero-friction entry with Holochain upgrade path.
 
-- **SessionUser model** (`session-user.model.ts`):
+- **SessionUser model** (`session-human.model.ts`):
   - `SessionUser` - temporary identity with sessionId, displayName, stats
   - `SessionStats` - engagement metrics (nodesViewed, pathsStarted, pathsCompleted)
   - `SessionActivity` - activity history for timeline
@@ -433,7 +433,7 @@ Model standardization and documentation alignment.
 
 2. **Date Field Standardization**:
    - All timestamp fields now use ISO 8601 string format (not Date objects)
-   - Files updated: `attestations.model.ts`, `user-affinity.model.ts`, `content-node.model.ts`
+   - Files updated: `attestations.model.ts`, `human-affinity.model.ts`, `content-node.model.ts`
    - Rationale: JSON serialization, Holochain compatibility, timezone safety
 
 3. **Index.ts Documentation**:
@@ -449,7 +449,7 @@ Model standardization and documentation alignment.
 
 **Files Modified:**
 - `attestations.model.ts` - Renamed type, fixed date fields
-- `user-affinity.model.ts` - Fixed date fields
+- `human-affinity.model.ts` - Fixed date fields
 - `content-node.model.ts` - Fixed date fields
 - `models/index.ts` - Enhanced documentation
 - `LAMAD_API_SPECIFICATION_v1.0.md` - Added technical conventions
@@ -592,7 +592,7 @@ src/app/lamad/
 │   ├── knowledge-map.model.ts      # Four-dimensional maps (domain, self, person, collective)
 │   ├── path-extension.model.ts     # Learner path extensions
 │   ├── exploration.model.ts        # Graph exploration queries
-│   ├── session-user.model.ts       # Session human identity
+│   ├── session-human.model.ts       # Session human identity
 │   ├── content-access.model.ts     # Tiered access control
 │   ├── profile.model.ts            # Human profile (Imago Dei)
 │   ├── rea-bridge.model.ts         # ValueFlows ontology (hREA integration)

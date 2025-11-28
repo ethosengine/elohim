@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-proverbs-4-23",
+  "contentType": "bible-verse",
+  "title": "Proverbs 4:23",
+  "description": "Scripture reference used in FCT Module 2",
+  "content": {
+    "reference": "Proverbs 4:23",
+    "book": "Proverbs",
+    "chapter": 4,
+    "verseStart": 23,
+    "verseEnd": null,
+    "contextInModule": "Proverbs 4:23 \\- \"Above all else, guard your heart, for everything you do flows from it.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "proverbs",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "thematicContext": "Systems Thinking"
+  },
+  "createdAt": "2025-11-28T02:53:21.848789",
+  "updatedAt": "2025-11-28T02:53:21.848791"
+}

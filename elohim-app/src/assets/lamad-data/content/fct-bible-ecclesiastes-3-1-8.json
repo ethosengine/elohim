@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-ecclesiastes-3-1-8",
+  "contentType": "bible-verse",
+  "title": "Ecclesiastes 3:1-8",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Ecclesiastes 3:1-8",
+    "book": "Ecclesiastes",
+    "chapter": 3,
+    "verseStart": 1,
+    "verseEnd": 8,
+    "contextInModule": "Ecclesiastes 3:1-8 \\- \"For everything there is a season, and a time for every matter under heaven...\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "ecclesiastes",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899019",
+  "updatedAt": "2025-11-28T02:53:21.899020"
+}

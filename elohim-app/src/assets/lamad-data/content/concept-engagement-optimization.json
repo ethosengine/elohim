@@ -1,0 +1,30 @@
+{
+  "id": "concept-engagement-optimization",
+  "contentType": "concept",
+  "title": "Engagement optimization",
+  "description": "weaponizes human psychology, addicting us to outrage and validation",
+  "content": "weaponizes human psychology, addicting us to outrage and validation",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/crisis-digital/concept-engagement-optimization.json",
+  "tags": [
+    "crisis",
+    "digital",
+    "addiction",
+    "manipulation",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "social-medium-epic",
+    "lamad-reference-implementation"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-digital",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001001",
+  "updatedAt": "2025-11-28T17:11:57.001001"
+}

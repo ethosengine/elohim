@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-matthew-6-33",
+  "contentType": "bible-verse",
+  "title": "Matthew 6:33",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Matthew 6:33",
+    "book": "Matthew",
+    "chapter": 6,
+    "verseStart": 33,
+    "verseEnd": null,
+    "contextInModule": "Matthew 6:33 \\- \"But seek first the kingdom of God and his righteousness, and all these things will be added to you.\"\nConsidering Basic Needs and Capabilities for All:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "matthew",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899114",
+  "updatedAt": "2025-11-28T02:53:21.899115"
+}

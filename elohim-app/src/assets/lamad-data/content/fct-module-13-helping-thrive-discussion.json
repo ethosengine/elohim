@@ -1,0 +1,30 @@
+{
+  "id": "fct-module-13-helping-thrive-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Helping People Thrive",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "Review Activity : EXAMINING FLAWED STORIES  \nTechnology companies often have compelling stories about how their products contribute to human thriving.   \nLook at the following stereotypical stories. In what way are they authentic? In what ways do they mimic thriving in toxic ways?\n\n\u201cWe value creators and want to create a place where they can show off their brilliance, grow their audience, and make real money.\u201d   \n          \\-  Often used by products like TikTok  \n\u200b  \n\u201cWe\u2019re a place for fun, inspiration, and ideas that matter. We show people the most relevant content so that they can enjoy themselves and lead more informed and meaningful lives.\u201d   \n          \u2013 Often used by products like YouTube/Google\u200b\n\n\u201cWe help small business owners find customers who\u2019ll love their products so that their businesses can grow and thrive.\u201d   \n          \u2013 Often used by products like Instagram\u200b\n\nReflect on each of these examples. Note that some definitions of thriving you believe in may be tangled up in those stories.   \nThen consider how a product you\u2019ve worked on or use may seek to help people thrive. Does that product define thriving accurately?\n\nREFLECTION: EXAMINING OUR CHURCH'S MISSION AND PRACTICES\n\nJust as technology companies often have compelling stories about how their products contribute to human thriving, churches also have mission statements or creeds that describe their purpose and values. However, like tech companies, churches may sometimes drift from these ideals or unintentionally mask practices that don't align with their stated mission.  \nActivity:\n\nFind your church's mission statement or creed. If your church doesn't have one, consider the general mission of the Christian church as stated in Matthew 28:19-20 or Acts 1:8.  \nReflect on the following questions:  \na. What does your church's mission statement claim about how it contributes to human thriving or fulfills God's calling?  \nb. In what ways is this mission statement authentically lived out in your church's practices?  \nc. Are there ways in which your church's actual practices might mimic thriving in potentially harmful or misleading ways?  \nConsider the following examples of church mission statements and practices. How might these statements potentially mask practices that don't align with their ideals?\n\nExample 1: \"We exist to reach the lost and make disciples of all nations.\"  \nPotential misalignment: A church that focuses solely on overseas missions while neglecting local community needs.  \nExample 2: \"Our mission is to love God, love others, and serve the world.\"  \nPotential misalignment: A church that emphasizes feel-good experiences in worship but doesn't actively engage in serving the local community or addressing social justice issues.  \nExample 3: \"We are a welcoming community where all can experience God's love.\"  \nPotential misalignment: A church that claims to be welcoming but has unspoken cultural or socioeconomic barriers that make certain groups feel unwelcome or excluded.\n\nReflect on these questions:  \na. How might your church's practices sometimes drift from its stated mission?  \nb. Are there any \"metrics\" your church uses to measure success (e.g., attendance, donations) that might inadvertently lead to practices that don't align with its core mission?  \nc. How can your church better align its practices with its stated mission and with biblical principles of thriving?  \nConsider how technology use in your church might be supporting or hindering the authentic fulfillment of its mission. Are there ways technology is being used that might mimic spiritual growth or community building without actually fostering deep, transformative experiences?\n\nThis activity aims to encourage honest, thoughtful reflection on how our churches, like tech companies, can sometimes drift from their core mission or unintentionally adopt practices that don't truly foster thriving as defined by Christ. By examining these potential misalignments, we can work towards creating church communities and using technologies in ways that genuinely support spiritual growth, authentic community, and Christ-centered thriving.",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T02:53:21.899408",
+  "updatedAt": "2025-11-28T02:53:21.899409"
+}

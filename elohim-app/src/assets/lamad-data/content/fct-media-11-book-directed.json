@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-11-book-directed",
+  "contentType": "book",
+  "title": "directed",
+  "description": "Book by Ava Du",
+  "content": {
+    "title": "directed",
+    "author": "Ava Du",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "book",
+    "author": "Ava Du"
+  },
+  "_contributor": "Ava Du",
+  "createdAt": "2025-11-28T02:53:21.893033",
+  "updatedAt": "2025-11-28T02:53:21.893034"
+}

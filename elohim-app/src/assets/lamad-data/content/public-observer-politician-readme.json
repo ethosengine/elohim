@@ -7,9 +7,9 @@
   "contentFormat": "markdown",
   "tags": [
     "user:politician",
-    "public-observer",
     "concept",
-    "epic:public_observer"
+    "epic:public_observer",
+    "public-observer"
   ],
   "sourcePath": "public_observer/politician/README.md",
   "relatedNodeIds": [

@@ -1,0 +1,71 @@
+{
+  "lastUpdated": "2025-11-28T00:09:03.481626",
+  "totalCount": 3,
+  "precedents": [
+    {
+      "id": "precedent-001",
+      "title": "Superseded Content Handling",
+      "summary": "When content is superseded by a newer version, the original should be preserved with a clear redirect rather than deleted.",
+      "fullReasoning": "Content may still be valuable for historical understanding. Deletion removes the ability to trace how understanding evolved. Redirects preserve history while guiding learners to current material.",
+      "establishedBy": {
+        "challengeId": "challenge-003",
+        "decidedBy": "elohim-community-learning",
+        "decidedAt": "2025-10-29T00:09:03.481602"
+      },
+      "binding": "binding-local",
+      "scope": {
+        "entityTypes": [
+          "content"
+        ],
+        "categories": [
+          "technical-specification"
+        ]
+      },
+      "citations": 3,
+      "status": "active"
+    },
+    {
+      "id": "precedent-002",
+      "title": "Steward Standing in Challenges",
+      "summary": "Domain stewards have automatic standing to challenge content in their domain, regardless of personal impact.",
+      "fullReasoning": "Stewards are entrusted with domain integrity. Requiring personal harm to challenge would undermine their stewardship role. Their expert standing serves the community's interest in accurate content.",
+      "establishedBy": {
+        "appealId": "appeal-legacy-001",
+        "decidedBy": "elohim-community-learning",
+        "decidedAt": "2025-09-29T00:09:03.481604"
+      },
+      "binding": "binding-network",
+      "scope": {
+        "entityTypes": [
+          "content",
+          "path",
+          "assessment"
+        ],
+        "roles": [
+          "domain-steward"
+        ]
+      },
+      "citations": 7,
+      "status": "active"
+    },
+    {
+      "id": "precedent-003",
+      "title": "SLA Grace Period for Good Faith",
+      "summary": "SLA deadlines include a 24-hour grace period when the responding party demonstrates good faith progress.",
+      "fullReasoning": "Rigid SLA enforcement without consideration for context would create perverse incentives (rushed decisions to meet deadlines). A brief grace period with demonstrated progress balances accountability with quality.",
+      "establishedBy": {
+        "appealId": "appeal-legacy-002",
+        "decidedBy": "elohim-global",
+        "decidedAt": "2025-08-30T00:09:03.481606"
+      },
+      "binding": "constitutional",
+      "scope": {
+        "entityTypes": [
+          "governance-decision"
+        ]
+      },
+      "citations": 12,
+      "status": "active"
+    }
+  ]
+}

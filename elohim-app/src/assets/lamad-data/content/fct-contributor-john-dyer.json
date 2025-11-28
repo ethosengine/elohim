@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-john-dyer",
+  "contentType": "contributor",
+  "title": "John Dyer",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "John Dyer",
+    "role": "author",
+    "works": [
+      "From the Garden to the City"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act",
+    "fct-media-13-book-from-the-garden-to-t"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-14-ready-to-act"
+  },
+  "createdAt": "2025-11-28T02:53:21.901918",
+  "updatedAt": "2025-11-28T02:53:21.901920"
+}

@@ -6,7 +6,7 @@ import { takeUntil, map } from 'rxjs/operators';
 import { DataLoaderService } from '../../services/data-loader.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentNode } from '../../models/content-node.model';
-import { CategoryAffinityStats } from '../../models/user-affinity.model';
+import { CategoryAffinityStats } from '../../models/human-affinity.model';
 
 interface CategorySection {
   name: string;

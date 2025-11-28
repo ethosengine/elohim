@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-paul-sparks",
+  "contentType": "contributor",
+  "title": "Paul Sparks",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Paul Sparks",
+    "role": "author",
+    "works": [
+      "The New Parish"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive",
+    "fct-media-12-book-the-new-parish"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-13-helping-thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899383",
+  "updatedAt": "2025-11-28T02:53:21.899385"
+}

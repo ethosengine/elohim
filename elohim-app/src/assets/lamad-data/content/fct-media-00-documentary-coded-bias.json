@@ -1,0 +1,32 @@
+{
+  "id": "fct-media-00-documentary-coded-bias",
+  "contentType": "documentary",
+  "title": "Coded Bias",
+  "description": "Coded Bias (2020)",
+  "content": {
+    "title": "Coded Bias",
+    "year": 2020,
+    "platform": null,
+    "duration": null,
+    "format": "documentary"
+  },
+  "contentFormat": "documentary",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "documentary",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "documentary",
+    "year": "2020"
+  },
+  "_organization": null,
+  "createdAt": "2025-11-28T02:53:21.847426",
+  "updatedAt": "2025-11-28T02:53:21.847428"
+}

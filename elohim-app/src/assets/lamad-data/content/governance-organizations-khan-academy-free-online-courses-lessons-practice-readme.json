@@ -6,15 +6,30 @@
   "content": "---\nnode_type: organization\norg_id: khan_academy_free_online_courses_lessons_practice\nname: \"Khan Academy | Free Online Courses, Lessons & Practice\"\nurl: \"https://www.khanacademy.org/\"\ngem_id: \"RhN3nm86GO1ywegRtcdY\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Khan Academy | Free Online Courses, Lessons & Practice inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Khan Academy | Free Online Courses, Lessons & Practice\n\n## Description\n\nLearn for free about math, art, computer programming, economics, physics, chemistry, biology, medicine, finance, history, and more. Khan Academy is a nonprofit with the mission of providing a free, world-class education for anyone, anywhere.\n\n**Publisher:** Khan Academy\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Khan Academy | Free Online Courses, Lessons & Practice relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.khanacademy.org/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "governance"
+    "governance",
+    "organization"
   ],
   "sourcePath": "governance/organizations/khan_academy_free_online_courses_lessons_practice/README.md",
   "relatedNodeIds": [],
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://www.khanacademy.org/",
+    "name": "Khan Academy | Free Online Courses, Lessons & Practice",
+    "org_id": "khan_academy_free_online_courses_lessons_practice",
+    "gem_id": "RhN3nm86GO1ywegRtcdY",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Khan Academy",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Khan Academy | Free Online Courses, Lessons & Practice inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.171597",
   "updatedAt": "2025-11-21T18:54:29.171597"

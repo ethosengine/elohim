@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-13-book-ethics-in-the-age-of",
+  "contentType": "book",
+  "title": "Ethics in the Age of Technology",
+  "description": "Book by George Hunsberger",
+  "content": {
+    "title": "Ethics in the Age of Technology",
+    "author": "George Hunsberger",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "mediaType": "book",
+    "author": "George Hunsberger"
+  },
+  "_contributor": "George Hunsberger",
+  "createdAt": "2025-11-28T02:53:21.902462",
+  "updatedAt": "2025-11-28T02:53:21.902464"
+}

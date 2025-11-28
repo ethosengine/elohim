@@ -6,8 +6,8 @@
   "content": "---\nnode_type: organization\norg_id: commons_transition_commons_transition\nname: \"Commons Transition - Commons Transition\"\nurl: \"https://commonstransition.org/\"\ngem_id: \"SryYbSn31IBrJAQivR6I\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [social_medium]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How Commons Transition - Commons Transition inspires the value_scanner epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Commons Transition - Commons Transition inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Commons Transition - Commons Transition\n\n## Description\n\nCommons Transition showcases practical experiences and policy proposals for a more humane and environmentally grounded mode of societal organization.\n\n**Publisher:** Commons Transition\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how Commons Transition - Commons Transition relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: social_medium\n\n[How Commons Transition - Commons Transition also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://commonstransition.org/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "organization",
-    "value-scanner"
+    "value-scanner",
+    "organization"
   ],
   "sourcePath": "value_scanner/organizations/commons_transition_commons_transition/README.md",
   "relatedNodeIds": [
@@ -18,7 +18,26 @@
     "related_epics": [
       "social_medium"
     ],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://commonstransition.org/",
+    "name": "Commons Transition - Commons Transition",
+    "org_id": "commons_transition_commons_transition",
+    "gem_id": "SryYbSn31IBrJAQivR6I",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Commons Transition",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How Commons Transition - Commons Transition inspires the value_scanner epic]",
+        "parallel_work": []
+      },
+      "social_medium": {
+        "inspiration": "[How Commons Transition - Commons Transition inspires the social_medium epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.192597",
   "updatedAt": "2025-11-21T18:54:29.192597"

@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-2-timothy-1-7",
+  "contentType": "bible-verse",
+  "title": "2 Timothy 1:7",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "2 Timothy 1:7",
+    "book": "2 Timothy",
+    "chapter": 1,
+    "verseStart": 7,
+    "verseEnd": null,
+    "contextInModule": "2 Timothy 1:7 \\- Spirit of power, love, and self-discipline",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "2-timothy",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T02:53:21.901773",
+  "updatedAt": "2025-11-28T02:53:21.901775"
+}

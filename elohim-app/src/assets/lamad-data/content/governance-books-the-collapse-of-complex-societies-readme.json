@@ -14,7 +14,22 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0",
+    "name": "The Collapse of Complex Societies",
+    "org_id": "the_collapse_of_complex_societies",
+    "gem_id": "ss9WkKEJ55XMAKBTmw6F",
+    "node_type": "book",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Google Books",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How The Collapse of Complex Societies inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
   "createdAt": "2025-11-21T18:54:29.168597",
   "updatedAt": "2025-11-21T18:54:29.168597"

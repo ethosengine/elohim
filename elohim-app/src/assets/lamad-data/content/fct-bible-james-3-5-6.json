@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-james-3-5-6",
+  "contentType": "bible-verse",
+  "title": "James 3:5-6",
+  "description": "Scripture reference used in FCT Module 10",
+  "content": {
+    "reference": "James 3:5-6",
+    "book": "James",
+    "chapter": 3,
+    "verseStart": 5,
+    "verseEnd": 6,
+    "contextInModule": "James 3:5-6 \\- \"So also the tongue is a small member, yet it boasts of great things. How great a forest is set ablaze by such a small fire\\! And the tongue is a fire, a world of unrighteousness.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 10 - Creating Shared Understanding - Recognize Distortions.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "james",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-10-recognize-distortions"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-10-recognize-distortions",
+    "thematicContext": "Creating Shared Understanding: Recognize Distortions"
+  },
+  "createdAt": "2025-11-28T02:53:21.878472",
+  "updatedAt": "2025-11-28T02:53:21.878473"
+}

@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-27T06:01:59.174162",
-  "totalCount": 2913,
+  "lastUpdated": "2025-11-28T17:14:13.696914",
+  "totalCount": 2920,
   "relationships": [
     {
       "id": "rel-0",
@@ -26217,6 +26217,69 @@
       "type": "RELATES_TO",
       "metadata": {
         "cross_domain": true
+      }
+    },
+    {
+      "id": "rel-2913",
+      "source": "lamad-reference-implementation",
+      "target": "manifesto",
+      "type": "IMPLEMENTS",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2914",
+      "source": "lamad-reference-implementation",
+      "target": "governance-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2915",
+      "source": "lamad-reference-implementation",
+      "target": "value-scanner-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2916",
+      "source": "lamad-reference-implementation",
+      "target": "public-observer-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2917",
+      "source": "lamad-reference-implementation",
+      "target": "autonomous-entity-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2918",
+      "source": "lamad-reference-implementation",
+      "target": "social-medium-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2919",
+      "source": "lamad-reference-implementation",
+      "target": "economic-coordination-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
       }
     }
   ],

@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-the-art-of-thinking-",
+  "contentType": "book",
+  "title": "The Art of Thinking Clearly",
+  "description": "Book by Rolf Dobelli",
+  "content": {
+    "title": "The Art of Thinking Clearly",
+    "author": "Rolf Dobelli",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "deep-thinking",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Rolf Dobelli"
+  },
+  "_contributor": "Rolf Dobelli",
+  "createdAt": "2025-11-28T02:53:21.848275",
+  "updatedAt": "2025-11-28T02:53:21.848276"
+}

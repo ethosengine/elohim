@@ -1,0 +1,30 @@
+{
+  "id": "fct-contributor-cal-newport",
+  "contentType": "contributor",
+  "title": "Cal Newport",
+  "description": "Author, speaker, or creator referenced in FCT",
+  "content": {
+    "name": "Cal Newport",
+    "role": "author",
+    "works": [
+      "Deep Work"
+    ]
+  },
+  "contentFormat": "contributor-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "contributor",
+    "fct",
+    "person"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-book-deep-work"
+  ],
+  "metadata": {
+    "category": "contributor",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T02:53:21.848133",
+  "updatedAt": "2025-11-28T02:53:21.848134"
+}

@@ -4,7 +4,7 @@ import { map, switchMap, catchError } from 'rxjs/operators';
 
 import { DataLoaderService } from './data-loader.service';
 import { PathService } from './path.service';
-import { SessionUserService } from './session-user.service';
+import { SessionHumanService } from './session-human.service';
 import { AffinityTrackingService } from './affinity-tracking.service';
 import { AgentService } from './agent.service';
 
@@ -23,7 +23,7 @@ import {
   PathsOverview,
   ProfileSummaryCompact,
 } from '../models/profile.model';
-import { SessionPathProgress, SessionActivity } from '../models/session-user.model';
+import { SessionPathProgress, SessionActivity } from '../models/session-human.model';
 import { PathIndexEntry } from '../models/learning-path.model';
 
 /**
@@ -50,7 +50,7 @@ export class ProfileService {
     private pathService: PathService,
     private affinityService: AffinityTrackingService,
     private agentService: AgentService,
-    @Optional() private sessionUserService: SessionUserService | null
+    @Optional() private sessionHumanService: SessionHumanService | null
   ) {}
 
   // =========================================================================
@@ -68,7 +68,7 @@ export class ProfileService {
       this.getDevelopedCapabilities(),
     ]).pipe(
       map(([journeyStats, currentFocus, developedCapabilities]) => {
-        const session = this.sessionUserService?.getSession();
+        const session = this.sessionHumanService?.getSession();
         const agent = this.agentService.getAgent();
 
         return {
@@ -110,7 +110,7 @@ export class ProfileService {
    * Transforms raw stats into growth-oriented metrics.
    */
   getJourneyStats(): Observable<JourneyStats> {
-    const session = this.sessionUserService?.getSession();
+    const session = this.sessionHumanService?.getSession();
 
     if (session) {
       // Session-based: derive from session stats
@@ -168,7 +168,7 @@ export class ProfileService {
    * Sorted by most recent activity.
    */
   getCurrentFocus(): Observable<CurrentFocus[]> {
-    const pathProgress = this.sessionUserService?.getAllPathProgress() || [];
+    const pathProgress = this.sessionHumanService?.getAllPathProgress() || [];
 
     if (pathProgress.length === 0) {
       return of([]);
@@ -249,7 +249,7 @@ export class ProfileService {
    * These are transformation points, not just activity logs.
    */
   getTimeline(limit: number = 50): Observable<TimelineEvent[]> {
-    const activities = this.sessionUserService?.getActivityHistory() || [];
+    const activities = this.sessionHumanService?.getActivityHistory() || [];
 
     // Transform activities into timeline events
     const events: TimelineEvent[] = activities
@@ -383,7 +383,7 @@ export class ProfileService {
    * Notes are meaning-making artifacts.
    */
   getAllNotes(): Observable<NoteWithContext[]> {
-    const pathProgress = this.sessionUserService?.getAllPathProgress() || [];
+    const pathProgress = this.sessionHumanService?.getAllPathProgress() || [];
     const notes: NoteWithContext[] = [];
 
     // Collect notes from path progress
@@ -481,7 +481,7 @@ export class ProfileService {
   getPathsOverview(): Observable<PathsOverview> {
     return this.dataLoader.getPathIndex().pipe(
       switchMap(index => {
-        const pathProgress = this.sessionUserService?.getAllPathProgress() || [];
+        const pathProgress = this.sessionHumanService?.getAllPathProgress() || [];
         const progressMap = new Map<string, SessionPathProgress>();
         pathProgress.forEach(p => progressMap.set(p.pathId, p));
 

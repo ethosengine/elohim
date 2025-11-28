@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-2-kings-23-10",
+  "contentType": "bible-verse",
+  "title": "2 Kings 23:10",
+  "description": "Scripture reference used in FCT Module 2",
+  "content": {
+    "reference": "2 Kings 23:10",
+    "book": "2 Kings",
+    "chapter": 23,
+    "verseStart": 10,
+    "verseEnd": null,
+    "contextInModule": "The worship of Moloch, involving human sacrifice, particularly the sacrifice of children by fire, is a historical example that can be related to the concept of a multipolar trap in game theory. In the context of 2 Kings 23:10, King Josiah's reforms, including the desecration of Topheth in the Valley of Ben Hinnom to prevent sacrifices to Moloch, highlight a societal effort to escape from a deeply entrenched and destructive practice.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 2 - Systems Thinking.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "2-kings",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-02-systems-thinking"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-02-systems-thinking",
+    "thematicContext": "Systems Thinking"
+  },
+  "createdAt": "2025-11-28T02:53:21.848753",
+  "updatedAt": "2025-11-28T02:53:21.848754"
+}

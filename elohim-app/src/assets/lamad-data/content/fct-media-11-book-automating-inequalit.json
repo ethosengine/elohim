@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-11-book-automating-inequalit",
+  "contentType": "book",
+  "title": "Automating Inequality",
+  "description": "Book by Virginia Eubanks",
+  "content": {
+    "title": "Automating Inequality",
+    "author": "Virginia Eubanks",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 12 - Supporting Fairness and Justice.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-12-fairness-justice"
+  ],
+  "metadata": {
+    "category": "algorithmic-bias",
+    "sourceModule": "fct-module-12-fairness-justice",
+    "mediaType": "book",
+    "author": "Virginia Eubanks"
+  },
+  "_contributor": "Virginia Eubanks",
+  "createdAt": "2025-11-28T02:53:21.892946",
+  "updatedAt": "2025-11-28T02:53:21.892948"
+}

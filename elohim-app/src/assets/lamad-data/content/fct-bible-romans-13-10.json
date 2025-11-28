@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-romans-13-10",
+  "contentType": "bible-verse",
+  "title": "Romans 13:10",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Romans 13:10",
+    "book": "Romans",
+    "chapter": 13,
+    "verseStart": 10,
+    "verseEnd": null,
+    "contextInModule": "Romans 13:10\nLove does no wrong to its neighbor. Therefore love is the fulfillment of the law.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "romans",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T02:53:21.870661",
+  "updatedAt": "2025-11-28T02:53:21.870662"
+}

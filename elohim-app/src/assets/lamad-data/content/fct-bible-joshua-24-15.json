@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-joshua-24-15",
+  "contentType": "bible-verse",
+  "title": "Joshua 24:15",
+  "description": "Scripture reference used in FCT Module 13",
+  "content": {
+    "reference": "Joshua 24:15",
+    "book": "Joshua",
+    "chapter": 24,
+    "verseStart": 15,
+    "verseEnd": null,
+    "contextInModule": "Joshua 24:15 \\- \"...choose this day whom you will serve...\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "joshua",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "thematicContext": "Helping People Thrive"
+  },
+  "createdAt": "2025-11-28T02:53:21.899157",
+  "updatedAt": "2025-11-28T02:53:21.899158"
+}

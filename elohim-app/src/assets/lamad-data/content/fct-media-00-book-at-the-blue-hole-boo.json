@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-at-the-blue-hole-boo",
+  "contentType": "book",
+  "title": "\\* At the Blue Hole (book",
+  "description": "Book by Jack Reese",
+  "content": {
+    "title": "\\* At the Blue Hole (book",
+    "author": "Jack Reese",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "church-crisis",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Jack Reese"
+  },
+  "_contributor": "Jack Reese",
+  "createdAt": "2025-11-28T02:53:21.840573",
+  "updatedAt": "2025-11-28T02:53:21.840575"
+}

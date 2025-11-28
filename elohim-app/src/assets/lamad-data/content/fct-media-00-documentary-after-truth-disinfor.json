@@ -1,0 +1,32 @@
+{
+  "id": "fct-media-00-documentary-after-truth-disinfor",
+  "contentType": "documentary",
+  "title": "After Truth: Disinformation and the Cost of Fake News",
+  "description": "After Truth: Disinformation and the Cost of Fake News (2020)",
+  "content": {
+    "title": "After Truth: Disinformation and the Cost of Fake News",
+    "year": 2020,
+    "platform": "HBO",
+    "duration": null,
+    "format": "documentary"
+  },
+  "contentFormat": "documentary",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "documentary",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "information-literacy",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "documentary",
+    "year": "2020"
+  },
+  "_organization": "HBO",
+  "createdAt": "2025-11-28T02:53:21.847169",
+  "updatedAt": "2025-11-28T02:53:21.847170"
+}

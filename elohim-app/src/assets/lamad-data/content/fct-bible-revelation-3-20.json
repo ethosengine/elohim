@@ -1,0 +1,34 @@
+{
+  "id": "fct-bible-revelation-3-20",
+  "contentType": "bible-verse",
+  "title": "Revelation 3:20",
+  "description": "Scripture reference used in FCT Module 5",
+  "content": {
+    "reference": "Revelation 3:20",
+    "book": "Revelation",
+    "chapter": 3,
+    "verseStart": 20,
+    "verseEnd": null,
+    "contextInModule": "Revelation 3:20, \"Behold, I stand at the door and knock. If anyone hears my voice and opens the door, I will come in to him and eat with him, and he with me\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 5 - Respecting Human Nature - Our Attention is Sacred.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "revelation",
+    "human-nature"
+  ],
+  "relatedNodeIds": [
+    "fct-module-05-respecting-human-nature"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-05-respecting-human-nature",
+    "thematicContext": "Respecting Human Nature"
+  },
+  "createdAt": "2025-11-28T02:53:21.854909",
+  "updatedAt": "2025-11-28T02:53:21.854910"
+}

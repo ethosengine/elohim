@@ -1,0 +1,30 @@
+{
+  "id": "fct-media-00-book-thinking-fast-and-sl",
+  "contentType": "book",
+  "title": "Thinking, Fast and Slow",
+  "description": "Book by Daniel Kahneman",
+  "content": {
+    "title": "Thinking, Fast and Slow",
+    "author": "Daniel Kahneman",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "deep-thinking",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Daniel Kahneman"
+  },
+  "_contributor": "Daniel Kahneman",
+  "createdAt": "2025-11-28T02:53:21.848232",
+  "updatedAt": "2025-11-28T02:53:21.848233"
+}
