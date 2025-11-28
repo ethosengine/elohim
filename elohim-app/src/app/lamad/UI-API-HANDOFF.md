@@ -2,29 +2,53 @@
 
 ## Overview
 
-This document provides UI developers with everything they need to implement learning path navigation and content display features for the upcoming sprint (1-2 weeks).
+This document provides UI developers with everything they need to implement Territory exploration and Journey navigation features for the upcoming sprint (1-2 weeks).
+
+**Lamad Architecture (Hebrew לָמַד - "to learn/teach"):**
+- **Territory**: Content nodes (immutable knowledge graph)
+- **Journey**: Learning paths (curated sequences through Territory)
+- **Traveler**: Humans navigating the Territory
 
 **What's New:**
-- ✅ **Khan Academy-style shared content completion** across paths
+- ✅ **Cross-Journey content visibility** - content completed in one Journey shows in all Journeys
 - ✅ **Bulk loading APIs** for efficient rendering
-- ✅ **Chapter navigation** for structured learning journeys
-- ✅ **Learning analytics** for dashboard displays
+- ✅ **Chapter navigation** for structured Journeys
+- ✅ **Human analytics** for dashboard displays
 - ✅ **Open standards metadata** (DID, ActivityPub, JSON-LD, Open Graph)
 
 **Data Coverage:**
-- 3,397 total content nodes
-- 98.4% coverage on all standards fields (DID, ActivityPub, JSON-LD, Open Graph)
+- 3,397 total content nodes in Territory
+- 98.4% coverage on all standards fields
 - All data validated and ready for production
+
+---
+
+## Lamad Terminology (Critical!)
+
+**Use these terms in UI, NOT Khan Academy terminology:**
+
+| Lamad Term | Meaning | ❌ Don't Use |
+|------------|---------|-------------|
+| **Territory** | The content graph (ContentNodes) | "Library", "Content DB" |
+| **Journey** | A curated learning path | "Course", "Unit", "Class" |
+| **Traveler** / **Human** | Person navigating Territory | "User", "Student", "Learner" |
+| **Step** | A point in a Journey referencing a content node | "Lesson", "Exercise" |
+| **Content Node** | Single piece of content | "Skill", "Concept", "Topic" |
+| **Affinity** (0.0-1.0) | Depth of engagement with content | "Mastery level", "Score" |
+| **Attestation** | Earned credential/badge | "Badge", "Achievement" |
+| **Meaningful Encounter** | High-affinity content interaction | "View", "Completion" |
+
+**Critical Convention:** Use "human" NOT "user" throughout all code and UI.
 
 ---
 
 ## Table of Contents
 
 1. [Core Services](#core-services)
-2. [Shared Content Completion](#shared-content-completion-khan-academy-style)
+2. [Cross-Journey Content Visibility](#cross-journey-content-visibility)
 3. [Bulk Loading & Performance](#bulk-loading--performance)
 4. [Chapter Navigation](#chapter-navigation)
-5. [Learning Analytics](#learning-analytics)
+5. [Human Analytics](#human-analytics)
 6. [Open Standards Metadata](#open-standards-metadata)
 7. [Data Migration](#data-migration)
 8. [Code Examples](#code-examples)
@@ -68,133 +92,170 @@ Direct access to content nodes (outside of path context).
 
 ---
 
-## Shared Content Completion (Khan Academy-style)
+## Cross-Journey Content Visibility
 
-> **Note:** Khan Academy is used as an **analogy** for explaining the feature. The Lamad ontology uses different terminology.
+**Lamad Architecture:** The Territory (content graph) is immutable and shared across all Journeys. When a Traveler (human) encounters a Content Node in one Journey, that meaningful encounter is visible across all Journeys that reference the same node.
 
-### Lamad Ontology Mapping
+### Core Concept
 
-In Lamad (Territory + Learning Paths):
-- **Content Nodes** = Individual pieces of content (concepts, scenarios, features, videos, etc.)
-- **Paths** = Curated learning journeys (e.g., "The Elohim Protocol", "Foundations for Christian Technology")
-- **Steps** = References to content nodes within a path (same content can appear in multiple paths)
-- **Completion Status** = Whether a content node has been mastered (completed in ANY path)
+In Lamad's three-layer architecture:
+- **Territory Layer** = Immutable content graph (ContentNodes)
+- **Journey Layer** = Curated paths through Territory (LearningPaths with Steps)
+- **Traveler Layer** = Humans navigating the Territory (Agents with Progress)
 
-Khan Academy Analogy:
-- Content Nodes ≈ Skills/Concepts
-- Paths ≈ Units/Courses
-- Steps ≈ Exercises
-- Completion Status ≈ Mastery Levels (practiced → level 1 → level 2 → mastered)
+**Key Insight:** Content nodes exist in the Territory, independent of any Journey. A Journey's Steps are references/pointers to Territory nodes, not the content itself.
 
-### The Problem: Step-Based vs Content-Based Completion
+**What This Means:**
+- When a Traveler completes "Bidirectional Trust" in "The Elohim Protocol" Journey, they've mastered that Territory node
+- If "Foundations for Christian Technology" also references "Bidirectional Trust", it shows as completed there too
+- Progress is tracked both ways:
+  - **Global**: Which Territory nodes have been mastered (stored in `__global__` progress)
+  - **Journey-Specific**: Which Steps in this particular Journey have been completed
 
-Traditional path completion counts **steps**, not **unique content**:
+### The Problem: Step-Based vs Territory-Based Mastery
 
-**Example with your actual paths:**
-- "**The Elohim Protocol**": 85 steps, 60 unique content nodes
-- "**Foundations for Christian Technology**": 120 steps, 80 unique content nodes
-  - 30 content nodes are **shared scaffolding concepts** (e.g., "Bidirectional Trust", "REA Ontology", "Constitutional Alignment")
+Traditional Journey completion counts **Steps** (linear progression), not **Territory mastery** (content knowledge):
 
-**Problem:** If a learner completes "The Elohim Protocol" (100%), traditional view shows "Foundations for Christian Technology" as 0% complete, even though they've already mastered 37.5% of the content (30 shared / 80 total)!
+**Example with our actual Journeys:**
+- "**The Elohim Protocol**" Journey: 85 Steps, 60 unique Territory nodes
+- "**Foundations for Christian Technology**" Journey: 120 Steps, 80 unique Territory nodes
+  - 30 Territory nodes are **shared foundational concepts** (e.g., "Bidirectional Trust", "REA Ontology", "Constitutional Alignment")
 
-### The Solution: Cross-Path Content Visibility
+**Problem:** If a Traveler completes "The Elohim Protocol" (100%), traditional view shows "Foundations for Christian Technology" as 0% complete, even though they've already mastered 37.5% of the Territory content (30 shared nodes / 80 total)!
 
-Content completed in **any path** shows as completed in **all paths** that reference the same content.
+### The Solution: Territory-First Progress Tracking
+
+Territory nodes mastered in **any Journey** are visible in **all Journeys** that reference those same nodes.
 
 **How it works:**
-1. Learner completes "Bidirectional Trust" content node in "The Elohim Protocol"
-2. That content node is marked as `completedContentIds` in global progress
-3. When viewing "Foundations for Christian Technology", that same content node shows as ✓ completed
-4. Path completion calculated by **unique content mastered**, not step indices
+1. Traveler encounters "Bidirectional Trust" Territory node while navigating "The Elohim Protocol" Journey
+2. That Territory node is marked in global progress (`completedContentIds` in `__global__` pathId)
+3. When viewing "Foundations for Christian Technology" Journey, that same Territory node shows as ✓ mastered
+4. Journey completion calculated by **unique Territory mastery**, not just Step indices
 
-### Visual Pattern: "Chips" Interface (Legacy Khan Academy Reference)
+### UI Inspiration: Visual Progress Patterns
 
-Khan Academy historically showed concept mastery with colored "chips":
-- 🔵 **Practiced** (attempted, not mastered)
-- 🟡 **Level 1** (partial mastery)
-- 🟢 **Level 2** (strong mastery)
-- ⭐ **Mastered** (fully mastered)
+> 📸 **UI Reference:** See `src/app/lamad/khan-inspiration/` for visual examples
+>
+> **IMPORTANT:** These screenshots show Khan Academy's UI patterns as **visual inspiration only**. Use Lamad terminology (Territory/Journey/Traveler/Affinity) in all implementation, NOT Khan's ontology (skills/courses/mastery).
 
-**In Lamad, you can implement a similar pattern:**
+**Visual Pattern:** Khan Academy uses colored "chips" to show progress at-a-glance. This is a useful UI pattern for showing Territory mastery in Lamad:
+
+**Khan's Visual System (for reference):**
+- ⚪ Gray chip = "Not Started"
+- 🔵 Light blue = "Practiced" (attempted but not mastered)
+- 🟡 Teal = "Level 1" (partial mastery)
+- 🟢 Dark teal = "Level 2" (strong mastery)
+- 🟦 Dark blue = "Mastered" (fully mastered)
+
+**Key Visual Patterns from Reference Images:**
+
+1. **Progress Circle** (`mathematics_1_overview.png`): Large circular progress indicator with breakdown by status
+2. **Cross-Course Visibility** (`explorer-navigation-with-completion-peeks.png`): Shows completion across multiple courses - this is analogous to our Territory visibility across Journeys
+3. **Category Groupings**: Content organized into categories with chip-based progress indicators
+
+**Mapping to Lamad UI:**
 
 ```typescript
-// Get completion status for all steps in a path
+// Get Territory mastery status for all Steps in a Journey
 this.pathService.getAllStepsWithCompletionStatus(pathId).subscribe(steps => {
   steps.forEach(step => {
-    let chipStyle = 'not-started';  // ⚪ Not started
+    let chipStyle = 'not-encountered';  // ⚪ Gray
+    let chipLabel = '';
 
-    if (step.isCompleted) {
-      chipStyle = 'completed-this-path';  // ✓ Completed in this path
+    if (step.isCompleted && !step.completedInOtherPath) {
+      chipStyle = 'mastered-here';  // 🟦 Dark blue - mastered in THIS Journey
+      chipLabel = 'Mastered';
     } else if (step.completedInOtherPath) {
-      chipStyle = 'completed-other-path';  // ✓ Mastered elsewhere
+      chipStyle = 'mastered-elsewhere';  // 🟢 Green - mastered in OTHER Journey
+      chipLabel = 'Mastered in other Journey';
+    } else if (step.affinity >= 0.7) {
+      chipStyle = 'high-affinity';  // 🟢 Teal - strong engagement
+      chipLabel = 'High affinity';
+    } else if (step.affinity >= 0.4) {
+      chipStyle = 'medium-affinity';  // 🟡 Light teal - moderate engagement
+      chipLabel = 'Growing affinity';
     } else if (step.affinity > 0) {
-      chipStyle = 'in-progress';  // 🔵 Started/practicing
+      chipStyle = 'encountered';  // 🔵 Light blue - encountered but low affinity
+      chipLabel = 'Encountered';
     }
 
     // Render chip with appropriate styling
+    // Visual pattern inspired by Khan Academy's compact chips
   });
 });
 ```
 
-**Suggested UI for Shared Content:**
+**Lamad Progress States:**
 
-When content is completed in another path, show:
-- ✅ **Green checkmark** on the step
-- 💡 **Badge**: "Mastered in [Path Name]"
-- 🎯 **Tooltip**: "You completed this in 'The Elohim Protocol' on [date]"
+| Lamad State | Visual | Color | Meaning |
+|-------------|--------|-------|---------|
+| Not encountered | ⚪ Chip | Gray | Territory node not yet visited |
+| Encountered (Affinity 0-0.4) | 🔵 Chip | Light blue | Meaningful encounter begun |
+| Growing Affinity (0.4-0.7) | 🟡 Chip | Teal | Moderate engagement depth |
+| High Affinity (0.7-1.0) | 🟢 Chip | Dark teal | Strong engagement depth |
+| Mastered (this Journey) | 🟦 Chip | Dark blue | Completed in THIS Journey |
+| Mastered (other Journey) | 🟢 Chip + badge | Green | Completed in OTHER Journey |
 
-This creates "**at-a-glance completion**" - learners immediately see which concepts they've already mastered across all paths.
+**Suggested UI for Cross-Journey Territory Mastery:**
+
+When a Territory node was mastered in another Journey, show:
+- ✅ **Green checkmark** on the Step
+- 💡 **Badge**: "Mastered in [Journey Name]"
+- 🎯 **Tooltip**: "You encountered this in 'The Elohim Protocol' on [date]"
+
+This creates **Territory-at-a-glance** - Travelers immediately see which Territory nodes they've already mastered across all Journeys.
 
 **Implementation:**
 ```typescript
-// Example: Viewing "Foundations for Christian Technology" after completing "The Elohim Protocol"
+// Example: Viewing "Foundations for Christian Technology" Journey after completing "The Elohim Protocol"
 this.pathService.getPathCompletionByContent('foundations-for-christian-technology').subscribe(completion => {
   console.log(completion);
   // {
   //   totalSteps: 120,
-  //   completedSteps: 15,  // Steps completed in THIS path
+  //   completedSteps: 15,  // Steps completed in THIS Journey
   //   totalUniqueContent: 80,
-  //   completedUniqueContent: 30,  // 30 shared scaffolding concepts from Elohim Protocol
-  //   contentCompletionPercentage: 38%,  // (30 / 80) - already mastered!
-  //   stepCompletionPercentage: 13%,     // (15 / 120)
-  //   sharedContentCompleted: 30  // Concepts like "Bidirectional Trust", "REA Ontology", etc.
+  //   completedUniqueContent: 30,  // 30 Territory nodes already mastered
+  //   contentCompletionPercentage: 38%,  // (30 / 80) Territory mastery!
+  //   stepCompletionPercentage: 13%,     // (15 / 120) Journey progression
+  //   sharedContentCompleted: 30  // Nodes like "Bidirectional Trust", "REA Ontology", etc.
   // }
 });
 ```
 
 **UI Recommendations:**
-- Show **content completion** percentage prominently: "**38% Content Mastered**"
-- Show step completion as secondary metric: "15 of 120 steps in this path"
-- Add badge: "✓ 30 concepts already mastered from The Elohim Protocol"
+- Show **Territory mastery** prominently: "**38% Territory Mastered**"
+- Show Journey progression as secondary: "15 of 120 Steps in this Journey"
+- Add badge: "✓ 30 Territory nodes mastered from The Elohim Protocol"
 - Use progress bars that distinguish:
-  - 🟢 Content mastered in this path
-  - 🔵 Content mastered in other paths (shared scaffolding)
-  - ⚪ Content not yet started
+  - 🟢 Territory mastered in this Journey
+  - 🔵 Territory mastered in other Journeys (shared foundation)
+  - ⚪ Territory not yet encountered
 
-### Global Completion Status: Per-Step Visibility
+### Territory Mastery: Per-Step Visibility
 
-Check if specific content is completed globally (across all paths):
+Check if a specific Territory node is mastered globally (across all Journeys):
 
 ```typescript
-// Example: Checking if "Bidirectional Trust" concept is already mastered
+// Example: Checking if "Bidirectional Trust" Territory node is already mastered
 this.pathService.getStepWithCompletionStatus('foundations-for-christian-technology', 42).subscribe(stepView => {
   if (stepView.completedInOtherPath) {
-    console.log('Already mastered in another path!');
+    console.log('Territory node already mastered in another Journey!');
     // Show badge: "✓ Mastered in 'The Elohim Protocol'"
-    // Add tooltip: "You completed this concept on Jan 15, 2025"
+    // Add tooltip: "You encountered this Territory node on Jan 15, 2025"
   }
 });
 
-// Get ALL steps with global completion status (for path overview)
+// Get ALL Steps with Territory mastery status (for Journey overview)
 this.pathService.getAllStepsWithCompletionStatus('foundations-for-christian-technology').subscribe(steps => {
   steps.forEach((step, index) => {
     if (step.isCompletedGlobally) {
       // Render with checkmark chip/badge
     }
     if (step.completedInOtherPath) {
-      // Show "already mastered" indicator
-      // Example: Step 42 "Bidirectional Trust" shows ✓ even though learner
-      // hasn't started FCT yet, because they completed it in Elohim Protocol
+      // Show "Territory mastered elsewhere" indicator
+      // Example: Step 42 "Bidirectional Trust" shows ✓ even though Traveler
+      // hasn't started FCT Journey yet, because they mastered it in Elohim Protocol
     }
   });
 });
@@ -203,106 +264,390 @@ this.pathService.getAllStepsWithCompletionStatus('foundations-for-christian-tech
 **Visual Example for UI:**
 
 ```
-Foundations for Christian Technology - Path Overview
+Foundations for Christian Technology - Journey Overview
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-38% Content Mastered  |  15 of 120 steps  |  ✓ 30 shared concepts
+38% Territory Mastered  |  15 of 120 Steps  |  ✓ 30 nodes from other Journeys
 
 Chapter 1: Constitutional Foundations
-  ✓ Step 1: Introduction                    [Completed in this path]
+  ✓ Step 1: Introduction                    [Mastered in this Journey]
   ✓ Step 2: Bidirectional Trust             [Mastered in "The Elohim Protocol"]
-  ○ Step 3: Trust Attestations              [Not started]
+  ○ Step 3: Trust Attestations              [Not encountered]
   ✓ Step 4: REA Ontology                    [Mastered in "The Elohim Protocol"]
-  ○ Step 5: Resource-Event-Agent Model      [Not started]
+  ○ Step 5: Resource-Event-Agent Model      [Not encountered]
 
 Chapter 2: Technical Implementation
-  ○ Step 6: Holochain Architecture          [Not started]
+  ○ Step 6: Holochain Architecture          [Not encountered]
   ✓ Step 7: Constitutional Alignment        [Mastered in "The Elohim Protocol"]
   ...
 ```
 
 ---
 
+## Content Viewer Pattern (Step Navigation)
+
+> 📸 **UI Reference:** `src/app/lamad/khan-inspiration/algeba-basics-content-view-navigation.png`
+>
+> **Note:** This shows Khan Academy's navigation pattern as visual inspiration. Use Lamad terminology in implementation.
+
+When a Traveler is viewing a specific Territory node within a Journey, a **compact left navigation** pattern provides Journey context and quick navigation.
+
+### Key UI Elements (inspired by reference image)
+
+**Left Navigation Panel:**
+1. **Journey Title + Icon** - Journey identity
+2. **Breadcrumb** - "JOURNEY: [JOURNEY NAME] > CHAPTER [N]" (context)
+3. **Chapter Title** - Current chapter/section
+4. **Prev/Next Arrows** - Quick navigation between Steps
+5. **Compact Step List:**
+   - Chapter headers (▶ Chapter name)
+   - Individual Steps with Territory mastery indicators (✓ Mastered)
+   - Current Step highlighted
+   - Only Step titles shown (not full Territory node content)
+6. **Full Breadcrumb Trail** - Territory > Journey > Chapter > Step (bottom)
+
+**Main Content Area:**
+1. Territory node title with standards tags
+2. Share/export buttons
+3. Full Territory node content body
+4. "Up next: [Next Step]" button
+
+### Implementation with Lamad Services
+
+```typescript
+@Component({
+  selector: 'app-step-viewer',
+  template: `
+    <!-- Left Navigation Panel -->
+    <aside class="step-nav">
+      <!-- 1. Journey Title -->
+      <div class="journey-header">
+        <img [src]="journey?.iconUrl" />
+        <h2>{{ journey?.title }}</h2>
+      </div>
+
+      <!-- 2. Breadcrumb Context -->
+      <div class="breadcrumb">
+        <span class="label">JOURNEY:</span>
+        <span>{{ journey?.title | uppercase }}</span>
+        <span *ngIf="currentChapter"> > {{ currentChapter.title | uppercase }}</span>
+      </div>
+
+      <!-- 3. Current Chapter Title -->
+      <div class="chapter-header">
+        <button (click)="navigatePrevious()" [disabled]="!currentStep?.hasPrevious">
+          <
+        </button>
+        <h3>{{ currentChapter?.title || 'Chapter ' + (currentStepIndex + 1) }}</h3>
+        <button (click)="navigateNext()" [disabled]="!currentStep?.hasNext">
+          >
+        </button>
+      </div>
+
+      <!-- 4. Compact Step List (bulk loaded for performance) -->
+      <nav class="step-list">
+        <div *ngFor="let step of visibleSteps; let i = index">
+          <!-- Chapter header if chapter changes -->
+          <div *ngIf="step.chapter?.id !== prevStep?.chapter?.id" class="section-header">
+            ▶ {{ step.chapter.title }}
+          </div>
+
+          <!-- Step item -->
+          <a [routerLink]="['/lamad/journey', journeyId, 'step', step.step.order]"
+             [class.active]="step.step.order === currentStepIndex"
+             [class.mastered]="step.isCompletedGlobally">
+
+            <!-- Territory mastery badge -->
+            <span *ngIf="step.isCompletedGlobally" class="badge">
+              {{ step.completedInOtherPath ? '✓ From other Journey' : '✓ Mastered' }}
+            </span>
+
+            <!-- Step title (truncated) -->
+            <span class="title">{{ step.step.stepTitle | truncate:40 }}</span>
+          </a>
+        </div>
+      </nav>
+
+      <!-- 5. Full breadcrumb trail (bottom) -->
+      <div class="breadcrumb-trail">
+        <a routerLink="/lamad">Territory</a>
+        <span> > </span>
+        <a [routerLink]="['/lamad/journey', journeyId]">{{ journey?.title }}</a>
+        <span *ngIf="currentChapter"> > {{ currentChapter.title }}</span>
+        <span> > {{ currentStep?.step.stepTitle }}</span>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content-viewer">
+      <!-- Territory node title with standards -->
+      <header>
+        <h1>{{ currentStep?.content.title }}</h1>
+        <div class="metadata">
+          <span *ngFor="let tag of currentStep?.content.tags" class="tag">
+            {{ tag }}
+          </span>
+          <!-- Share buttons -->
+          <button (click)="shareContent()">📋 Share</button>
+        </div>
+      </header>
+
+      <!-- Territory node content body -->
+      <article [innerHTML]="currentStep?.content.content | safeHtml">
+      </article>
+
+      <!-- Next Step button -->
+      <footer *ngIf="currentStep?.hasNext">
+        <button (click)="navigateNext()" class="next-step">
+          Up next: {{ nextStepTitle }}
+        </button>
+      </footer>
+    </main>
+  `
+})
+export class StepViewerComponent implements OnInit {
+  journeyId: string;
+  currentStepIndex: number;
+  currentStep: PathStepView;
+  visibleSteps: Array<PathStepView & { isCompletedGlobally: boolean }>;
+  journey: LearningPath;
+  currentChapter: PathChapter;
+
+  ngOnInit() {
+    this.journeyId = this.route.snapshot.params['journeyId'];
+    this.currentStepIndex = +this.route.snapshot.params['stepIndex'];
+
+    // Load Journey metadata for left nav
+    this.pathService.getPath(this.journeyId).subscribe(journey => {
+      this.journey = journey;
+
+      // Determine current chapter
+      if (journey.chapters) {
+        let stepCount = 0;
+        for (const chapter of journey.chapters) {
+          if (this.currentStepIndex < stepCount + chapter.steps.length) {
+            this.currentChapter = chapter;
+            break;
+          }
+          stepCount += chapter.steps.length;
+        }
+      }
+    });
+
+    // Load current Step (lazy - just this one)
+    this.pathService.getPathStep(this.journeyId, this.currentStepIndex).subscribe(
+      step => {
+        this.currentStep = step;
+
+        // Prefetch next Step for smooth navigation
+        if (step.hasNext) {
+          this.pathService.getNextNSteps(this.journeyId, this.currentStepIndex, 1).subscribe();
+        }
+      }
+    );
+
+    // Load compact Step list for left nav (bulk for performance)
+    // Only load metadata, not full Territory node content
+    this.loadCompactStepList();
+  }
+
+  loadCompactStepList() {
+    // Option 1: Load all Steps (if Journey has < 50 Steps)
+    this.pathService.getAllStepsWithCompletionStatus(this.journeyId).subscribe(
+      steps => this.visibleSteps = steps
+    );
+
+    // Option 2: Load only current chapter (if chapters exist)
+    // if (this.currentChapter) {
+    //   this.pathService.getChapterSteps(this.journeyId, this.currentChapter.id).subscribe(
+    //     steps => this.visibleSteps = steps
+    //   );
+    // }
+  }
+
+  navigateNext() {
+    if (this.currentStep?.hasNext) {
+      this.router.navigate(['/lamad/journey', this.journeyId, 'step', this.currentStep.nextStepIndex]);
+    }
+  }
+
+  navigatePrevious() {
+    if (this.currentStep?.hasPrevious) {
+      this.router.navigate(['/lamad/journey', this.journeyId, 'step', this.currentStep.previousStepIndex]);
+    }
+  }
+}
+```
+
+### At-a-Glance Territory Mastery in Left Nav
+
+The compact Step list shows Territory mastery at-a-glance (visual pattern inspired by Khan Academy):
+- **✓ Mastered** - Badge for Territory node mastered in THIS Journey
+- **✓ From other Journey** - Badge for Territory node mastered in OTHER Journey
+- **Current Step** - Highlighted with left border
+- **Chapter headers** - Chapter titles (collapsible in advanced UIs)
+
+### Performance Optimization
+
+**Problem:** Loading full Territory node content for 50+ Steps just to show titles = slow!
+
+**Solution:** Use `getAllStepsWithCompletionStatus()` which:
+1. Loads Journey metadata (lightweight)
+2. Loads all Territory node metadata (titles, IDs) in bulk
+3. Checks Territory mastery status from localStorage
+4. Does NOT load full Territory node content bodies
+5. Result: Fast left nav even for 100+ Step Journeys
+
+---
+
 ## Bulk Loading & Performance
 
-### Problem: Lazy Loading is Slow for Overviews
+### Problem: Lazy Loading is Slow for Journey Overviews
 
-Loading 50 steps one-at-a-time for a path overview page = 50 HTTP requests. Slow!
+Loading 50 Steps one-at-a-time for a Journey overview page = 50 HTTP requests. Slow!
 
 ### Solution: Bulk Loading APIs
 
 ```typescript
-// Load 10 steps at once
-this.pathService.getBulkSteps('path-id', 0, 10).subscribe(steps => {
-  // Render first 10 steps immediately
+// Load 10 Steps at once
+this.pathService.getBulkSteps('journey-id', 0, 10).subscribe(steps => {
+  // Render first 10 Steps immediately
 });
 
-// Prefetch next 3 steps while user reads current step
-this.pathService.getNextNSteps('path-id', currentIndex, 3).subscribe(nextSteps => {
+// Prefetch next 3 Steps while Traveler reads current Territory node
+this.pathService.getNextNSteps('journey-id', currentIndex, 3).subscribe(nextSteps => {
   // Preload for smooth navigation
 });
 ```
 
 **Performance Tips:**
-- Load 5-10 steps at a time for list views
-- Prefetch 2-3 steps ahead for navigation
-- Use virtual scrolling for paths with 50+ steps
+- Load 5-10 Steps at a time for list views
+- Prefetch 2-3 Steps ahead for navigation
+- Use virtual scrolling for Journeys with 50+ Steps
 
 ---
 
 ## Chapter Navigation
 
-Paths can be structured with chapters (thematic groupings).
+Journeys can be structured with chapters (thematic groupings).
 
-### Check if Path Uses Chapters
+### Check if Journey Uses Chapters
 
 ```typescript
-this.pathService.getPath(pathId).subscribe(path => {
-  if (path.chapters && path.chapters.length > 0) {
-    // Path uses chapters - show chapter-based navigation
+this.pathService.getPath(journeyId).subscribe(journey => {
+  if (journey.chapters && journey.chapters.length > 0) {
+    // Journey uses chapters - show chapter-based navigation
   } else {
-    // Path uses flat steps - show simple navigation
+    // Journey uses flat Steps - show simple navigation
   }
 });
 ```
 
-### Get Chapter Summaries
+### Get Chapter Summaries (Territory-Based)
+
+**NEW:** `getChapterSummariesWithContent()` shows **Territory mastery** at the chapter level, including Territory nodes mastered in other Journeys.
 
 ```typescript
-this.pathService.getChapterSummaries(pathId).subscribe(summaries => {
+// Example: "Foundations for Christian Technology" after completing "The Elohim Protocol"
+this.pathService.getChapterSummariesWithContent('foundations-for-christian-technology').subscribe(summaries => {
   summaries.forEach(summary => {
     console.log(summary.chapter.title);
-    console.log(`${summary.completedSteps} / ${summary.totalSteps} steps`);
-    console.log(`${summary.completionPercentage}% complete`);
+    console.log(`Territory: ${summary.contentCompletionPercentage}% mastered`);
+    console.log(`  ${summary.completedUniqueContent} of ${summary.totalUniqueContent} Territory nodes`);
+    console.log(`  ✓ ${summary.sharedContentCompleted} mastered in other Journeys`);
+    console.log(`Steps: ${summary.stepCompletionPercentage}% (${summary.completedSteps}/${summary.totalSteps})`);
   });
+});
+
+// Example output:
+// Chapter 1: Constitutional Foundations
+// Territory: 75% mastered
+//   9 of 12 Territory nodes
+//   ✓ 6 mastered in other Journeys (Bidirectional Trust, REA Ontology, etc.)
+// Steps: 45% (5/11 Steps in this Journey)
+```
+
+**Visual Pattern - Khan Academy-Inspired Categories:**
+
+Khan Academy shows skill categories with chip bars (see `mathematics_1_overview.png` for reference).
+
+**In Lamad, chapters use similar visual pattern:**
+
+```typescript
+// Example: Render chapters with Territory mastery visualization
+this.pathService.getChapterSummariesWithContent(journeyId).subscribe(summaries => {
+  summaries.forEach(summary => {
+    // Render chapter title
+    console.log(summary.chapter.title);
+
+    // Render chip bar showing Territory mastery distribution
+    // Get individual Step statuses to render chips
+    this.pathService.getChapterSteps(journeyId, summary.chapter.id).subscribe(steps => {
+      // Now you have all Steps in chapter with their Territory mastery status
+      // Render horizontal chip bar (visual pattern inspired by Khan Academy)
+    });
+
+    // Show summary stats
+    console.log(`${summary.contentCompletionPercentage}% Territory mastered`);
+    if (summary.sharedContentCompleted > 0) {
+      console.log(`✓ ${summary.sharedContentCompleted} from other Journeys`);
+    }
+  });
+});
+```
+
+**Result looks like:**
+```
+Chapter 1: Constitutional Foundations
+[🟦🟦🟢🟢🟢🟢🟡🔵⚪⚪⚪⚪]  75% Territory mastered
+✓ 6 Territory nodes from "The Elohim Protocol"
+
+Chapter 2: Technical Implementation
+[🟦🟢🟡⚪⚪⚪⚪⚪⚪⚪]  30% Territory mastered
+✓ 2 Territory nodes from "The Elohim Protocol"
+```
+
+Where:
+- 🟦 = Mastered in this Journey
+- 🟢 = Mastered in other Journey (shared Territory)
+- 🟡 = Growing affinity (0.4-0.7)
+- 🔵 = Encountered (affinity 0-0.4)
+- ⚪ = Not encountered
+```
+
+**Legacy Method** (Step-based only):
+```typescript
+// getChapterSummaries() still available for backward compatibility
+this.pathService.getChapterSummaries(journeyId).subscribe(summaries => {
+  // Returns Step-based completion only
 });
 ```
 
 ### Navigate by Chapter
 
 ```typescript
-// Get all steps in a chapter
-this.pathService.getChapterSteps(pathId, chapterId).subscribe(steps => {
+// Get all Steps in a chapter
+this.pathService.getChapterSteps(journeyId, chapterId).subscribe(steps => {
   // Render entire chapter
 });
 
-// Jump to first step of a chapter
-this.pathService.getChapterFirstStep(pathId, chapterId).subscribe(firstStep => {
-  // Navigate to step
+// Jump to first Step of a chapter
+this.pathService.getChapterFirstStep(journeyId, chapterId).subscribe(firstStep => {
+  // Navigate to Step
 });
 
 // Get next chapter
-this.pathService.getNextChapter(pathId, currentChapterId).subscribe(nextChapterSteps => {
+this.pathService.getNextChapter(journeyId, currentChapterId).subscribe(nextChapterSteps => {
   if (nextChapterSteps) {
     // Show "Start Next Chapter" button
   } else {
-    // Show "Path Complete!" message
+    // Show "Journey Complete!" message
   }
 });
 ```
 
 ---
 
-## Learning Analytics
+## Human Analytics
 
 Display rich dashboard metrics using `getLearningAnalytics()`.
 
@@ -311,25 +656,25 @@ this.agentService.getLearningAnalytics().subscribe(analytics => {
   console.log(analytics);
   // {
   //   // Overall progress
-  //   totalPathsStarted: 5,
-  //   totalPathsCompleted: 2,
-  //   totalContentNodesCompleted: 147,
-  //   totalStepsCompleted: 203,
+  //   totalPathsStarted: 5,           // Journeys begun
+  //   totalPathsCompleted: 2,         // Journeys completed
+  //   totalContentNodesCompleted: 147, // Territory nodes mastered
+  //   totalStepsCompleted: 203,       // Total Steps completed across all Journeys
   //
   //   // Engagement metrics
-  //   totalLearningTime: 42,  // days
+  //   totalLearningTime: 42,  // days navigating Territory
   //   lastActivityDate: "2025-01-15T10:30:00Z",
   //   firstActivityDate: "2024-12-04T09:00:00Z",
   //   currentStreak: 7,  // consecutive days
   //   longestStreak: 12,
   //
-  //   // Path insights
-  //   mostActivePathId: "elohim-protocol",
-  //   mostRecentPathId: "governance-basics",
+  //   // Journey insights
+  //   mostActivePathId: "elohim-protocol",     // Most active Journey
+  //   mostRecentPathId: "governance-basics",   // Most recent Journey
   //
   //   // Affinity insights
   //   averageAffinity: 0.75,
-  //   highAffinityPaths: ["elohim-protocol", "value-flows"],
+  //   highAffinityPaths: ["elohim-protocol", "value-flows"],  // Journeys with deep engagement
   //
   //   // Attestations
   //   totalAttestationsEarned: 3,
@@ -339,10 +684,10 @@ this.agentService.getLearningAnalytics().subscribe(analytics => {
 ```
 
 **Dashboard UI Ideas:**
-- **Hero Stat Cards:** Paths Completed, Content Mastered, Learning Streak
+- **Hero Stat Cards:** Journeys Completed, Territory Mastered, Engagement Streak
 - **Activity Graph:** Show `currentStreak` with flame icon 🔥
-- **Progress Bars:** Completion percentages for in-progress paths
-- **Affinity Badges:** Highlight `highAffinityPaths` (learner loves these!)
+- **Progress Bars:** Completion percentages for in-progress Journeys
+- **Affinity Badges:** Highlight `highAffinityPaths` (Traveler has deep affinity with these!)
 - **Attestations:** Display earned credentials with icons
 
 ---
@@ -501,24 +846,24 @@ export class AppComponent implements OnInit {
 
 ## Code Examples
 
-### Example 1: Path Overview Page
+### Example 1: Journey Overview Page
 
 ```typescript
 @Component({
-  selector: 'app-path-overview',
+  selector: 'app-journey-overview',
   template: `
-    <div class="path-header">
-      <h1>{{ path?.title }}</h1>
+    <div class="journey-header">
+      <h1>{{ journey?.title }}</h1>
       <div class="completion-stats">
         <div class="primary-stat">
           <strong>{{ completion?.contentCompletionPercentage }}%</strong>
-          <span>Content Mastered</span>
+          <span>Territory Mastered</span>
         </div>
         <div class="secondary-stat">
-          {{ completion?.completedSteps }} of {{ completion?.totalSteps }} steps
+          {{ completion?.completedSteps }} of {{ completion?.totalSteps }} Steps
         </div>
         <div class="badge" *ngIf="completion?.sharedContentCompleted > 0">
-          ✓ {{ completion.sharedContentCompleted }} steps mastered from other paths
+          ✓ {{ completion.sharedContentCompleted }} Territory nodes mastered in other Journeys
         </div>
       </div>
     </div>
@@ -526,17 +871,33 @@ export class AppComponent implements OnInit {
     <div class="chapters" *ngIf="chapterSummaries?.length">
       <div *ngFor="let summary of chapterSummaries" class="chapter-card">
         <h3>{{ summary.chapter.title }}</h3>
-        <progress [value]="summary.completionPercentage" max="100"></progress>
-        <span>{{ summary.completedSteps }} / {{ summary.totalSteps }} steps</span>
+
+        <!-- Territory mastery (primary) -->
+        <div class="territory-progress">
+          <progress [value]="summary.contentCompletionPercentage" max="100"></progress>
+          <span class="primary">{{ summary.contentCompletionPercentage }}% Territory Mastered</span>
+          <span class="detail">{{ summary.completedUniqueContent }} of {{ summary.totalUniqueContent }} Territory nodes</span>
+        </div>
+
+        <!-- Shared Territory badge -->
+        <div class="shared-badge" *ngIf="summary.sharedContentCompleted > 0">
+          ✓ {{ summary.sharedContentCompleted }} Territory nodes from other Journeys
+        </div>
+
+        <!-- Step-based progress (secondary) -->
+        <div class="step-progress">
+          <span class="secondary">{{ summary.completedSteps }} / {{ summary.totalSteps }} Steps in this Journey</span>
+        </div>
+
         <button (click)="startChapter(summary.chapter.id)">
-          {{ summary.completedSteps > 0 ? 'Continue' : 'Start' }} Chapter
+          {{ summary.completedSteps > 0 ? 'Continue' : 'Begin' }} Chapter
         </button>
       </div>
     </div>
   `
 })
-export class PathOverviewComponent implements OnInit {
-  path: LearningPath;
+export class JourneyOverviewComponent implements OnInit {
+  journey: LearningPath;
   completion: any;
   chapterSummaries: any[];
 
@@ -546,27 +907,27 @@ export class PathOverviewComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    const pathId = this.route.snapshot.params['pathId'];
+    const journeyId = this.route.snapshot.params['journeyId'];
 
-    // Load path metadata
-    this.pathService.getPath(pathId).subscribe(path => this.path = path);
+    // Load Journey metadata
+    this.pathService.getPath(journeyId).subscribe(journey => this.journey = journey);
 
-    // Load content-based completion
-    this.pathService.getPathCompletionByContent(pathId).subscribe(
+    // Load Territory-based completion
+    this.pathService.getPathCompletionByContent(journeyId).subscribe(
       completion => this.completion = completion
     );
 
-    // Load chapter summaries if path uses chapters
-    this.pathService.getChapterSummaries(pathId).subscribe(
+    // Load chapter summaries with Territory-based completion
+    this.pathService.getChapterSummariesWithContent(journeyId).subscribe(
       summaries => this.chapterSummaries = summaries
     );
   }
 
   startChapter(chapterId: string) {
-    this.pathService.getChapterFirstStep(this.path.id, chapterId).subscribe(
+    this.pathService.getChapterFirstStep(this.journey.id, chapterId).subscribe(
       firstStep => {
         if (firstStep) {
-          this.router.navigate(['/lamad/path', this.path.id, 'step', firstStep.step.order]);
+          this.router.navigate(['/lamad/journey', this.journey.id, 'step', firstStep.step.order]);
         }
       }
     );
@@ -574,21 +935,21 @@ export class PathOverviewComponent implements OnInit {
 }
 ```
 
-### Example 2: Learning Dashboard
+### Example 2: Traveler Dashboard
 
 ```typescript
 @Component({
-  selector: 'app-learning-dashboard',
+  selector: 'app-traveler-dashboard',
   template: `
     <div class="dashboard">
       <div class="stats-grid">
         <div class="stat-card">
           <div class="value">{{ analytics?.totalContentNodesCompleted }}</div>
-          <div class="label">Content Mastered</div>
+          <div class="label">Territory Mastered</div>
         </div>
         <div class="stat-card">
           <div class="value">{{ analytics?.totalPathsCompleted }}</div>
-          <div class="label">Paths Completed</div>
+          <div class="label">Journeys Completed</div>
         </div>
         <div class="stat-card streak">
           <div class="value">🔥 {{ analytics?.currentStreak }}</div>
@@ -596,13 +957,13 @@ export class PathOverviewComponent implements OnInit {
         </div>
         <div class="stat-card">
           <div class="value">{{ analytics?.totalAttestationsEarned }}</div>
-          <div class="label">Credentials Earned</div>
+          <div class="label">Attestations Earned</div>
         </div>
       </div>
 
       <div class="activity-summary">
-        <p>Learning for {{ analytics?.totalLearningTime }} days</p>
-        <p>Last active: {{ analytics?.lastActivityDate | date }}</p>
+        <p>Navigating Territory for {{ analytics?.totalLearningTime }} days</p>
+        <p>Last encounter: {{ analytics?.lastActivityDate | date }}</p>
         <p *ngIf="analytics?.longestStreak > analytics?.currentStreak">
           Longest streak: {{ analytics.longestStreak }} days
         </p>
@@ -610,7 +971,7 @@ export class PathOverviewComponent implements OnInit {
     </div>
   `
 })
-export class LearningDashboardComponent implements OnInit {
+export class TravelerDashboardComponent implements OnInit {
   analytics: any;
 
   constructor(private agentService: AgentService) {}
@@ -635,16 +996,16 @@ export class StepViewComponent implements OnInit {
   prefetchedSteps: PathStepView[] = [];
 
   ngOnInit() {
-    const pathId = this.route.snapshot.params['pathId'];
+    const journeyId = this.route.snapshot.params['journeyId'];
     const stepIndex = +this.route.snapshot.params['stepIndex'];
 
-    // Load current step
-    this.pathService.getPathStep(pathId, stepIndex).subscribe(
+    // Load current Step (Territory node within Journey context)
+    this.pathService.getPathStep(journeyId, stepIndex).subscribe(
       step => {
         this.currentStep = step;
 
-        // Prefetch next 2 steps for smooth navigation
-        this.pathService.getNextNSteps(pathId, stepIndex, 2).subscribe(
+        // Prefetch next 2 Steps for smooth navigation
+        this.pathService.getNextNSteps(journeyId, stepIndex, 2).subscribe(
           nextSteps => this.prefetchedSteps = nextSteps
         );
       }
@@ -658,7 +1019,9 @@ export class StepViewComponent implements OnInit {
       this.prefetchedSteps.shift();
     } else {
       // Fallback to lazy load
-      this.pathService.getPathStep(pathId, stepIndex + 1).subscribe(...);
+      const journeyId = this.route.snapshot.params['journeyId'];
+      const stepIndex = +this.route.snapshot.params['stepIndex'];
+      this.pathService.getPathStep(journeyId, stepIndex + 1).subscribe(...);
     }
   }
 }

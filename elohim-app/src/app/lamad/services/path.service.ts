@@ -590,6 +590,7 @@ export class PathService {
    * Get chapter summaries for path overview.
    *
    * Includes progress information if user has started the path.
+   * Returns STEP-based completion (legacy behavior).
    *
    * @param pathId The learning path ID
    */
@@ -638,6 +639,124 @@ export class PathService {
             totalSteps,
             isComplete,
             completionPercentage
+          };
+        });
+      })
+    );
+  }
+
+  /**
+   * Get chapter summaries with CONTENT-based completion (Khan Academy-style).
+   *
+   * Shows unique content mastery at the chapter level, including shared content
+   * completed in other paths. This enables "at-a-glance" visibility of which
+   * scaffolding concepts are already mastered.
+   *
+   * Use this for chapter overview pages to show shared content completion.
+   *
+   * @param pathId The learning path ID
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  getChapterSummariesWithContent(
+    pathId: string,
+    agentId?: string
+  ): Observable<Array<{
+    chapter: PathChapter;
+    // Step-based metrics (traditional)
+    completedSteps: number;
+    totalSteps: number;
+    stepCompletionPercentage: number;
+    // Content-based metrics (Khan Academy-style)
+    totalUniqueContent: number;
+    completedUniqueContent: number;
+    contentCompletionPercentage: number;
+    sharedContentCompleted: number;  // Completed via other paths
+    isComplete: boolean;
+  }>> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId),
+      completedContentIds: this.agentService.getCompletedContentIds(agentId)
+    }).pipe(
+      map(({ path, progress, completedContentIds }) => {
+        // Path must use chapters
+        if (!path.chapters || path.chapters.length === 0) {
+          return [];
+        }
+
+        let absoluteStepIndex = 0;
+        return path.chapters.map(chapter => {
+          const totalSteps = chapter.steps.length;
+
+          // Extract unique content IDs from this chapter
+          const chapterContentIds = new Set(
+            chapter.steps.map(step => step.resourceId)
+          );
+          const totalUniqueContent = chapterContentIds.size;
+
+          // Calculate step-based completion
+          let completedSteps = 0;
+          if (progress) {
+            for (let i = 0; i < totalSteps; i++) {
+              const stepIndex = absoluteStepIndex + i;
+              if (progress.completedStepIndices.includes(stepIndex)) {
+                completedSteps++;
+              }
+            }
+          }
+
+          // Calculate content-based completion
+          let completedUniqueContent = 0;
+          let sharedContentCompleted = 0;
+
+          for (const contentId of chapterContentIds) {
+            if (completedContentIds.has(contentId)) {
+              completedUniqueContent++;
+
+              // Check if completed in THIS chapter vs other paths/chapters
+              let completedInThisChapter = false;
+              if (progress) {
+                for (let i = 0; i < totalSteps; i++) {
+                  const stepIndex = absoluteStepIndex + i;
+                  if (
+                    progress.completedStepIndices.includes(stepIndex) &&
+                    chapter.steps[i]?.resourceId === contentId
+                  ) {
+                    completedInThisChapter = true;
+                    break;
+                  }
+                }
+              }
+
+              if (!completedInThisChapter) {
+                sharedContentCompleted++;
+              }
+            }
+          }
+
+          absoluteStepIndex += totalSteps;
+
+          const stepCompletionPercentage = totalSteps > 0
+            ? Math.round((completedSteps / totalSteps) * 100)
+            : 0;
+
+          const contentCompletionPercentage = totalUniqueContent > 0
+            ? Math.round((completedUniqueContent / totalUniqueContent) * 100)
+            : 0;
+
+          // Chapter is complete when all unique content is mastered
+          const isComplete = completedUniqueContent === totalUniqueContent;
+
+          return {
+            chapter,
+            completedSteps,
+            totalSteps,
+            stepCompletionPercentage,
+            totalUniqueContent,
+            completedUniqueContent,
+            contentCompletionPercentage,
+            sharedContentCompleted,
+            isComplete
           };
         });
       })
