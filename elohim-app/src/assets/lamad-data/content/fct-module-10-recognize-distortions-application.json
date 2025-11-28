@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-10-recognize-distortions"
   },
-  "createdAt": "2025-11-28T02:53:21.881974",
-  "updatedAt": "2025-11-28T02:53:21.881975"
+  "createdAt": "2025-11-28T21:10:19.214686",
+  "updatedAt": "2025-11-28T21:10:19.214687",
+  "did": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Creating Shared Understanding: Recognize Distortions",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Creating Shared Understanding: Recognize Distortions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions-application",
+    "identifier": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
+    "name": "Application: Creating Shared Understanding: Recognize Distortions",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.214686",
+    "dateModified": "2025-11-28T21:10:19.214687",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

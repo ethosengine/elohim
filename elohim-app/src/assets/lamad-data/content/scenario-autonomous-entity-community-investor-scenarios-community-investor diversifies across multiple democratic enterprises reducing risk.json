@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor diversifies across multiple democratic enterprises reducing risk",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor diversifies across multiple democratic enterprises reducing risk",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor diversifies across multiple democratic enterprises reducing risk",
   "description": "Investor diversifies across multiple democratic enterprises reducing risk",
   "content": "Scenario: Investor diversifies across multiple democratic enterprises reducing risk\n    Given individual business investment is high-risk\n    And Patricia needs diversification for financial security\n    When community investment pool spreads capital across multiple conversions\n    Then her $10K in pool supports Maria's Kitchen, Rosa's Auto, and neighborhood retail\n    And portfolio diversification reduces single-business failure risk\n    And democratic network mutual support further reduces risk\n    And risk management is transparent and community-governed\n    And community_elohim coordinates portfolio diversification and risk management\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor diversifies across multiple democratic enterprises reducing risk",
+    "ogDescription": "Investor diversifies across multiple democratic enterprises reducing risk",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor diversifies across multiple democratic enterprises reducing risk",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor diversifies across multiple democratic enterprises reducing risk - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor diversifies across multiple democratic enterprises reducing risk",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor diversifies across multiple democratic enterprises reducing risk",
+    "name": "Investor diversifies across multiple democratic enterprises reducing risk",
+    "description": "Investor diversifies across multiple democratic enterprises reducing risk",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-connecting personal consumption to planetary boundaries",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-connecting personal consumption to planetary boundaries",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Connecting personal consumption to planetary boundaries",
   "description": "Connecting personal consumption to planetary boundaries",
   "content": "Scenario: Connecting personal consumption to planetary boundaries\n    Given Kenji's consumption choices aggregate with billions of others\n    And planetary boundaries define sustainable resource use\n    When the bioregional_elohim shows planetary context\n    Then it should help Kenji understand his consumption in global context\n    And it should show \"Your consumption is well below sustainable average\"\n    And it should connect personal choices to planetary care economy\n    And it should teach him that individual actions scale to collective impact\n    And the system should bridge personal and planetary scales\n    And Kenji should understand himself as participant in planetary care economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Connecting personal consumption to planetary boundaries",
+    "ogDescription": "Connecting personal consumption to planetary boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-connecting personal consumption to planetary boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting personal consumption to planetary boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-connecting personal consumption to planetary boundaries",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-connecting personal consumption to planetary boundaries",
+    "name": "Connecting personal consumption to planetary boundaries",
+    "description": "Connecting personal consumption to planetary boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

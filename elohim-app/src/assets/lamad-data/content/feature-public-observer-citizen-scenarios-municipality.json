@@ -1,6 +1,8 @@
 {
   "id": "feature-public-observer-citizen-scenarios-municipality",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:municipality",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Municipal Civic Democracy for Citizen",
   "description": "As a citizen in the public_observer system Operating at the municipality governance layer I want to engage meaningfully with city decisions without policy expertise So that democracy works for working people with limited time",
   "content": "@epic:public_observer\n@user_type:citizen\n@governance_layer:municipality\n@related_users:activist,politician,board_member,journalist\n@related_layers:community,district,county_regional\n@elohim_agents:public_observer,municipal_elohim\n\nFeature: Municipal Civic Democracy for Citizen\n  As a citizen in the public_observer system\n  Operating at the municipality governance layer\n  I want to engage meaningfully with city decisions without policy expertise\n  So that democracy works for working people with limited time\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the citizen user is registered in the system\n    And the municipality governance context is active\n\n  Scenario: Citizen understands city budget trade-offs\n    Given the city council is deciding the annual budget\n    And a 300-page budget document was released\n    When the citizen reviews the Observer summary\n    Then they see clear spending priorities in plain language\n    And understand which neighborhoods get infrastructure investment\n    And view trade-offs between services (parks vs roads vs libraries)\n    And can submit position on budget priorities in 10 minutes\n    And complex civic decisions become comprehensible\n\n  Scenario: Citizen detects politician voting pattern inconsistency\n    Given a council member claims to support affordable housing\n    And the citizen cares about housing affordability\n    When the Observer tracks voting records over time\n    Then the citizen sees the council member voted against 5 housing measures\n    And approved tax breaks for luxury development\n    And observes patterns vs rhetoric divergence\n    And can hold officials accountable in elections\n    And political theater becomes visible\n\n  Scenario: Citizen participates in zoning decision with real-time context\n    Given a city council meeting is discussing zoning changes\n    And the citizen is following virtually during dinner\n    When officials and developers make claims\n    Then the Observer provides real-time fact-checking\n    And shows what \"efficient development\" actually means for residents\n    And calculates community costs hidden in presentations\n    And surfaces conflicts of interest (donations, relationships)\n    And informed participation happens in real-time\n\n  Scenario: Citizen forms coalition across municipal issue areas\n    Given 230 families are losing time to bus delays\n    And 47 teachers are concerned about school overcrowding\n    And both issues stem from municipal transportation budget\n    When the Observer detects the pattern connection\n    Then citizens see the larger civic context\n    And can coordinate with teachers and other affected groups\n    And build more powerful coalition across stakeholder types\n    And isolated concerns become coordinated advocacy\n    And cross-issue patterns surface organically\n\n  Scenario: Citizen verifies municipal service delivery claims\n    Given city officials claim streets are maintained equitably\n    And the citizen's neighborhood has persistent potholes\n    When the Observer tracks service delivery patterns\n    Then the citizen sees which neighborhoods receive infrastructure investment\n    And compares response times across different areas\n    And identifies disparities in municipal services\n    And presents evidence for accountability demands\n    And equitable service delivery becomes measurable\n",
@@ -29,6 +31,32 @@
     "epic": "public_observer",
     "scenarioCount": 5
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal Civic Democracy for Citizen",
+    "ogDescription": "As a citizen in the public_observer system Operating at the municipality governance layer I want to engage meaningfully with city decisions without policy expertise So that democracy works for working",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-citizen-scenarios-municipality",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Municipal Civic Democracy for Citizen - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-citizen-scenarios-municipality",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:municipality",
+    "name": "Municipal Civic Democracy for Citizen",
+    "description": "As a citizen in the public_observer system Operating at the municipality governance layer I want to engage meaningfully with city decisions without policy expertise So that democracy works for working people with limited time",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

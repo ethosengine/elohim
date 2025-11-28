@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-educational-alternative education models aligned with care economy",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-alternative education models aligned with care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Alternative education models aligned with care economy",
   "description": "Alternative education models aligned with care economy",
   "content": "Scenario: Alternative education models aligned with care economy\n    Given traditional higher education often fails care economy principles\n    And alternative models exist (cooperative education, free universities, community learning)\n    When Kenji explores educational alternatives\n    Then the educational_elohim should inform him of care-aligned options\n    And it should help him evaluate educational models against care principles\n    And it should recognize diverse pathways for learning and development\n    And the system should support student exploration of alternative education\n    And education should serve flourishing, not just credential accumulation\n    And care economy education should be accessible and diverse\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Alternative education models aligned with care economy",
+    "ogDescription": "Alternative education models aligned with care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-alternative education models aligned with care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Alternative education models aligned with care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-alternative education models aligned with care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-alternative education models aligned with care economy",
+    "name": "Alternative education models aligned with care economy",
+    "description": "Alternative education models aligned with care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

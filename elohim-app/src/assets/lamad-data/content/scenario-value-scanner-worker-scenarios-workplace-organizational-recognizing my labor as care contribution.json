@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-recognizing my labor as care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-recognizing my labor as care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognizing my labor as care contribution",
   "description": "Recognizing my labor as care contribution",
   "content": "Scenario: Recognizing my labor as care contribution\n    Given I prepare food that nourishes people and serves community\n    When I view my work through care economy lens\n    Then the protocol should help me understand my work as care labor\n    And accumulate care tokens reflecting my contribution to community well-being\n    And reframe my relationship to work from pure exploitation to meaningful service\n    And build consciousness that my labor deserves dignity and fair compensation\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing my labor as care contribution",
+    "ogDescription": "Recognizing my labor as care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-recognizing my labor as care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing my labor as care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-recognizing my labor as care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-recognizing my labor as care contribution",
+    "name": "Recognizing my labor as care contribution",
+    "description": "Recognizing my labor as care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

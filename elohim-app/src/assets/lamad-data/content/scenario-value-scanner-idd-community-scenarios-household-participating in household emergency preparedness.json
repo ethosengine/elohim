@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-participating in household emergency preparedness",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-participating in household emergency preparedness",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in household emergency preparedness",
   "description": "Participating in household emergency preparedness",
   "content": "Scenario: Participating in household emergency preparedness\n    Given the household practices emergency procedures\n    And everyone needs to know safety protocols\n    When the household conducts a fire drill\n    Then Jordan receives emergency instructions in accessible format\n    And the interface shows evacuation steps with pictures and arrows\n    And Jordan can practice the procedures with support\n    And Jordan's understanding is verified in accessible ways\n    And Jordan's safety capability is enhanced through practice\n    And Jordan experiences being an active participant in household safety\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in household emergency preparedness",
+    "ogDescription": "Participating in household emergency preparedness",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-participating in household emergency preparedness",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in household emergency preparedness - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-participating in household emergency preparedness",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-participating in household emergency preparedness",
+    "name": "Participating in household emergency preparedness",
+    "description": "Participating in household emergency preparedness",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

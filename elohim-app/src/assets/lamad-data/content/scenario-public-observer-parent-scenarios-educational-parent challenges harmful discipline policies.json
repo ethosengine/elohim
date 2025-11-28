@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-educational-parent challenges harmful discipline policies",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent challenges harmful discipline policies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent challenges harmful discipline policies",
   "description": "Parent challenges harmful discipline policies",
   "content": "Scenario: Parent challenges harmful discipline policies\n    Given the school implements zero-tolerance discipline policy\n    And the parent's child has been suspended for minor incident\n    When the parent reviews Observer's discipline data\n    Then they see suspension rates and disparate racial impacts\n    And learn about restorative justice alternatives\n    And discover other parents whose children face similar treatment\n    And understand policy alternatives from other districts\n    And parent coalition advocates for evidence-based discipline reform\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent challenges harmful discipline policies",
+    "ogDescription": "Parent challenges harmful discipline policies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent challenges harmful discipline policies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent challenges harmful discipline policies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent challenges harmful discipline policies",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent challenges harmful discipline policies",
+    "name": "Parent challenges harmful discipline policies",
+    "description": "Parent challenges harmful discipline policies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

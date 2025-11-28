@@ -62,6 +62,34 @@
     "bookCount": 0,
     "bibleVerseCount": 10
   },
-  "createdAt": "2025-11-28T02:53:21.866784",
-  "updatedAt": "2025-11-28T02:53:21.866785"
+  "createdAt": "2025-11-28T21:10:19.207114",
+  "updatedAt": "2025-11-28T21:10:19.207115",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 6: Minimizing Harmful Consequences",
+    "ogDescription": "When a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competi",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.207114",
+    "articleModifiedTime": "2025-11-28T21:10:19.207115",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 6: Minimizing Harmful Consequences - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "FCT 6: Minimizing Harmful Consequences",
+    "description": "When a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competition and away from collaboration",
+    "dateCreated": "2025-11-28T21:10:19.207114",
+    "dateModified": "2025-11-28T21:10:19.207115",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

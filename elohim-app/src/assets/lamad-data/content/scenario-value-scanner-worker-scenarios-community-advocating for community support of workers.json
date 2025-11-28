@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-community-advocating for community support of workers",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-advocating for community support of workers",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advocating for community support of workers",
   "description": "Advocating for community support of workers",
   "content": "Scenario: Advocating for community support of workers\n    Given workers are systematically underpaid and overworked\n    When I want to advocate for community support of workers\n    Then the protocol should help me organize advocacy\n    And connect me with other workers for collective action\n    And support pushing for living wage campaigns and worker protections\n    And build community culture that values worker dignity\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for community support of workers",
+    "ogDescription": "Advocating for community support of workers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-advocating for community support of workers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for community support of workers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-advocating for community support of workers",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-advocating for community support of workers",
+    "name": "Advocating for community support of workers",
+    "description": "Advocating for community support of workers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

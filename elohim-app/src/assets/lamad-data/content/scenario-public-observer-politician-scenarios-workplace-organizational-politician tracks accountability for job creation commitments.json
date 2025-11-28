@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician tracks accountability for job creation commitments",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician tracks accountability for job creation commitments",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician tracks accountability for job creation commitments",
   "description": "Politician tracks accountability for job creation commitments",
   "content": "Scenario: Politician tracks accountability for job creation commitments\n    Given the politician approved tax incentives for business expansion\n    And company promised specific job creation and wage levels\n    When the Observer monitors economic development outcomes\n    Then they see actual jobs created versus commitments\n    And track whether wages meet promised levels\n    And identify whether company hires local workers versus imports\n    And receive alerts when company fails to meet obligations\n    And enforce accountability provisions or recapture subsidies\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician tracks accountability for job creation commitments",
+    "ogDescription": "Politician tracks accountability for job creation commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician tracks accountability for job creation commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician tracks accountability for job creation commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician tracks accountability for job creation commitments",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician tracks accountability for job creation commitments",
+    "name": "Politician tracks accountability for job creation commitments",
+    "description": "Politician tracks accountability for job creation commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

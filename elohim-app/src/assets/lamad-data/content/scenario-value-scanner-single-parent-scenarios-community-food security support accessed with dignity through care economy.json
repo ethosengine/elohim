@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-community-food security support accessed with dignity through care economy",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-food security support accessed with dignity through care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Food security support accessed with dignity through care economy",
   "description": "Food security support accessed with dignity through care economy",
   "content": "Scenario: Food security support accessed with dignity through care economy\n    Given Maria's $175/week grocery budget for four people is severely constrained\n    And food security is essential for family well-being\n    When Maria's economic status qualifies her for food support\n    Then the community_elohim should connect her to food assistance programs\n    And support should be framed as care economy reciprocity, not charity\n    And Maria should access help without stigmatizing means-testing processes\n    And her massive care contributions should be recognized as qualifying her for support\n    And food assistance should be dignified and adequate for family needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Food security support accessed with dignity through care economy",
+    "ogDescription": "Food security support accessed with dignity through care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-food security support accessed with dignity through care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Food security support accessed with dignity through care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-food security support accessed with dignity through care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-food security support accessed with dignity through care economy",
+    "name": "Food security support accessed with dignity through care economy",
+    "description": "Food security support accessed with dignity through care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

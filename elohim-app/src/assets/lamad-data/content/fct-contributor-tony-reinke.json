@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-14-ready-to-act"
   },
-  "createdAt": "2025-11-28T02:53:21.902424",
-  "updatedAt": "2025-11-28T02:53:21.902425"
+  "createdAt": "2025-11-28T21:10:19.225373",
+  "updatedAt": "2025-11-28T21:10:19.225374",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Tony Reinke",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-tony-reinke",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Tony Reinke - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-tony-reinke",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Tony Reinke",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.225373",
+    "dateModified": "2025-11-28T21:10:19.225374",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

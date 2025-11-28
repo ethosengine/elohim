@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's proposals can be rejected without retaliation",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:workplace-organizational-manager's proposals can be rejected without retaliation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Manager's proposals can be rejected without retaliation",
   "description": "Manager's proposals can be rejected without retaliation",
   "content": "Scenario: Manager's proposals can be rejected without retaliation\n    Given Marcus proposes operational change he believes is beneficial\n    And workers deliberate and vote to reject the proposal\n    When rejection occurs\n    Then Marcus accepts worker decision gracefully\n    And Marcus does not retaliate through subtle means\n    And Marcus proposes alternative approaches respecting worker concerns\n    And workers know their democratic power is real, not performative\n    And workplace_elohim ensures rejected proposals don't resurface as subtle coercion\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Manager's proposals can be rejected without retaliation",
+    "ogDescription": "Manager's proposals can be rejected without retaliation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's proposals can be rejected without retaliation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Manager's proposals can be rejected without retaliation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's proposals can be rejected without retaliation",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:workplace-organizational-manager's proposals can be rejected without retaliation",
+    "name": "Manager's proposals can be rejected without retaliation",
+    "description": "Manager's proposals can be rejected without retaliation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

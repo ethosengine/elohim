@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-seasonal supply coordination enables year-round democratic food service",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-seasonal supply coordination enables year-round democratic food service",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Seasonal supply coordination enables year-round democratic food service",
   "description": "Seasonal supply coordination enables year-round democratic food service",
   "content": "Scenario: Seasonal supply coordination enables year-round democratic food service\n    Given individual farms have limited seasonal production windows\n    And restaurants need year-round supply but faced corporate distribution dependence\n    When democratic farms coordinate across climate zones and seasons\n    Then network provides diverse year-round supply through farmer coordination\n    And restaurants adapt menus to seasonal availability reducing waste\n    And farmers specialize in crops suited to their land and climate\n    And seasonal coordination provides reliability without standardization\n    And industry_sector_elohim coordinates seasonal supply across bioregional network\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Seasonal supply coordination enables year-round democratic food service",
+    "ogDescription": "Seasonal supply coordination enables year-round democratic food service",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-seasonal supply coordination enables year-round democratic food service",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Seasonal supply coordination enables year-round democratic food service - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-seasonal supply coordination enables year-round democratic food service",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-seasonal supply coordination enables year-round democratic food service",
+    "name": "Seasonal supply coordination enables year-round democratic food service",
+    "description": "Seasonal supply coordination enables year-round democratic food service",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

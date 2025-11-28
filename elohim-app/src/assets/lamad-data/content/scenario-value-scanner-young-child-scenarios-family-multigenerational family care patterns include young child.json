@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-family-multigenerational family care patterns include young child",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family-multigenerational family care patterns include young child",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Multigenerational family care patterns include young child",
   "description": "Multigenerational family care patterns include young child",
   "content": "Scenario: Multigenerational family care patterns include young child\n    Given Tommy's grandparent is part of the extended family\n    And the grandparent provides childcare\n    When Tommy interacts with grandparent through care economy\n    Then his care contributions should be visible to grandparent\n    And grandparent's care for Tommy should be tracked\n    And the family_elohim should coordinate across generations\n    And Tommy should learn that care flows in multiple directions\n    And family care economy should span beyond nuclear household\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Multigenerational family care patterns include young child",
+    "ogDescription": "Multigenerational family care patterns include young child",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-family-multigenerational family care patterns include young child",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multigenerational family care patterns include young child - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-family-multigenerational family care patterns include young child",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family-multigenerational family care patterns include young child",
+    "name": "Multigenerational family care patterns include young child",
+    "description": "Multigenerational family care patterns include young child",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

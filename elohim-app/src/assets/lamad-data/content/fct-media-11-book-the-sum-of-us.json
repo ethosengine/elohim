@@ -25,6 +25,36 @@
     "author": "Heather Mc"
   },
   "_contributor": "Heather Mc",
-  "createdAt": "2025-11-28T02:53:21.892609",
-  "updatedAt": "2025-11-28T02:53:21.892610"
+  "createdAt": "2025-11-28T21:10:19.219778",
+  "updatedAt": "2025-11-28T21:10:19.219779",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Sum of Us",
+    "ogDescription": "Book by Heather Mc",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-the-sum-of-us",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Sum of Us - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-the-sum-of-us",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "The Sum of Us",
+    "description": "Book by Heather Mc",
+    "dateCreated": "2025-11-28T21:10:19.219778",
+    "dateModified": "2025-11-28T21:10:19.219779",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Heather Mc"
+    }
+  }
 }

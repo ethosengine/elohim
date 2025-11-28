@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-family-transition from dependent child to independent adult in family",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-transition from dependent child to independent adult in family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transition from dependent child to independent adult in family",
   "description": "Transition from dependent child to independent adult in family",
   "content": "Scenario: Transition from dependent child to independent adult in family\n    Given Aisha was recently a dependent family member\n    And she's now an independent adult\n    When Aisha participates in family governance\n    Then her voice should carry equal weight to other adults\n    And she should participate in family decisions as a peer\n    And her care contributions should be recognized as adult care work\n    And the family_elohim should reflect her changed status\n    And family relationships should adapt to her independence\n    And she should be valued as capable adult contributor\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Transition from dependent child to independent adult in family",
+    "ogDescription": "Transition from dependent child to independent adult in family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-transition from dependent child to independent adult in family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transition from dependent child to independent adult in family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-transition from dependent child to independent adult in family",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-transition from dependent child to independent adult in family",
+    "name": "Transition from dependent child to independent adult in family",
+    "description": "Transition from dependent child to independent adult in family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

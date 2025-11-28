@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-bioregional connection through local food and resources",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-bioregional connection through local food and resources",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional connection through local food and resources",
   "description": "Bioregional connection through local food and resources",
   "content": "Scenario: Bioregional connection through local food and resources\n    Given Sarah's family lives in specific bioregion\n    And connecting to local ecology builds stewardship\n    When the ecological_elohim supports bioregional connection\n    Then it should help Sarah source local food and resources\n    And it should provide information about regional ecology\n    And it should recognize Sarah's work to build local connections\n    And bioregional care should be valued in care economy\n    And the system should support regional ecological engagement\n    And Sarah should be rewarded for choosing local over global\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional connection through local food and resources",
+    "ogDescription": "Bioregional connection through local food and resources",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-bioregional connection through local food and resources",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional connection through local food and resources - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-bioregional connection through local food and resources",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-bioregional connection through local food and resources",
+    "name": "Bioregional connection through local food and resources",
+    "description": "Bioregional connection through local food and resources",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

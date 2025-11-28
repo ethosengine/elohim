@@ -65,6 +65,34 @@
     "bookCount": 0,
     "bibleVerseCount": 14
   },
-  "createdAt": "2025-11-28T02:53:21.854709",
-  "updatedAt": "2025-11-28T02:53:21.854710"
+  "createdAt": "2025-11-28T21:10:19.196874",
+  "updatedAt": "2025-11-28T21:10:19.196875",
+  "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 4: Setting the Stage: Scaling Wisdom",
+    "ogDescription": "Review, evolution of Trust  \\- https://ncase.me/trust/ ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.196874",
+    "articleModifiedTime": "2025-11-28T21:10:19.196875",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 4: Setting the Stage: Scaling Wisdom - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom",
+    "identifier": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+    "name": "FCT 4: Setting the Stage: Scaling Wisdom",
+    "description": "Review, evolution of Trust  \\- https://ncase.me/trust/ ",
+    "dateCreated": "2025-11-28T21:10:19.196874",
+    "dateModified": "2025-11-28T21:10:19.196875",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

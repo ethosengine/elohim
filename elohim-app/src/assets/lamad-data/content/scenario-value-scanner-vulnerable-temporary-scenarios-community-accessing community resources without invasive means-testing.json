@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-accessing community resources without invasive means-testing",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-accessing community resources without invasive means-testing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing community resources without invasive means-testing",
   "description": "Accessing community resources without invasive means-testing",
   "content": "Scenario: Accessing community resources without invasive means-testing\n    Given traditional social services require proving I'm \"needy enough\"\n    And care economy provides support based on different principles\n    When I access community resources through care economy\n    Then the Value Scanner provides access based on care participation, not means-testing\n    And doesn't require exposing private trauma to gatekeepers\n    And validates my care contributions as basis for receiving support\n    And preserves my privacy and dignity\n    And connects me to resources efficiently without bureaucratic barriers\n    And my personal_agent helps me navigate with minimal burden\n    And recognizes that care economy support differs from institutional charity\n    And provides dignified alternative to degrading social services\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing community resources without invasive means-testing",
+    "ogDescription": "Accessing community resources without invasive means-testing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-accessing community resources without invasive means-testing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing community resources without invasive means-testing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-accessing community resources without invasive means-testing",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-accessing community resources without invasive means-testing",
+    "name": "Accessing community resources without invasive means-testing",
+    "description": "Accessing community resources without invasive means-testing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

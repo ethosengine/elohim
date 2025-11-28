@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-community-mentoring younger community members and professionals",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-mentoring younger community members and professionals",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Mentoring younger community members and professionals",
   "description": "Mentoring younger community members and professionals",
   "content": "Scenario: Mentoring younger community members and professionals\n    Given Margaret has decades of nursing experience and life wisdom\n    And younger professionals and community members can learn from her\n    When Margaret mentors or teaches in community\n    Then the community_elohim should recognize mentoring as care work\n    And it should value intergenerational knowledge transmission\n    And it should connect Margaret with mentoring opportunities\n    And her wisdom and experience should benefit next generation\n    And mentoring should accumulate care tokens\n    And community should benefit from elder mentorship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Mentoring younger community members and professionals",
+    "ogDescription": "Mentoring younger community members and professionals",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-mentoring younger community members and professionals",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mentoring younger community members and professionals - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-mentoring younger community members and professionals",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-mentoring younger community members and professionals",
+    "name": "Mentoring younger community members and professionals",
+    "description": "Mentoring younger community members and professionals",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

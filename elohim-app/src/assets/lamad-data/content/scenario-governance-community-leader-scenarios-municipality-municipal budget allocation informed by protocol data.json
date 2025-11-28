@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-municipal budget allocation informed by protocol data",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal budget allocation informed by protocol data",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal budget allocation informed by protocol data",
   "description": "Municipal budget allocation informed by protocol data",
   "content": "Scenario: Municipal budget allocation informed by protocol data\n    Given city council determines annual budget\n    And we need evidence about neighborhood needs and priorities\n    When Municipal Elohim provides resource flow analysis\n    Then we see: which neighborhoods are underserved\n    And we identify: where investments would have most impact\n    And we understand: how different spending choices ripple across city\n    And city council: deliberates and decides using this information\n    And we maintain: political accountability for budget choices\n    And protocol transparency: enables better democratic decision-making\n    And agent information: serves elected governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal budget allocation informed by protocol data",
+    "ogDescription": "Municipal budget allocation informed by protocol data",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal budget allocation informed by protocol data",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal budget allocation informed by protocol data - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal budget allocation informed by protocol data",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal budget allocation informed by protocol data",
+    "name": "Municipal budget allocation informed by protocol data",
+    "description": "Municipal budget allocation informed by protocol data",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

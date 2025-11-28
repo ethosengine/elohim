@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-community-community appeal informs local policy development",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-community appeal informs local policy development",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community appeal informs local policy development",
   "description": "Community appeal informs local policy development",
   "content": "Scenario: Community appeal informs local policy development\n    Given my appeal revealed gaps in how Community Elohim handles certain situations\n    And Constitutional Council made recommendations for improvement\n    When Community Leader reviews appeal patterns and recommendations\n    Then the leader brings findings to city council for policy response\n    And Local ordinances may be updated to clarify boundaries\n    And Community protocol calibration may be proposed\n    And My individual appeal contributes to broader community governance\n    And Democratic feedback loop connects appeals to policy improvement\n    And Community becomes more responsive through listening to dissent\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Community appeal informs local policy development",
+    "ogDescription": "Community appeal informs local policy development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-community appeal informs local policy development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community appeal informs local policy development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-community appeal informs local policy development",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-community appeal informs local policy development",
+    "name": "Community appeal informs local policy development",
+    "description": "Community appeal informs local policy development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

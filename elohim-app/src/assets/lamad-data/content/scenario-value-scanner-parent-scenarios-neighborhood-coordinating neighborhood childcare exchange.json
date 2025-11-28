@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-neighborhood-coordinating neighborhood childcare exchange",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-coordinating neighborhood childcare exchange",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating neighborhood childcare exchange",
   "description": "Coordinating neighborhood childcare exchange",
   "content": "Scenario: Coordinating neighborhood childcare exchange\n    Given Sarah needs occasional childcare coverage\n    And she can provide childcare for others in exchange\n    When the neighborhood_elohim coordinates childcare sharing\n    Then it should match parents for reciprocal childcare\n    And it should track care provided and received\n    And it should ensure exchanges are equitable over time\n    And childcare cooperation should be visible and valued\n    And parents should support each other sustainably\n    And neighborhood care economy should reduce childcare costs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating neighborhood childcare exchange",
+    "ogDescription": "Coordinating neighborhood childcare exchange",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-coordinating neighborhood childcare exchange",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating neighborhood childcare exchange - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-coordinating neighborhood childcare exchange",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-coordinating neighborhood childcare exchange",
+    "name": "Coordinating neighborhood childcare exchange",
+    "description": "Coordinating neighborhood childcare exchange",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

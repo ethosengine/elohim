@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-teaching children environmental values through lived practice",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-teaching children environmental values through lived practice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching children environmental values through lived practice",
   "description": "Teaching children environmental values through lived practice",
   "content": "Scenario: Teaching children environmental values through lived practice\n    Given Maria's children witness thrift, waste prevention, and resource care daily\n    And they learn sustainability through household necessity\n    When children's environmental education is assessed\n    Then the bioregional_elohim should recognize that Maria teaches sustainability through practice\n    And it should value lived environmental education over abstract lessons\n    And her children should be developing deep sustainability values\n    And household practices should be honored as effective environmental socialization\n    And Maria should be recognized as teaching next generation environmental stewardship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching children environmental values through lived practice",
+    "ogDescription": "Teaching children environmental values through lived practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-teaching children environmental values through lived practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching children environmental values through lived practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-teaching children environmental values through lived practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-teaching children environmental values through lived practice",
+    "name": "Teaching children environmental values through lived practice",
+    "description": "Teaching children environmental values through lived practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

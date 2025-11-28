@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-individual-right to disconnect maintained with full data portability",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-right to disconnect maintained with full data portability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Right to disconnect maintained with full data portability",
   "description": "Right to disconnect maintained with full data portability",
   "content": "Scenario: Right to disconnect maintained with full data portability\n    Given Sarah has been using the Value Scanner\n    And constitutional constraints apply at all layers\n    When Sarah chooses to disconnect from the system\n    Then the system must honor disconnection immediately\n    And she should receive complete data export of all her information\n    And no manipulative retention patterns should be employed\n    And her right to not participate must be absolute\n    And data portability should enable switching to alternative systems\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Right to disconnect maintained with full data portability",
+    "ogDescription": "Right to disconnect maintained with full data portability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-right to disconnect maintained with full data portability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Right to disconnect maintained with full data portability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-right to disconnect maintained with full data portability",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-right to disconnect maintained with full data portability",
+    "name": "Right to disconnect maintained with full data portability",
+    "description": "Right to disconnect maintained with full data portability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "feature-public-observer-activist-scenarios-provincial-state",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "State-Level Policy Advocacy for Activist",
   "description": "As an activist in the public_observer system Operating at the provincial_state governance layer I want to connect local struggles to state policy solutions So that structural barriers can be addressed at appropriate scale",
   "content": "@epic:public_observer\n@user_type:activist\n@governance_layer:provincial_state\n@related_users:community_organizer,activist,politician,journalist\n@related_layers:municipality,nation_state,county_regional\n@elohim_agents:public_observer,regional_elohim,policy_elohim\n\nFeature: State-Level Policy Advocacy for Activist\n  As an activist in the public_observer system\n  Operating at the provincial_state governance layer\n  I want to connect local struggles to state policy solutions\n  So that structural barriers can be addressed at appropriate scale\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the provincial_state governance context is active\n\n  Scenario: Activist identifies state preemption blocking local solutions\n    Given the activist's community wants rent control\n    But local municipality cannot enact it\n    When the Observer explains state preemption law\n    Then the activist learns state policy blocks local authority\n    And sees which legislators voted for preemption\n    And identifies campaign donors (real estate lobby)\n    And connects to statewide coalition fighting preemption\n    And local organizing scales to state-level campaign\n\n  Scenario: Activist tracks state legislation across session\n    Given hundreds of bills move through state legislature\n    And the activist cannot attend all hearings\n    When the Observer monitors state education legislation\n    Then the activist receives alerts on relevant bills\n    And sees analysis of policy impacts on students\n    And identifies opportunities for testimony\n    And tracks which legislators support or oppose\n    And statewide advocacy becomes sustainable\n\n  Scenario: Activist exposes corporate lobbying influence\n    Given a harmful environmental bill is advancing\n    And the activist suspects industry capture\n    When the Observer tracks lobbying and donations\n    Then the activist sees which companies lobby for the bill\n    And views campaign contributions to bill sponsors\n    And identifies revolving door between industry and regulators\n    And corruption patterns become documented\n    And advocacy targets political vulnerabilities\n\n  Scenario: Activist connects local impacts to state policy\n    Given state education funding formula harms the activist's district\n    And needs to build pressure for reform\n    When the Observer calculates local impacts of state policy\n    Then the activist shows how formula shortchanges their district by $4M\n    And documents impacts on class sizes and programs\n    And connects families affected by funding gaps\n    And state policy debate becomes grounded in local reality\n    And abstract policy becomes personal stakes\n\n  Scenario: Activist coordinates statewide organizing campaign\n    Given housing justice activists across 15 cities face same state policy barrier\n    And coordination is exhausting without infrastructure\n    When the Observer facilitates statewide activist network\n    Then activists can share tactics and research\n    And coordinate testimony across multiple legislative hearings\n    And track campaign progress and legislator commitments\n    And distributed organizing becomes coordinated movement\n    And state-level power builds through network effects\n",
@@ -29,6 +31,32 @@
     "epic": "public_observer",
     "scenarioCount": 5
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "State-Level Policy Advocacy for Activist",
+    "ogDescription": "As an activist in the public_observer system Operating at the provincial_state governance layer I want to connect local struggles to state policy solutions So that structural barriers can be addressed",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-activist-scenarios-provincial-state",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "State-Level Policy Advocacy for Activist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-activist-scenarios-provincial-state",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state",
+    "name": "State-Level Policy Advocacy for Activist",
+    "description": "As an activist in the public_observer system Operating at the provincial_state governance layer I want to connect local struggles to state policy solutions So that structural barriers can be addressed at appropriate scale",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

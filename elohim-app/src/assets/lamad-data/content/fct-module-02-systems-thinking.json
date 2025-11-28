@@ -58,6 +58,34 @@
     "bookCount": 1,
     "bibleVerseCount": 10
   },
-  "createdAt": "2025-11-28T02:53:21.853317",
-  "updatedAt": "2025-11-28T02:53:21.853318"
+  "createdAt": "2025-11-28T21:10:19.195461",
+  "updatedAt": "2025-11-28T21:10:19.195462",
+  "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 2: Systems Thinking",
+    "ogDescription": "Welcome to an exploration of complex and complicated systems through the lens of our Christian faith. This journey will introduce you to the distinct characteristics of these two types of systems and ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-02-systems-thinking",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.195461",
+    "articleModifiedTime": "2025-11-28T21:10:19.195462",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 2: Systems Thinking - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-02-systems-thinking",
+    "identifier": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+    "name": "FCT 2: Systems Thinking",
+    "description": "Welcome to an exploration of complex and complicated systems through the lens of our Christian faith. This journey will introduce you to the distinct characteristics of these two types of systems and the unique techniques required to interact with each, all while grounding our understanding in biblical wisdom and Christian stewardship.",
+    "dateCreated": "2025-11-28T21:10:19.195461",
+    "dateModified": "2025-11-28T21:10:19.195462",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

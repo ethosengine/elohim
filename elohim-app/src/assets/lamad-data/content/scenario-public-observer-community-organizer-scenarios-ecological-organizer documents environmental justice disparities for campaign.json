@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-ecological-organizer documents environmental justice disparities for campaign",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer documents environmental justice disparities for campaign",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer documents environmental justice disparities for campaign",
   "description": "Organizer documents environmental justice disparities for campaign",
   "content": "Scenario: Organizer documents environmental justice disparities for campaign\n    Given industrial pollution concentrates in low-income neighborhoods of color\n    While parks and trees concentrate in wealthy white areas\n    When the Observer provides environmental equity data\n    Then the organizer sees pollution sources mapped by neighborhood demographics\n    And views park access and tree canopy distribution\n    And calculates health impact disparities from environmental conditions\n    And identifies affected communities for organizing base\n    And environmental racism becomes documented and actionable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer documents environmental justice disparities for campaign",
+    "ogDescription": "Organizer documents environmental justice disparities for campaign",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer documents environmental justice disparities for campaign",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer documents environmental justice disparities for campaign - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer documents environmental justice disparities for campaign",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer documents environmental justice disparities for campaign",
+    "name": "Organizer documents environmental justice disparities for campaign",
+    "description": "Organizer documents environmental justice disparities for campaign",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

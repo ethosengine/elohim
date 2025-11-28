@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-family-family care legacy and intergenerational learning",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-family care legacy and intergenerational learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care legacy and intergenerational learning",
   "description": "Family care legacy and intergenerational learning",
   "content": "Scenario: Family care legacy and intergenerational learning\n    Given Sarah learned caregiving from her own parents\n    And she is teaching care practices to Tommy and Emma\n    When the family_elohim tracks intergenerational patterns\n    Then it should recognize care legacy across generations\n    And it should show how care practices are transmitted\n    And it should value Sarah's role in teaching next generation\n    And intergenerational care knowledge should be recognized\n    And the system should support positive care culture transmission\n    And family care economy should build across generations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care legacy and intergenerational learning",
+    "ogDescription": "Family care legacy and intergenerational learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-family care legacy and intergenerational learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care legacy and intergenerational learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-family care legacy and intergenerational learning",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-family care legacy and intergenerational learning",
+    "name": "Family care legacy and intergenerational learning",
+    "description": "Family care legacy and intergenerational learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

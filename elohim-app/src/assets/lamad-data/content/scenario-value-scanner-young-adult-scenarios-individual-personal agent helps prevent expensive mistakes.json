@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-individual-personal agent helps prevent expensive mistakes",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-personal agent helps prevent expensive mistakes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent helps prevent expensive mistakes",
   "description": "Personal agent helps prevent expensive mistakes",
   "content": "Scenario: Personal agent helps prevent expensive mistakes\n    Given Aisha bought too much fresh produce last week\n    And the produce spoiled before she could use it\n    When the personal_agent analyzes her shopping patterns\n    Then it should identify the waste pattern\n    And it should suggest buying smaller quantities\n    And it should recommend frozen alternatives when appropriate\n    And the feedback should be constructive, not judgmental\n    And Aisha should learn from the mistake without shame\n    And the system should help her optimize future purchases\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent helps prevent expensive mistakes",
+    "ogDescription": "Personal agent helps prevent expensive mistakes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-personal agent helps prevent expensive mistakes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent helps prevent expensive mistakes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-personal agent helps prevent expensive mistakes",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-personal agent helps prevent expensive mistakes",
+    "name": "Personal agent helps prevent expensive mistakes",
+    "description": "Personal agent helps prevent expensive mistakes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

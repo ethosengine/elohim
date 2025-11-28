@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-alex's disability expertise recognized as valuable family knowledge",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-alex's disability expertise recognized as valuable family knowledge",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Alex's disability expertise recognized as valuable family knowledge",
   "description": "Alex's disability expertise recognized as valuable family knowledge",
   "content": "Scenario: Alex's disability expertise recognized as valuable family knowledge\n    Given Alex has deep expertise about disability, accessibility, and ableism\n    And this knowledge benefits entire family\n    When family engages with disability-related topics\n    Then Alex should be recognized as the family expert\n    And family should seek Alex's guidance on accessibility matters\n    And Alex's advocacy work should be valued as contribution\n    And Alex's perspective should shape family understanding\n    And the family_elohim should position Alex as knowledge source\n    And Alex's disability experience should be treated as expertise, not deficit\n    And family should learn from Alex, not pity Alex\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Alex's disability expertise recognized as valuable family knowledge",
+    "ogDescription": "Alex's disability expertise recognized as valuable family knowledge",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-alex's disability expertise recognized as valuable family knowledge",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Alex's disability expertise recognized as valuable family knowledge - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-alex's disability expertise recognized as valuable family knowledge",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-alex's disability expertise recognized as valuable family knowledge",
+    "name": "Alex's disability expertise recognized as valuable family knowledge",
+    "description": "Alex's disability expertise recognized as valuable family knowledge",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

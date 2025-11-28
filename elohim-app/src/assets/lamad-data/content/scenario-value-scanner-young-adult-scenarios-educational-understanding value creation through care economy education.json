@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-educational-understanding value creation through care economy education",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-understanding value creation through care economy education",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Understanding value creation through care economy education",
   "description": "Understanding value creation through care economy education",
   "content": "Scenario: Understanding value creation through care economy education\n    Given traditional economics education emphasizes market transactions\n    And Aisha is learning care economy principles\n    When the personal_agent teaches value concepts\n    Then it should explain how care creates value\n    And it should teach that invisible work is valuable\n    And it should explain care token economics\n    And it should help her understand reciprocal care systems\n    And care economy literacy should provide alternative to market capitalism\n    And foundational economic understanding should center care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Understanding value creation through care economy education",
+    "ogDescription": "Understanding value creation through care economy education",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-understanding value creation through care economy education",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding value creation through care economy education - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-understanding value creation through care economy education",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-understanding value creation through care economy education",
+    "name": "Understanding value creation through care economy education",
+    "description": "Understanding value creation through care economy education",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

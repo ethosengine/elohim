@@ -27,6 +27,32 @@
     "year": null
   },
   "_organization": null,
-  "createdAt": "2025-11-28T02:53:21.847231",
-  "updatedAt": "2025-11-28T02:53:21.847232"
+  "createdAt": "2025-11-28T21:10:19.189562",
+  "updatedAt": "2025-11-28T21:10:19.189564",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Video",
+  "openGraphMetadata": {
+    "ogTitle": "The Hidden Tribes of America",
+    "ogDescription": "The Hidden Tribes of America",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-video-the-hidden-tribes-of",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/video.jpg",
+    "ogImageAlt": "The Hidden Tribes of America - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "VideoObject",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-video-the-hidden-tribes-of",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "The Hidden Tribes of America",
+    "description": "The Hidden Tribes of America",
+    "dateCreated": "2025-11-28T21:10:19.189562",
+    "dateModified": "2025-11-28T21:10:19.189564",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

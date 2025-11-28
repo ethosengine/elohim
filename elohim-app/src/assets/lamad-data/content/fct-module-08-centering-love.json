@@ -61,6 +61,34 @@
     "bookCount": 0,
     "bibleVerseCount": 10
   },
-  "createdAt": "2025-11-28T02:53:21.872173",
-  "updatedAt": "2025-11-28T02:53:21.872175"
+  "createdAt": "2025-11-28T21:10:19.210002",
+  "updatedAt": "2025-11-28T21:10:19.210003",
+  "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 8: Centering Values: Love",
+    "ogDescription": "On Christ The Solid Rock I Stand (hymn)",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-08-centering-love",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.210002",
+    "articleModifiedTime": "2025-11-28T21:10:19.210003",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 8: Centering Values: Love - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-08-centering-love",
+    "identifier": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+    "name": "FCT 8: Centering Values: Love",
+    "description": "On Christ The Solid Rock I Stand (hymn)",
+    "dateCreated": "2025-11-28T21:10:19.210002",
+    "dateModified": "2025-11-28T21:10:19.210003",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

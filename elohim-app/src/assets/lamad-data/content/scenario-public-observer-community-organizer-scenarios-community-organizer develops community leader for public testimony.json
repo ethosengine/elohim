@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-community-organizer develops community leader for public testimony",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer develops community leader for public testimony",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer develops community leader for public testimony",
   "description": "Organizer develops community leader for public testimony",
   "content": "Scenario: Organizer develops community leader for public testimony\n    Given a tenant has never spoken at public meetings\n    And they want to testify about rent burden at city council\n    When the organizer uses Observer to support leadership development\n    Then the tenant receives accessible data on local rent patterns\n    And gets sample testimony framework personalized to their experience\n    And sees common questions and effective response strategies\n    And practices using Observer's preparation tools\n    And emerges as powerful community voice not dependent on organizer\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer develops community leader for public testimony",
+    "ogDescription": "Organizer develops community leader for public testimony",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer develops community leader for public testimony",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer develops community leader for public testimony - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer develops community leader for public testimony",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer develops community leader for public testimony",
+    "name": "Organizer develops community leader for public testimony",
+    "description": "Organizer develops community leader for public testimony",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

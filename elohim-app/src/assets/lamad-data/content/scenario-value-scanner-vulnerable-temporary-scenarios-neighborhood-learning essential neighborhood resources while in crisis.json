@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-learning essential neighborhood resources while in crisis",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-learning essential neighborhood resources while in crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning essential neighborhood resources while in crisis",
   "description": "Learning essential neighborhood resources while in crisis",
   "content": "Scenario: Learning essential neighborhood resources while in crisis\n    Given I have just moved to this neighborhood in crisis circumstances\n    And I need to quickly learn where essential services are located\n    When I explore my new neighborhood\n    Then the Value Scanner maps critical local resources\n    And identifies nearest food assistance, medical care, schools, childcare\n    And surfaces public transportation routes and walkability\n    And locates free/low-cost resources for children (parks, libraries, activities)\n    And provides information about neighborhood safety and character\n    And my personal_agent creates personalized neighborhood resource guide\n    And updates information as I discover new resources\n    And helps me build neighborhood knowledge efficiently\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Learning essential neighborhood resources while in crisis",
+    "ogDescription": "Learning essential neighborhood resources while in crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-learning essential neighborhood resources while in crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning essential neighborhood resources while in crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-learning essential neighborhood resources while in crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-learning essential neighborhood resources while in crisis",
+    "name": "Learning essential neighborhood resources while in crisis",
+    "description": "Learning essential neighborhood resources while in crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

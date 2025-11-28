@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-worker council makes strategic decisions about business direction",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-worker council makes strategic decisions about business direction",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Worker council makes strategic decisions about business direction",
   "description": "Worker council makes strategic decisions about business direction",
   "content": "Scenario: Worker council makes strategic decisions about business direction\n    Given corporate previously mandated menu, pricing, and suppliers\n    And workers now govern these strategic decisions democratically\n    When Emma proposes direct relationships with local farmers\n    Then worker council deliberates on supply chain transition\n    And workers analyze cost/benefit of local vs. corporate sourcing\n    And workers vote on adopting Johnson Farm as primary vegetable supplier\n    And the decision is implemented immediately\n    And menu adapts to seasonal availability from democratic supplier relationships\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Worker council makes strategic decisions about business direction",
+    "ogDescription": "Worker council makes strategic decisions about business direction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-worker council makes strategic decisions about business direction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Worker council makes strategic decisions about business direction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-worker council makes strategic decisions about business direction",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-worker council makes strategic decisions about business direction",
+    "name": "Worker council makes strategic decisions about business direction",
+    "description": "Worker council makes strategic decisions about business direction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

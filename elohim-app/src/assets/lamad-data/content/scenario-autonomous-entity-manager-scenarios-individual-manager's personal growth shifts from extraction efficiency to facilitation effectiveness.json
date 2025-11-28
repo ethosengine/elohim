@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-manager-scenarios-individual-manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:individual-manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
   "description": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
   "content": "Scenario: Manager's personal growth shifts from extraction efficiency to facilitation effectiveness\n    Given corporate measured Marcus's success by labor cost minimization\n    And his career growth meant managing more extraction at larger scale\n    When he transitions to democratic coordinator\n    Then his growth trajectory shifts to facilitation skill development\n    And he learns consensus-building, conflict mediation, transparent communication\n    And his expertise becomes transferable to human flourishing, not just profit extraction\n    And he can mentor new EAE acquisitions through democratic transition\n    And his skills serve life instead of serving only capital\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-manager-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "ogDescription": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-individual-manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-individual-manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:individual-manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "name": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "description": "Manager's personal growth shifts from extraction efficiency to facilitation effectiveness",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

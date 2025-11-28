@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-supplier-scenarios-industry-sector-democratic distribution cooperative emerges providing logistics without extraction",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-democratic distribution cooperative emerges providing logistics without extraction",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Democratic distribution cooperative emerges providing logistics without extraction",
   "description": "Democratic distribution cooperative emerges providing logistics without extraction",
   "content": "Scenario: Democratic distribution cooperative emerges providing logistics without extraction\n    Given some distribution infrastructure is useful (aggregation, transportation, storage)\n    And corporate distributors provide this but extract massively beyond cost\n    When democratic network creates worker-owned distribution cooperative\n    Then logistics services are provided at cost-recovery, not profit maximization\n    And distribution workers gain ownership and democratic governance\n    And necessary functions are preserved without extraction\n    And democratic cooperative proves distribution infrastructure can be democratically operated\n    And industry_sector_elohim coordinates democratic distribution cooperative development\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-supplier-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Democratic distribution cooperative emerges providing logistics without extraction",
+    "ogDescription": "Democratic distribution cooperative emerges providing logistics without extraction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-democratic distribution cooperative emerges providing logistics without extraction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Democratic distribution cooperative emerges providing logistics without extraction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-industry-sector-democratic distribution cooperative emerges providing logistics without extraction",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:industry-sector-democratic distribution cooperative emerges providing logistics without extraction",
+    "name": "Democratic distribution cooperative emerges providing logistics without extraction",
+    "description": "Democratic distribution cooperative emerges providing logistics without extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

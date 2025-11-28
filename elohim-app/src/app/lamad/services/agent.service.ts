@@ -191,8 +191,12 @@ export class AgentService {
 
   /**
    * Mark a step as completed.
+   *
+   * @param pathId The learning path ID
+   * @param stepIndex The step index to mark complete
+   * @param resourceId Optional content resourceId - if provided, also tracks global content completion
    */
-  completeStep(pathId: string, stepIndex: number): Observable<void> {
+  completeStep(pathId: string, stepIndex: number, resourceId?: string): Observable<void> {
     return this.getProgressForPath(pathId).pipe(
       switchMap(existingProgress => {
         const now = new Date().toISOString();
@@ -233,6 +237,13 @@ export class AgentService {
             this.sessionHumanService.recordPathStarted(pathId);
           }
           this.sessionHumanService.recordStepCompleted(pathId, stepIndex);
+        }
+
+        // Track content completion globally if resourceId provided
+        if (resourceId) {
+          return this.dataLoader.saveAgentProgress(progress).pipe(
+            switchMap(() => this.completeContentNode(resourceId, agentId))
+          );
         }
 
         return this.dataLoader.saveAgentProgress(progress);
@@ -341,6 +352,95 @@ export class AgentService {
     return Array.from(this.attestations);
   }
 
+  // =========================================================================
+  // SHARED CONTENT COMPLETION TRACKING (Khan Academy-style)
+  // =========================================================================
+
+  /**
+   * Track content completion globally across all paths.
+   *
+   * Uses special pathId '__global__' to store cross-path completion data.
+   * When content is completed in any path, it's marked here and will show
+   * as completed in ALL paths that reference the same content.
+   *
+   * @param contentId The resourceId of the completed content
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  completeContentNode(contentId: string, agentId?: string): Observable<void> {
+    const targetAgentId = agentId || this.getCurrentAgentId();
+
+    return this.getProgressForPath('__global__').pipe(
+      switchMap(existingProgress => {
+        const now = new Date().toISOString();
+
+        const progress: AgentProgress = existingProgress || {
+          agentId: targetAgentId,
+          pathId: '__global__',
+          currentStepIndex: 0,
+          completedStepIndices: [],
+          startedAt: now,
+          lastActivityAt: now,
+          stepAffinity: {},
+          stepNotes: {},
+          reflectionResponses: {},
+          attestationsEarned: [],
+          completedContentIds: []
+        };
+
+        // Add to completed content (avoid duplicates)
+        if (!progress.completedContentIds) {
+          progress.completedContentIds = [];
+        }
+        if (!progress.completedContentIds.includes(contentId)) {
+          progress.completedContentIds.push(contentId);
+        }
+        progress.lastActivityAt = now;
+
+        this.progressCache.set('__global__', progress);
+        return this.dataLoader.saveAgentProgress(progress);
+      })
+    );
+  }
+
+  /**
+   * Check if content has been completed in any path.
+   *
+   * @param contentId The resourceId to check
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  isContentCompleted(contentId: string, agentId?: string): Observable<boolean> {
+    const targetAgentId = agentId || this.getCurrentAgentId();
+
+    return this.getProgressForPath('__global__').pipe(
+      map(progress => {
+        if (!progress || !progress.completedContentIds) {
+          return false;
+        }
+        return progress.completedContentIds.includes(contentId);
+      })
+    );
+  }
+
+  /**
+   * Get all completed content IDs across all paths.
+   *
+   * Returns as a Set for efficient O(1) lookup in PathService calculations.
+   *
+   * @param agentId Optional agent ID (defaults to current agent)
+   */
+  getCompletedContentIds(agentId?: string): Observable<Set<string>> {
+    const targetAgentId = agentId || this.getCurrentAgentId();
+
+    return this.getProgressForPath('__global__').pipe(
+      map(progress => {
+        if (!progress || !progress.completedContentIds) {
+          return new Set<string>();
+        }
+        return new Set(progress.completedContentIds);
+      })
+    );
+  }
+
   /**
    * Get the learning frontier - paths with active progress.
    * Returns the "resume" points for the learner dashboard.
@@ -384,5 +484,248 @@ export class AgentService {
    */
   clearProgressCache(): void {
     this.progressCache.clear();
+  }
+
+  // =========================================================================
+  // LEARNING ANALYTICS
+  // =========================================================================
+
+  /**
+   * Get comprehensive learning analytics for the current agent.
+   *
+   * Returns metrics useful for dashboard displays:
+   * - Overall progress statistics
+   * - Learning patterns and streaks
+   * - Path activity summary
+   *
+   * This aggregates data from localStorage progress records.
+   */
+  getLearningAnalytics(): Observable<{
+    // Overall progress
+    totalPathsStarted: number;
+    totalPathsCompleted: number;
+    totalContentNodesCompleted: number;
+    totalStepsCompleted: number;
+
+    // Engagement metrics
+    totalLearningTime: number; // Days between first and last activity
+    lastActivityDate: string;
+    firstActivityDate: string;
+    currentStreak: number; // Days with consecutive activity
+    longestStreak: number;
+
+    // Path breakdown
+    mostActivePathId: string | null;
+    mostActivePathTitle?: string;
+    mostRecentPathId: string | null;
+    mostRecentPathTitle?: string;
+
+    // Affinity insights
+    averageAffinity: number; // Average across all steps with affinity
+    highAffinityPaths: string[]; // Paths with avg affinity > 0.7
+
+    // Attestations
+    totalAttestationsEarned: number;
+    attestationIds: string[];
+  }> {
+    const progress = this.getAgentProgress();
+
+    return progress.pipe(
+      map(progressRecords => {
+        // Filter out __global__ progress
+        const pathProgress = progressRecords.filter(p => p.pathId !== '__global__');
+        const globalProgress = progressRecords.find(p => p.pathId === '__global__');
+
+        // Basic counts
+        const totalPathsStarted = pathProgress.length;
+        const totalPathsCompleted = pathProgress.filter(p => p.completedAt).length;
+        const totalContentNodesCompleted = globalProgress?.completedContentIds?.length || 0;
+        const totalStepsCompleted = pathProgress.reduce(
+          (sum, p) => sum + p.completedStepIndices.length,
+          0
+        );
+
+        // Time analysis
+        let firstActivityDate = '';
+        let lastActivityDate = '';
+        if (pathProgress.length > 0) {
+          const dates = pathProgress
+            .map(p => new Date(p.startedAt).getTime())
+            .filter(d => !isNaN(d));
+
+          if (dates.length > 0) {
+            firstActivityDate = new Date(Math.min(...dates)).toISOString();
+          }
+
+          const lastDates = pathProgress
+            .map(p => new Date(p.lastActivityAt).getTime())
+            .filter(d => !isNaN(d));
+
+          if (lastDates.length > 0) {
+            lastActivityDate = new Date(Math.max(...lastDates)).toISOString();
+          }
+        }
+
+        const totalLearningTime = firstActivityDate && lastActivityDate
+          ? Math.floor(
+              (new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+            )
+          : 0;
+
+        // Streak calculation (simplified - counts distinct activity days)
+        const activityDates = new Set(
+          pathProgress
+            .map(p => new Date(p.lastActivityAt).toISOString().split('T')[0])
+        );
+        const currentStreak = this.calculateCurrentStreak(Array.from(activityDates));
+        const longestStreak = this.calculateLongestStreak(Array.from(activityDates));
+
+        // Most active path (by total steps completed)
+        let mostActivePathId: string | null = null;
+        let maxSteps = 0;
+        for (const p of pathProgress) {
+          if (p.completedStepIndices.length > maxSteps) {
+            maxSteps = p.completedStepIndices.length;
+            mostActivePathId = p.pathId;
+          }
+        }
+
+        // Most recent path
+        const mostRecentPathId = pathProgress.length > 0
+          ? pathProgress.reduce((latest, p) =>
+              new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest
+            ).pathId
+          : null;
+
+        // Affinity analysis
+        let totalAffinity = 0;
+        let affinityCount = 0;
+        const pathAffinities = new Map<string, { sum: number; count: number }>();
+
+        for (const p of pathProgress) {
+          const affinityValues = Object.values(p.stepAffinity);
+          for (const affinity of affinityValues) {
+            totalAffinity += affinity;
+            affinityCount++;
+          }
+
+          // Track per-path affinity
+          if (affinityValues.length > 0) {
+            const pathSum = affinityValues.reduce((sum, a) => sum + a, 0);
+            pathAffinities.set(p.pathId, {
+              sum: pathSum,
+              count: affinityValues.length
+            });
+          }
+        }
+
+        const averageAffinity = affinityCount > 0 ? totalAffinity / affinityCount : 0;
+
+        // High affinity paths (avg > 0.7)
+        const highAffinityPaths: string[] = [];
+        for (const [pathId, { sum, count }] of pathAffinities) {
+          const avg = sum / count;
+          if (avg > 0.7) {
+            highAffinityPaths.push(pathId);
+          }
+        }
+
+        // Attestations
+        const allAttestations = new Set<string>();
+        for (const p of pathProgress) {
+          for (const att of p.attestationsEarned) {
+            allAttestations.add(att);
+          }
+        }
+
+        return {
+          totalPathsStarted,
+          totalPathsCompleted,
+          totalContentNodesCompleted,
+          totalStepsCompleted,
+          totalLearningTime,
+          lastActivityDate,
+          firstActivityDate,
+          currentStreak,
+          longestStreak,
+          mostActivePathId,
+          mostRecentPathId,
+          averageAffinity,
+          highAffinityPaths,
+          totalAttestationsEarned: allAttestations.size,
+          attestationIds: Array.from(allAttestations)
+        };
+      })
+    );
+  }
+
+  /**
+   * Calculate current learning streak (consecutive days with activity).
+   * A streak is broken if there's a gap > 1 day.
+   */
+  private calculateCurrentStreak(activityDates: string[]): number {
+    if (activityDates.length === 0) return 0;
+
+    // Sort dates descending (most recent first)
+    const sorted = activityDates
+      .map(d => new Date(d))
+      .sort((a, b) => b.getTime() - a.getTime());
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let streak = 0;
+    let currentDate = today;
+
+    for (const activityDate of sorted) {
+      activityDate.setHours(0, 0, 0, 0);
+
+      const daysDiff = Math.floor(
+        (currentDate.getTime() - activityDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysDiff === 0 || daysDiff === 1) {
+        streak++;
+        currentDate = activityDate;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  /**
+   * Calculate longest learning streak from activity dates.
+   */
+  private calculateLongestStreak(activityDates: string[]): number {
+    if (activityDates.length === 0) return 0;
+
+    // Sort dates ascending
+    const sorted = activityDates
+      .map(d => new Date(d))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    let longestStreak = 1;
+    let currentStreak = 1;
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prevDate = sorted[i - 1];
+      const currDate = sorted[i];
+
+      const daysDiff = Math.floor(
+        (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysDiff === 1) {
+        currentStreak++;
+        longestStreak = Math.max(longestStreak, currentStreak);
+      } else {
+        currentStreak = 1;
+      }
+    }
+
+    return longestStreak;
   }
 }

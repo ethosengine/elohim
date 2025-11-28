@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-industry-sector-organizing for universal benefits in food service",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-organizing for universal benefits in food service",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizing for universal benefits in food service",
   "description": "Organizing for universal benefits in food service",
   "content": "Scenario: Organizing for universal benefits in food service\n    Given many food service workers lack health insurance, paid leave, or retirement\n    When workers advocate for universal benefits\n    Then the protocol should support campaigns for mandatory benefits\n    And help workers articulate need for healthcare, sick leave, and security\n    And coordinate advocacy for industry-wide benefit requirements\n    And push for decoupling essential benefits from individual employer provision\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizing for universal benefits in food service",
+    "ogDescription": "Organizing for universal benefits in food service",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-organizing for universal benefits in food service",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizing for universal benefits in food service - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-organizing for universal benefits in food service",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-organizing for universal benefits in food service",
+    "name": "Organizing for universal benefits in food service",
+    "description": "Organizing for universal benefits in food service",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

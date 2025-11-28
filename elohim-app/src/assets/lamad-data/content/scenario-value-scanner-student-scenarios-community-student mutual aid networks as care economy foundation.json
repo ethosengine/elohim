@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-community-student mutual aid networks as care economy foundation",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:community-student mutual aid networks as care economy foundation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Student mutual aid networks as care economy foundation",
   "description": "Student mutual aid networks as care economy foundation",
   "content": "Scenario: Student mutual aid networks as care economy foundation\n    Given Kenji participates in student mutual aid group\n    And students share resources, knowledge, and support\n    When the community_elohim tracks mutual aid participation\n    Then it should recognize meal sharing as care contribution\n    And it should value textbook lending, note sharing, and skill exchange\n    And it should accumulate care tokens for helping other students\n    And mutual aid should be understood as care economy practice\n    And the system should make reciprocal support visible\n    And student mutual aid should be recognized as community building\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Student mutual aid networks as care economy foundation",
+    "ogDescription": "Student mutual aid networks as care economy foundation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-student mutual aid networks as care economy foundation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Student mutual aid networks as care economy foundation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-student mutual aid networks as care economy foundation",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:community-student mutual aid networks as care economy foundation",
+    "name": "Student mutual aid networks as care economy foundation",
+    "description": "Student mutual aid networks as care economy foundation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

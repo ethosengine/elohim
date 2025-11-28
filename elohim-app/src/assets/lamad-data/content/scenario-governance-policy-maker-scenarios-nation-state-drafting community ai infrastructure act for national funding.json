@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-nation-state-drafting community ai infrastructure act for national funding",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-drafting community ai infrastructure act for national funding",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Drafting Community AI Infrastructure Act for national funding",
   "description": "Drafting Community AI Infrastructure Act for national funding",
   "content": "Scenario: Drafting Community AI Infrastructure Act for national funding\n    Given poor communities nationwide need infrastructure support\n    And I want equitable protocol access\n    When I draft national funding legislation\n    Then I provide: grants for community nodes and maintenance\n    And I fund: research evaluating protocol outcomes\n    And I support: technical assistance for poor communities\n    And I establish: sliding scale and cross-subsidization\n    And I treat: democratic AI governance as public infrastructure\n    And I defend: against claims of \"picking winners\"\n    And I argue: this enables democracy not market manipulation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Drafting Community AI Infrastructure Act for national funding",
+    "ogDescription": "Drafting Community AI Infrastructure Act for national funding",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-drafting community ai infrastructure act for national funding",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Drafting Community AI Infrastructure Act for national funding - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-drafting community ai infrastructure act for national funding",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-drafting community ai infrastructure act for national funding",
+    "name": "Drafting Community AI Infrastructure Act for national funding",
+    "description": "Drafting Community AI Infrastructure Act for national funding",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

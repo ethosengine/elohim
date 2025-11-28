@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-family-family financial coordination for retirement on fixed income",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-family financial coordination for retirement on fixed income",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family financial coordination for retirement on fixed income",
   "description": "Family financial coordination for retirement on fixed income",
   "content": "Scenario: Family financial coordination for retirement on fixed income\n    Given Frank lives on fixed income of $28k/year\n    And he occasionally provides financial support to adult children\n    And he's managing his mother-in-law's care costs\n    When family_elohim coordinates financial flows\n    Then it should track Frank's financial contributions to family\n    And surface when financial support compromises his own security\n    And help family understand his economic constraints\n    And facilitate honest conversations about financial capacity\n    And protect Frank from unsustainable financial requests\n    And ensure his fixed income sustains his own household first\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Family financial coordination for retirement on fixed income",
+    "ogDescription": "Family financial coordination for retirement on fixed income",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-family financial coordination for retirement on fixed income",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family financial coordination for retirement on fixed income - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-family financial coordination for retirement on fixed income",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-family financial coordination for retirement on fixed income",
+    "name": "Family financial coordination for retirement on fixed income",
+    "description": "Family financial coordination for retirement on fixed income",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

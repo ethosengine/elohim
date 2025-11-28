@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-state legislator verifies industry claims about regulation impacts",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator verifies industry claims about regulation impacts",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "State legislator verifies industry claims about regulation impacts",
   "description": "State legislator verifies industry claims about regulation impacts",
   "content": "Scenario: State legislator verifies industry claims about regulation impacts\n    Given business lobbyists claim environmental regulation will destroy jobs\n    And present alarming economic analysis\n    When the Observer fact-checks industry projections\n    Then they see similar regulations in other states\n    And review actual employment impacts versus predicted job losses\n    And identify which industries comply without job losses\n    And understand costs of inaction (health impacts, environmental damage)\n    And resist fear-mongering with evidence-based policy analysis\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "State legislator verifies industry claims about regulation impacts",
+    "ogDescription": "State legislator verifies industry claims about regulation impacts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator verifies industry claims about regulation impacts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "State legislator verifies industry claims about regulation impacts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator verifies industry claims about regulation impacts",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator verifies industry claims about regulation impacts",
+    "name": "State legislator verifies industry claims about regulation impacts",
+    "description": "State legislator verifies industry claims about regulation impacts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

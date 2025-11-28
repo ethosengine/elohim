@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-community accountability ensures democratic locations serve neighborhood needs",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-community accountability ensures democratic locations serve neighborhood needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community accountability ensures democratic locations serve neighborhood needs",
   "description": "Community accountability ensures democratic locations serve neighborhood needs",
   "content": "Scenario: Community accountability ensures democratic locations serve neighborhood needs\n    Given franchise corporate ignored community needs in pursuit of profit maximization\n    And locations had no mechanism for community input on operations\n    When democratic governance includes community stakeholder participation\n    Then neighborhood residents can attend stakeholder meetings and provide input\n    And community concerns about impacts (environmental, traffic, employment) are heard\n    And workers consider community feedback in democratic decision-making\n    And accountability flows both ways (community and workers mutually accountable)\n    And community_elohim facilitates stakeholder participation protecting worker autonomy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Community accountability ensures democratic locations serve neighborhood needs",
+    "ogDescription": "Community accountability ensures democratic locations serve neighborhood needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-community accountability ensures democratic locations serve neighborhood needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community accountability ensures democratic locations serve neighborhood needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-community accountability ensures democratic locations serve neighborhood needs",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-community accountability ensures democratic locations serve neighborhood needs",
+    "name": "Community accountability ensures democratic locations serve neighborhood needs",
+    "description": "Community accountability ensures democratic locations serve neighborhood needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

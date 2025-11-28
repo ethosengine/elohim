@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-educational-student contribution to peer learning community",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-student contribution to peer learning community",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Student contribution to peer learning community",
   "description": "Student contribution to peer learning community",
   "content": "Scenario: Student contribution to peer learning community\n    Given Kenji helps classmates understand difficult concepts\n    And peer teaching strengthens everyone's learning\n    When the educational_elohim tracks peer teaching\n    Then it should recognize Kenji's teaching labor as care contribution\n    And it should accumulate care tokens for tutoring peers\n    And it should value \"Kenji explained organic chemistry to 3 struggling classmates\"\n    And peer education should be recognized as community care work\n    And the system should make student teaching labor visible\n    And intellectual generosity should be valued and encouraged\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Student contribution to peer learning community",
+    "ogDescription": "Student contribution to peer learning community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-student contribution to peer learning community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Student contribution to peer learning community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-student contribution to peer learning community",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-student contribution to peer learning community",
+    "name": "Student contribution to peer learning community",
+    "description": "Student contribution to peer learning community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

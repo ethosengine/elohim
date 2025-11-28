@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional food systems participation supports care and ecology",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-bioregional food systems participation supports care and ecology",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional food systems participation supports care and ecology",
   "description": "Bioregional food systems participation supports care and ecology",
   "content": "Scenario: Bioregional food systems participation supports care and ecology\n    Given Robert's household needs food\n    And food choices affect ecological health and care economy\n    And bioregional food systems can serve both\n    When bioregional_elohim supports food system participation\n    Then it should connect Robert to bioregional food networks\n    And surface opportunities for local food sourcing, community gardens, and food cooperatives\n    And recognize that supporting regional farmers is care economy participation\n    And help him understand food system ecological impact\n    And support food choices that serve bioregional health and care economy\n    And demonstrate that eating is care for people and planet\n    And build bioregional food resilience through participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional food systems participation supports care and ecology",
+    "ogDescription": "Bioregional food systems participation supports care and ecology",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional food systems participation supports care and ecology",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional food systems participation supports care and ecology - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional food systems participation supports care and ecology",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-bioregional food systems participation supports care and ecology",
+    "name": "Bioregional food systems participation supports care and ecology",
+    "description": "Bioregional food systems participation supports care and ecology",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace recognition of caregiver constraints on employment",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-workplace recognition of caregiver constraints on employment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace recognition of caregiver constraints on employment",
   "description": "Workplace recognition of caregiver constraints on employment",
   "content": "Scenario: Workplace recognition of caregiver constraints on employment\n    Given James can only work ~20 hours/week due to caregiving\n    And his availability is constrained by care needs\n    When the workplace_elohim communicates with employers\n    Then James's caregiving situation should be visible to employer\n    And his reduced availability should be explained as care-related\n    And employer should understand caregiving constraints on capacity\n    And caregiver status should be recognized as legitimate limit\n    And workplace should accommodate caregiving realities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace recognition of caregiver constraints on employment",
+    "ogDescription": "Workplace recognition of caregiver constraints on employment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace recognition of caregiver constraints on employment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace recognition of caregiver constraints on employment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace recognition of caregiver constraints on employment",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-workplace recognition of caregiver constraints on employment",
+    "name": "Workplace recognition of caregiver constraints on employment",
+    "description": "Workplace recognition of caregiver constraints on employment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

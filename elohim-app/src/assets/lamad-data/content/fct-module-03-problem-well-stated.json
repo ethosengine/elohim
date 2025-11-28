@@ -60,6 +60,34 @@
     "bookCount": 0,
     "bibleVerseCount": 9
   },
-  "createdAt": "2025-11-28T02:53:21.854137",
-  "updatedAt": "2025-11-28T02:53:21.854138"
+  "createdAt": "2025-11-28T21:10:19.196277",
+  "updatedAt": "2025-11-28T21:10:19.196278",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 3: A Problem Well Stated",
+    "ogDescription": "We can't have the power of gods without the wisdom, love and prudence of gods.  \\- Daniel Schmachtenberger",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.196277",
+    "articleModifiedTime": "2025-11-28T21:10:19.196278",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 3: A Problem Well Stated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "FCT 3: A Problem Well Stated",
+    "description": "We can't have the power of gods without the wisdom, love and prudence of gods.  \\- Daniel Schmachtenberger",
+    "dateCreated": "2025-11-28T21:10:19.196277",
+    "dateModified": "2025-11-28T21:10:19.196278",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

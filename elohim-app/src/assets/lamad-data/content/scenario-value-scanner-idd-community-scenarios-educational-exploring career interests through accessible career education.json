@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-educational-exploring career interests through accessible career education",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-exploring career interests through accessible career education",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Exploring career interests through accessible career education",
   "description": "Exploring career interests through accessible career education",
   "content": "Scenario: Exploring career interests through accessible career education\n    Given Jordan might want to explore other career options\n    And career exploration supports life planning\n    When Jordan uses career exploration resources\n    Then the personal_agent shows career options with pictures and simple descriptions\n    And Jordan can learn about different jobs through videos and stories\n    And Jordan can explore interests without pressure to commit\n    And the educational_elohim provides information about training pathways\n    And Jordan's career dreams are taken seriously, not dismissed\n    And Jordan experiences hope and possibility through education\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Exploring career interests through accessible career education",
+    "ogDescription": "Exploring career interests through accessible career education",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-exploring career interests through accessible career education",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Exploring career interests through accessible career education - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-exploring career interests through accessible career education",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-exploring career interests through accessible career education",
+    "name": "Exploring career interests through accessible career education",
+    "description": "Exploring career interests through accessible career education",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

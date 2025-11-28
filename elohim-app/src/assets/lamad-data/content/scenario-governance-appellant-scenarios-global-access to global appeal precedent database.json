@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-global-access to global appeal precedent database",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:global-access to global appeal precedent database",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Access to global appeal precedent database",
   "description": "Access to global appeal precedent database",
   "content": "Scenario: Access to global appeal precedent database\n    Given Marcus wants to understand how similar appeals were resolved globally\n    When Marcus searches the global constitutional precedent database\n    Then he finds anonymized cases from dozens of countries\n    And he sees how different cultures interpret privacy versus care\n    And he understands constitutional reasoning across contexts\n    And he can cite global precedent in his own appeal\n    And he learns his case is not isolated but part of human pattern\n    And the database empowers appellants worldwide with shared knowledge\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Access to global appeal precedent database",
+    "ogDescription": "Access to global appeal precedent database",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-access to global appeal precedent database",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Access to global appeal precedent database - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-access to global appeal precedent database",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:global-access to global appeal precedent database",
+    "name": "Access to global appeal precedent database",
+    "description": "Access to global appeal precedent database",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-municipality-responsible developer leverages positive track record",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-responsible developer leverages positive track record",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responsible developer leverages positive track record",
   "description": "Responsible developer leverages positive track record",
   "content": "Scenario: Responsible developer leverages positive track record\n    Given a responsible developer delivered promised benefits in three past projects\n    And competes against extractive developer with misleading claims\n    When the Observer makes track records visible\n    Then the responsible developer's history shows: jobs delivered matched projections\n    And community benefits were actually built and maintained\n    And environmental commitments were kept\n    And positive reputation becomes competitive advantage\n    And integrity creates market differentiation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Responsible developer leverages positive track record",
+    "ogDescription": "Responsible developer leverages positive track record",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-responsible developer leverages positive track record",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responsible developer leverages positive track record - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-responsible developer leverages positive track record",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-responsible developer leverages positive track record",
+    "name": "Responsible developer leverages positive track record",
+    "description": "Responsible developer leverages positive track record",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

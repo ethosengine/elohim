@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-advocating for neighborhood accessibility improvements",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-advocating for neighborhood accessibility improvements",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advocating for neighborhood accessibility improvements",
   "description": "Advocating for neighborhood accessibility improvements",
   "content": "Scenario: Advocating for neighborhood accessibility improvements\n    Given Jordan notices the sidewalk has a dangerous crack\n    And the broken sidewalk creates barriers for Jordan and others\n    When Jordan reports the accessibility issue\n    Then the personal_agent helps Jordan document the problem\n    And the neighborhood_elohim routes the report to appropriate authorities\n    And Jordan's advocacy contributes to universal accessibility\n    And the repair benefits Jordan and other neighbors with mobility challenges\n    And Jordan experiences being an active citizen advocating for community\n    And Jordan's voice influences neighborhood infrastructure\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for neighborhood accessibility improvements",
+    "ogDescription": "Advocating for neighborhood accessibility improvements",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-advocating for neighborhood accessibility improvements",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for neighborhood accessibility improvements - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-advocating for neighborhood accessibility improvements",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-advocating for neighborhood accessibility improvements",
+    "name": "Advocating for neighborhood accessibility improvements",
+    "description": "Advocating for neighborhood accessibility improvements",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

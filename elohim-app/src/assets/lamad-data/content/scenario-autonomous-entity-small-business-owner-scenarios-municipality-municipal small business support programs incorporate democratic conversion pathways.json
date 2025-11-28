@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal small business support programs incorporate democratic conversion pathways",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal small business support programs incorporate democratic conversion pathways",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal small business support programs incorporate democratic conversion pathways",
   "description": "Municipal small business support programs incorporate democratic conversion pathways",
   "content": "Scenario: Municipal small business support programs incorporate democratic conversion pathways\n    Given city offers small business loans, technical assistance, and development support\n    And these programs could facilitate democratic conversions\n    When municipality recognizes conversion potential for struggling businesses\n    Then small business support programs add worker ownership conversion option\n    And struggling owners learn they can exit with dignity while protecting workers\n    And municipal economic development staff are trained in democratic transition support\n    And public resources help overcome conversion barriers (legal costs, financing, technical assistance)\n    And municipality_elohim provides conversion expertise to municipal programs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal small business support programs incorporate democratic conversion pathways",
+    "ogDescription": "Municipal small business support programs incorporate democratic conversion pathways",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal small business support programs incorporate democratic conversion pathways",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal small business support programs incorporate democratic conversion pathways - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal small business support programs incorporate democratic conversion pathways",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal small business support programs incorporate democratic conversion pathways",
+    "name": "Municipal small business support programs incorporate democratic conversion pathways",
+    "description": "Municipal small business support programs incorporate democratic conversion pathways",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

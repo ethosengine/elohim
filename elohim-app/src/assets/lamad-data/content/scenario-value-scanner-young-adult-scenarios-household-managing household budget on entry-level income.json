@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-household-managing household budget on entry-level income",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-managing household budget on entry-level income",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing household budget on entry-level income",
   "description": "Managing household budget on entry-level income",
   "content": "Scenario: Managing household budget on entry-level income\n    Given Aisha's income is $38,000 annually\n    And rent consumes a large portion of her budget\n    When Aisha allocates household resources\n    Then the personal_agent should help optimize spending\n    And it should identify where to invest versus economize\n    And it should suggest cost-saving strategies appropriate to her situation\n    And budget tools should account for her income constraints\n    And the system should help her achieve sustainability within limits\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing household budget on entry-level income",
+    "ogDescription": "Managing household budget on entry-level income",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-managing household budget on entry-level income",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing household budget on entry-level income - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-managing household budget on entry-level income",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-managing household budget on entry-level income",
+    "name": "Managing household budget on entry-level income",
+    "description": "Managing household budget on entry-level income",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

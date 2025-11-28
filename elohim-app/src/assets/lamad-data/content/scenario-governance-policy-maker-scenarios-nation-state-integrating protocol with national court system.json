@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-nation-state-integrating protocol with national court system",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-integrating protocol with national court system",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Integrating protocol with national court system",
   "description": "Integrating protocol with national court system",
   "content": "Scenario: Integrating protocol with national court system\n    Given judicial system must work with protocol governance\n    And judges need training and procedural guidance\n    When I work with judicial branch on integration\n    Then I support: judicial education about agent reasoning\n    And I establish: evidentiary standards for agent testimony\n    And I create: appeal pathways for council-court conflicts\n    And I ensure: due process protections maintained\n    And I respect: judicial independence\n    And I enable: protocol to function within legal framework\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Integrating protocol with national court system",
+    "ogDescription": "Integrating protocol with national court system",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-integrating protocol with national court system",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Integrating protocol with national court system - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-integrating protocol with national court system",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-integrating protocol with national court system",
+    "name": "Integrating protocol with national court system",
+    "description": "Integrating protocol with national court system",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

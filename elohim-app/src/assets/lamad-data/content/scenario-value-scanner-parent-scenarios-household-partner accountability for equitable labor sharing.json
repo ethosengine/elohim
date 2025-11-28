@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-household-partner accountability for equitable labor sharing",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-partner accountability for equitable labor sharing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Partner accountability for equitable labor sharing",
   "description": "Partner accountability for equitable labor sharing",
   "content": "Scenario: Partner accountability for equitable labor sharing\n    Given the household_elohim makes labor distribution visible\n    And the partner can see he performs only 25% of household work\n    When the partner commits to increasing his contribution\n    Then the system should track whether he follows through\n    And it should provide accountability for behavioral change\n    And it should show whether labor distribution is actually improving\n    And accountability should be built into the care economy system\n    And moving toward equity should be trackable and measurable\n    And the system should support partnership transformation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Partner accountability for equitable labor sharing",
+    "ogDescription": "Partner accountability for equitable labor sharing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-partner accountability for equitable labor sharing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Partner accountability for equitable labor sharing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-partner accountability for equitable labor sharing",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-partner accountability for equitable labor sharing",
+    "name": "Partner accountability for equitable labor sharing",
+    "description": "Partner accountability for equitable labor sharing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

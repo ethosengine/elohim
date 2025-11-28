@@ -50,6 +50,34 @@
     "bookCount": 0,
     "bibleVerseCount": 2
   },
-  "createdAt": "2025-11-28T02:53:21.870411",
-  "updatedAt": "2025-11-28T02:53:21.870413"
+  "createdAt": "2025-11-28T21:10:19.208188",
+  "updatedAt": "2025-11-28T21:10:19.208189",
+  "did": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 7: Regeneration and Reconciliation",
+    "ogDescription": "It\u2019s tempting to think that all we need is more technology to solve all our problems. After all, hasn\u2019t technology solved so many of our problems to date?  \nOnce we\u2019re operating at an unsustainably ex",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-07-regeneration",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.208188",
+    "articleModifiedTime": "2025-11-28T21:10:19.208189",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 7: Regeneration and Reconciliation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-07-regeneration",
+    "identifier": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+    "name": "FCT 7: Regeneration and Reconciliation",
+    "description": "It\u2019s tempting to think that all we need is more technology to solve all our problems. After all, hasn\u2019t technology solved so many of our problems to date?  \nOnce we\u2019re operating at an unsustainably extractive scale, attempts to address the problems created by technology with more technology are likely to lead to a larger set of problems.",
+    "dateCreated": "2025-11-28T21:10:19.208188",
+    "dateModified": "2025-11-28T21:10:19.208189",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

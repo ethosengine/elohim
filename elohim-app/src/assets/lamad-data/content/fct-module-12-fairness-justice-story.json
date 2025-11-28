@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-12-fairness-justice"
   },
-  "createdAt": "2025-11-28T02:53:21.896250",
-  "updatedAt": "2025-11-28T02:53:21.896251"
+  "createdAt": "2025-11-28T21:10:19.223588",
+  "updatedAt": "2025-11-28T21:10:19.223589",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "The Path to Justice: Lessons from Post-War Germany",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "The Path to Justice: Lessons from Post-War Germany - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-story",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "The Path to Justice: Lessons from Post-War Germany",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.223588",
+    "dateModified": "2025-11-28T21:10:19.223589",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

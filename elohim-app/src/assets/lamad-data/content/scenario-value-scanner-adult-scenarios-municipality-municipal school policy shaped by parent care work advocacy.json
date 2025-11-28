@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-municipality-municipal school policy shaped by parent care work advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal school policy shaped by parent care work advocacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal school policy shaped by parent care work advocacy",
   "description": "Municipal school policy shaped by parent care work advocacy",
   "content": "Scenario: Municipal school policy shaped by parent care work advocacy\n    Given Sarah works as teacher and is parent advocate\n    And she has deep knowledge of educational needs\n    When municipal school policy is debated\n    Then Sarah's professional and parent care work should be recognized\n    And her advocacy should be informed by care economy data\n    And school policy should reflect actual parent and educator experiences\n    And care economy should strengthen parent voice in education policy\n    And municipal education should benefit from care worker input\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal school policy shaped by parent care work advocacy",
+    "ogDescription": "Municipal school policy shaped by parent care work advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal school policy shaped by parent care work advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal school policy shaped by parent care work advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal school policy shaped by parent care work advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal school policy shaped by parent care work advocacy",
+    "name": "Municipal school policy shaped by parent care work advocacy",
+    "description": "Municipal school policy shaped by parent care work advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

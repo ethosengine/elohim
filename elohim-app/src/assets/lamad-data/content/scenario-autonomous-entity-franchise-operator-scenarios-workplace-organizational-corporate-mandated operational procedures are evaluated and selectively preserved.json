@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-corporate-mandated operational procedures are evaluated and selectively preserved",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-corporate-mandated operational procedures are evaluated and selectively preserved",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Corporate-mandated operational procedures are evaluated and selectively preserved",
   "description": "Corporate-mandated operational procedures are evaluated and selectively preserved",
   "content": "Scenario: Corporate-mandated operational procedures are evaluated and selectively preserved\n    Given franchise required standardized procedures (some useful, others extractive)\n    And workers had no voice in which procedures served quality vs. extraction\n    When democratic governance reviews all franchise operational requirements\n    Then health and safety protocols are preserved and improved\n    And useful training structures are kept while eliminating degrading aspects\n    And extractive mechanisms (bathroom time limits, speedup metrics) are eliminated\n    And workers decide democratically which standards serve quality and dignity\n    And workplace_elohim documents procedural changes and rationale\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Corporate-mandated operational procedures are evaluated and selectively preserved",
+    "ogDescription": "Corporate-mandated operational procedures are evaluated and selectively preserved",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-corporate-mandated operational procedures are evaluated and selectively preserved",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Corporate-mandated operational procedures are evaluated and selectively preserved - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-corporate-mandated operational procedures are evaluated and selectively preserved",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-corporate-mandated operational procedures are evaluated and selectively preserved",
+    "name": "Corporate-mandated operational procedures are evaluated and selectively preserved",
+    "description": "Corporate-mandated operational procedures are evaluated and selectively preserved",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

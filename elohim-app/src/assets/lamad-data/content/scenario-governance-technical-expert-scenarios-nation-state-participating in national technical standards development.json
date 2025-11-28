@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-nation-state-participating in national technical standards development",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-participating in national technical standards development",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in national technical standards development",
   "description": "Participating in national technical standards development",
   "content": "Scenario: Participating in national technical standards development\n    Given national protocol standards need technical specification\n    And I serve on standards development committee\n    When I help craft technical requirements\n    Then I ensure: standards serve constitutional principles\n    And I verify: specifications are implementable\n    And I check: for security vulnerabilities in standards\n    And I collaborate: with diverse technical experts\n    And I submit: standards to National Constitutional Council for approval\n    And I demonstrate: technical development serving democratic governance\n    And citizens authorize: technical changes through council oversight\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in national technical standards development",
+    "ogDescription": "Participating in national technical standards development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-participating in national technical standards development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in national technical standards development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-participating in national technical standards development",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-participating in national technical standards development",
+    "name": "Participating in national technical standards development",
+    "description": "Participating in national technical standards development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

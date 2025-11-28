@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-household-household care tokens reflect both partners' contributions",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-household care tokens reflect both partners' contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household care tokens reflect both partners' contributions",
   "description": "Household care tokens reflect both partners' contributions",
   "content": "Scenario: Household care tokens reflect both partners' contributions\n    Given both Sarah and her partner contribute to household\n    And contributions are currently very unequal\n    When household care tokens are calculated\n    Then they should reflect actual labor performed\n    And Sarah's 75% contribution should yield 75% of household tokens\n    And tokens should give standing in household resource decisions\n    And economic equity should follow labor equity\n    And care contributions should determine household governance power\n    And the partner should understand that tokens reflect actual work\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Household care tokens reflect both partners' contributions",
+    "ogDescription": "Household care tokens reflect both partners' contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-household care tokens reflect both partners' contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household care tokens reflect both partners' contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-household care tokens reflect both partners' contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-household care tokens reflect both partners' contributions",
+    "name": "Household care tokens reflect both partners' contributions",
+    "description": "Household care tokens reflect both partners' contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

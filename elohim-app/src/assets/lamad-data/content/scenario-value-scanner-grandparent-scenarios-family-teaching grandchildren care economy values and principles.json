@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-family-teaching grandchildren care economy values and principles",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-teaching grandchildren care economy values and principles",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching grandchildren care economy values and principles",
   "description": "Teaching grandchildren care economy values and principles",
   "content": "Scenario: Teaching grandchildren care economy values and principles\n    Given Margaret is modeling care economy through her actions\n    And Tommy and Emma are learning from her example\n    When Margaret provides care and teaches family values\n    Then the family_elohim should support intergenerational value transmission\n    And children should learn that care creates value\n    And they should see that elders have wisdom and worth\n    And they should understand families are reciprocal care networks\n    And Margaret's care teaching should be recognized as developmental work\n    And next generation should internalize care economy principles\n    And family culture should be transformed through children's learning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching grandchildren care economy values and principles",
+    "ogDescription": "Teaching grandchildren care economy values and principles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-teaching grandchildren care economy values and principles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching grandchildren care economy values and principles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-teaching grandchildren care economy values and principles",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-teaching grandchildren care economy values and principles",
+    "name": "Teaching grandchildren care economy values and principles",
+    "description": "Teaching grandchildren care economy values and principles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

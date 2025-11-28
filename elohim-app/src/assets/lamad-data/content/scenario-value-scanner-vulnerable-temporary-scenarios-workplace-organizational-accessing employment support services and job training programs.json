@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-accessing employment support services and job training programs",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-accessing employment support services and job training programs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing employment support services and job training programs",
   "description": "Accessing employment support services and job training programs",
   "content": "Scenario: Accessing employment support services and job training programs\n    Given various programs offer employment support for vulnerable populations\n    And these programs vary widely in quality and appropriateness\n    When I seek employment support services\n    Then the workplace_elohim identifies quality employment support programs\n    And helps me access job training, resume support, interview coaching\n    And evaluates whether programs are genuinely helpful vs. bureaucratic\n    And connects me to programs that respect my dignity and capability\n    And validates that I deserve quality employment support\n    And my personal_agent tracks program applications and requirements\n    And recognizes that navigating employment services is labor\n    And ensures employment support actually supports rather than burdens me\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing employment support services and job training programs",
+    "ogDescription": "Accessing employment support services and job training programs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-accessing employment support services and job training programs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing employment support services and job training programs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-accessing employment support services and job training programs",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-accessing employment support services and job training programs",
+    "name": "Accessing employment support services and job training programs",
+    "description": "Accessing employment support services and job training programs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

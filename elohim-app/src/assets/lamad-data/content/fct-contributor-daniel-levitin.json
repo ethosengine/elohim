@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-01-church-dilemma"
   },
-  "createdAt": "2025-11-28T02:53:21.847467",
-  "updatedAt": "2025-11-28T02:53:21.847468"
+  "createdAt": "2025-11-28T21:10:19.189805",
+  "updatedAt": "2025-11-28T21:10:19.189806",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Daniel Levitin",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-daniel-levitin",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Daniel Levitin - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-daniel-levitin",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Daniel Levitin",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.189805",
+    "dateModified": "2025-11-28T21:10:19.189806",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

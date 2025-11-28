@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-extended family contributions distributed equitably",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-extended family contributions distributed equitably",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Extended family contributions distributed equitably",
   "description": "Extended family contributions distributed equitably",
   "content": "Scenario: Extended family contributions distributed equitably\n    Given James carries enormous family care burden\n    And other family members could provide some support\n    When the family_elohim analyzes family care distribution\n    Then it should identify who is doing what\n    And it should make visible that James is carrying most burden\n    And it should prevent care from falling entirely on one person\n    And it should enable equitable distribution negotiations\n    And family care should be shared fairly, not concentrated\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Extended family contributions distributed equitably",
+    "ogDescription": "Extended family contributions distributed equitably",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-extended family contributions distributed equitably",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Extended family contributions distributed equitably - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-extended family contributions distributed equitably",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-extended family contributions distributed equitably",
+    "name": "Extended family contributions distributed equitably",
+    "description": "Extended family contributions distributed equitably",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investment in land trusts protects bioregional ecological integrity",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-investment in land trusts protects bioregional ecological integrity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investment in land trusts protects bioregional ecological integrity",
   "description": "Investment in land trusts protects bioregional ecological integrity",
   "content": "Scenario: Investment in land trusts protects bioregional ecological integrity\n    Given land speculation threatens farmland, forests, and ecosystems\n    And Patricia values protecting bioregional ecological infrastructure\n    When community investment supports community land trusts\n    Then agricultural land is permanently protected from development\n    And forests and watersheds are stewarded for ecological health, not timber extraction\n    And bioregional ecological integrity is preserved through democratic land governance\n    And investment protects ecosystems while generating sustainable returns\n    And bioregional_elohim coordinates land trust investment and stewardship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investment in land trusts protects bioregional ecological integrity",
+    "ogDescription": "Investment in land trusts protects bioregional ecological integrity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investment in land trusts protects bioregional ecological integrity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investment in land trusts protects bioregional ecological integrity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-investment in land trusts protects bioregional ecological integrity",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-investment in land trusts protects bioregional ecological integrity",
+    "name": "Investment in land trusts protects bioregional ecological integrity",
+    "description": "Investment in land trusts protects bioregional ecological integrity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

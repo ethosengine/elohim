@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-educational-continued intellectual engagement prevents cognitive decline",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-continued intellectual engagement prevents cognitive decline",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Continued intellectual engagement prevents cognitive decline",
   "description": "Continued intellectual engagement prevents cognitive decline",
   "content": "Scenario: Continued intellectual engagement prevents cognitive decline\n    Given cognitive engagement supports brain health in aging\n    And intellectual isolation accelerates decline\n    When Helen participates in learning and teaching\n    Then educational engagement should be recognized as health intervention\n    And community should support elder intellectual life\n    And learning opportunities should be accessible and meaningful\n    And the protocol should demonstrate that education serves health in aging\n    And Helen should remain intellectually engaged\n    And cognitive health should be supported through educational participation\n    And investment in elder learning should be justified by health outcomes\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Continued intellectual engagement prevents cognitive decline",
+    "ogDescription": "Continued intellectual engagement prevents cognitive decline",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-continued intellectual engagement prevents cognitive decline",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Continued intellectual engagement prevents cognitive decline - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-continued intellectual engagement prevents cognitive decline",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-continued intellectual engagement prevents cognitive decline",
+    "name": "Continued intellectual engagement prevents cognitive decline",
+    "description": "Continued intellectual engagement prevents cognitive decline",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

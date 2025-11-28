@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-community-community legal aid for caregiver navigation needs",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community legal aid for caregiver navigation needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community legal aid for caregiver navigation needs",
   "description": "Community legal aid for caregiver navigation needs",
   "content": "Scenario: Community legal aid for caregiver navigation needs\n    Given James needs advance directives, power of attorney, possibly guardianship\n    And legal services are expensive and complex\n    When the community_elohim connects to legal resources\n    Then legal aid should be accessible based on care contributions\n    And attorneys should understand caregiver-specific needs\n    And legal navigation should be supported through care economy\n    And community should ensure caregivers access legal protections\n    And legal complexity should not be impossible barrier\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Community legal aid for caregiver navigation needs",
+    "ogDescription": "Community legal aid for caregiver navigation needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community legal aid for caregiver navigation needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community legal aid for caregiver navigation needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community legal aid for caregiver navigation needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community legal aid for caregiver navigation needs",
+    "name": "Community legal aid for caregiver navigation needs",
+    "description": "Community legal aid for caregiver navigation needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

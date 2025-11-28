@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-community-local board member identifies when community issues require higher-level action",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-local board member identifies when community issues require higher-level action",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Local board member identifies when community issues require higher-level action",
   "description": "Local board member identifies when community issues require higher-level action",
   "content": "Scenario: Local board member identifies when community issues require higher-level action\n    Given neighborhood board addresses various community concerns\n    And some issues are within board authority while others require city or district action\n    And board wants to be effective by focusing advocacy appropriately\n    When the board member uses Observer governance layer analysis\n    Then they see which issues are addressable at community level\n    And identify which concerns require municipality or district decisions\n    And access guidance on advocacy strategies for different governance levels\n    And connect to relevant board members at higher governance layers\n    And clear governance mapping makes advocacy more strategic and effective\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Local board member identifies when community issues require higher-level action",
+    "ogDescription": "Local board member identifies when community issues require higher-level action",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-local board member identifies when community issues require higher-level action",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Local board member identifies when community issues require higher-level action - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-local board member identifies when community issues require higher-level action",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-local board member identifies when community issues require higher-level action",
+    "name": "Local board member identifies when community issues require higher-level action",
+    "description": "Local board member identifies when community issues require higher-level action",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

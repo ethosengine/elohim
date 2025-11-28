@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-content-creator-scenarios-affinity-network-creator produces quality educational content that earns reach",
+  "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:affinity-network-creator produces quality educational content that earns reach",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Creator produces quality educational content that earns reach",
   "description": "Creator produces quality educational content that earns reach",
   "content": "Scenario: Creator produces quality educational content that earns reach\n    Given Jordan creates a video explaining climate feedback loops\n    And the content includes verified scientific sources\n    And it's accessible to general audience without oversimplification\n    When Jordan contributes the content to climate education affinity network\n    Then the verification agent validates the scientific claims\n    And the content is offered to climate education communities\n    And educators and learners can review and appreciate the content\n    And genuine appreciation causes the content to spread to related networks\n    And Jordan receives community support for valuable educational work\n    And reach is earned through demonstrated value, not algorithms\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Creator produces quality educational content that earns reach",
+    "ogDescription": "Creator produces quality educational content that earns reach",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-affinity-network-creator produces quality educational content that earns reach",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creator produces quality educational content that earns reach - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-affinity-network-creator produces quality educational content that earns reach",
+    "identifier": "did:web:elohim.host:content:social-medium:content-creator:scenarios:affinity-network-creator produces quality educational content that earns reach",
+    "name": "Creator produces quality educational content that earns reach",
+    "description": "Creator produces quality educational content that earns reach",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

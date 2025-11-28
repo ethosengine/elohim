@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical record integration for comprehensive care coordination",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medical record integration for comprehensive care coordination",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Medical record integration for comprehensive care coordination",
   "description": "Medical record integration for comprehensive care coordination",
   "content": "Scenario: Medical record integration for comprehensive care coordination\n    Given David's medical information is scattered across providers\n    And comprehensive view is essential for good care\n    When the healthcare_elohim accesses medical records\n    Then it should integrate information across healthcare systems\n    And James should have complete medical picture\n    And providers should receive comprehensive information\n    And medical record fragmentation should be addressed\n    And care coordination should be supported by integrated data\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Medical record integration for comprehensive care coordination",
+    "ogDescription": "Medical record integration for comprehensive care coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical record integration for comprehensive care coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Medical record integration for comprehensive care coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical record integration for comprehensive care coordination",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medical record integration for comprehensive care coordination",
+    "name": "Medical record integration for comprehensive care coordination",
+    "description": "Medical record integration for comprehensive care coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

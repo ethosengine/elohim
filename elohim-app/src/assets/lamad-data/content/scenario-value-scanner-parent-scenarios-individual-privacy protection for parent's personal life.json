@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-individual-privacy protection for parent's personal life",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:individual-privacy protection for parent's personal life",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Privacy protection for parent's personal life",
   "description": "Privacy protection for parent's personal life",
   "content": "Scenario: Privacy protection for parent's personal life\n    Given Sarah's care work generates extensive data\n    And she has full privacy rights as an individual\n    When care economy data is collected\n    Then Sarah must have complete control over her personal information\n    And no third party access should be permitted without explicit consent\n    And her parenting patterns should not be monetized\n    And the system should protect her from surveillance capitalism\n    And privacy should be default, not opt-in\n    And Sarah's dignity should be protected through data sovereignty\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Privacy protection for parent's personal life",
+    "ogDescription": "Privacy protection for parent's personal life",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-individual-privacy protection for parent's personal life",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy protection for parent's personal life - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-individual-privacy protection for parent's personal life",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:individual-privacy protection for parent's personal life",
+    "name": "Privacy protection for parent's personal life",
+    "description": "Privacy protection for parent's personal life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

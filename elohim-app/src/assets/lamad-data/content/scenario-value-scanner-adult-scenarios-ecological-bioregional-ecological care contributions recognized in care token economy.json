@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-ecological care contributions recognized in care token economy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-ecological care contributions recognized in care token economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Ecological care contributions recognized in care token economy",
   "description": "Ecological care contributions recognized in care token economy",
   "content": "Scenario: Ecological care contributions recognized in care token economy\n    Given Sarah makes environmentally conscious choices\n    And ecological care is care work that benefits everyone\n    When Sarah's care contributions are tracked\n    Then environmental care choices should generate care tokens\n    And Sarah should be recognized for ecological stewardship\n    And care for planet should be valued alongside care for people\n    And care tokens should incentivize environmental care\n    And ecological care should be integrated into care economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Ecological care contributions recognized in care token economy",
+    "ogDescription": "Ecological care contributions recognized in care token economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-ecological care contributions recognized in care token economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Ecological care contributions recognized in care token economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-ecological care contributions recognized in care token economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-ecological care contributions recognized in care token economy",
+    "name": "Ecological care contributions recognized in care token economy",
+    "description": "Ecological care contributions recognized in care token economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

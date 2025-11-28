@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-elder-scenarios-neighborhood-elder shares traditional skill with neighborhood",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder shares traditional skill with neighborhood",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder shares traditional skill with neighborhood",
   "description": "Elder shares traditional skill with neighborhood",
   "content": "Scenario: Elder shares traditional skill with neighborhood\n    Given Rose is an expert seamstress with 60 years experience\n    When she offers to teach mending and sewing skills\n    And she creates a contribution proposing weekly sewing circles\n    Then the contribution reaches her neighborhood\n    And community members interested in learning can respond\n    And a neighborhood sewing circle forms with Rose as mentor\n    And Rose experiences being valued for her knowledge\n    And traditional skills are preserved and transmitted\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder shares traditional skill with neighborhood",
+    "ogDescription": "Elder shares traditional skill with neighborhood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder shares traditional skill with neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder shares traditional skill with neighborhood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder shares traditional skill with neighborhood",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder shares traditional skill with neighborhood",
+    "name": "Elder shares traditional skill with neighborhood",
+    "description": "Elder shares traditional skill with neighborhood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

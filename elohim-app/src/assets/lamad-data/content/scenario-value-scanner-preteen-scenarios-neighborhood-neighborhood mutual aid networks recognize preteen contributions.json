@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood mutual aid networks recognize preteen contributions",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-neighborhood mutual aid networks recognize preteen contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood mutual aid networks recognize preteen contributions",
   "description": "Neighborhood mutual aid networks recognize preteen contributions",
   "content": "Scenario: Neighborhood mutual aid networks recognize preteen contributions\n    Given Marcus's family both needs and provides care\n    And neighborhood mutual aid operates on reciprocity\n    When neighborhood care networks are coordinated\n    Then Marcus's household labor should be visible to mutual aid networks\n    And his contributions should qualify family for receiving support\n    And the framing should be reciprocal care, not charity\n    And Marcus gives care (household management); community gives care (support)\n    And the neighborhood_elohim should coordinate these exchanges\n    And dignity should be preserved through reciprocity framework\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood mutual aid networks recognize preteen contributions",
+    "ogDescription": "Neighborhood mutual aid networks recognize preteen contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood mutual aid networks recognize preteen contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood mutual aid networks recognize preteen contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood mutual aid networks recognize preteen contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-neighborhood mutual aid networks recognize preteen contributions",
+    "name": "Neighborhood mutual aid networks recognize preteen contributions",
+    "description": "Neighborhood mutual aid networks recognize preteen contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

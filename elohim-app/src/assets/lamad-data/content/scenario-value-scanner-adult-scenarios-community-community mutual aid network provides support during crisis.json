@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-community-community mutual aid network provides support during crisis",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community mutual aid network provides support during crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community mutual aid network provides support during crisis",
   "description": "Community mutual aid network provides support during crisis",
   "content": "Scenario: Community mutual aid network provides support during crisis\n    Given Sarah or community members may face crises\n    And traditional systems often fail to provide adequate support\n    When Sarah experiences job loss, health emergency, or family crisis\n    Then the community_elohim should connect her to mutual aid network\n    And support should be immediate, dignified, and effective\n    And community should function as safety net\n    And Sarah's previous contributions should enable access to help\n    And mutual aid should be reciprocal and community-based\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Community mutual aid network provides support during crisis",
+    "ogDescription": "Community mutual aid network provides support during crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community mutual aid network provides support during crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community mutual aid network provides support during crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community mutual aid network provides support during crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community mutual aid network provides support during crisis",
+    "name": "Community mutual aid network provides support during crisis",
+    "description": "Community mutual aid network provides support during crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-07-regeneration"
   },
-  "createdAt": "2025-11-28T02:53:21.870272",
-  "updatedAt": "2025-11-28T02:53:21.870273"
+  "createdAt": "2025-11-28T21:10:19.208032",
+  "updatedAt": "2025-11-28T21:10:19.208033",
+  "did": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Matthew 6: Giving to the Needy",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-07-regeneration-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Matthew 6: Giving to the Needy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-07-regeneration-story",
+    "identifier": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+    "name": "Matthew 6: Giving to the Needy",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.208032",
+    "dateModified": "2025-11-28T21:10:19.208033",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

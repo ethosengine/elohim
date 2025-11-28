@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-district-board member tracks accountability for student outcome commitments",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member tracks accountability for student outcome commitments",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Board member tracks accountability for student outcome commitments",
   "description": "Board member tracks accountability for student outcome commitments",
   "content": "Scenario: Board member tracks accountability for student outcome commitments\n    Given the politician pledged to improve reading proficiency\n    And committed to closing achievement gaps\n    When the Observer monitors outcome tracking\n    Then they see reading proficiency trends by school and demographic\n    And identify which interventions work versus ineffective programs\n    And receive alerts when metrics decline\n    And understand whether district implements promised reforms\n    And maintain accountability for student outcome commitments\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-district",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Board member tracks accountability for student outcome commitments",
+    "ogDescription": "Board member tracks accountability for student outcome commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member tracks accountability for student outcome commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Board member tracks accountability for student outcome commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member tracks accountability for student outcome commitments",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member tracks accountability for student outcome commitments",
+    "name": "Board member tracks accountability for student outcome commitments",
+    "description": "Board member tracks accountability for student outcome commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

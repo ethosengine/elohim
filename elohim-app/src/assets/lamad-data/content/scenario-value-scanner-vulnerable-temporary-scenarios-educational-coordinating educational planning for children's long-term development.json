@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational planning for children's long-term development",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-coordinating educational planning for children's long-term development",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating educational planning for children's long-term development",
   "description": "Coordinating educational planning for children's long-term development",
   "content": "Scenario: Coordinating educational planning for children's long-term development\n    Given crisis is temporary but children's educational trajectory is long-term\n    And current educational decisions affect future opportunities\n    When I make educational choices considering children's futures\n    Then the Value Scanner helps me consider long-term educational implications\n    And balances immediate stability needs with future development\n    And tracks children's educational progress and trajectory\n    And ensures crisis doesn't permanently derail educational opportunities\n    And validates that my educational planning serves children's futures\n    And my personal_agent surfaces educational opportunities supporting development\n    And recognizes long-term educational planning as sophisticated parenting\n    And celebrates my investment in children's educational futures despite crisis\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating educational planning for children's long-term development",
+    "ogDescription": "Coordinating educational planning for children's long-term development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational planning for children's long-term development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating educational planning for children's long-term development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational planning for children's long-term development",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-coordinating educational planning for children's long-term development",
+    "name": "Coordinating educational planning for children's long-term development",
+    "description": "Coordinating educational planning for children's long-term development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

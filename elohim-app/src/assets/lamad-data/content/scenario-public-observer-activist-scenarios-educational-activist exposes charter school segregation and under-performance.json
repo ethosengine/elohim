@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-educational-activist exposes charter school segregation and under-performance",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist exposes charter school segregation and under-performance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist exposes charter school segregation and under-performance",
   "description": "Activist exposes charter school segregation and under-performance",
   "content": "Scenario: Activist exposes charter school segregation and under-performance\n    Given charter schools claim to serve disadvantaged students\n    But the activist sees segregation and selective enrollment\n    When the Observer tracks charter school demographics and outcomes\n    Then the activist shows charters are more segregated than district schools\n    And suspension rates for Black students are even higher\n    And test score gains evaporate when controlling for selective enrollment\n    And charter expansion drains resources from district schools\n    And privatization agenda meets evidence-based critique\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist exposes charter school segregation and under-performance",
+    "ogDescription": "Activist exposes charter school segregation and under-performance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist exposes charter school segregation and under-performance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist exposes charter school segregation and under-performance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist exposes charter school segregation and under-performance",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist exposes charter school segregation and under-performance",
+    "name": "Activist exposes charter school segregation and under-performance",
+    "description": "Activist exposes charter school segregation and under-performance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

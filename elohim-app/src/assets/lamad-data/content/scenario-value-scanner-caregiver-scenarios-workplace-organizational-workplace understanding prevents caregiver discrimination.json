@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace understanding prevents caregiver discrimination",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-workplace understanding prevents caregiver discrimination",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace understanding prevents caregiver discrimination",
   "description": "Workplace understanding prevents caregiver discrimination",
   "content": "Scenario: Workplace understanding prevents caregiver discrimination\n    Given caregivers often face employment discrimination\n    And James might be seen as less committed or reliable\n    When the workplace_elohim monitors for discrimination\n    Then it should recognize caregiver discrimination patterns\n    And it should educate employers about caregiver rights\n    And it should advocate when James faces unfair treatment\n    And workplace should not penalize caregiving responsibilities\n    And caregiver status should be protected like other statuses\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace understanding prevents caregiver discrimination",
+    "ogDescription": "Workplace understanding prevents caregiver discrimination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace understanding prevents caregiver discrimination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace understanding prevents caregiver discrimination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-workplace understanding prevents caregiver discrimination",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-workplace understanding prevents caregiver discrimination",
+    "name": "Workplace understanding prevents caregiver discrimination",
+    "description": "Workplace understanding prevents caregiver discrimination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

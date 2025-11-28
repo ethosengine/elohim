@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-customer-scenarios-individual-customer consumption aligns with values through democratic option",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer consumption aligns with values through democratic option",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Customer consumption aligns with values through democratic option",
   "description": "Customer consumption aligns with values through democratic option",
   "content": "Scenario: Customer consumption aligns with values through democratic option\n    Given Ms. Johnson opposed worker exploitation but lacked alternatives\n    And corporate greenwashing made ethical consumption impossible to verify\n    When democratic business provides transparent ethical alternative\n    Then her consumption supports values: worker dignity, fair wages, environmental stewardship, community wealth\n    And alignment between values and consumption reduces moral cognitive dissonance\n    And she feels good about supporting democratic business, not guilty about corporate extraction\n    And ethical consumption becomes real choice, not marketing manipulation\n    And community_elohim helps communicate values alignment opportunities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Customer consumption aligns with values through democratic option",
+    "ogDescription": "Customer consumption aligns with values through democratic option",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer consumption aligns with values through democratic option",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer consumption aligns with values through democratic option - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer consumption aligns with values through democratic option",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer consumption aligns with values through democratic option",
+    "name": "Customer consumption aligns with values through democratic option",
+    "description": "Customer consumption aligns with values through democratic option",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

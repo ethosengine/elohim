@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-community-first-layer appeal review within 24 hours",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-first-layer appeal review within 24 hours",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "First-layer appeal review within 24 hours",
   "description": "First-layer appeal review within 24 hours",
   "content": "Scenario: First-layer appeal review within 24 hours\n    Given I appealed my Family Elohim's decision about mental health intervention\n    When Community Elohim conducts first-layer appeal review\n    Then the review happens within 24 hours of my appeal filing\n    And Community Elohim examines if Family Elohim decision was appropriate for local context\n    And They consider community resources available (mental health services, support networks)\n    And They evaluate if local cultural norms were respected\n    And They provide transparent reasoning for their review decision\n    And Most appeals are resolved at this layer through clarification or correction\n    And I receive immediate notification of the review outcome\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "First-layer appeal review within 24 hours",
+    "ogDescription": "First-layer appeal review within 24 hours",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-first-layer appeal review within 24 hours",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "First-layer appeal review within 24 hours - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-first-layer appeal review within 24 hours",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-first-layer appeal review within 24 hours",
+    "name": "First-layer appeal review within 24 hours",
+    "description": "First-layer appeal review within 24 hours",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

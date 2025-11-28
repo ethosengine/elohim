@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-traditional knowledge of food preservation and storage",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:ecological-bioregional-traditional knowledge of food preservation and storage",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Traditional knowledge of food preservation and storage",
   "description": "Traditional knowledge of food preservation and storage",
   "content": "Scenario: Traditional knowledge of food preservation and storage\n    Given Margaret knows how to preserve food, reduce waste, maximize resources\n    And these skills were essential in her generation\n    When the bioregional_elohim tracks traditional ecological knowledge\n    Then it should recognize Margaret's food preservation skills as valuable\n    And it should value her knowledge of canning, freezing, storing food\n    And it should facilitate teaching these skills to grandchildren\n    And traditional knowledge should be documented and transmitted\n    And Margaret's expertise should contribute to food security\n    And ecological wisdom should accumulate care tokens\n    And sustainable food practices should be valued and preserved\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Traditional knowledge of food preservation and storage",
+    "ogDescription": "Traditional knowledge of food preservation and storage",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-ecological-bioregional-traditional knowledge of food preservation and storage",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Traditional knowledge of food preservation and storage - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-ecological-bioregional-traditional knowledge of food preservation and storage",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:ecological-bioregional-traditional knowledge of food preservation and storage",
+    "name": "Traditional knowledge of food preservation and storage",
+    "description": "Traditional knowledge of food preservation and storage",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

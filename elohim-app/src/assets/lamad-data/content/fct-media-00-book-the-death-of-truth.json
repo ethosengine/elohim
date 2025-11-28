@@ -25,6 +25,36 @@
     "author": "Michiko Kakutani"
   },
   "_contributor": "Michiko Kakutani",
-  "createdAt": "2025-11-28T02:53:21.847907",
-  "updatedAt": "2025-11-28T02:53:21.847908"
+  "createdAt": "2025-11-28T21:10:19.190254",
+  "updatedAt": "2025-11-28T21:10:19.190255",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Death of Truth",
+    "ogDescription": "Book by Michiko Kakutani",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-the-death-of-truth",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Death of Truth - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-the-death-of-truth",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "The Death of Truth",
+    "description": "Book by Michiko Kakutani",
+    "dateCreated": "2025-11-28T21:10:19.190254",
+    "dateModified": "2025-11-28T21:10:19.190255",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Michiko Kakutani"
+    }
+  }
 }

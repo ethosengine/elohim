@@ -29,6 +29,32 @@
     "sourceModule": "fct-module-14-ready-to-act",
     "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
   },
-  "createdAt": "2025-11-28T02:53:21.901753",
-  "updatedAt": "2025-11-28T02:53:21.901754"
+  "createdAt": "2025-11-28T21:10:19.224746",
+  "updatedAt": "2025-11-28T21:10:19.224747",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Galatians 6:9-10",
+    "ogDescription": "Scripture reference used in FCT Module 14",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-galatians-6-9-10",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Galatians 6:9-10 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-galatians-6-9-10",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Galatians 6:9-10",
+    "description": "Scripture reference used in FCT Module 14",
+    "dateCreated": "2025-11-28T21:10:19.224746",
+    "dateModified": "2025-11-28T21:10:19.224747",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-neighborhood-navigating student-resident tensions in shared neighborhood",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-navigating student-resident tensions in shared neighborhood",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Navigating student-resident tensions in shared neighborhood",
   "description": "Navigating student-resident tensions in shared neighborhood",
   "content": "Scenario: Navigating student-resident tensions in shared neighborhood\n    Given long-term residents might resent student noise, parties, or turnover\n    And students might be unaware of neighborhood norms\n    When the neighborhood_elohim facilitates student-resident relationships\n    Then it should educate students about neighborhood expectations\n    And it should help residents recognize students as temporary but real members\n    And it should facilitate communication between students and long-term residents\n    And it should build understanding across different neighborhood groups\n    And the system should reduce student-resident conflict\n    And mixed neighborhoods should be navigable for all residents\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Navigating student-resident tensions in shared neighborhood",
+    "ogDescription": "Navigating student-resident tensions in shared neighborhood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-navigating student-resident tensions in shared neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating student-resident tensions in shared neighborhood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-navigating student-resident tensions in shared neighborhood",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-navigating student-resident tensions in shared neighborhood",
+    "name": "Navigating student-resident tensions in shared neighborhood",
+    "description": "Navigating student-resident tensions in shared neighborhood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

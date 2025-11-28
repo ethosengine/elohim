@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood mutual aid network provides crisis support",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood mutual aid network provides crisis support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood mutual aid network provides crisis support",
   "description": "Neighborhood mutual aid network provides crisis support",
   "content": "Scenario: Neighborhood mutual aid network provides crisis support\n    Given Sarah or her neighbors may face crises\n    And traditional systems often fail to provide timely support\n    When a household experiences emergency\n    Then the neighborhood_elohim should activate mutual aid network\n    And neighbors with capacity should be prompted to help\n    And support should be immediate and community-based\n    And neighborhood should function as first-line safety net\n    And mutual aid should be coordinated effectively\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood mutual aid network provides crisis support",
+    "ogDescription": "Neighborhood mutual aid network provides crisis support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood mutual aid network provides crisis support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood mutual aid network provides crisis support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood mutual aid network provides crisis support",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood mutual aid network provides crisis support",
+    "name": "Neighborhood mutual aid network provides crisis support",
+    "description": "Neighborhood mutual aid network provides crisis support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

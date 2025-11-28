@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-educational-developing abstract thinking through real economic complexity",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-developing abstract thinking through real economic complexity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developing abstract thinking through real economic complexity",
   "description": "Developing abstract thinking through real economic complexity",
   "content": "Scenario: Developing abstract thinking through real economic complexity\n    Given Marcus is in developmental phase of emerging abstract thought\n    And he manages genuinely complex resource coordination\n    When Marcus plans meals and budgets across time\n    Then he should be developing advanced cognitive capabilities\n    And abstract concepts like opportunity cost should be learned through application\n    And systems thinking should develop through real experience\n    And the personal_agent should support abstract reasoning development\n    And complex adult work should accelerate cognitive maturation\n    And educational scaffolding should support his emerging abstraction\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Developing abstract thinking through real economic complexity",
+    "ogDescription": "Developing abstract thinking through real economic complexity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-developing abstract thinking through real economic complexity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developing abstract thinking through real economic complexity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-developing abstract thinking through real economic complexity",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-developing abstract thinking through real economic complexity",
+    "name": "Developing abstract thinking through real economic complexity",
+    "description": "Developing abstract thinking through real economic complexity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

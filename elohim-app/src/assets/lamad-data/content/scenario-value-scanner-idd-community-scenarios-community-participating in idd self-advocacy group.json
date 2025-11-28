@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-community-participating in idd self-advocacy group",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-participating in idd self-advocacy group",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in IDD self-advocacy group",
   "description": "Participating in IDD self-advocacy group",
   "content": "Scenario: Participating in IDD self-advocacy group\n    Given there's a local IDD self-advocacy organization\n    And Jordan wants to participate in advocacy work\n    When Jordan attends a self-advocacy meeting\n    Then the personal_agent provides accessible meeting information\n    And the meeting uses IDD-accessible facilitation practices\n    And Jordan can share experiences and voice concerns\n    And Jordan's advocacy contribution is valued by peers\n    And the group works on issues Jordan cares about\n    And Jordan accumulates care tokens for community advocacy work\n    And Jordan experiences political agency and community power\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in IDD self-advocacy group",
+    "ogDescription": "Participating in IDD self-advocacy group",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-participating in idd self-advocacy group",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in IDD self-advocacy group - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-participating in idd self-advocacy group",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-participating in idd self-advocacy group",
+    "name": "Participating in IDD self-advocacy group",
+    "description": "Participating in IDD self-advocacy group",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-family-student privacy rights within family context",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-student privacy rights within family context",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Student privacy rights within family context",
   "description": "Student privacy rights within family context",
   "content": "Scenario: Student privacy rights within family context\n    Given Kenji is legal adult with full privacy rights\n    And family relationships involve some appropriate information sharing\n    When the family_elohim manages family information\n    Then Kenji must have complete control over what family sees\n    And parents should not have access to his personal data without consent\n    And the system should respect his adult autonomy absolutely\n    And family connection should not compromise privacy\n    And Kenji should decide what to share with family\n    And adult student privacy should be default, non-negotiable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Student privacy rights within family context",
+    "ogDescription": "Student privacy rights within family context",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-student privacy rights within family context",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Student privacy rights within family context - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-student privacy rights within family context",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-student privacy rights within family context",
+    "name": "Student privacy rights within family context",
+    "description": "Student privacy rights within family context",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

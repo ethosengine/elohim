@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer employment impacts on community economics",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:workplace-organizational-developer employment impacts on community economics",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer employment impacts on community economics",
   "description": "Developer employment impacts on community economics",
   "content": "Scenario: Developer employment impacts on community economics\n    Given a developer's project will employ 150 construction workers\n    And claims significant economic impact on local economy\n    When the Observer analyzes actual community economic impacts\n    Then analysis shows: most workers spend earnings in home communities not locally\n    And temporary jobs create temporary spending not sustained economic benefit\n    And few local businesses benefit from construction employment\n    And honest economic analysis reveals limited community benefit\n    And employment claims need scrutiny about actual community economics\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer employment impacts on community economics",
+    "ogDescription": "Developer employment impacts on community economics",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer employment impacts on community economics",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer employment impacts on community economics - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-workplace-organizational-developer employment impacts on community economics",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:workplace-organizational-developer employment impacts on community economics",
+    "name": "Developer employment impacts on community economics",
+    "description": "Developer employment impacts on community economics",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

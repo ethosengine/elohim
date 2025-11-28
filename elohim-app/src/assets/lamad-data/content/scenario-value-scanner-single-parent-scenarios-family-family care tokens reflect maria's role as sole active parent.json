@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-family care tokens reflect maria's role as sole active parent",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-family care tokens reflect maria's role as sole active parent",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care tokens reflect Maria's role as sole active parent",
   "description": "Family care tokens reflect Maria's role as sole active parent",
   "content": "Scenario: Family care tokens reflect Maria's role as sole active parent\n    Given Maria provides all active parenting for three children\n    And she's performing care work of two parents alone\n    When family care tokens are calculated\n    Then Maria's tokens should reflect solo parenting of multiple children\n    And the protocol should recognize she's providing all emotional support, guidance, and presence\n    And her care contributions should be valued higher than partnered parents\n    And quantified solo parenting work should validate her superhuman efforts\n    And society should see undeniable proof that single parents deserve extraordinary support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care tokens reflect Maria's role as sole active parent",
+    "ogDescription": "Family care tokens reflect Maria's role as sole active parent",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-family care tokens reflect maria's role as sole active parent",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care tokens reflect Maria's role as sole active parent - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-family care tokens reflect maria's role as sole active parent",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-family care tokens reflect maria's role as sole active parent",
+    "name": "Family care tokens reflect Maria's role as sole active parent",
+    "description": "Family care tokens reflect Maria's role as sole active parent",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

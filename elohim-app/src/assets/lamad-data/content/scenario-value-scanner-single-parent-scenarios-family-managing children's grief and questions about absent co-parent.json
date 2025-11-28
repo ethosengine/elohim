@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-managing children's grief and questions about absent co-parent",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-managing children's grief and questions about absent co-parent",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing children's grief and questions about absent co-parent",
   "description": "Managing children's grief and questions about absent co-parent",
   "content": "Scenario: Managing children's grief and questions about absent co-parent\n    Given children may grieve or question their absent other parent\n    And Maria must handle these emotions while managing her own feelings\n    When children express feelings about family structure\n    Then the family_elohim should help Maria respond appropriately to each child's age\n    And it should remind her to validate their feelings without defensiveness\n    And it should help her maintain healthy narrative about family structure\n    And it should support her in helping children process complicated family reality\n    And Maria should have guidance for emotionally complex parenting situations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing children's grief and questions about absent co-parent",
+    "ogDescription": "Managing children's grief and questions about absent co-parent",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-managing children's grief and questions about absent co-parent",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing children's grief and questions about absent co-parent - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-managing children's grief and questions about absent co-parent",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-managing children's grief and questions about absent co-parent",
+    "name": "Managing children's grief and questions about absent co-parent",
+    "description": "Managing children's grief and questions about absent co-parent",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

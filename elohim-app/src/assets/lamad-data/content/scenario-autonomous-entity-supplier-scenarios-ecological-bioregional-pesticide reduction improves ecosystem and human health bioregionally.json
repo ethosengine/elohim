@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-pesticide reduction improves ecosystem and human health bioregionally",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:ecological-bioregional-pesticide reduction improves ecosystem and human health bioregionally",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Pesticide reduction improves ecosystem and human health bioregionally",
   "description": "Pesticide reduction improves ecosystem and human health bioregionally",
   "content": "Scenario: Pesticide reduction improves ecosystem and human health bioregionally\n    Given pesticide use harms pollinators, water quality, farmworker health, and ecosystems\n    And individual farms face pest pressure requiring coordinated management\n    When democratic farms coordinate integrated pest management bioregionally\n    Then pesticide use decreases through ecological pest control methods\n    And farmworker health improves from reduced chemical exposure\n    And pollinator populations recover from pesticide reduction\n    And ecosystem health improves measurably across bioregion\n    And bioregional_elohim tracks pesticide reduction and ecosystem health indicators\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Pesticide reduction improves ecosystem and human health bioregionally",
+    "ogDescription": "Pesticide reduction improves ecosystem and human health bioregionally",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-pesticide reduction improves ecosystem and human health bioregionally",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Pesticide reduction improves ecosystem and human health bioregionally - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-pesticide reduction improves ecosystem and human health bioregionally",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:ecological-bioregional-pesticide reduction improves ecosystem and human health bioregionally",
+    "name": "Pesticide reduction improves ecosystem and human health bioregionally",
+    "description": "Pesticide reduction improves ecosystem and human health bioregionally",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

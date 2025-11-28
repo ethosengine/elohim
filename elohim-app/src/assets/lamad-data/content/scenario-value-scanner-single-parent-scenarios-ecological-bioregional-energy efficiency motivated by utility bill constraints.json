@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-energy efficiency motivated by utility bill constraints",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-energy efficiency motivated by utility bill constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Energy efficiency motivated by utility bill constraints",
   "description": "Energy efficiency motivated by utility bill constraints",
   "content": "Scenario: Energy efficiency motivated by utility bill constraints\n    Given Maria carefully manages utility costs on tight budget\n    And she minimizes energy use to keep bills affordable\n    When household energy consumption is tracked\n    Then the bioregional_elohim should recognize her low energy footprint\n    And it should celebrate her energy efficiency as climate contribution\n    And her utility management should be valued as environmental stewardship\n    And economic necessity should be reframed as climate leadership\n    And Maria should see her household as energy efficiency exemplar\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Energy efficiency motivated by utility bill constraints",
+    "ogDescription": "Energy efficiency motivated by utility bill constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-energy efficiency motivated by utility bill constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Energy efficiency motivated by utility bill constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-energy efficiency motivated by utility bill constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-energy efficiency motivated by utility bill constraints",
+    "name": "Energy efficiency motivated by utility bill constraints",
+    "description": "Energy efficiency motivated by utility bill constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

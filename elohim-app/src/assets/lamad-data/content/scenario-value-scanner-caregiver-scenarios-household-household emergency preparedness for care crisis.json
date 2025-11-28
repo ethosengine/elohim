@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household emergency preparedness for care crisis",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household emergency preparedness for care crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household emergency preparedness for care crisis",
   "description": "Household emergency preparedness for care crisis",
   "content": "Scenario: Household emergency preparedness for care crisis\n    Given David's condition could deteriorate suddenly\n    And James could become ill and unable to provide care\n    When the household_elohim plans for emergencies\n    Then it should maintain emergency care plans\n    And it should identify backup caregivers\n    And it should ensure emergency contacts are current\n    And it should prepare for crisis scenarios\n    And household should have resilience planning for care emergencies\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household emergency preparedness for care crisis",
+    "ogDescription": "Household emergency preparedness for care crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household emergency preparedness for care crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household emergency preparedness for care crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household emergency preparedness for care crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household emergency preparedness for care crisis",
+    "name": "Household emergency preparedness for care crisis",
+    "description": "Household emergency preparedness for care crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

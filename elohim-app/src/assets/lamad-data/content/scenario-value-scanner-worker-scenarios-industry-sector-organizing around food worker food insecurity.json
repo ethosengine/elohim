@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-industry-sector-organizing around food worker food insecurity",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-organizing around food worker food insecurity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizing around food worker food insecurity",
   "description": "Organizing around food worker food insecurity",
   "content": "Scenario: Organizing around food worker food insecurity\n    Given food service workers often cannot afford adequate food despite preparing food\n    When this contradiction becomes visible\n    Then the protocol should help organize around food worker food security\n    And advocate for meal provisions as standard for food workers\n    And push for wages that enable workers to afford quality food\n    And make visible the injustice of hungry people feeding others\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizing around food worker food insecurity",
+    "ogDescription": "Organizing around food worker food insecurity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-organizing around food worker food insecurity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizing around food worker food insecurity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-organizing around food worker food insecurity",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-organizing around food worker food insecurity",
+    "name": "Organizing around food worker food insecurity",
+    "description": "Organizing around food worker food insecurity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

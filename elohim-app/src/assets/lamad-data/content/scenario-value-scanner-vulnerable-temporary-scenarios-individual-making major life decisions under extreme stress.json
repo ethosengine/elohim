@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-making major life decisions under extreme stress",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-making major life decisions under extreme stress",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Making major life decisions under extreme stress",
   "description": "Making major life decisions under extreme stress",
   "content": "Scenario: Making major life decisions under extreme stress\n    Given I need to make important decisions about housing, employment, or children's needs\n    And I am traumatized, exhausted, and overwhelmed\n    When I need to evaluate my options\n    Then my personal_agent helps me process complex information\n    And breaks down overwhelming decisions into manageable steps\n    And provides decision support without making decisions for me\n    And helps me identify my priorities and values\n    And surfaces relevant information at the right time\n    And prevents decision paralysis without overriding my agency\n    And validates that my stress is reasonable given my circumstances\n    And trusts that I can make good decisions with appropriate support\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Making major life decisions under extreme stress",
+    "ogDescription": "Making major life decisions under extreme stress",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-making major life decisions under extreme stress",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Making major life decisions under extreme stress - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-making major life decisions under extreme stress",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-making major life decisions under extreme stress",
+    "name": "Making major life decisions under extreme stress",
+    "description": "Making major life decisions under extreme stress",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

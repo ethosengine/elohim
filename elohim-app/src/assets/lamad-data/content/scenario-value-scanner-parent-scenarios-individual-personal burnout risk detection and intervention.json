@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-individual-personal burnout risk detection and intervention",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:individual-personal burnout risk detection and intervention",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal burnout risk detection and intervention",
   "description": "Personal burnout risk detection and intervention",
   "content": "Scenario: Personal burnout risk detection and intervention\n    Given Sarah has been operating at unsustainable intensity\n    And she wakes at 5:30am and works until 10pm daily\n    When the personal_agent detects burnout patterns\n    Then it should flag the unsustainability explicitly\n    And it should say \"This pace will break you. You need support.\"\n    And it should connect her to respite resources\n    And it should help her identify what must give\n    And crisis intervention should be immediate and clear\n    And the system should prioritize her survival over perfection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal burnout risk detection and intervention",
+    "ogDescription": "Personal burnout risk detection and intervention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-individual-personal burnout risk detection and intervention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal burnout risk detection and intervention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-individual-personal burnout risk detection and intervention",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:individual-personal burnout risk detection and intervention",
+    "name": "Personal burnout risk detection and intervention",
+    "description": "Personal burnout risk detection and intervention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

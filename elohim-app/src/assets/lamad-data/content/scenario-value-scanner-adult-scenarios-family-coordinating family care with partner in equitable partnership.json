@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-family-coordinating family care with partner in equitable partnership",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-coordinating family care with partner in equitable partnership",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating family care with partner in equitable partnership",
   "description": "Coordinating family care with partner in equitable partnership",
   "content": "Scenario: Coordinating family care with partner in equitable partnership\n    Given Sarah and partner share parenting responsibilities\n    And they're raising children together\n    When family care labor is distributed\n    Then the family_elohim should track both partners' contributions\n    And labor should be distributed equitably\n    And neither partner should bear unfair burden\n    And children should see modeled equitable partnership\n    And family governance should be genuinely shared\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating family care with partner in equitable partnership",
+    "ogDescription": "Coordinating family care with partner in equitable partnership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-coordinating family care with partner in equitable partnership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating family care with partner in equitable partnership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-coordinating family care with partner in equitable partnership",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-coordinating family care with partner in equitable partnership",
+    "name": "Coordinating family care with partner in equitable partnership",
+    "description": "Coordinating family care with partner in equitable partnership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

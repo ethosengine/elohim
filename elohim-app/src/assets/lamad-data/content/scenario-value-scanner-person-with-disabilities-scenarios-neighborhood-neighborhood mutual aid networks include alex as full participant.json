@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-neighborhood mutual aid networks include alex as full participant",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-neighborhood mutual aid networks include alex as full participant",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood mutual aid networks include Alex as full participant",
   "description": "Neighborhood mutual aid networks include Alex as full participant",
   "content": "Scenario: Neighborhood mutual aid networks include Alex as full participant\n    Given Alex participates in neighborhood mutual aid\n    And Alex both gives and receives support\n    When neighborhood care flows are tracked\n    Then Alex should be recognized as mutual aid contributor\n    And Alex provides support to neighbors (advice, connection, skills)\n    And Alex receives support from neighbors (physical assistance, rides, help)\n    And reciprocity should be visible and valued\n    And the neighborhood_elohim should track care flows in multiple directions\n    And Alex should experience genuine mutuality, not charity\n    And interdependence should be normalized as neighborhood practice\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood mutual aid networks include Alex as full participant",
+    "ogDescription": "Neighborhood mutual aid networks include Alex as full participant",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-neighborhood mutual aid networks include alex as full participant",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood mutual aid networks include Alex as full participant - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-neighborhood mutual aid networks include alex as full participant",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-neighborhood mutual aid networks include alex as full participant",
+    "name": "Neighborhood mutual aid networks include Alex as full participant",
+    "description": "Neighborhood mutual aid networks include Alex as full participant",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

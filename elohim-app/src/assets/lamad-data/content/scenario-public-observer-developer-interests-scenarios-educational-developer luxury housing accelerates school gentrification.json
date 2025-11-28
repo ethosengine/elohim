@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-educational-developer luxury housing accelerates school gentrification",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer luxury housing accelerates school gentrification",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer luxury housing accelerates school gentrification",
   "description": "Developer luxury housing accelerates school gentrification",
   "content": "Scenario: Developer luxury housing accelerates school gentrification\n    Given a developer builds high-end housing in gentrifying neighborhood\n    And displacement impacts working-class families\n    When the Observer analyzes school enrollment changes\n    Then analysis shows: low-income student enrollment dropped 40%\n    And school demographics shifted from 70% to 35% students of color\n    And affordable family housing converted to luxury units\n    And development accelerated displacement affecting educational equity\n    And gentrification impacts on schools become visible and challengeable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer luxury housing accelerates school gentrification",
+    "ogDescription": "Developer luxury housing accelerates school gentrification",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer luxury housing accelerates school gentrification",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer luxury housing accelerates school gentrification - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer luxury housing accelerates school gentrification",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer luxury housing accelerates school gentrification",
+    "name": "Developer luxury housing accelerates school gentrification",
+    "description": "Developer luxury housing accelerates school gentrification",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

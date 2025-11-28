@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-educational-teaching reciprocity and mutual care through experience",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-teaching reciprocity and mutual care through experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching reciprocity and mutual care through experience",
   "description": "Teaching reciprocity and mutual care through experience",
   "content": "Scenario: Teaching reciprocity and mutual care through experience\n    Given Tommy is learning social and moral concepts\n    And reciprocity is foundational to care economy\n    When Tommy both gives and receives care through the scanner\n    Then he should learn that care flows in multiple directions\n    And he should experience receiving recognition for his care\n    And he should practice recognizing others' care for him\n    And reciprocal care patterns should be modeled\n    And mutual flourishing should be taught through practice\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching reciprocity and mutual care through experience",
+    "ogDescription": "Teaching reciprocity and mutual care through experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-teaching reciprocity and mutual care through experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching reciprocity and mutual care through experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-teaching reciprocity and mutual care through experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-teaching reciprocity and mutual care through experience",
+    "name": "Teaching reciprocity and mutual care through experience",
+    "description": "Teaching reciprocity and mutual care through experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

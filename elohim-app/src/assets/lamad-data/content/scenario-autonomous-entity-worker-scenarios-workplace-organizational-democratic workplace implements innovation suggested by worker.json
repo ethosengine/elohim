@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-democratic workplace implements innovation suggested by worker",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-democratic workplace implements innovation suggested by worker",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Democratic workplace implements innovation suggested by worker",
   "description": "Democratic workplace implements innovation suggested by worker",
   "content": "Scenario: Democratic workplace implements innovation suggested by worker\n    Given Emma has identified a workflow optimization\n    And corporate system previously prohibited worker-initiated changes\n    When Emma proposes the optimization at worker council meeting\n    Then workers deliberate on implementation feasibility\n    And workers vote to pilot Emma's optimization for two weeks\n    And results are measured and shared transparently\n    And if successful, Emma's innovation is permanently adopted\n    And Emma receives recognition and compensation for the contribution\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Democratic workplace implements innovation suggested by worker",
+    "ogDescription": "Democratic workplace implements innovation suggested by worker",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-democratic workplace implements innovation suggested by worker",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Democratic workplace implements innovation suggested by worker - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-democratic workplace implements innovation suggested by worker",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-democratic workplace implements innovation suggested by worker",
+    "name": "Democratic workplace implements innovation suggested by worker",
+    "description": "Democratic workplace implements innovation suggested by worker",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

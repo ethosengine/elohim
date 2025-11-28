@@ -60,6 +60,34 @@
     "bookCount": 0,
     "bibleVerseCount": 11
   },
-  "createdAt": "2025-11-28T02:53:21.882108",
-  "updatedAt": "2025-11-28T02:53:21.882110"
+  "createdAt": "2025-11-28T21:10:19.214824",
+  "updatedAt": "2025-11-28T21:10:19.214826",
+  "did": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 10: Creating Shared Understanding: Recognize Distortions",
+    "ogDescription": "C.S.Lewis (Mere Christianity) \"God can show Himself as He reall is only to real men. And that means not simply t omen who are individually good, but to men who are united together in a body, loving on",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.214824",
+    "articleModifiedTime": "2025-11-28T21:10:19.214826",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 10: Creating Shared Understanding: Recognize Distortions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions",
+    "identifier": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
+    "name": "FCT 10: Creating Shared Understanding: Recognize Distortions",
+    "description": "C.S.Lewis (Mere Christianity) \"God can show Himself as He reall is only to real men. And that means not simply t omen who are individually good, but to men who are united together in a body, loving one another, helping one another, show Him to one another. For that is what God ment humanity to be like; like players in one band, or organs in one body. ",
+    "dateCreated": "2025-11-28T21:10:19.214824",
+    "dateModified": "2025-11-28T21:10:19.214826",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-educational-lifelong learning continues in retirement for enrichment",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-lifelong learning continues in retirement for enrichment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Lifelong learning continues in retirement for enrichment",
   "description": "Lifelong learning continues in retirement for enrichment",
   "content": "Scenario: Lifelong learning continues in retirement for enrichment\n    Given Margaret has intellectual curiosity and time for learning\n    And education should continue throughout life\n    When the educational_elohim connects Margaret to learning opportunities\n    Then continuing education programs should be accessible\n    And learning for enrichment should be distinguished from job training\n    And Margaret should pursue subjects of personal interest\n    And senior learning programs should be available and affordable\n    And education should be framed as lifelong right and pleasure\n    And intellectual engagement should support cognitive health\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Lifelong learning continues in retirement for enrichment",
+    "ogDescription": "Lifelong learning continues in retirement for enrichment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-lifelong learning continues in retirement for enrichment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Lifelong learning continues in retirement for enrichment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-lifelong learning continues in retirement for enrichment",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-lifelong learning continues in retirement for enrichment",
+    "name": "Lifelong learning continues in retirement for enrichment",
+    "description": "Lifelong learning continues in retirement for enrichment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

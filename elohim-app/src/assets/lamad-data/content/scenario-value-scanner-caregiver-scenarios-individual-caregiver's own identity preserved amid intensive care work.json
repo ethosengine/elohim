@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-individual-caregiver's own identity preserved amid intensive care work",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-caregiver's own identity preserved amid intensive care work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Caregiver's own identity preserved amid intensive care work",
   "description": "Caregiver's own identity preserved amid intensive care work",
   "content": "Scenario: Caregiver's own identity preserved amid intensive care work\n    Given James's life is consumed by caregiving responsibilities\n    And he risks losing his identity as caregiving intensifies\n    When the personal_agent monitors James's individual well-being\n    Then it should protect tiny spaces for his own identity\n    And it should remind him that his flourishing matters too\n    And it should recognize when caregiving threatens his sense of self\n    And it should prompt activities that sustain his individual identity\n    And caregiving should not erase who James is as a person\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Caregiver's own identity preserved amid intensive care work",
+    "ogDescription": "Caregiver's own identity preserved amid intensive care work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-caregiver's own identity preserved amid intensive care work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Caregiver's own identity preserved amid intensive care work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-caregiver's own identity preserved amid intensive care work",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-caregiver's own identity preserved amid intensive care work",
+    "name": "Caregiver's own identity preserved amid intensive care work",
+    "description": "Caregiver's own identity preserved amid intensive care work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

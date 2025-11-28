@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-community-community food systems and nutrition access for seniors",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-community food systems and nutrition access for seniors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community food systems and nutrition access for seniors",
   "description": "Community food systems and nutrition access for seniors",
   "content": "Scenario: Community food systems and nutrition access for seniors\n    Given Margaret manages nutrition on limited budget\n    And community food systems affect senior health\n    When the community_elohim coordinates food access\n    Then Margaret should help shape senior-appropriate food programs\n    And her needs and knowledge should inform program design\n    And community should ensure affordable nutritious food for seniors\n    And Margaret should influence resource allocation\n    And senior nutritional needs should be community priority\n    And her participation should improve services for all seniors\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Community food systems and nutrition access for seniors",
+    "ogDescription": "Community food systems and nutrition access for seniors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-community food systems and nutrition access for seniors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community food systems and nutrition access for seniors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-community food systems and nutrition access for seniors",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-community food systems and nutrition access for seniors",
+    "name": "Community food systems and nutrition access for seniors",
+    "description": "Community food systems and nutrition access for seniors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

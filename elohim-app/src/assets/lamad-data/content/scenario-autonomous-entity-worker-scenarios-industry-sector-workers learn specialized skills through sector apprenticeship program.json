@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-worker-scenarios-industry-sector-workers learn specialized skills through sector apprenticeship program",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:industry-sector-workers learn specialized skills through sector apprenticeship program",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workers learn specialized skills through sector apprenticeship program",
   "description": "Workers learn specialized skills through sector apprenticeship program",
   "content": "Scenario: Workers learn specialized skills through sector apprenticeship program\n    Given different EAE entities have different specialty expertise\n    And Emma wants to learn about grain milling at Garden Bowl\n    When Emma applies for sector cross-training opportunity\n    Then industry_sector_elohim matches her interest with Garden Bowl capacity\n    And Emma spends two weeks learning grain milling alongside ChickenMax work\n    And both entities benefit from cross-pollination of expertise\n    And Emma returns with new skills enhancing ChickenMax operations\n    And sector-wide learning builds collective capability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Workers learn specialized skills through sector apprenticeship program",
+    "ogDescription": "Workers learn specialized skills through sector apprenticeship program",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-industry-sector-workers learn specialized skills through sector apprenticeship program",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workers learn specialized skills through sector apprenticeship program - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-industry-sector-workers learn specialized skills through sector apprenticeship program",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:industry-sector-workers learn specialized skills through sector apprenticeship program",
+    "name": "Workers learn specialized skills through sector apprenticeship program",
+    "description": "Workers learn specialized skills through sector apprenticeship program",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

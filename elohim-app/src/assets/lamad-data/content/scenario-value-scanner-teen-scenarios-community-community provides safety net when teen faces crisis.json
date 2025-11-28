@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-community-community provides safety net when teen faces crisis",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-community provides safety net when teen faces crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community provides safety net when teen faces crisis",
   "description": "Community provides safety net when teen faces crisis",
   "content": "Scenario: Community provides safety net when teen faces crisis\n    Given Jasmine encounters a family crisis or household instability\n    And she has been a consistent community contributor\n    When the crisis occurs and she needs support\n    Then the community_elohim should surface available resources\n    And her care contributions should give her standing to access support\n    And community institutions should respond to protect her wellbeing\n    And the system should preserve her autonomy and dignity\n    And demonstrate that care economy operates as mutual aid\n    And show that communities care for members who have cared for community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Community provides safety net when teen faces crisis",
+    "ogDescription": "Community provides safety net when teen faces crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-community provides safety net when teen faces crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community provides safety net when teen faces crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-community provides safety net when teen faces crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-community provides safety net when teen faces crisis",
+    "name": "Community provides safety net when teen faces crisis",
+    "description": "Community provides safety net when teen faces crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

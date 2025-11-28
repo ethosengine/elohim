@@ -25,6 +25,32 @@
     "sourceModule": "fct-module-12-fairness-justice",
     "activityType": "discussion"
   },
-  "createdAt": "2025-11-28T02:53:21.896241",
-  "updatedAt": "2025-11-28T02:53:21.896243"
+  "createdAt": "2025-11-28T21:10:19.223579",
+  "updatedAt": "2025-11-28T21:10:19.223581",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Supporting Fairness and Justice",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Supporting Fairness and Justice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Discussion: Supporting Fairness and Justice",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.223579",
+    "dateModified": "2025-11-28T21:10:19.223581",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

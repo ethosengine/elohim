@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-industry-sector-pushing for industry scheduling regulations",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-pushing for industry scheduling regulations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Pushing for industry scheduling regulations",
   "description": "Pushing for industry scheduling regulations",
   "content": "Scenario: Pushing for industry scheduling regulations\n    Given unpredictable scheduling is endemic in food service\n    When workers advocate for fair scheduling laws\n    Then the protocol should support advocacy for scheduling regulations\n    Such as advance notice requirements, predictable hours, right to request schedule\n    And provide evidence of harm from current scheduling practices\n    And coordinate workers pushing for legislative change\n    And transform industry standards through policy intervention\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Pushing for industry scheduling regulations",
+    "ogDescription": "Pushing for industry scheduling regulations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-pushing for industry scheduling regulations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Pushing for industry scheduling regulations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-pushing for industry scheduling regulations",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-pushing for industry scheduling regulations",
+    "name": "Pushing for industry scheduling regulations",
+    "description": "Pushing for industry scheduling regulations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

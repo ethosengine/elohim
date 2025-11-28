@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-individual-personal nutrition maintained despite overwhelming demands",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-personal nutrition maintained despite overwhelming demands",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal nutrition maintained despite overwhelming demands",
   "description": "Personal nutrition maintained despite overwhelming demands",
   "content": "Scenario: Personal nutrition maintained despite overwhelming demands\n    Given James often skips meals while caring for David\n    And his nutrition suffers under caregiving pressure\n    When the personal_agent monitors James's eating patterns\n    Then it should recognize inadequate nutrition\n    And it should prompt meal planning that includes James\n    And it should ensure James maintains basic nutrition\n    And his well-being should be prioritized alongside David's\n    And the protocol should prevent James's health decline\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal nutrition maintained despite overwhelming demands",
+    "ogDescription": "Personal nutrition maintained despite overwhelming demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-personal nutrition maintained despite overwhelming demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal nutrition maintained despite overwhelming demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-personal nutrition maintained despite overwhelming demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-personal nutrition maintained despite overwhelming demands",
+    "name": "Personal nutrition maintained despite overwhelming demands",
+    "description": "Personal nutrition maintained despite overwhelming demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

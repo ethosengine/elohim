@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-neighborhood-identifying food waste reduction opportunities at neighborhood scale",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-identifying food waste reduction opportunities at neighborhood scale",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Identifying food waste reduction opportunities at neighborhood scale",
   "description": "Identifying food waste reduction opportunities at neighborhood scale",
   "content": "Scenario: Identifying food waste reduction opportunities at neighborhood scale\n    Given Marcus must maximize value from limited budget\n    And food waste represents lost resources\n    When the neighborhood_elohim identifies waste patterns\n    Then it should connect Marcus to gleaning opportunities\n    And it should facilitate food rescue programs\n    And it should help him access surplus food from stores\n    And neighborhood coordination should reduce waste while addressing need\n    And Marcus's family should benefit from systematic waste reduction\n    And ecological and economic goals should align\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Identifying food waste reduction opportunities at neighborhood scale",
+    "ogDescription": "Identifying food waste reduction opportunities at neighborhood scale",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-identifying food waste reduction opportunities at neighborhood scale",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Identifying food waste reduction opportunities at neighborhood scale - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-identifying food waste reduction opportunities at neighborhood scale",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-identifying food waste reduction opportunities at neighborhood scale",
+    "name": "Identifying food waste reduction opportunities at neighborhood scale",
+    "description": "Identifying food waste reduction opportunities at neighborhood scale",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-educational-communication methods accommodate working single parent schedule",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-communication methods accommodate working single parent schedule",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Communication methods accommodate working single parent schedule",
   "description": "Communication methods accommodate working single parent schedule",
   "content": "Scenario: Communication methods accommodate working single parent schedule\n    Given Maria cannot answer phone calls during work hours\n    And she manages communications for three children across different schools\n    When schools communicate with parents\n    Then the educational_elohim should coordinate school communications efficiently\n    And schools should use methods accessible to working parents (email, portal, evening calls)\n    And Maria should not miss critical information due to daytime-only communication\n    And communication should be consolidated and efficient for time-constrained parents\n    And schools should respect that single working parents have limited availability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Communication methods accommodate working single parent schedule",
+    "ogDescription": "Communication methods accommodate working single parent schedule",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-communication methods accommodate working single parent schedule",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Communication methods accommodate working single parent schedule - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-communication methods accommodate working single parent schedule",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-communication methods accommodate working single parent schedule",
+    "name": "Communication methods accommodate working single parent schedule",
+    "description": "Communication methods accommodate working single parent schedule",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

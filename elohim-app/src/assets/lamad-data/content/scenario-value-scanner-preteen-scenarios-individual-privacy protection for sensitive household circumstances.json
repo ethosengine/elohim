@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-individual-privacy protection for sensitive household circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-privacy protection for sensitive household circumstances",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Privacy protection for sensitive household circumstances",
   "description": "Privacy protection for sensitive household circumstances",
   "content": "Scenario: Privacy protection for sensitive household circumstances\n    Given Marcus's household situation must be protected\n    And his family's economic constraints are private information\n    When Marcus's care contributions are tracked\n    Then his specific circumstances must not be broadcast\n    And data about shopping patterns must remain confidential\n    And community resource coordination should use anonymized data\n    And his privacy should be protected even while receiving support\n    And no stigmatizing exposure of family situation should occur\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Privacy protection for sensitive household circumstances",
+    "ogDescription": "Privacy protection for sensitive household circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-privacy protection for sensitive household circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy protection for sensitive household circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-privacy protection for sensitive household circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-privacy protection for sensitive household circumstances",
+    "name": "Privacy protection for sensitive household circumstances",
+    "description": "Privacy protection for sensitive household circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

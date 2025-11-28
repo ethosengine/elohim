@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-repair and reuse culture born of necessity",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-repair and reuse culture born of necessity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Repair and reuse culture born of necessity",
   "description": "Repair and reuse culture born of necessity",
   "content": "Scenario: Repair and reuse culture born of necessity\n    Given Maria cannot afford to replace items frequently\n    And she repairs, maintains, and extends the life of possessions\n    When household consumption patterns are tracked\n    Then the bioregional_elohim should quantify her repair and reuse practices\n    And it should celebrate her circular economy participation\n    And her repair culture should be valued as waste reduction\n    And economic necessity should be reframed as environmental leadership\n    And Maria should see herself as exemplifying sustainable consumption\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Repair and reuse culture born of necessity",
+    "ogDescription": "Repair and reuse culture born of necessity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-repair and reuse culture born of necessity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Repair and reuse culture born of necessity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-repair and reuse culture born of necessity",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-repair and reuse culture born of necessity",
+    "name": "Repair and reuse culture born of necessity",
+    "description": "Repair and reuse culture born of necessity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

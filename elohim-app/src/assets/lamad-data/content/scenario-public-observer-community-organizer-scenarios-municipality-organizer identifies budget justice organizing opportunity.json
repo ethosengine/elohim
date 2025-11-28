@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer identifies budget justice organizing opportunity",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer identifies budget justice organizing opportunity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer identifies budget justice organizing opportunity",
   "description": "Organizer identifies budget justice organizing opportunity",
   "content": "Scenario: Organizer identifies budget justice organizing opportunity\n    Given city council will vote on annual budget in three weeks\n    And proposed cuts affect services in low-income neighborhoods\n    When the Observer surfaces the organizing opportunity\n    Then the organizer receives early alert with enough time to organize\n    And sees which communities are most affected by cuts\n    And gets analysis of budget trade-offs and alternatives\n    And identifies decision points where testimony will have impact\n    And three weeks allows for education, coalition building, and mobilization\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer identifies budget justice organizing opportunity",
+    "ogDescription": "Organizer identifies budget justice organizing opportunity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer identifies budget justice organizing opportunity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer identifies budget justice organizing opportunity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer identifies budget justice organizing opportunity",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer identifies budget justice organizing opportunity",
+    "name": "Organizer identifies budget justice organizing opportunity",
+    "description": "Organizer identifies budget justice organizing opportunity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

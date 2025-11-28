@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-worker-scenarios-community-workers participate in neighborhood economic development planning",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:community-workers participate in neighborhood economic development planning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workers participate in neighborhood economic development planning",
   "description": "Workers participate in neighborhood economic development planning",
   "content": "Scenario: Workers participate in neighborhood economic development planning\n    Given municipality is developing economic revitalization plan\n    And workers represent community institution through democratic ownership\n    When neighborhood planning meetings occur\n    Then Maria attends as ChickenMax worker-owner representative\n    And Maria shares experience of democratic business model\n    And Maria advocates for policies supporting worker ownership\n    And community recognizes workers as stakeholders, not just employees\n    And worker voice shapes community economic development\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-worker-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Workers participate in neighborhood economic development planning",
+    "ogDescription": "Workers participate in neighborhood economic development planning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-community-workers participate in neighborhood economic development planning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workers participate in neighborhood economic development planning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-community-workers participate in neighborhood economic development planning",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:community-workers participate in neighborhood economic development planning",
+    "name": "Workers participate in neighborhood economic development planning",
+    "description": "Workers participate in neighborhood economic development planning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-provincial-state-providing evidence to senator ruiz for policy development",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-providing evidence to senator ruiz for policy development",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Providing evidence to Senator Ruiz for policy development",
   "description": "Providing evidence to Senator Ruiz for policy development",
   "content": "Scenario: Providing evidence to Senator Ruiz for policy development\n    Given Senator Ruiz is drafting AI governance legislation\n    And she needs evidence about what regulatory approaches help vs harm\n    When I brief her committee on my regional research findings\n    Then I present: rigorous evaluation of protocol outcomes\n    And I explain: what factors predict successful adoption\n    And I provide: evidence about marginalized community access\n    And I offer: comparative findings about governance models\n    And I testify: honestly about limitations and uncertainties\n    And I maintain: independence by reporting truth not advocacy\n    And My research becomes: evidence base for democratic policy making\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Providing evidence to Senator Ruiz for policy development",
+    "ogDescription": "Providing evidence to Senator Ruiz for policy development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-providing evidence to senator ruiz for policy development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Providing evidence to Senator Ruiz for policy development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-providing evidence to senator ruiz for policy development",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-providing evidence to senator ruiz for policy development",
+    "name": "Providing evidence to Senator Ruiz for policy development",
+    "description": "Providing evidence to Senator Ruiz for policy development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

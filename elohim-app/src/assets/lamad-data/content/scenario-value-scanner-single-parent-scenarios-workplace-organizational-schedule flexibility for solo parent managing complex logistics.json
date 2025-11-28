@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-schedule flexibility for solo parent managing complex logistics",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-schedule flexibility for solo parent managing complex logistics",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Schedule flexibility for solo parent managing complex logistics",
   "description": "Schedule flexibility for solo parent managing complex logistics",
   "content": "Scenario: Schedule flexibility for solo parent managing complex logistics\n    Given Maria coordinates three children's schools, activities, and appointments alone\n    And rigid work schedules create impossible conflicts for single parents\n    When Maria's work schedule is determined\n    Then the workplace_elohim should advocate for flexible scheduling options\n    And Maria should have ability to adjust hours for critical parenting needs\n    And flexibility should be policy, not personal favor requiring explanation\n    And schedule should enable sustainable work-parenting integration\n    And single parents should access flexibility without career penalty\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Schedule flexibility for solo parent managing complex logistics",
+    "ogDescription": "Schedule flexibility for solo parent managing complex logistics",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-schedule flexibility for solo parent managing complex logistics",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Schedule flexibility for solo parent managing complex logistics - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-schedule flexibility for solo parent managing complex logistics",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-schedule flexibility for solo parent managing complex logistics",
+    "name": "Schedule flexibility for solo parent managing complex logistics",
+    "description": "Schedule flexibility for solo parent managing complex logistics",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

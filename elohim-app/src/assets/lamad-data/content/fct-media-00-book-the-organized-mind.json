@@ -25,6 +25,36 @@
     "author": "Daniel Levitin"
   },
   "_contributor": "Daniel Levitin",
-  "createdAt": "2025-11-28T02:53:21.847459",
-  "updatedAt": "2025-11-28T02:53:21.847460"
+  "createdAt": "2025-11-28T21:10:19.189797",
+  "updatedAt": "2025-11-28T21:10:19.189798",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Organized Mind",
+    "ogDescription": "Book by Daniel Levitin",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-the-organized-mind",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Organized Mind - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-the-organized-mind",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "The Organized Mind",
+    "description": "Book by Daniel Levitin",
+    "dateCreated": "2025-11-28T21:10:19.189797",
+    "dateModified": "2025-11-28T21:10:19.189798",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Daniel Levitin"
+    }
+  }
 }

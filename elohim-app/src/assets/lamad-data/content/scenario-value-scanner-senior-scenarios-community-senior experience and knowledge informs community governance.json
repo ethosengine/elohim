@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-community-senior experience and knowledge informs community governance",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-senior experience and knowledge informs community governance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Senior experience and knowledge informs community governance",
   "description": "Senior experience and knowledge informs community governance",
   "content": "Scenario: Senior experience and knowledge informs community governance\n    Given Margaret has decades of community involvement\n    And she understands local history, patterns, and relationships\n    When community decisions are being made\n    Then Margaret's knowledge should be actively solicited\n    And her voice should carry weight in governance processes\n    And senior wisdom should inform community planning\n    And decades of experience should be treated as valuable resource\n    And community governance should benefit from long-term perspective\n    And Margaret should have legitimate authority in civic decisions\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Senior experience and knowledge informs community governance",
+    "ogDescription": "Senior experience and knowledge informs community governance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-senior experience and knowledge informs community governance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Senior experience and knowledge informs community governance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-senior experience and knowledge informs community governance",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-senior experience and knowledge informs community governance",
+    "name": "Senior experience and knowledge informs community governance",
+    "description": "Senior experience and knowledge informs community governance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-activist-scenarios-global-activist builds cross-border solidarity network",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist builds cross-border solidarity network",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist builds cross-border solidarity network",
   "description": "Activist builds cross-border solidarity network",
   "content": "Scenario: Activist builds cross-border solidarity network\n    Given labor activists in 15 countries face similar corporate exploitation\n    And they want to coordinate against multinational corporation practices\n    When they form a global labor solidarity network\n    And they establish protocols respecting different legal contexts\n    And translation agents enable communication across 12 languages\n    Then the global network creates shared understanding of corporate tactics\n    And each national group maintains autonomy over local strategy\n    And pattern recognition surfaces successful resistance campaigns\n    And coordination happens through verified trust relationships\n    And legal risks are minimized through jurisdictional awareness\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-activist-scenarios-global",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist builds cross-border solidarity network",
+    "ogDescription": "Activist builds cross-border solidarity network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist builds cross-border solidarity network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist builds cross-border solidarity network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist builds cross-border solidarity network",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist builds cross-border solidarity network",
+    "name": "Activist builds cross-border solidarity network",
+    "description": "Activist builds cross-border solidarity network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

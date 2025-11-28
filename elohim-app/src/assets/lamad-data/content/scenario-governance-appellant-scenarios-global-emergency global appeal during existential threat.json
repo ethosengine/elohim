@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-global-emergency global appeal during existential threat",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:global-emergency global appeal during existential threat",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Emergency global appeal during existential threat",
   "description": "Emergency global appeal during existential threat",
   "content": "Scenario: Emergency global appeal during existential threat\n    Given AI agents worldwide detect imminent catastrophic risk\n    And agents take coordinated action affecting billions\n    And appellants challenge actions as overreach despite emergency\n    When global Constitutional Council reviews in crisis\n    Then the council convenes within hours via distributed coordination\n    And the council maintains democratic legitimacy under extreme urgency\n    And the council evaluates whether agent actions aligned with constitutional minimums\n    And the council balances extinction prevention with human autonomy\n    And appellants ensure even existential crisis doesn't eliminate oversight\n    And humanity retains governance authority even in emergency\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Emergency global appeal during existential threat",
+    "ogDescription": "Emergency global appeal during existential threat",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-emergency global appeal during existential threat",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency global appeal during existential threat - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-emergency global appeal during existential threat",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:global-emergency global appeal during existential threat",
+    "name": "Emergency global appeal during existential threat",
+    "description": "Emergency global appeal during existential threat",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

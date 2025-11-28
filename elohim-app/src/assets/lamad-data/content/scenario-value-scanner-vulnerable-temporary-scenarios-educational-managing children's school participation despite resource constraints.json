@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-managing children's school participation despite resource constraints",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-managing children's school participation despite resource constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing children's school participation despite resource constraints",
   "description": "Managing children's school participation despite resource constraints",
   "content": "Scenario: Managing children's school participation despite resource constraints\n    Given school requires fees, supplies, or resources I cannot afford\n    And children need to participate fully in educational activities\n    When resource constraints threaten children's school participation\n    Then the Value Scanner identifies school assistance programs and resources\n    And helps me access fee waivers, supply assistance, scholarship programs\n    And connects me to community resources for school needs\n    And validates that lack of resources shouldn't exclude children\n    And my personal_agent tracks school financial requirements and deadlines\n    And recognizes resource navigation as substantial invisible labor\n    And ensures children's educational participation despite poverty\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Managing children's school participation despite resource constraints",
+    "ogDescription": "Managing children's school participation despite resource constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-managing children's school participation despite resource constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing children's school participation despite resource constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-managing children's school participation despite resource constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-managing children's school participation despite resource constraints",
+    "name": "Managing children's school participation despite resource constraints",
+    "description": "Managing children's school participation despite resource constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

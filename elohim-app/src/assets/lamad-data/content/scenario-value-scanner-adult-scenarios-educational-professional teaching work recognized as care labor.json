@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-educational-professional teaching work recognized as care labor",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-professional teaching work recognized as care labor",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Professional teaching work recognized as care labor",
   "description": "Professional teaching work recognized as care labor",
   "content": "Scenario: Professional teaching work recognized as care labor\n    Given Sarah works full-time as a teacher\n    And education is one of society's most important care functions\n    When Sarah's professional work is tracked in care economy\n    Then teaching should be recognized as care labor\n    And the educational_elohim should quantify Sarah's care contributions to students\n    And professional education should be valued alongside household care\n    And Sarah should see her career as care work, not separate from care economy\n    And teaching should be explicitly valued as caring for next generation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Professional teaching work recognized as care labor",
+    "ogDescription": "Professional teaching work recognized as care labor",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-professional teaching work recognized as care labor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional teaching work recognized as care labor - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-professional teaching work recognized as care labor",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-professional teaching work recognized as care labor",
+    "name": "Professional teaching work recognized as care labor",
+    "description": "Professional teaching work recognized as care labor",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

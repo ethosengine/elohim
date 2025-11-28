@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal aging infrastructure influenced by sandwich generation",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal aging infrastructure influenced by sandwich generation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal aging infrastructure influenced by sandwich generation",
   "description": "Municipal aging infrastructure influenced by sandwich generation",
   "content": "Scenario: Municipal aging infrastructure influenced by sandwich generation\n    Given Robert manages care for both aging parents and adult children\n    And he understands infrastructure needs across lifecycle\n    And municipal aging infrastructure often inadequate\n    When municipal_elohim supports aging infrastructure advocacy\n    Then it should connect Robert to municipal aging policy development\n    And help him advocate for adult day care, senior centers, home health support, and transportation\n    And surface gaps in current municipal aging infrastructure\n    And support him in testifying about infrastructure needs\n    And build municipal systems that support aging with dignity\n    And demonstrate that aging infrastructure benefits entire community\n    And create municipalities where aging is supported, not hidden\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal aging infrastructure influenced by sandwich generation",
+    "ogDescription": "Municipal aging infrastructure influenced by sandwich generation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal aging infrastructure influenced by sandwich generation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal aging infrastructure influenced by sandwich generation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal aging infrastructure influenced by sandwich generation",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal aging infrastructure influenced by sandwich generation",
+    "name": "Municipal aging infrastructure influenced by sandwich generation",
+    "description": "Municipal aging infrastructure influenced by sandwich generation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

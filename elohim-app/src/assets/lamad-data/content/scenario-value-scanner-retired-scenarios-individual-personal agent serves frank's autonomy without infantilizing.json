@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-individual-personal agent serves frank's autonomy without infantilizing",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-personal agent serves frank's autonomy without infantilizing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent serves Frank's autonomy without infantilizing",
   "description": "Personal agent serves Frank's autonomy without infantilizing",
   "content": "Scenario: Personal agent serves Frank's autonomy without infantilizing\n    Given Frank is a capable adult with 70 years of life experience\n    And he has decades of construction expertise\n    And the interface uses AI assistance\n    When the personal_agent interacts with Frank\n    Then it must preserve his full autonomy and dignity\n    And it must never be patronizing or infantilizing\n    And it must respect his expertise and judgment\n    And it must provide information and options, not directives\n    And it must acknowledge his skills and competence\n    And the relationship should be respectful partnership\n    And Frank should feel empowered and respected, never managed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent serves Frank's autonomy without infantilizing",
+    "ogDescription": "Personal agent serves Frank's autonomy without infantilizing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-personal agent serves frank's autonomy without infantilizing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent serves Frank's autonomy without infantilizing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-personal agent serves frank's autonomy without infantilizing",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-personal agent serves frank's autonomy without infantilizing",
+    "name": "Personal agent serves Frank's autonomy without infantilizing",
+    "description": "Personal agent serves Frank's autonomy without infantilizing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

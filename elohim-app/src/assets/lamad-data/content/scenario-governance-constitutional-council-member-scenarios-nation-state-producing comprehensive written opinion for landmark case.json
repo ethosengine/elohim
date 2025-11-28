@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-producing comprehensive written opinion for landmark case",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-producing comprehensive written opinion for landmark case",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Producing comprehensive written opinion for landmark case",
   "description": "Producing comprehensive written opinion for landmark case",
   "content": "Scenario: Producing comprehensive written opinion for landmark case\n    Given our case has major national implications\n    And it will be studied for generations\n    When we craft our written opinion\n    Then we explain: constitutional reasoning in accessible language\n    And we address: major arguments and counterarguments\n    And we examine: long-term implications of our interpretation\n    And we include: dissenting opinions with their reasoning\n    And we document: our deliberation process and considerations\n    And we create: precedent that serves legal clarity and public education\n    And we demonstrate: how citizen governance produces constitutional law\n    And we fulfill: responsibility to those affected by our judgment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Producing comprehensive written opinion for landmark case",
+    "ogDescription": "Producing comprehensive written opinion for landmark case",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-producing comprehensive written opinion for landmark case",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Producing comprehensive written opinion for landmark case - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-producing comprehensive written opinion for landmark case",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-producing comprehensive written opinion for landmark case",
+    "name": "Producing comprehensive written opinion for landmark case",
+    "description": "Producing comprehensive written opinion for landmark case",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

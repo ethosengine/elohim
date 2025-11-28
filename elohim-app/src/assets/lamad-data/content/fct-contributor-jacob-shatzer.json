@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-14-ready-to-act"
   },
-  "createdAt": "2025-11-28T02:53:21.902160",
-  "updatedAt": "2025-11-28T02:53:21.902163"
+  "createdAt": "2025-11-28T21:10:19.225084",
+  "updatedAt": "2025-11-28T21:10:19.225085",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Jacob Shatzer",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-jacob-shatzer",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Jacob Shatzer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-jacob-shatzer",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Jacob Shatzer",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.225084",
+    "dateModified": "2025-11-28T21:10:19.225085",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

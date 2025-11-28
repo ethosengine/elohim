@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-building neighborhood safety through mutual care",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-building neighborhood safety through mutual care",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building neighborhood safety through mutual care",
   "description": "Building neighborhood safety through mutual care",
   "content": "Scenario: Building neighborhood safety through mutual care\n    Given neighborhoods are safer when residents know each other\n    And Aisha wants to feel secure in her new home\n    When Aisha participates in neighborhood care networks\n    Then the connections should build mutual familiarity\n    And the neighborhood_elohim should strengthen social fabric\n    And care relationships should create natural neighborhood watch\n    And safety should emerge from community bonds\n    And the system should build security through care, not surveillance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building neighborhood safety through mutual care",
+    "ogDescription": "Building neighborhood safety through mutual care",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-building neighborhood safety through mutual care",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building neighborhood safety through mutual care - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-building neighborhood safety through mutual care",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-building neighborhood safety through mutual care",
+    "name": "Building neighborhood safety through mutual care",
+    "description": "Building neighborhood safety through mutual care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

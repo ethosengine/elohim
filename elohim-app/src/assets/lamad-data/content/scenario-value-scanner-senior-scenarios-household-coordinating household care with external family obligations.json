@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-household-coordinating household care with external family obligations",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-coordinating household care with external family obligations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating household care with external family obligations",
   "description": "Coordinating household care with external family obligations",
   "content": "Scenario: Coordinating household care with external family obligations\n    Given Margaret provides care for grandchildren at her home sometimes\n    And her mother may visit or require household accommodation\n    When the household_elohim coordinates multi-generational care\n    Then it should help Margaret prepare household for care provision\n    And it should track supplies needed for grandchild visits\n    And it should plan for mother's accessibility needs\n    And household resources should flex for care obligations\n    And Margaret's home should support her care contributions\n    And the household should be center of care economy activity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating household care with external family obligations",
+    "ogDescription": "Coordinating household care with external family obligations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-coordinating household care with external family obligations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating household care with external family obligations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-coordinating household care with external family obligations",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-coordinating household care with external family obligations",
+    "name": "Coordinating household care with external family obligations",
+    "description": "Coordinating household care with external family obligations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

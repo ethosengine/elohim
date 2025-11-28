@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-navigating neighborhood with wayfinding support",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-navigating neighborhood with wayfinding support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Navigating neighborhood with wayfinding support",
   "description": "Navigating neighborhood with wayfinding support",
   "content": "Scenario: Navigating neighborhood with wayfinding support\n    Given Jordan is learning the neighborhood geography\n    And some streets and locations still confuse Jordan\n    When Jordan wants to visit a neighbor or shop\n    Then the personal_agent provides visual wayfinding assistance\n    And the interface shows landmarks and turn-by-turn pictures\n    And Jordan's navigation skills improve with accessible support\n    And Jordan gains increasing independence in the neighborhood\n    And support workers can reduce assistance as Jordan's capability grows\n    And Jordan experiences growing autonomy and confidence\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Navigating neighborhood with wayfinding support",
+    "ogDescription": "Navigating neighborhood with wayfinding support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-navigating neighborhood with wayfinding support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating neighborhood with wayfinding support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-navigating neighborhood with wayfinding support",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-navigating neighborhood with wayfinding support",
+    "name": "Navigating neighborhood with wayfinding support",
+    "description": "Navigating neighborhood with wayfinding support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

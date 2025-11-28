@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-navigating workplace power dynamics",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-navigating workplace power dynamics",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Navigating workplace power dynamics",
   "description": "Navigating workplace power dynamics",
   "content": "Scenario: Navigating workplace power dynamics\n    Given employers have significant power over workers\n    And I may fear retaliation for advocating for my needs\n    When I need to navigate workplace advocacy carefully\n    Then the protocol should help me understand my protections\n    And provide strategies for advocacy that minimize retaliation risk\n    And connect me with legal resources if needed\n    And support me in exercising my rights despite power imbalance\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Navigating workplace power dynamics",
+    "ogDescription": "Navigating workplace power dynamics",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-navigating workplace power dynamics",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating workplace power dynamics - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-navigating workplace power dynamics",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-navigating workplace power dynamics",
+    "name": "Navigating workplace power dynamics",
+    "description": "Navigating workplace power dynamics",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

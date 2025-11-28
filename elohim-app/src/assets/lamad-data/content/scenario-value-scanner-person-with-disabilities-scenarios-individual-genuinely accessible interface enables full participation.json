@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-genuinely accessible interface enables full participation",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-genuinely accessible interface enables full participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Genuinely accessible interface enables full participation",
   "description": "Genuinely accessible interface enables full participation",
   "content": "Scenario: Genuinely accessible interface enables full participation\n    Given Alex needs to use the Value Scanner\n    And Alex has limited fine motor control\n    When Alex opens the Value Scanner\n    Then the interface should support voice commands fully\n    And it should be compatible with Alex's screen reader\n    And keyboard navigation should work for all functions\n    And visual settings should be customizable for contrast and size\n    And the interface should be forgiving with error recovery\n    And accessibility should be built-in, not retrofitted\n    And Alex should experience the system as designed for them\n    And universal design principles should be evident throughout\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Genuinely accessible interface enables full participation",
+    "ogDescription": "Genuinely accessible interface enables full participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-genuinely accessible interface enables full participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Genuinely accessible interface enables full participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-genuinely accessible interface enables full participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-genuinely accessible interface enables full participation",
+    "name": "Genuinely accessible interface enables full participation",
+    "description": "Genuinely accessible interface enables full participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

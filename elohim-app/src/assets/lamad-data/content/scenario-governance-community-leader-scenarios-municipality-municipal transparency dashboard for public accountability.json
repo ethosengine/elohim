@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-municipal transparency dashboard for public accountability",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal transparency dashboard for public accountability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal transparency dashboard for public accountability",
   "description": "Municipal transparency dashboard for public accountability",
   "content": "Scenario: Municipal transparency dashboard for public accountability\n    Given residents deserve visibility into city governance\n    And I am accountable through democratic elections\n    When we provide municipal transparency dashboard\n    Then residents see: resource flows across neighborhoods\n    And they access: appeal patterns and council decisions\n    And they view: city budget allocation and outcomes\n    And they compare: promised benefits with actual results\n    And they hold me accountable: with evidence not just rhetoric\n    And transparency strengthens: democratic governance\n    And I cannot hide: behind \"algorithm decided\" or \"trust me\"\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal transparency dashboard for public accountability",
+    "ogDescription": "Municipal transparency dashboard for public accountability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal transparency dashboard for public accountability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal transparency dashboard for public accountability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal transparency dashboard for public accountability",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal transparency dashboard for public accountability",
+    "name": "Municipal transparency dashboard for public accountability",
+    "description": "Municipal transparency dashboard for public accountability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

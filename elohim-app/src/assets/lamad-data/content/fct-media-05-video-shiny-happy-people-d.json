@@ -27,6 +27,32 @@
     "year": "2023"
   },
   "_organization": null,
-  "createdAt": "2025-11-28T02:53:21.865125",
-  "updatedAt": "2025-11-28T02:53:21.865126"
+  "createdAt": "2025-11-28T21:10:19.205408",
+  "updatedAt": "2025-11-28T21:10:19.205409",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Video",
+  "openGraphMetadata": {
+    "ogTitle": "Shiny Happy People: Duggar Family Secrets",
+    "ogDescription": "Shiny Happy People: Duggar Family Secrets (2023)",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-05-video-shiny-happy-people-d",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/video.jpg",
+    "ogImageAlt": "Shiny Happy People: Duggar Family Secrets - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "VideoObject",
+    "@id": "https://elohim-protocol.org/content/fct-media-05-video-shiny-happy-people-d",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "Shiny Happy People: Duggar Family Secrets",
+    "description": "Shiny Happy People: Duggar Family Secrets (2023)",
+    "dateCreated": "2025-11-28T21:10:19.205408",
+    "dateModified": "2025-11-28T21:10:19.205409",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

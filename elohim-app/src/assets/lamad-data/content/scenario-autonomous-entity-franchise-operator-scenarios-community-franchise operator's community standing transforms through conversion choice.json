@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-franchise operator's community standing transforms through conversion choice",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-franchise operator's community standing transforms through conversion choice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Franchise operator's community standing transforms through conversion choice",
   "description": "Franchise operator's community standing transforms through conversion choice",
   "content": "Scenario: Franchise operator's community standing transforms through conversion choice\n    Given James was invisible behind ChickenMax brand despite owning locations\n    And community saw franchise locations as corporate, didn't know operator existed\n    When James's conversion choice becomes visible to neighborhoods\n    Then community learns he chose democratic ownership over continuing corporate extraction\n    And neighbors respect decision to prioritize workers and community wealth\n    And his standing shifts from anonymous franchise operator to community member who chose well\n    And conversion demonstrates operators can be allies in community wealth-building\n    And community_elohim helps communicate operator's conversion choice and values\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Franchise operator's community standing transforms through conversion choice",
+    "ogDescription": "Franchise operator's community standing transforms through conversion choice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-franchise operator's community standing transforms through conversion choice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise operator's community standing transforms through conversion choice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-franchise operator's community standing transforms through conversion choice",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-franchise operator's community standing transforms through conversion choice",
+    "name": "Franchise operator's community standing transforms through conversion choice",
+    "description": "Franchise operator's community standing transforms through conversion choice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

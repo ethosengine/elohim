@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-neighborhood-sarah's care contributions give her standing in neighborhood decisions",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-sarah's care contributions give her standing in neighborhood decisions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Sarah's care contributions give her standing in neighborhood decisions",
   "description": "Sarah's care contributions give her standing in neighborhood decisions",
   "content": "Scenario: Sarah's care contributions give her standing in neighborhood decisions\n    Given Sarah participates actively in neighborhood care economy\n    And she contributes to collective well-being\n    When neighborhood governance decisions are made\n    Then Sarah's care contributions should be visible and valued\n    And her accumulated care work should give her voice\n    And neighborhood leadership should reflect actual contributions\n    And care economy participation should create legitimate standing\n    And neighborhood democracy should be based on demonstrated care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Sarah's care contributions give her standing in neighborhood decisions",
+    "ogDescription": "Sarah's care contributions give her standing in neighborhood decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-sarah's care contributions give her standing in neighborhood decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sarah's care contributions give her standing in neighborhood decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-sarah's care contributions give her standing in neighborhood decisions",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-sarah's care contributions give her standing in neighborhood decisions",
+    "name": "Sarah's care contributions give her standing in neighborhood decisions",
+    "description": "Sarah's care contributions give her standing in neighborhood decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -53,6 +53,34 @@
     "bookCount": 9,
     "bibleVerseCount": 4
   },
-  "createdAt": "2025-11-28T02:53:21.896453",
-  "updatedAt": "2025-11-28T02:53:21.896454"
+  "createdAt": "2025-11-28T21:10:19.223800",
+  "updatedAt": "2025-11-28T21:10:19.223801",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 12: Supporting Fairness and Justice",
+    "ogDescription": "Justice as Active Participation in God's Kingdom  \nIn our digital age, the concept of justice takes on new dimensions, yet its core remains rooted in the timeless wisdom of Scripture. As we navigate t",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-12-fairness-justice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.223800",
+    "articleModifiedTime": "2025-11-28T21:10:19.223801",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 12: Supporting Fairness and Justice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-12-fairness-justice",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "FCT 12: Supporting Fairness and Justice",
+    "description": "Justice as Active Participation in God's Kingdom  \nIn our digital age, the concept of justice takes on new dimensions, yet its core remains rooted in the timeless wisdom of Scripture. As we navigate the complex landscape of technology and its impact on society, we must remember that true justice is not merely an ideal to be discussed, but a reality to be lived and experienced.  \nJustice, in its fullest sense, is the degree to which individuals can actively participate in and benefit from the val",
+    "dateCreated": "2025-11-28T21:10:19.223800",
+    "dateModified": "2025-11-28T21:10:19.223801",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

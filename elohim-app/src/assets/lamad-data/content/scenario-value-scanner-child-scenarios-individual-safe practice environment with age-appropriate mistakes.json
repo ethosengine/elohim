@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-individual-safe practice environment with age-appropriate mistakes",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-safe practice environment with age-appropriate mistakes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Safe practice environment with age-appropriate mistakes",
   "description": "Safe practice environment with age-appropriate mistakes",
   "content": "Scenario: Safe practice environment with age-appropriate mistakes\n    Given Emma makes a choice that doesn't align with family needs\n    And she selected a more expensive option without considering budget\n    When the family experiences the consequence\n    Then her personal_agent should guide gentle reflection\n    And the agent should ask \"How did that work out?\"\n    And Emma should learn from the mistake without shame\n    And consequences should be educational, not punitive\n    And she should build judgment through safe practice\n    And mistakes should be treated as learning opportunities\n    And the stakes should be appropriately low for her age\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Safe practice environment with age-appropriate mistakes",
+    "ogDescription": "Safe practice environment with age-appropriate mistakes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-safe practice environment with age-appropriate mistakes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Safe practice environment with age-appropriate mistakes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-safe practice environment with age-appropriate mistakes",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-safe practice environment with age-appropriate mistakes",
+    "name": "Safe practice environment with age-appropriate mistakes",
+    "description": "Safe practice environment with age-appropriate mistakes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

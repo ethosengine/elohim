@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-individual-building individual resilience through care work visibility",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-building individual resilience through care work visibility",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building individual resilience through care work visibility",
   "description": "Building individual resilience through care work visibility",
   "content": "Scenario: Building individual resilience through care work visibility\n    Given the protocol tracks all my care contributions\n    Including my paid labor and household self-care\n    When I review my care economy participation\n    Then I should see comprehensive evidence of my contributions\n    And understand that I am providing valuable service to community\n    And recognize that I deserve better compensation and conditions\n    And feel empowered to advocate for my needs\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building individual resilience through care work visibility",
+    "ogDescription": "Building individual resilience through care work visibility",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-building individual resilience through care work visibility",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building individual resilience through care work visibility - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-building individual resilience through care work visibility",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-building individual resilience through care work visibility",
+    "name": "Building individual resilience through care work visibility",
+    "description": "Building individual resilience through care work visibility",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

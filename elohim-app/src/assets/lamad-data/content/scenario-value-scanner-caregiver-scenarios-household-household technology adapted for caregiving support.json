@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household technology adapted for caregiving support",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household technology adapted for caregiving support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household technology adapted for caregiving support",
   "description": "Household technology adapted for caregiving support",
   "content": "Scenario: Household technology adapted for caregiving support\n    Given James uses technology for care coordination\n    And household needs assistive technology for David\n    When household technology is configured\n    Then the household_elohim should support care technology integration\n    And it should help James use monitoring and safety technology\n    And it should ensure technology serves caregiving needs\n    And assistive devices should be coordinated through household system\n    And technology should reduce burden, not increase complexity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household technology adapted for caregiving support",
+    "ogDescription": "Household technology adapted for caregiving support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household technology adapted for caregiving support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household technology adapted for caregiving support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household technology adapted for caregiving support",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household technology adapted for caregiving support",
+    "name": "Household technology adapted for caregiving support",
+    "description": "Household technology adapted for caregiving support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

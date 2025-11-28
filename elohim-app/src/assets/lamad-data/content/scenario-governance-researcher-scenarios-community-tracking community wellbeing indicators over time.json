@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-community-tracking community wellbeing indicators over time",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:community-tracking community wellbeing indicators over time",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Tracking community wellbeing indicators over time",
   "description": "Tracking community wellbeing indicators over time",
   "content": "Scenario: Tracking community wellbeing indicators over time\n    Given Riverside adopted Elohim Protocol three years ago\n    And I am measuring community outcomes longitudinally\n    When I analyze wellbeing data before and after adoption\n    Then I examine: loneliness rates (down 12%), life satisfaction (up 8%)\n    And I track: crisis response effectiveness, economic resilience\n    And I monitor: social cohesion, trust in institutions, civic participation\n    And I conduct: comparison with similar communities without protocol\n    And I use: difference-in-differences analysis to isolate protocol effects\n    And I distinguish: what's protocol impact vs what's secular trend\n    And I provide: evidence about whether democratic AI governance works\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Tracking community wellbeing indicators over time",
+    "ogDescription": "Tracking community wellbeing indicators over time",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-tracking community wellbeing indicators over time",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Tracking community wellbeing indicators over time - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-tracking community wellbeing indicators over time",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:community-tracking community wellbeing indicators over time",
+    "name": "Tracking community wellbeing indicators over time",
+    "description": "Tracking community wellbeing indicators over time",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

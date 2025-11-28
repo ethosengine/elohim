@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-family cultural recognition of caregiving as sacred work",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family cultural recognition of caregiving as sacred work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family cultural recognition of caregiving as sacred work",
   "description": "Family cultural recognition of caregiving as sacred work",
   "content": "Scenario: Family cultural recognition of caregiving as sacred work\n    Given some cultural traditions honor caregiving as sacred\n    And family culture may recognize James's care work meaningfully\n    When the family_elohim tracks cultural care values\n    Then it should recognize cultural frameworks that honor caregiving\n    And it should support family cultural practices around care\n    And cultural recognition should supplement economic recognition\n    And diverse family cultures should be respected and valued\n    And care economy should align with family cultural values\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Family cultural recognition of caregiving as sacred work",
+    "ogDescription": "Family cultural recognition of caregiving as sacred work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family cultural recognition of caregiving as sacred work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family cultural recognition of caregiving as sacred work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family cultural recognition of caregiving as sacred work",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family cultural recognition of caregiving as sacred work",
+    "name": "Family cultural recognition of caregiving as sacred work",
+    "description": "Family cultural recognition of caregiving as sacred work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

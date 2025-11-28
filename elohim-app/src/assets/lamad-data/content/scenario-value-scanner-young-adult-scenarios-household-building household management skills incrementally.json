@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-household-building household management skills incrementally",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-building household management skills incrementally",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building household management skills incrementally",
   "description": "Building household management skills incrementally",
   "content": "Scenario: Building household management skills incrementally\n    Given Aisha has never managed a household before\n    And she's learning essential adult skills\n    When Aisha uses household management features\n    Then the personal_agent should teach skills progressively\n    And it should provide checklists for routine maintenance\n    And it should remind her of non-obvious tasks (changing air filters, etc.)\n    And education should integrate with task management\n    And Aisha should build comprehensive household competence\n    And the learning curve should feel supportive, not judgmental\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building household management skills incrementally",
+    "ogDescription": "Building household management skills incrementally",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-building household management skills incrementally",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building household management skills incrementally - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-building household management skills incrementally",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-building household management skills incrementally",
+    "name": "Building household management skills incrementally",
+    "description": "Building household management skills incrementally",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

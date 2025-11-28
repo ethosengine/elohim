@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-elder-scenarios-affinity-network-elder shares cultural knowledge across generations",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network-elder shares cultural knowledge across generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder shares cultural knowledge across generations",
   "description": "Elder shares cultural knowledge across generations",
   "content": "Scenario: Elder shares cultural knowledge across generations\n    Given Rose is second-generation Italian American\n    And she knows traditional recipes and cultural practices\n    When she joins a cultural preservation affinity network\n    And she documents her grandmother's recipes with stories\n    Then her contributions reach others interested in Italian American heritage\n    And younger generations learn traditional knowledge\n    And her cultural memory is preserved for future generations\n    And Rose experiences pride in cultural contribution\n    And intergenerational cultural transmission succeeds\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-elder-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder shares cultural knowledge across generations",
+    "ogDescription": "Elder shares cultural knowledge across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-affinity-network-elder shares cultural knowledge across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder shares cultural knowledge across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-affinity-network-elder shares cultural knowledge across generations",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network-elder shares cultural knowledge across generations",
+    "name": "Elder shares cultural knowledge across generations",
+    "description": "Elder shares cultural knowledge across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-household-coordinating bulk buying to maximize household budget efficiency",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-coordinating bulk buying to maximize household budget efficiency",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating bulk buying to maximize household budget efficiency",
   "description": "Coordinating bulk buying to maximize household budget efficiency",
   "content": "Scenario: Coordinating bulk buying to maximize household budget efficiency\n    Given Kenji and roommates each have limited grocery budgets\n    And bulk buying saves money but requires coordination\n    When Kenji proposes coordinated bulk purchase of rice, beans, and cooking oil\n    Then the household_elohim should facilitate group buying coordination\n    And it should track who pays what and how costs are divided\n    And it should calculate savings: \"Bulk rice saves each person $8/month\"\n    And it should help roommates see financial benefit of coordination\n    And the system should reduce friction in shared purchasing\n    And collective buying should be easy and fair\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating bulk buying to maximize household budget efficiency",
+    "ogDescription": "Coordinating bulk buying to maximize household budget efficiency",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-coordinating bulk buying to maximize household budget efficiency",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating bulk buying to maximize household budget efficiency - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-coordinating bulk buying to maximize household budget efficiency",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-coordinating bulk buying to maximize household budget efficiency",
+    "name": "Coordinating bulk buying to maximize household budget efficiency",
+    "description": "Coordinating bulk buying to maximize household budget efficiency",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

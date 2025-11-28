@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-ecological-bioregional-activist connects local environmental struggle to regional climate justice",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional-activist connects local environmental struggle to regional climate justice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist connects local environmental struggle to regional climate justice",
   "description": "Activist connects local environmental struggle to regional climate justice",
   "content": "Scenario: Activist connects local environmental struggle to regional climate justice\n    Given the activist fights pollution in their neighborhood\n    When the Observer reveals regional climate adaptation patterns\n    Then the activist sees climate resilience investments favor wealthy areas\n    And flood vulnerability concentrates in communities of color\n    And urban heat island effects exacerbate environmental injustice\n    And local environmental fight connects to climate justice movement\n    And climate policy must address environmental equity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist connects local environmental struggle to regional climate justice",
+    "ogDescription": "Activist connects local environmental struggle to regional climate justice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-ecological-bioregional-activist connects local environmental struggle to regional climate justice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist connects local environmental struggle to regional climate justice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-ecological-bioregional-activist connects local environmental struggle to regional climate justice",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional-activist connects local environmental struggle to regional climate justice",
+    "name": "Activist connects local environmental struggle to regional climate justice",
+    "description": "Activist connects local environmental struggle to regional climate justice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

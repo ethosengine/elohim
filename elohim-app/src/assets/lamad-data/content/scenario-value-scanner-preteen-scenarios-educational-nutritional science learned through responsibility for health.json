@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-educational-nutritional science learned through responsibility for health",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-nutritional science learned through responsibility for health",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Nutritional science learned through responsibility for health",
   "description": "Nutritional science learned through responsibility for health",
   "content": "Scenario: Nutritional science learned through responsibility for health\n    Given Marcus is responsible for his and Keisha's nutrition\n    And adequate nutrition requires scientific understanding\n    When Marcus makes food choices\n    Then he should be learning applied nutritional science\n    And the personal_agent should teach nutrition in context\n    And he should understand macronutrients, vitamins, balanced diet\n    And learning should be motivated by real care responsibility\n    And nutritional education should be deeper than typical age 12 curriculum\n    And his care work should accelerate domain-specific learning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Nutritional science learned through responsibility for health",
+    "ogDescription": "Nutritional science learned through responsibility for health",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-nutritional science learned through responsibility for health",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Nutritional science learned through responsibility for health - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-nutritional science learned through responsibility for health",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-nutritional science learned through responsibility for health",
+    "name": "Nutritional science learned through responsibility for health",
+    "description": "Nutritional science learned through responsibility for health",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

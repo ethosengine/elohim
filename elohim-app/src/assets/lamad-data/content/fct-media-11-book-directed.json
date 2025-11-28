@@ -25,6 +25,36 @@
     "author": "Ava Du"
   },
   "_contributor": "Ava Du",
-  "createdAt": "2025-11-28T02:53:21.893033",
-  "updatedAt": "2025-11-28T02:53:21.893034"
+  "createdAt": "2025-11-28T21:10:19.220221",
+  "updatedAt": "2025-11-28T21:10:19.220222",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "directed",
+    "ogDescription": "Book by Ava Du",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-directed",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "directed - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-directed",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "directed",
+    "description": "Book by Ava Du",
+    "dateCreated": "2025-11-28T21:10:19.220221",
+    "dateModified": "2025-11-28T21:10:19.220222",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Ava Du"
+    }
+  }
 }

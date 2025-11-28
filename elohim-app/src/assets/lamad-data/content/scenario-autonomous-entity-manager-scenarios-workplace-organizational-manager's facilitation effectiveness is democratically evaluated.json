@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's facilitation effectiveness is democratically evaluated",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:workplace-organizational-manager's facilitation effectiveness is democratically evaluated",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Manager's facilitation effectiveness is democratically evaluated",
   "description": "Manager's facilitation effectiveness is democratically evaluated",
   "content": "Scenario: Manager's facilitation effectiveness is democratically evaluated\n    Given workers want accountability for coordinator role\n    And corporate model had no worker input on manager performance\n    When quarterly facilitation review occurs\n    Then workers provide feedback on Marcus's coordination effectiveness\n    And workers rate his facilitation skills, transparency, and respect for autonomy\n    And feedback informs Marcus's continued development\n    And poor evaluations trigger support and training, not immediate termination\n    And sustained poor performance enables democratic recall\n    And workplace_elohim ensures fair evaluation process\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Manager's facilitation effectiveness is democratically evaluated",
+    "ogDescription": "Manager's facilitation effectiveness is democratically evaluated",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's facilitation effectiveness is democratically evaluated",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Manager's facilitation effectiveness is democratically evaluated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager's facilitation effectiveness is democratically evaluated",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:workplace-organizational-manager's facilitation effectiveness is democratically evaluated",
+    "name": "Manager's facilitation effectiveness is democratically evaluated",
+    "description": "Manager's facilitation effectiveness is democratically evaluated",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

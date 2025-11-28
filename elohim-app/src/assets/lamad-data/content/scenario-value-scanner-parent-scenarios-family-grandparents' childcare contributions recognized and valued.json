@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-family-grandparents' childcare contributions recognized and valued",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-grandparents' childcare contributions recognized and valued",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Grandparents' childcare contributions recognized and valued",
   "description": "Grandparents' childcare contributions recognized and valued",
   "content": "Scenario: Grandparents' childcare contributions recognized and valued\n    Given Sarah's parents provide regular childcare\n    And they help with Tommy and Emma multiple times weekly\n    When the family_elohim tracks grandparent care\n    Then their contributions should be quantified and valued\n    And they should accumulate care tokens for their labor\n    And their work should be recognized as essential family support\n    And grandparents should not be taken for granted\n    And multigenerational care should be reciprocal, not extractive\n    And the system should make grandparent labor visible and valued\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Grandparents' childcare contributions recognized and valued",
+    "ogDescription": "Grandparents' childcare contributions recognized and valued",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-grandparents' childcare contributions recognized and valued",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grandparents' childcare contributions recognized and valued - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-grandparents' childcare contributions recognized and valued",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-grandparents' childcare contributions recognized and valued",
+    "name": "Grandparents' childcare contributions recognized and valued",
+    "description": "Grandparents' childcare contributions recognized and valued",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

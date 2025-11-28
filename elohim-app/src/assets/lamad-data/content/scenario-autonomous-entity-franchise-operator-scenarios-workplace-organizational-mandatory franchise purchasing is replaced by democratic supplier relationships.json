@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-mandatory franchise purchasing is replaced by democratic supplier relationships",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-mandatory franchise purchasing is replaced by democratic supplier relationships",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
   "description": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
   "content": "Scenario: Mandatory franchise purchasing is replaced by democratic supplier relationships\n    Given franchise agreement required purchasing from corporate-approved vendors at markup\n    And local suppliers offering better quality and prices were prohibited\n    When purchasing autonomy is restored through franchise termination\n    Then workers establish direct relationships with Johnson Farm and local distributors\n    And supply costs decrease 30% through eliminating corporate markup\n    And quality improves through local sourcing and worker choice\n    And supplier relationships become partnerships, not corporate-mandated transactions\n    And workplace_elohim coordinates supply chain across EAE network\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "ogDescription": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mandatory franchise purchasing is replaced by democratic supplier relationships - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-workplace-organizational-mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:workplace-organizational-mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "name": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "description": "Mandatory franchise purchasing is replaced by democratic supplier relationships",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

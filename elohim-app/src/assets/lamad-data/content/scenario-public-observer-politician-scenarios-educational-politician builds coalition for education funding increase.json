@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-educational-politician builds coalition for education funding increase",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician builds coalition for education funding increase",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician builds coalition for education funding increase",
   "description": "Politician builds coalition for education funding increase",
   "content": "Scenario: Politician builds coalition for education funding increase\n    Given the politician champions education investment\n    And needs public support for tax increase\n    When the Observer identifies coalition building opportunities\n    Then they see parents across political spectrum support smaller class sizes\n    And identify business community concern about workforce preparation\n    And connect with educators who can explain funding impacts\n    And facilitate coalition across traditional political divides\n    And build broad-based campaign for education investment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician builds coalition for education funding increase",
+    "ogDescription": "Politician builds coalition for education funding increase",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician builds coalition for education funding increase",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician builds coalition for education funding increase - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician builds coalition for education funding increase",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician builds coalition for education funding increase",
+    "name": "Politician builds coalition for education funding increase",
+    "description": "Politician builds coalition for education funding increase",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

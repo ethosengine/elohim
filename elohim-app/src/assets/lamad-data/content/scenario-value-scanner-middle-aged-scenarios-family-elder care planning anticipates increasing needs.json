@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-family-elder care planning anticipates increasing needs",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-elder care planning anticipates increasing needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder care planning anticipates increasing needs",
   "description": "Elder care planning anticipates increasing needs",
   "content": "Scenario: Elder care planning anticipates increasing needs\n    Given Robert's parents are ages 78 and 75\n    And their care needs will likely increase\n    And family should plan proactively rather than react to crises\n    When family_elohim supports elder care planning\n    Then it should help family anticipate future care needs\n    And surface: \"Medical patterns suggest increased care needs likely within 2-3 years\"\n    And support family in discussing long-term care options\n    And help siblings plan for potential crisis scenarios\n    And ensure parents are included in planning with dignity\n    And coordinate financial, medical, and housing planning\n    And prevent family crisis from lack of preparation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder care planning anticipates increasing needs",
+    "ogDescription": "Elder care planning anticipates increasing needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-elder care planning anticipates increasing needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder care planning anticipates increasing needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-elder care planning anticipates increasing needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-elder care planning anticipates increasing needs",
+    "name": "Elder care planning anticipates increasing needs",
+    "description": "Elder care planning anticipates increasing needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

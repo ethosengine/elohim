@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-citizen-scenarios-educational-citizen participates in curriculum policy discussion",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen participates in curriculum policy discussion",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Citizen participates in curriculum policy discussion",
   "description": "Citizen participates in curriculum policy discussion",
   "content": "Scenario: Citizen participates in curriculum policy discussion\n    Given the school board is considering curriculum changes\n    And the citizen has children or cares about education\n    When the Observer provides background and context\n    Then the citizen learns what successful curriculum looks like\n    And sees teacher professional perspectives on the proposal\n    And understands student and parent concerns\n    And can contribute informed perspective to discussion\n    And participatory democracy extends to educational content\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-citizen-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Citizen participates in curriculum policy discussion",
+    "ogDescription": "Citizen participates in curriculum policy discussion",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen participates in curriculum policy discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen participates in curriculum policy discussion - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen participates in curriculum policy discussion",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen participates in curriculum policy discussion",
+    "name": "Citizen participates in curriculum policy discussion",
+    "description": "Citizen participates in curriculum policy discussion",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

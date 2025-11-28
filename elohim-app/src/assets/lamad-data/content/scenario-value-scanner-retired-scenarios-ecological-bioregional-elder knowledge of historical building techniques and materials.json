@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-elder knowledge of historical building techniques and materials",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-elder knowledge of historical building techniques and materials",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder knowledge of historical building techniques and materials",
   "description": "Elder knowledge of historical building techniques and materials",
   "content": "Scenario: Elder knowledge of historical building techniques and materials\n    Given Frank has decades of construction experience\n    And traditional building techniques are often more sustainable\n    When the bioregional_elohim coordinates building knowledge\n    Then it should value Frank's knowledge of traditional techniques\n    And facilitate teaching historical building methods\n    And recognize that older practices may be more ecological\n    And connect past building wisdom to contemporary sustainability\n    And Frank's experience should inform bioregional building culture\n    And elder knowledge should guide sustainable building revival\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder knowledge of historical building techniques and materials",
+    "ogDescription": "Elder knowledge of historical building techniques and materials",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-elder knowledge of historical building techniques and materials",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder knowledge of historical building techniques and materials - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-elder knowledge of historical building techniques and materials",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-elder knowledge of historical building techniques and materials",
+    "name": "Elder knowledge of historical building techniques and materials",
+    "description": "Elder knowledge of historical building techniques and materials",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

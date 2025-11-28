@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-educational-early childhood education policies inform pedagogical approach",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-early childhood education policies inform pedagogical approach",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Early childhood education policies inform pedagogical approach",
   "description": "Early childhood education policies inform pedagogical approach",
   "content": "Scenario: Early childhood education policies inform pedagogical approach\n    Given educational governance includes early childhood development research\n    And evidence-based practices exist for ages 5-7\n    When the personal_agent's pedagogy is configured\n    Then it should incorporate developmental psychology research\n    And it should follow evidence-based early learning principles\n    And it should respect limits of cognitive development at age 5\n    And it should support optimal development trajectories\n    And educational policy should shape how Tommy is taught\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Early childhood education policies inform pedagogical approach",
+    "ogDescription": "Early childhood education policies inform pedagogical approach",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-early childhood education policies inform pedagogical approach",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Early childhood education policies inform pedagogical approach - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-early childhood education policies inform pedagogical approach",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-early childhood education policies inform pedagogical approach",
+    "name": "Early childhood education policies inform pedagogical approach",
+    "description": "Early childhood education policies inform pedagogical approach",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-managing family financial governance with child support uncertainty",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-managing family financial governance with child support uncertainty",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing family financial governance with child support uncertainty",
   "description": "Managing family financial governance with child support uncertainty",
   "content": "Scenario: Managing family financial governance with child support uncertainty\n    Given I am supposed to receive child support but it's unreliable\n    And family finances are therefore unpredictable\n    When I manage family financial planning with uncertain child support\n    Then the family_elohim helps me plan for multiple scenarios\n    And tracks child support payments and non-payments\n    And documents non-payment for legal enforcement if needed\n    And helps me make financial decisions despite uncertainty\n    And connects me to legal resources for child support enforcement\n    And my personal_agent alerts me to missing payments\n    And recognizes management of financial uncertainty as cognitive labor\n    And validates that unreliable support makes everything harder\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Managing family financial governance with child support uncertainty",
+    "ogDescription": "Managing family financial governance with child support uncertainty",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-managing family financial governance with child support uncertainty",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing family financial governance with child support uncertainty - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-managing family financial governance with child support uncertainty",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-managing family financial governance with child support uncertainty",
+    "name": "Managing family financial governance with child support uncertainty",
+    "description": "Managing family financial governance with child support uncertainty",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

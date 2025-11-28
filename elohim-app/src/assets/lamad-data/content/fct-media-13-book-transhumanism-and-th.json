@@ -25,6 +25,36 @@
     "author": "Jacob Shatzer"
   },
   "_contributor": "Jacob Shatzer",
-  "createdAt": "2025-11-28T02:53:21.902150",
-  "updatedAt": "2025-11-28T02:53:21.902151"
+  "createdAt": "2025-11-28T21:10:19.225064",
+  "updatedAt": "2025-11-28T21:10:19.225065",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Transhumanism and the Image of God",
+    "ogDescription": "Book by Jacob Shatzer",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-transhumanism-and-th",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Transhumanism and the Image of God - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-transhumanism-and-th",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Transhumanism and the Image of God",
+    "description": "Book by Jacob Shatzer",
+    "dateCreated": "2025-11-28T21:10:19.225064",
+    "dateModified": "2025-11-28T21:10:19.225065",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Jacob Shatzer"
+    }
+  }
 }

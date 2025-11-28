@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-municipality-municipal health care access and coordination",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-municipal health care access and coordination",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal health care access and coordination",
   "description": "Municipal health care access and coordination",
   "content": "Scenario: Municipal health care access and coordination\n    Given Margaret has changing health needs with aging\n    And she navigates complex health care systems\n    When the municipality_elohim coordinates health access\n    Then municipal health programs should be accessible\n    And senior health clinics should be available and affordable\n    And navigation support should help Margaret access care\n    And preventive health should be prioritized for seniors\n    And municipal health policy should support senior wellness\n    And Margaret should be able to age healthily in community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal health care access and coordination",
+    "ogDescription": "Municipal health care access and coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-municipal health care access and coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal health care access and coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-municipal health care access and coordination",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-municipal health care access and coordination",
+    "name": "Municipal health care access and coordination",
+    "description": "Municipal health care access and coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

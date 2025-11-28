@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-household-resolving household care conflicts",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-resolving household care conflicts",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Resolving household care conflicts",
   "description": "Resolving household care conflicts",
   "content": "Scenario: Resolving household care conflicts\n    Given household care distribution may become imbalanced\n    When conflicts arise about who is contributing fairly\n    Then the protocol should provide objective contribution data\n    And facilitate conversations about fairness and capacity\n    And help us identify solutions that work for everyone\n    And support negotiation toward sustainable arrangements\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Resolving household care conflicts",
+    "ogDescription": "Resolving household care conflicts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-resolving household care conflicts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Resolving household care conflicts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-resolving household care conflicts",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-resolving household care conflicts",
+    "name": "Resolving household care conflicts",
+    "description": "Resolving household care conflicts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

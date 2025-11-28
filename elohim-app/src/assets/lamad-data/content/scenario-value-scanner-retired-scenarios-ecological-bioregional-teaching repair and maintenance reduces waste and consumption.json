@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-teaching repair and maintenance reduces waste and consumption",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-teaching repair and maintenance reduces waste and consumption",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching repair and maintenance reduces waste and consumption",
   "description": "Teaching repair and maintenance reduces waste and consumption",
   "content": "Scenario: Teaching repair and maintenance reduces waste and consumption\n    Given Frank knows how to repair buildings, equipment, and systems\n    And repair culture counters disposability and resource extraction\n    When the bioregional_elohim coordinates repair knowledge sharing\n    Then it should facilitate Frank teaching repair skills\n    And help community members learn to maintain their homes\n    And recognize repair education as ecological care contribution\n    And reduce consumption through extended equipment lifespan\n    And build bioregional self-sufficiency through skill transmission\n    And Frank's knowledge should serve waste reduction and resilience\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching repair and maintenance reduces waste and consumption",
+    "ogDescription": "Teaching repair and maintenance reduces waste and consumption",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-teaching repair and maintenance reduces waste and consumption",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching repair and maintenance reduces waste and consumption - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-teaching repair and maintenance reduces waste and consumption",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-teaching repair and maintenance reduces waste and consumption",
+    "name": "Teaching repair and maintenance reduces waste and consumption",
+    "description": "Teaching repair and maintenance reduces waste and consumption",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

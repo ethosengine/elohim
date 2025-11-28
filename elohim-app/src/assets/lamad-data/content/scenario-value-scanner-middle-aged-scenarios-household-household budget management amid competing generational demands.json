@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-household-household budget management amid competing generational demands",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-household budget management amid competing generational demands",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household budget management amid competing generational demands",
   "description": "Household budget management amid competing generational demands",
   "content": "Scenario: Household budget management amid competing generational demands\n    Given the household supports adult children financially\n    And contributes to parents' care costs\n    And maintains their own household\n    And saves for retirement\n    When household_elohim manages budget\n    Then it should track spending across generational categories\n    And surface when one category expands unsustainably\n    And provide analysis: \"Child support increased 40% last quarter while retirement savings decreased\"\n    And help them make conscious choices about allocation\n    And recognize when external support is needed\n    And support sustainable household financial management\n    And prevent financial crisis from competing demands\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Household budget management amid competing generational demands",
+    "ogDescription": "Household budget management amid competing generational demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-household budget management amid competing generational demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household budget management amid competing generational demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-household budget management amid competing generational demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-household budget management amid competing generational demands",
+    "name": "Household budget management amid competing generational demands",
+    "description": "Household budget management amid competing generational demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

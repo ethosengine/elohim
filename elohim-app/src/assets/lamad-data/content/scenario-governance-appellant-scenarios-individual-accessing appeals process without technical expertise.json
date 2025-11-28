@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-individual-accessing appeals process without technical expertise",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-accessing appeals process without technical expertise",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing appeals process without technical expertise",
   "description": "Accessing appeals process without technical expertise",
   "content": "Scenario: Accessing appeals process without technical expertise\n    Given I am not tech-savvy and don't understand AI systems well\n    And an agent decision has affected me in a way I disagree with\n    When I want to file an appeal\n    Then I can trigger the appeal with a simple button: \"I disagree with this decision\"\n    And I can state my complaint in plain language without legal jargon\n    And I don't need a lawyer or technical knowledge to participate\n    And The interface guides me through the process step-by-step\n    And Support is available in my language and accessible format\n    And The process respects my dignity regardless of my technical literacy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-individual",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing appeals process without technical expertise",
+    "ogDescription": "Accessing appeals process without technical expertise",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-accessing appeals process without technical expertise",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing appeals process without technical expertise - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-accessing appeals process without technical expertise",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-accessing appeals process without technical expertise",
+    "name": "Accessing appeals process without technical expertise",
+    "description": "Accessing appeals process without technical expertise",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

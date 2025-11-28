@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for worker and environmental justice together",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-advocating for worker and environmental justice together",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advocating for worker and environmental justice together",
   "description": "Advocating for worker and environmental justice together",
   "content": "Scenario: Advocating for worker and environmental justice together\n    Given worker exploitation and environmental exploitation are connected\n    When I organize for worker dignity and fair compensation\n    Then the protocol should help me connect labor justice to ecological justice\n    And recognize that care economy serves both human and ecological flourishing\n    And support advocacy that addresses both worker conditions and environmental sustainability\n    And build movements connecting labor rights and environmental protection\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for worker and environmental justice together",
+    "ogDescription": "Advocating for worker and environmental justice together",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for worker and environmental justice together",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for worker and environmental justice together - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for worker and environmental justice together",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-advocating for worker and environmental justice together",
+    "name": "Advocating for worker and environmental justice together",
+    "description": "Advocating for worker and environmental justice together",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

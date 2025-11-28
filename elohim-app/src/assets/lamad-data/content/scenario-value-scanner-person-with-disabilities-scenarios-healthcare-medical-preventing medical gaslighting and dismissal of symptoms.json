@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-preventing medical gaslighting and dismissal of symptoms",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-preventing medical gaslighting and dismissal of symptoms",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Preventing medical gaslighting and dismissal of symptoms",
   "description": "Preventing medical gaslighting and dismissal of symptoms",
   "content": "Scenario: Preventing medical gaslighting and dismissal of symptoms\n    Given medical providers often dismiss disabled patients' symptom reports\n    And medical gaslighting is common experience for disabled people\n    When Alex reports new symptoms or health concerns\n    Then the personal_agent should help Alex document symptom patterns\n    And it should track which providers take Alex's reports seriously\n    And it should support Alex in insisting on appropriate investigation\n    And it should help Alex distinguish new symptoms from existing disability\n    And Alex's expertise about their own body should be validated\n    And the protocol should help Alex advocate against medical dismissal\n    And symptom documentation should support Alex in being believed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Preventing medical gaslighting and dismissal of symptoms",
+    "ogDescription": "Preventing medical gaslighting and dismissal of symptoms",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-preventing medical gaslighting and dismissal of symptoms",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing medical gaslighting and dismissal of symptoms - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-preventing medical gaslighting and dismissal of symptoms",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-preventing medical gaslighting and dismissal of symptoms",
+    "name": "Preventing medical gaslighting and dismissal of symptoms",
+    "description": "Preventing medical gaslighting and dismissal of symptoms",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

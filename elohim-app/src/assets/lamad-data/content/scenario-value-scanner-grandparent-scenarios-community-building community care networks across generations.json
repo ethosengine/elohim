@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-community-building community care networks across generations",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-building community care networks across generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building community care networks across generations",
   "description": "Building community care networks across generations",
   "content": "Scenario: Building community care networks across generations\n    Given Margaret connects with community members of all ages\n    And she participates in various community activities\n    When the community_elohim tracks social capital building\n    Then it should recognize Margaret's role in community connection\n    And it should value relationship-building as care work\n    And it should show how her connections strengthen community resilience\n    And intergenerational community building should be recognized\n    And Margaret should help create inclusive, connected community\n    And social capital creation should accumulate care tokens\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Building community care networks across generations",
+    "ogDescription": "Building community care networks across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-building community care networks across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building community care networks across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-building community care networks across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-building community care networks across generations",
+    "name": "Building community care networks across generations",
+    "description": "Building community care networks across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

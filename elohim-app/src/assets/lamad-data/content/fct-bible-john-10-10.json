@@ -29,6 +29,32 @@
     "sourceModule": "fct-module-13-helping-thrive",
     "thematicContext": "Helping People Thrive"
   },
-  "createdAt": "2025-11-28T02:53:21.898998",
-  "updatedAt": "2025-11-28T02:53:21.899000"
+  "createdAt": "2025-11-28T21:10:19.224032",
+  "updatedAt": "2025-11-28T21:10:19.224034",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "John 10:10",
+    "ogDescription": "Scripture reference used in FCT Module 13",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-john-10-10",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "John 10:10 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-john-10-10",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "John 10:10",
+    "description": "Scripture reference used in FCT Module 13",
+    "dateCreated": "2025-11-28T21:10:19.224032",
+    "dateModified": "2025-11-28T21:10:19.224034",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

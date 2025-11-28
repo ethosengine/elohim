@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-educational-developer childcare commitment becomes enforceable",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer childcare commitment becomes enforceable",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer childcare commitment becomes enforceable",
   "description": "Developer childcare commitment becomes enforceable",
   "content": "Scenario: Developer childcare commitment becomes enforceable\n    Given a developer promised on-site childcare facility as community benefit\n    And families counted on childcare when development was approved\n    When the Observer tracks community benefit delivery\n    Then monitoring shows: childcare space was never built\n    And developer converted it to retail space increasing revenue\n    And families who moved to development lack promised childcare\n    And broken commitment affects working families' ability to afford housing\n    And accountability creates real consequences for unkept promises\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer childcare commitment becomes enforceable",
+    "ogDescription": "Developer childcare commitment becomes enforceable",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer childcare commitment becomes enforceable",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer childcare commitment becomes enforceable - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer childcare commitment becomes enforceable",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer childcare commitment becomes enforceable",
+    "name": "Developer childcare commitment becomes enforceable",
+    "description": "Developer childcare commitment becomes enforceable",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

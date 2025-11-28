@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-educational-concrete operations stage supports numerical comparison",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-concrete operations stage supports numerical comparison",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Concrete operations stage supports numerical comparison",
   "description": "Concrete operations stage supports numerical comparison",
   "content": "Scenario: Concrete operations stage supports numerical comparison\n    Given Emma can handle basic math at age 8\n    And she is developing numerical reasoning\n    When Emma compares prices or quantities\n    Then the personal_agent should support mathematical thinking\n    And the agent should ask \"How much money would we save?\"\n    And simple calculations should be scaffolded\n    And Emma should practice applying math to real decisions\n    And numerical literacy should be built through authentic use\n    And abstract concepts should be grounded in concrete comparisons\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Concrete operations stage supports numerical comparison",
+    "ogDescription": "Concrete operations stage supports numerical comparison",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-concrete operations stage supports numerical comparison",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Concrete operations stage supports numerical comparison - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-concrete operations stage supports numerical comparison",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-concrete operations stage supports numerical comparison",
+    "name": "Concrete operations stage supports numerical comparison",
+    "description": "Concrete operations stage supports numerical comparison",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

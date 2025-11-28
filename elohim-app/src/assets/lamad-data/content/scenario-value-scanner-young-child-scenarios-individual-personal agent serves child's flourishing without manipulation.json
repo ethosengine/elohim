@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-individual-personal agent serves child's flourishing without manipulation",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-personal agent serves child's flourishing without manipulation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent serves child's flourishing without manipulation",
   "description": "Personal agent serves child's flourishing without manipulation",
   "content": "Scenario: Personal agent serves child's flourishing without manipulation\n    Given Tommy's personal_agent has AI capabilities\n    And Tommy is highly vulnerable to manipulation\n    When the personal_agent interacts with Tommy\n    Then it must never manipulate through guilt or shame\n    And it must never extract data for commercial purposes\n    And it must never train Tommy toward consumption patterns\n    And it must serve only Tommy's dignity and flourishing\n    And it must preserve Tommy's natural generosity from corruption\n    And it must set Tommy's baseline expectation that technology serves humans\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.199597",
-  "updatedAt": "2025-11-21T18:54:29.199597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent serves child's flourishing without manipulation",
+    "ogDescription": "Personal agent serves child's flourishing without manipulation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-personal agent serves child's flourishing without manipulation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent serves child's flourishing without manipulation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-personal agent serves child's flourishing without manipulation",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-personal agent serves child's flourishing without manipulation",
+    "name": "Personal agent serves child's flourishing without manipulation",
+    "description": "Personal agent serves child's flourishing without manipulation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-educational-activist demands equitable school funding formula",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist demands equitable school funding formula",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist demands equitable school funding formula",
   "description": "Activist demands equitable school funding formula",
   "content": "Scenario: Activist demands equitable school funding formula\n    Given state funding formula creates massive district disparities\n    And the activist works on statewide education justice\n    When the Observer calculates funding gaps and impacts\n    Then the activist shows low-income districts receive $3000 less per student\n    And demonstrates impact on class sizes and programs\n    And connects families in underfunded districts statewide\n    And builds coalition for funding formula reform\n    And structural inequity becomes focus of political campaign\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist demands equitable school funding formula",
+    "ogDescription": "Activist demands equitable school funding formula",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist demands equitable school funding formula",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist demands equitable school funding formula - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist demands equitable school funding formula",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist demands equitable school funding formula",
+    "name": "Activist demands equitable school funding formula",
+    "description": "Activist demands equitable school funding formula",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

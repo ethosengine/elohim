@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-content-creator-scenarios-affinity-network-creator documents elder wisdom for cultural preservation",
+  "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:affinity-network-creator documents elder wisdom for cultural preservation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Creator documents elder wisdom for cultural preservation",
   "description": "Creator documents elder wisdom for cultural preservation",
   "content": "Scenario: Creator documents elder wisdom for cultural preservation\n    Given Jordan collaborates with elder traditional knowledge keepers\n    When Jordan creates content documenting traditional ecological knowledge\n    And the elders approve the content and its use\n    Then the content is shared with appropriate cultural communities\n    And attribution and respect for knowledge sources is maintained\n    And younger generations learn traditional wisdom\n    And the elders receive recognition and value for their knowledge\n    And cultural preservation happens through respectful documentation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Creator documents elder wisdom for cultural preservation",
+    "ogDescription": "Creator documents elder wisdom for cultural preservation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-affinity-network-creator documents elder wisdom for cultural preservation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creator documents elder wisdom for cultural preservation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-affinity-network-creator documents elder wisdom for cultural preservation",
+    "identifier": "did:web:elohim.host:content:social-medium:content-creator:scenarios:affinity-network-creator documents elder wisdom for cultural preservation",
+    "name": "Creator documents elder wisdom for cultural preservation",
+    "description": "Creator documents elder wisdom for cultural preservation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

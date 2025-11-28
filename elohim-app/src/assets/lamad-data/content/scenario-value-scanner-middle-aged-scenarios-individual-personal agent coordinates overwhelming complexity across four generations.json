@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-individual-personal agent coordinates overwhelming complexity across four generations",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-personal agent coordinates overwhelming complexity across four generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent coordinates overwhelming complexity across four generations",
   "description": "Personal agent coordinates overwhelming complexity across four generations",
   "content": "Scenario: Personal agent coordinates overwhelming complexity across four generations\n    Given Robert manages care responsibilities across four generations\n    And he tracks his parents' medical appointments and medications\n    And he provides financial support and guidance to his adult children\n    And he maintains his own household with his spouse\n    And he occasionally provides care for his grandchild\n    When Robert uses his personal_agent for coordination\n    Then the agent should maintain awareness of all contexts simultaneously\n    And surface conflicts: \"Your father's cardiology appointment conflicts with your work presentation\"\n    And help him prioritize: \"Jordan's apartment deposit is due before your mother's prescription refill\"\n    And reduce cognitive load by holding details he can't track alone\n    And provide sophisticated decision support across multiple time horizons\n    And function as genuine coordination partner for managing extreme complexity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent coordinates overwhelming complexity across four generations",
+    "ogDescription": "Personal agent coordinates overwhelming complexity across four generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-personal agent coordinates overwhelming complexity across four generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent coordinates overwhelming complexity across four generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-personal agent coordinates overwhelming complexity across four generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-personal agent coordinates overwhelming complexity across four generations",
+    "name": "Personal agent coordinates overwhelming complexity across four generations",
+    "description": "Personal agent coordinates overwhelming complexity across four generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-community-convening deliberative assembly for community conflict",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community-convening deliberative assembly for community conflict",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Convening deliberative assembly for community conflict",
   "description": "Convening deliberative assembly for community conflict",
   "content": "Scenario: Convening deliberative assembly for community conflict\n    Given watershed decision deadlocked agents (agricultural vs ecological)\n    And multi-community coordination is needed\n    When I convene deliberative assembly with affected communities\n    Then we bring together: upstream and downstream stakeholders\n    And we facilitate: structured deliberation about shared resources\n    And we explore: synthesis honoring multiple values\n    And we enable: democratic resolution of agent conflicts\n    And we reach: agreement on graduated resource sharing\n    And deliberative democracy: resolves what algorithms couldn't\n    And I demonstrate: leadership as facilitation not command\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Convening deliberative assembly for community conflict",
+    "ogDescription": "Convening deliberative assembly for community conflict",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-convening deliberative assembly for community conflict",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Convening deliberative assembly for community conflict - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-convening deliberative assembly for community conflict",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:community-convening deliberative assembly for community conflict",
+    "name": "Convening deliberative assembly for community conflict",
+    "description": "Convening deliberative assembly for community conflict",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

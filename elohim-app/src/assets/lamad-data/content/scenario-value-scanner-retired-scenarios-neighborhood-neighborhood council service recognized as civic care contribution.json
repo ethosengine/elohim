@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood council service recognized as civic care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:neighborhood-neighborhood council service recognized as civic care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood council service recognized as civic care contribution",
   "description": "Neighborhood council service recognized as civic care contribution",
   "content": "Scenario: Neighborhood council service recognized as civic care contribution\n    Given Frank serves on his neighborhood council\n    And he attends meetings, participates in decisions, and contributes expertise\n    And council service requires time, knowledge, and commitment\n    When the neighborhood_elohim tracks civic participation\n    Then Frank's council service should be quantified as care labor\n    And meeting attendance and preparation time should be valued\n    And his construction expertise contributions should be recognized\n    And governance participation should accumulate care tokens\n    And Frank should experience himself as valued neighborhood leader\n    And civic engagement should be recognized as care economy contribution\n    And his voice in neighborhood governance should carry appropriate weight\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood council service recognized as civic care contribution",
+    "ogDescription": "Neighborhood council service recognized as civic care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-neighborhood-neighborhood council service recognized as civic care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood council service recognized as civic care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-neighborhood-neighborhood council service recognized as civic care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:neighborhood-neighborhood council service recognized as civic care contribution",
+    "name": "Neighborhood council service recognized as civic care contribution",
+    "description": "Neighborhood council service recognized as civic care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

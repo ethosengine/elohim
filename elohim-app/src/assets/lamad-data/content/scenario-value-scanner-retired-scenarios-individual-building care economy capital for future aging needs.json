@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-individual-building care economy capital for future aging needs",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-building care economy capital for future aging needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building care economy capital for future aging needs",
   "description": "Building care economy capital for future aging needs",
   "content": "Scenario: Building care economy capital for future aging needs\n    Given Frank is watching his mother-in-law navigate advanced aging\n    And he recognizes his own future care needs will increase\n    When Frank makes care contributions now\n    Then care tokens should accumulate to his individual account\n    And these tokens should represent future care economy resources\n    And the system should help him build reciprocal relationships\n    And he should be preparing for increased care needs in 10-20 years\n    And current contributions should create legitimate claims on future support\n    And Frank should experience agency in planning his own aging\n    And care reciprocity should flow across time\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Building care economy capital for future aging needs",
+    "ogDescription": "Building care economy capital for future aging needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-building care economy capital for future aging needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building care economy capital for future aging needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-building care economy capital for future aging needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-building care economy capital for future aging needs",
+    "name": "Building care economy capital for future aging needs",
+    "description": "Building care economy capital for future aging needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-community-coordinating community care during crises or emergencies",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-coordinating community care during crises or emergencies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating community care during crises or emergencies",
   "description": "Coordinating community care during crises or emergencies",
   "content": "Scenario: Coordinating community care during crises or emergencies\n    Given Margaret has nursing skills and disaster response experience\n    And community needs coordinated care during emergencies\n    When community crisis or emergency occurs\n    Then the community_elohim should help coordinate response\n    And Margaret's skills should be mobilized appropriately\n    And her crisis care should be specially recognized and valued\n    And community should benefit from retired professionals' expertise\n    And emergency care contributions should accumulate significant tokens\n    And community resilience should be strengthened by elder participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating community care during crises or emergencies",
+    "ogDescription": "Coordinating community care during crises or emergencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-coordinating community care during crises or emergencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating community care during crises or emergencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-coordinating community care during crises or emergencies",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-coordinating community care during crises or emergencies",
+    "name": "Coordinating community care during crises or emergencies",
+    "description": "Coordinating community care during crises or emergencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

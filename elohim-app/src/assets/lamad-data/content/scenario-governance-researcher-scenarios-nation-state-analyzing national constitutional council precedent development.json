@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-nation-state-analyzing national constitutional council precedent development",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-analyzing national constitutional council precedent development",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Analyzing national Constitutional Council precedent development",
   "description": "Analyzing national Constitutional Council precedent development",
   "content": "Scenario: Analyzing national Constitutional Council precedent development\n    Given National Constitutional Council has created precedents affecting millions\n    And I have access to five years of national-level decisions\n    When I analyze how constitutional interpretation evolves over time\n    Then I examine: consistency of principles across diverse cases\n    And I track: precedent citation patterns and influence\n    And I identify: watershed decisions that reshaped interpretation\n    And I analyze: how dissenting opinions influence future majorities\n    And I assess: whether interpretation drifts from constitutional text\n    And I explore: emergence of constitutional \"common law\" through cases\n    And My research reveals: how citizen governance creates coherent jurisprudence\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Analyzing national Constitutional Council precedent development",
+    "ogDescription": "Analyzing national Constitutional Council precedent development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-analyzing national constitutional council precedent development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Analyzing national Constitutional Council precedent development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-analyzing national constitutional council precedent development",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-analyzing national constitutional council precedent development",
+    "name": "Analyzing national Constitutional Council precedent development",
+    "description": "Analyzing national Constitutional Council precedent development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

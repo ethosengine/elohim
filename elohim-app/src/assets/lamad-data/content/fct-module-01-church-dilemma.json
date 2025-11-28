@@ -59,6 +59,34 @@
     "bookCount": 14,
     "bibleVerseCount": 4
   },
-  "createdAt": "2025-11-28T02:53:21.848492",
-  "updatedAt": "2025-11-28T02:53:21.848493"
+  "createdAt": "2025-11-28T21:10:19.190833",
+  "updatedAt": "2025-11-28T21:10:19.190835",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 1: The Church Dilemma",
+    "ogDescription": "Disclaimers & Rules, ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-01-church-dilemma",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.190833",
+    "articleModifiedTime": "2025-11-28T21:10:19.190835",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 1: The Church Dilemma - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-01-church-dilemma",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "FCT 1: The Church Dilemma",
+    "description": "Disclaimers & Rules, ",
+    "dateCreated": "2025-11-28T21:10:19.190833",
+    "dateModified": "2025-11-28T21:10:19.190835",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

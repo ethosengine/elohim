@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-community-engaging community-level sustainability initiatives",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-engaging community-level sustainability initiatives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Engaging community-level sustainability initiatives",
   "description": "Engaging community-level sustainability initiatives",
   "content": "Scenario: Engaging community-level sustainability initiatives\n    Given the community has environmental goals\n    And collective action is more effective than individual\n    When Aisha participates in community sustainability projects\n    Then the community_elohim should coordinate her involvement\n    And it should connect her to composting, recycling, or energy programs\n    And her environmental care work should be recognized\n    And community-scale sustainability should be facilitated\n    And the system should enable collective environmental stewardship\n    And ecological care should build community bonds\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Engaging community-level sustainability initiatives",
+    "ogDescription": "Engaging community-level sustainability initiatives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-engaging community-level sustainability initiatives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Engaging community-level sustainability initiatives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-engaging community-level sustainability initiatives",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-engaging community-level sustainability initiatives",
+    "name": "Engaging community-level sustainability initiatives",
+    "description": "Engaging community-level sustainability initiatives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

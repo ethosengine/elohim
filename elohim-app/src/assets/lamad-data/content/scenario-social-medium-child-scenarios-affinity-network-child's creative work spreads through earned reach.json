@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child's creative work spreads through earned reach",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child's creative work spreads through earned reach",
   "description": "Child's creative work spreads through earned reach",
   "content": "Scenario: Child's creative work spreads through earned reach\n    Given Emma creates a manga story about environmental conservation\n    And she shares it in her manga artists community\n    When other young artists appreciate and share her work\n    And the story demonstrates both artistic skill and positive values\n    Then the work travels through network based on genuine appreciation\n    And it reaches other youth environmental and art communities\n    And Emma experiences validation for quality contribution\n    And she learns that good work naturally finds its audience\n    And no algorithmic manipulation or viral exploitation occurs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child's creative work spreads through earned reach",
+    "ogDescription": "Child's creative work spreads through earned reach",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child's creative work spreads through earned reach - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child's creative work spreads through earned reach",
+    "name": "Child's creative work spreads through earned reach",
+    "description": "Child's creative work spreads through earned reach",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

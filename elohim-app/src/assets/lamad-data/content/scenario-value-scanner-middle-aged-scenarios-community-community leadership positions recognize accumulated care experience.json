@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-community-community leadership positions recognize accumulated care experience",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community leadership positions recognize accumulated care experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community leadership positions recognize accumulated care experience",
   "description": "Community leadership positions recognize accumulated care experience",
   "content": "Scenario: Community leadership positions recognize accumulated care experience\n    Given Robert has decades of care economy participation\n    And he has demonstrated capability through managing complex responsibilities\n    And community needs experienced leadership\n    When community_elohim identifies leadership opportunities\n    Then it should recognize Robert's accumulated care contributions as leadership qualification\n    And surface opportunities: community boards, policy advisory roles, initiative leadership\n    And connect his care experience to governance credibility\n    And help him understand that his lived experience is valuable wisdom\n    And match leadership opportunities to his capacity and interests\n    And prevent exploitation of middle-aged adults' sense of responsibility\n    And support meaningful community contribution without burnout\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Community leadership positions recognize accumulated care experience",
+    "ogDescription": "Community leadership positions recognize accumulated care experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community leadership positions recognize accumulated care experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community leadership positions recognize accumulated care experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community leadership positions recognize accumulated care experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community leadership positions recognize accumulated care experience",
+    "name": "Community leadership positions recognize accumulated care experience",
+    "description": "Community leadership positions recognize accumulated care experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

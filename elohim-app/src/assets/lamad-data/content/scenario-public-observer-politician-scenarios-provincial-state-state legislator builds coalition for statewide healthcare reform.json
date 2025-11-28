@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-state legislator builds coalition for statewide healthcare reform",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator builds coalition for statewide healthcare reform",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "State legislator builds coalition for statewide healthcare reform",
   "description": "State legislator builds coalition for statewide healthcare reform",
   "content": "Scenario: State legislator builds coalition for statewide healthcare reform\n    Given the politician champions Medicaid expansion\n    And needs bipartisan support for passage\n    When the Observer identifies coalition building opportunities\n    Then they see rural hospitals support expansion for financial survival\n    And identify business groups concerned about employee healthcare costs\n    And connect with faith organizations serving uninsured populations\n    And map which legislators have constituent pressure for expansion\n    And build diverse coalition across partisan and geographic divides\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "State legislator builds coalition for statewide healthcare reform",
+    "ogDescription": "State legislator builds coalition for statewide healthcare reform",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator builds coalition for statewide healthcare reform",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "State legislator builds coalition for statewide healthcare reform - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator builds coalition for statewide healthcare reform",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator builds coalition for statewide healthcare reform",
+    "name": "State legislator builds coalition for statewide healthcare reform",
+    "description": "State legislator builds coalition for statewide healthcare reform",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

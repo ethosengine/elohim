@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-educational-parent involvement recognition values maria's solo engagement",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-parent involvement recognition values maria's solo engagement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent involvement recognition values Maria's solo engagement",
   "description": "Parent involvement recognition values Maria's solo engagement",
   "content": "Scenario: Parent involvement recognition values Maria's solo engagement\n    Given Maria manages all school engagement for three children alone\n    And partnered parents split involvement between two people\n    When schools recognize parent involvement\n    Then the educational_elohim should quantify Maria's engagement across all three children\n    And her solo involvement should be recognized as extraordinary effort\n    And schools should value her participation even if she cannot match two-parent family availability\n    And parent involvement metrics should account for family structure differences\n    And Maria should receive appropriate recognition for managing everything alone\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent involvement recognition values Maria's solo engagement",
+    "ogDescription": "Parent involvement recognition values Maria's solo engagement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-parent involvement recognition values maria's solo engagement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent involvement recognition values Maria's solo engagement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-parent involvement recognition values maria's solo engagement",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-parent involvement recognition values maria's solo engagement",
+    "name": "Parent involvement recognition values Maria's solo engagement",
+    "description": "Parent involvement recognition values Maria's solo engagement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

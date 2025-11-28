@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-creating national appellant bill of rights from precedent",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-creating national appellant bill of rights from precedent",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Creating national appellant bill of rights from precedent",
   "description": "Creating national appellant bill of rights from precedent",
   "content": "Scenario: Creating national appellant bill of rights from precedent\n    Given accumulated appeals reveal patterns of dignity violations\n    And we recognize need for comprehensive framework\n    When we craft detailed appellant rights precedent\n    Then we enumerate: right to explanation, hearing, escalation\n    And we specify: timelines, accessibility, protection from retaliation\n    And we establish: precedent search, representation, dignity guarantees\n    And we create: national standard for all appeal processes\n    And we articulate: procedural justice as constitutional requirement\n    And we strengthen: protections for future appellants nationwide\n    And we fulfill: democratic promise of meaningful recourse\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Creating national appellant bill of rights from precedent",
+    "ogDescription": "Creating national appellant bill of rights from precedent",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-creating national appellant bill of rights from precedent",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creating national appellant bill of rights from precedent - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-creating national appellant bill of rights from precedent",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-creating national appellant bill of rights from precedent",
+    "name": "Creating national appellant bill of rights from precedent",
+    "description": "Creating national appellant bill of rights from precedent",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

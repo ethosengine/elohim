@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-water systems and food production understanding",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-water systems and food production understanding",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Water systems and food production understanding",
   "description": "Water systems and food production understanding",
   "content": "Scenario: Water systems and food production understanding\n    Given food production requires water resources\n    And Marcus is learning about ecological systems\n    When Marcus learns about food origins\n    Then the personal_agent should teach about water in agriculture\n    And it should explain water footprint of different foods\n    And it should connect food choices to watershed health\n    And bioregional water systems should be part of his literacy\n    And he should understand water as precious resource\n    And care economy should include stewardship of water\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Water systems and food production understanding",
+    "ogDescription": "Water systems and food production understanding",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-water systems and food production understanding",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Water systems and food production understanding - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-water systems and food production understanding",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-water systems and food production understanding",
+    "name": "Water systems and food production understanding",
+    "description": "Water systems and food production understanding",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-community-appealing community conflict mediation outcome",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-appealing community conflict mediation outcome",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appealing community conflict mediation outcome",
   "description": "Appealing community conflict mediation outcome",
   "content": "Scenario: Appealing community conflict mediation outcome\n    Given Community Elohim mediated a conflict between me and neighbors\n    And I believe the proposed resolution is unjust\n    When I appeal the mediation outcome\n    Then Constitutional Council reviews if mediation process was fair\n    And They evaluate if all parties had meaningful voice\n    And They examine if constitutional principles guided the resolution\n    And They consider if community harmony was balanced with individual justice\n    And They assess if cultural conflict resolution norms were respected\n    And The appeal can modify the resolution or offer alternative mediation\n    And Community learns how to balance harmony with individual rights\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appealing community conflict mediation outcome",
+    "ogDescription": "Appealing community conflict mediation outcome",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-appealing community conflict mediation outcome",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appealing community conflict mediation outcome - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-appealing community conflict mediation outcome",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-appealing community conflict mediation outcome",
+    "name": "Appealing community conflict mediation outcome",
+    "description": "Appealing community conflict mediation outcome",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

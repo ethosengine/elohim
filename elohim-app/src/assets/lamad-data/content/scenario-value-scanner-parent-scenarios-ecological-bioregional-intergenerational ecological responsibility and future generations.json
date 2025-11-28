@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-intergenerational ecological responsibility and future generations",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-intergenerational ecological responsibility and future generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Intergenerational ecological responsibility and future generations",
   "description": "Intergenerational ecological responsibility and future generations",
   "content": "Scenario: Intergenerational ecological responsibility and future generations\n    Given Sarah is raising children who will face climate consequences\n    And current generation's choices affect future generations\n    When the ecological_elohim assesses intergenerational care\n    Then it should recognize Sarah's work preparing children for climate future\n    And it should value her teaching of environmental responsibility\n    And raising environmentally conscious children should be recognized as service to future\n    And the system should honor intergenerational ecological care\n    And Sarah's parenting should be valued as investment in planetary future\n    And care for future generations should be fundamental care economy principle\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Intergenerational ecological responsibility and future generations",
+    "ogDescription": "Intergenerational ecological responsibility and future generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-intergenerational ecological responsibility and future generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Intergenerational ecological responsibility and future generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-intergenerational ecological responsibility and future generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-intergenerational ecological responsibility and future generations",
+    "name": "Intergenerational ecological responsibility and future generations",
+    "description": "Intergenerational ecological responsibility and future generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

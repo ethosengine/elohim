@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-accessible grocery shopping with delivery coordination",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-accessible grocery shopping with delivery coordination",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessible grocery shopping with delivery coordination",
   "description": "Accessible grocery shopping with delivery coordination",
   "content": "Scenario: Accessible grocery shopping with delivery coordination\n    Given Alex uses the Value Scanner for meal planning and shopping\n    And Alex cannot easily transport heavy grocery items\n    When Alex completes weekly shopping\n    Then the system should coordinate delivery seamlessly\n    And Alex should be able to schedule delivery to match their availability\n    And heavy items should be handled by support workers or delivery staff\n    And Alex should maintain control over product selection\n    And delivery should be dignified, not framed as special accommodation\n    And the process should be as efficient as able-bodied shopping\n    And Alex should have equal access to all products and options\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessible grocery shopping with delivery coordination",
+    "ogDescription": "Accessible grocery shopping with delivery coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-accessible grocery shopping with delivery coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessible grocery shopping with delivery coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-accessible grocery shopping with delivery coordination",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-accessible grocery shopping with delivery coordination",
+    "name": "Accessible grocery shopping with delivery coordination",
+    "description": "Accessible grocery shopping with delivery coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

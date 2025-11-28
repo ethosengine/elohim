@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-09-fruits-of-spirit"
   },
-  "createdAt": "2025-11-28T02:53:21.876211",
-  "updatedAt": "2025-11-28T02:53:21.876212"
+  "createdAt": "2025-11-28T21:10:19.210675",
+  "updatedAt": "2025-11-28T21:10:19.210676",
+  "did": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Centering Values: Fruits of the Spirit",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Centering Values: Fruits of the Spirit - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit-application",
+    "identifier": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
+    "name": "Application: Centering Values: Fruits of the Spirit",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.210675",
+    "dateModified": "2025-11-28T21:10:19.210676",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+  "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:ecological-bioregional",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Climate Displacement and Bioregional Coordination",
   "description": "As a displaced_person in the social_medium system Operating at the ecological_bioregional governance layer I want to maintain community cohesion despite climate displacement So that my community can support each other and coordinate across distance",
   "content": "@epic:social_medium\n@user_type:displaced_person\n@governance_layer:ecological_bioregional\n@related_users:activist,elder,community_moderator\n@related_layers:community,district,nation_state\n@elohim_agents:pattern_recognition_agent,coordination_agent,resource_agent\n\nFeature: Climate Displacement and Bioregional Coordination\n  As a displaced_person in the social_medium system\n  Operating at the ecological_bioregional governance layer\n  I want to maintain community cohesion despite climate displacement\n  So that my community can support each other and coordinate across distance\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the displaced_person user is registered in the system\n    And the ecological_bioregional governance context is active\n    And the displaced person is part of a coastal community displaced by sea level rise\n\n  Scenario: Climate-displaced community maintains cohesion across distance\n    Given a coastal town is gradually becoming uninhabitable due to flooding\n    And families are relocating to various inland communities over several years\n    When displaced community members use Elohim to stay connected\n    And they create a diaspora community space for their town\n    Then families scattered across multiple cities maintain relationships\n    And community memory and culture are preserved\n    And mutual aid flows between dispersed community members\n    And collective decision-making continues about remaining community assets\n    And the community maintains identity despite geographic dispersal\n\n  Scenario: Displaced community coordinates with climate adaptation network\n    Given multiple coastal communities face similar climate displacement\n    When they form a climate displacement affinity network\n    And they share strategies for community preservation\n    Then communities learn from each other's experiences\n    And successful resettlement patterns are documented and shared\n    And coordinated advocacy for climate displacement support emerges\n    And the network coordinates with climate justice activists\n    And systemic support for climate migrants is organized\n\n  Scenario: Elder preserves bioregional knowledge across displacement\n    Given community elders hold traditional knowledge of coastal ecology\n    And this knowledge is being lost as the community displaces\n    When elders document traditional knowledge through the network\n    And younger displaced community members learn and preserve it\n    Then bioregional ecological knowledge is preserved\n    And the knowledge can inform restoration efforts\n    And future generations maintain connection to ancestral place\n    And cultural-ecological wisdom survives displacement\n\n  Scenario: Displaced community coordinates managed retreat\n    Given the coastal community is planning managed retreat over 10 years\n    When the community uses Elohim to coordinate the transition\n    And they make collective decisions about timing and destination\n    Then families can coordinate moves to stay near each other\n    And community assets are managed collectively during transition\n    And mutual aid supports families through the displacement\n    And the community maintains agency and cohesion through the crisis\n    And managed retreat happens with dignity rather than chaos\n",
@@ -28,6 +30,32 @@
     "epic": "social_medium",
     "scenarioCount": 4
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Climate Displacement and Bioregional Coordination",
+    "ogDescription": "As a displaced_person in the social_medium system Operating at the ecological_bioregional governance layer I want to maintain community cohesion despite climate displacement So that my community can s",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Climate Displacement and Bioregional Coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+    "identifier": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:ecological-bioregional",
+    "name": "Climate Displacement and Bioregional Coordination",
+    "description": "As a displaced_person in the social_medium system Operating at the ecological_bioregional governance layer I want to maintain community cohesion despite climate displacement So that my community can support each other and coordinate across distance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

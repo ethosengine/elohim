@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-individual-first-time budget planning for independent living",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-first-time budget planning for independent living",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "First-time budget planning for independent living",
   "description": "First-time budget planning for independent living",
   "content": "Scenario: First-time budget planning for independent living\n    Given Aisha has a monthly grocery budget of $200\n    And she is learning to manage finances independently\n    When Aisha opens the Value Scanner budget planning feature\n    Then the personal_agent should display her monthly allocation\n    And the system should show remaining budget in real-time\n    And the interface should provide clear spending analytics\n    And budget recommendations should account for her income level\n    And the agent should help her balance immediate needs with future goals\n    And financial education should be integrated into the experience\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "First-time budget planning for independent living",
+    "ogDescription": "First-time budget planning for independent living",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-first-time budget planning for independent living",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "First-time budget planning for independent living - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-first-time budget planning for independent living",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-first-time budget planning for independent living",
+    "name": "First-time budget planning for independent living",
+    "description": "First-time budget planning for independent living",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

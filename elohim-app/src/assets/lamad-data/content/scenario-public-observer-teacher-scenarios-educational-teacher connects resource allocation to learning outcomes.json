@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-educational-teacher connects resource allocation to learning outcomes",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational-teacher connects resource allocation to learning outcomes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher connects resource allocation to learning outcomes",
   "description": "Teacher connects resource allocation to learning outcomes",
   "content": "Scenario: Teacher connects resource allocation to learning outcomes\n    Given district allocates resources based on administrative priorities\n    And claims all schools receive equitable support\n    When teachers document resource-outcome patterns through Observer\n    Then teachers show schools with counselors have better student wellbeing\n    And smaller class sizes correlate with better learning outcomes\n    And arts programs predict higher engagement and graduation rates\n    And teacher professional judgment is validated by student outcome data\n    And resource allocation becomes student-centered not administratively convenient\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher connects resource allocation to learning outcomes",
+    "ogDescription": "Teacher connects resource allocation to learning outcomes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-educational-teacher connects resource allocation to learning outcomes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher connects resource allocation to learning outcomes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-educational-teacher connects resource allocation to learning outcomes",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational-teacher connects resource allocation to learning outcomes",
+    "name": "Teacher connects resource allocation to learning outcomes",
+    "description": "Teacher connects resource allocation to learning outcomes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

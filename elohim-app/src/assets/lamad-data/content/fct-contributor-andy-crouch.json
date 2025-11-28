@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-14-ready-to-act"
   },
-  "createdAt": "2025-11-28T02:53:21.901958",
-  "updatedAt": "2025-11-28T02:53:21.901959"
+  "createdAt": "2025-11-28T21:10:19.224914",
+  "updatedAt": "2025-11-28T21:10:19.224915",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Andy Crouch",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-andy-crouch",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Andy Crouch - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-andy-crouch",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Andy Crouch",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.224914",
+    "dateModified": "2025-11-28T21:10:19.224915",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

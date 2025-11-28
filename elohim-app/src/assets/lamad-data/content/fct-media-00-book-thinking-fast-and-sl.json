@@ -25,6 +25,36 @@
     "author": "Daniel Kahneman"
   },
   "_contributor": "Daniel Kahneman",
-  "createdAt": "2025-11-28T02:53:21.848232",
-  "updatedAt": "2025-11-28T02:53:21.848233"
+  "createdAt": "2025-11-28T21:10:19.190559",
+  "updatedAt": "2025-11-28T21:10:19.190560",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Thinking, Fast and Slow",
+    "ogDescription": "Book by Daniel Kahneman",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-thinking-fast-and-sl",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Thinking, Fast and Slow - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-thinking-fast-and-sl",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Thinking, Fast and Slow",
+    "description": "Book by Daniel Kahneman",
+    "dateCreated": "2025-11-28T21:10:19.190559",
+    "dateModified": "2025-11-28T21:10:19.190560",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Daniel Kahneman"
+    }
+  }
 }

@@ -64,6 +64,34 @@
     "bookCount": 8,
     "bibleVerseCount": 15
   },
-  "createdAt": "2025-11-28T02:53:21.902625",
-  "updatedAt": "2025-11-28T02:53:21.902626"
+  "createdAt": "2025-11-28T21:10:19.225583",
+  "updatedAt": "2025-11-28T21:10:19.225584",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 14: Ready To Act: Embodying Christ in the Digital Age",
+    "ogDescription": "Ready to Act: Embodying Christ in the Digital Age,\" the final module of our Foundations for Christians and Technology course. As we conclude this journey, we stand at a pivotal moment\u2014where our faith ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-14-ready-to-act",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.225583",
+    "articleModifiedTime": "2025-11-28T21:10:19.225584",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 14: Ready To Act: Embodying Christ in the Digital Age - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-14-ready-to-act",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "FCT 14: Ready To Act: Embodying Christ in the Digital Age",
+    "description": "Ready to Act: Embodying Christ in the Digital Age,\" the final module of our Foundations for Christians and Technology course. As we conclude this journey, we stand at a pivotal moment\u2014where our faith intersects with the immense power and potential of modern technology.  \nThroughout this course, we've explored the complex landscape of digital innovation through the lens of our Christian faith. We've grappled with the challenges posed by exponential technological growth and examined how we, as fol",
+    "dateCreated": "2025-11-28T21:10:19.225583",
+    "dateModified": "2025-11-28T21:10:19.225584",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

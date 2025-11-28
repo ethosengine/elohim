@@ -25,6 +25,36 @@
     "author": "Vi Hart"
   },
   "_contributor": "Vi Hart",
-  "createdAt": "2025-11-28T02:53:21.892485",
-  "updatedAt": "2025-11-28T02:53:21.892487"
+  "createdAt": "2025-11-28T21:10:19.219669",
+  "updatedAt": "2025-11-28T21:10:19.219670",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Revisit this interactive demonstration",
+    "ogDescription": "Book by Vi Hart",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-revisit-this-interac",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Revisit this interactive demonstration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-revisit-this-interac",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Revisit this interactive demonstration",
+    "description": "Book by Vi Hart",
+    "dateCreated": "2025-11-28T21:10:19.219669",
+    "dateModified": "2025-11-28T21:10:19.219670",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Vi Hart"
+    }
+  }
 }

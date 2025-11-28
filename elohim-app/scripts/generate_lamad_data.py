@@ -95,6 +95,148 @@ def generate_id(source_path: str, prefix: str = "") -> str:
     return path_part
 
 
+def generate_did(source_path: str, node_type: str = "content") -> str:
+    """Generate W3C DID from source path."""
+    path_part = source_path.replace(".md", "").replace(".feature", "")
+    path_part = path_part.replace("/", ":").replace("_", "-").lower()
+    path_part = re.sub(r"-+", "-", path_part.strip("-"))
+    return f"did:web:elohim.host:{node_type}:{path_part}"
+
+
+# ActivityPub type mapping
+ACTIVITYPUB_TYPE_MAPPING = {
+    "epic": "Article",
+    "feature": "Article",
+    "scenario": "Note",
+    "video": "Video",
+    "book": "Document",
+    "book-chapter": "Document",
+    "simulation": "Application",
+    "assessment": "Question",
+    "concept": "Page",
+    "organization": "Organization",
+}
+
+
+def infer_activitypub_type(content_type: str, node_data: dict = None) -> str:
+    """Map ContentType to ActivityStreams vocabulary."""
+    return ACTIVITYPUB_TYPE_MAPPING.get(content_type, "Page")
+
+
+def get_git_timestamps(file_path: Path) -> dict:
+    """Extract creation and modification dates from git history."""
+    import subprocess
+
+    try:
+        # Get first commit (creation)
+        created = subprocess.check_output(
+            ["git", "log", "--diff-filter=A", "--format=%aI", "--", str(file_path)],
+            cwd=str(Path.cwd()),
+            stderr=subprocess.DEVNULL
+        ).decode().strip().split('\n')[0]
+
+        # Get last commit (modification)
+        modified = subprocess.check_output(
+            ["git", "log", "-1", "--format=%aI", "--", str(file_path)],
+            cwd=str(Path.cwd()),
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+
+        return {
+            "created": created if created else datetime.now().isoformat(),
+            "modified": modified if modified else datetime.now().isoformat()
+        }
+    except Exception:
+        # Fallback to file system timestamps
+        now = datetime.now().isoformat()
+        try:
+            mtime = datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+            return {"created": mtime, "modified": mtime}
+        except:
+            return {"created": now, "modified": now}
+
+
+def generate_open_graph_metadata(
+    title: str,
+    description: str,
+    node_id: str,
+    content_type: str,
+    frontmatter: dict,
+    timestamps: dict
+) -> dict:
+    """Generate Open Graph metadata for social sharing."""
+    og = {
+        "ogTitle": title,
+        "ogDescription": description[:200] if description else title,
+        "ogType": "article" if content_type in ["epic", "feature", "scenario"] else "website",
+        "ogUrl": f"https://elohim-protocol.org/content/{node_id}",
+        "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    }
+
+    # Add timestamps for articles
+    if content_type in ["epic", "feature", "scenario", "concept"]:
+        og["articlePublishedTime"] = timestamps.get("created")
+        og["articleModifiedTime"] = timestamps.get("modified")
+        if frontmatter.get("epic"):
+            og["articleSection"] = frontmatter["epic"]
+
+    # Placeholder image (UI devs can override)
+    og["ogImage"] = f"https://elohim-protocol.org/assets/images/og-defaults/{content_type}.jpg"
+    og["ogImageAlt"] = f"{title} - Elohim Protocol"
+
+    return og
+
+
+# Schema.org type mapping
+SCHEMA_TYPE_MAPPING = {
+    "epic": "Article",
+    "feature": "Article",
+    "video": "VideoObject",
+    "book": "Book",
+    "book-chapter": "Chapter",
+    "organization": "Organization",
+    "assessment": "Quiz",
+}
+
+
+def generate_linked_data(
+    node_id: str,
+    did: str,
+    content_type: str,
+    title: str,
+    description: str,
+    timestamps: dict,
+    frontmatter: dict
+) -> dict:
+    """Generate JSON-LD for semantic web compliance."""
+    schema_type = SCHEMA_TYPE_MAPPING.get(content_type, "CreativeWork")
+
+    linked_data = {
+        "@context": "https://schema.org/",
+        "@type": schema_type,
+        "@id": f"https://elohim-protocol.org/content/{node_id}",
+        "identifier": did,
+        "name": title,
+        "description": description,
+        "dateCreated": timestamps.get("created"),
+        "dateModified": timestamps.get("modified"),
+        "publisher": {
+            "@type": "Organization",
+            "@id": "https://elohim-protocol.org",
+            "name": "Elohim Protocol"
+        }
+    }
+
+    # Add author if available
+    if frontmatter.get("author_name"):
+        linked_data["author"] = {
+            "@type": "Person",
+            "name": frontmatter["author_name"]
+        }
+
+    return linked_data
+
+
 def parse_yaml_frontmatter(content: str) -> tuple[dict, str]:
     """Extract YAML frontmatter from markdown content."""
     frontmatter = {}
@@ -244,12 +386,27 @@ def parse_markdown(file_path: Path, manifest_type: str) -> Optional[dict]:
     if "epic" in frontmatter:
         related_ids.append(f"{frontmatter['epic'].replace('_', '-')}-epic")
 
-    # Get file modification time
-    mtime = datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+    # Generate node ID and DID
+    node_id = generate_id(source_path)
+    node_did = generate_did(source_path, "content")
+
+    # Get git timestamps (with fallback to file system)
+    timestamps = get_git_timestamps(file_path)
+
+    # Generate standards-aligned metadata
+    og_metadata = generate_open_graph_metadata(
+        title, description, node_id, content_type, frontmatter, timestamps
+    )
+    linked_data = generate_linked_data(
+        node_id, node_did, content_type, title, description, timestamps, frontmatter
+    )
+    activitypub_type = infer_activitypub_type(content_type)
 
     return {
-        "id": generate_id(source_path),
+        "id": node_id,
+        "did": node_did,
         "contentType": content_type,
+        "activityPubType": activitypub_type,
         "title": title,
         "description": description,
         "content": content,  # Full markdown content
@@ -258,8 +415,10 @@ def parse_markdown(file_path: Path, manifest_type: str) -> Optional[dict]:
         "sourcePath": source_path,
         "relatedNodeIds": related_ids,
         "metadata": metadata,
-        "createdAt": mtime,
-        "updatedAt": mtime,
+        "openGraphMetadata": og_metadata,
+        "linkedData": linked_data,
+        "createdAt": timestamps["created"],
+        "updatedAt": timestamps["modified"],
     }
 
 
@@ -272,7 +431,7 @@ def parse_gherkin(file_path: Path) -> list[dict]:
         return []
 
     source_path = str(file_path.relative_to(DOCS_DIR))
-    mtime = datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+    timestamps = get_git_timestamps(file_path)
     category = infer_category(source_path)
 
     nodes = []
@@ -344,9 +503,20 @@ def parse_gherkin(file_path: Path) -> list[dict]:
                         scenario_content_lines.append(next_line)
                         current_line += 1
 
+                    # Generate standards-aligned fields
+                    scenario_did = generate_did(f"{source_path}-{scenario_title}", "content")
+                    scenario_og = generate_open_graph_metadata(
+                        scenario_title, scenario_title, scenario_id, "scenario", {}, timestamps
+                    )
+                    scenario_ld = generate_linked_data(
+                        scenario_id, scenario_did, "scenario", scenario_title, scenario_title, timestamps, {}
+                    )
+
                     nodes.append({
                         "id": scenario_id,
+                        "did": scenario_did,
                         "contentType": "scenario",
+                        "activityPubType": "Note",
                         "title": scenario_title,
                         "description": scenario_title,
                         "content": "\n".join(scenario_content_lines),
@@ -359,8 +529,10 @@ def parse_gherkin(file_path: Path) -> list[dict]:
                             "featureId": feature_id,
                             "epic": epic_id,
                         },
-                        "createdAt": mtime,
-                        "updatedAt": mtime,
+                        "openGraphMetadata": scenario_og,
+                        "linkedData": scenario_ld,
+                        "createdAt": timestamps["created"],
+                        "updatedAt": timestamps["modified"],
                     })
         elif line.startswith("Scenario"):
             scenario_match = re.match(r"^(Scenario|Scenario Outline):\s*(.+)$", line)
@@ -378,9 +550,20 @@ def parse_gherkin(file_path: Path) -> list[dict]:
                     scenario_content_lines.append(next_line)
                     current_line += 1
 
+                # Generate standards-aligned fields
+                scenario_did = generate_did(f"{source_path}-{scenario_title}", "content")
+                scenario_og = generate_open_graph_metadata(
+                    scenario_title, scenario_title, scenario_id, "scenario", {}, timestamps
+                )
+                scenario_ld = generate_linked_data(
+                    scenario_id, scenario_did, "scenario", scenario_title, scenario_title, timestamps, {}
+                )
+
                 nodes.append({
                     "id": scenario_id,
+                    "did": scenario_did,
                     "contentType": "scenario",
+                    "activityPubType": "Note",
                     "title": scenario_title,
                     "description": scenario_title,
                     "content": "\n".join(scenario_content_lines),
@@ -393,18 +576,32 @@ def parse_gherkin(file_path: Path) -> list[dict]:
                         "featureId": feature_id,
                         "epic": epic_id,
                     },
-                    "createdAt": mtime,
-                    "updatedAt": mtime,
+                    "openGraphMetadata": scenario_og,
+                    "linkedData": scenario_ld,
+                    "createdAt": timestamps["created"],
+                    "updatedAt": timestamps["modified"],
                 })
         else:
             current_line += 1
 
-    # Create feature node
+    # Create feature node with standards-aligned fields
+    feature_title_final = feature_title or "Untitled Feature"
+    feature_description_final = " ".join(feature_description)[:500] if feature_description else feature_title
+    feature_did = generate_did(source_path, "content")
+    feature_og = generate_open_graph_metadata(
+        feature_title_final, feature_description_final, feature_id, "feature", {}, timestamps
+    )
+    feature_ld = generate_linked_data(
+        feature_id, feature_did, "feature", feature_title_final, feature_description_final, timestamps, {}
+    )
+
     feature_node = {
         "id": feature_id,
+        "did": feature_did,
         "contentType": "feature",
-        "title": feature_title or "Untitled Feature",
-        "description": " ".join(feature_description)[:500] if feature_description else feature_title,
+        "activityPubType": "Article",
+        "title": feature_title_final,
+        "description": feature_description_final,
         "content": content,
         "contentFormat": "gherkin",
         "tags": feature_tags + [category, "feature"],
@@ -415,8 +612,10 @@ def parse_gherkin(file_path: Path) -> list[dict]:
             "epic": epic_id,
             "scenarioCount": len(scenario_ids),
         },
-        "createdAt": mtime,
-        "updatedAt": mtime,
+        "openGraphMetadata": feature_og,
+        "linkedData": feature_ld,
+        "createdAt": timestamps["created"],
+        "updatedAt": timestamps["modified"],
     }
 
     return [feature_node] + nodes

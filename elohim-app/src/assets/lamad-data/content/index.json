@@ -142,10 +142,10 @@
       "description": "Senator Elena Ruiz chairs the Senate Committee on Artificial Intelligence and Digital Governance. When Elohim Protocol first emerged, she saw it as both opportunity and threat. Opportunity: finally, a",
       "contentType": "concept",
       "tags": [
-        "concept",
+        "epic:governance",
         "governance",
-        "user:policy_maker",
-        "epic:governance"
+        "concept",
+        "user:policy_maker"
       ],
       "category": "governance"
     },
@@ -852,10 +852,10 @@
       "description": "Marcus is 42 years old, and he's furious. His Family Elohim just alerted his partner about concerning behavioral changes\u2014increasing isolation, disturbing online content consumption, hints of suicidal ",
       "contentType": "concept",
       "tags": [
-        "user:appellant",
-        "concept",
+        "epic:governance",
         "governance",
-        "epic:governance"
+        "concept",
+        "user:appellant"
       ],
       "category": "governance"
     },
@@ -2174,8 +2174,8 @@
       "description": "Daniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes w",
       "contentType": "video",
       "tags": [
-        "video",
-        "governance"
+        "governance",
+        "video"
       ],
       "url": "https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA",
       "name": "Future Thinkers - Daniel Schmachtenberger - The Existential Game",
@@ -2189,10 +2189,10 @@
       "description": "Dr. James Chen is a political scientist specializing in democratic innovation and deliberative governance. For fifteen years, he studied how citizens engage with complex policy decisions: participator",
       "contentType": "concept",
       "tags": [
-        "concept",
-        "governance",
         "user:researcher",
-        "epic:governance"
+        "epic:governance",
+        "governance",
+        "concept"
       ],
       "category": "governance"
     },
@@ -3290,10 +3290,10 @@
       "description": "Jamal Washington has been the elected mayor of Riverside (population 45,000) for six years. When Elohim Protocol first launched, he was wary\u2014another tech solution promising to solve everything while u",
       "contentType": "concept",
       "tags": [
-        "concept",
+        "epic:governance",
         "governance",
-        "user:community_leader",
-        "epic:governance"
+        "concept",
+        "user:community_leader"
       ],
       "category": "governance"
     },
@@ -3949,8 +3949,8 @@
       "description": "<p>Our mission is to support a model of growth that allows America\u2019s cities, towns and neighborhoods to become financially strong and resilient. Join the Strong towns movement today.</p>",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.strongtowns.org",
       "name": "Strong Towns",
@@ -3964,8 +3964,8 @@
       "description": "Holochain delivers beyond the promises of blockchain by providing a lightweight, secure and versatile framework for everyday distributed apps.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.holochain.org",
       "name": "Holochain | App framework with P2P networking",
@@ -3979,8 +3979,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://en.wikipedia.org/wiki/World3",
       "name": "World3 - Wikipedia",
@@ -3994,8 +3994,8 @@
       "description": "Technology Architect and Senior Software Engineer, Consilience, Data Science. 1737 Cambridge St, K328 Cambridge, MA 02138. rtreacy@hmdc.harvard.edu.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.iq.harvard.edu/people/program/consilience",
       "name": "Consilience Project | Institute for Quantitative Social Science",
@@ -4009,8 +4009,8 @@
       "description": "The Task Force for a Trustworthy Future Web\u2019s report captures analysis of the systems gaps and critical opportunities that will define how the next generation of online spaces will be constructed.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.atlanticcouncil.org/in-depth-research-reports/report/scaling-trust/",
       "name": "Scaling trust on the web",
@@ -4024,8 +4024,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://en.wikipedia.org/wiki/Green_gross_domestic_product",
       "name": "Green gross domestic product - Wikipedia",
@@ -4039,8 +4039,8 @@
       "description": "Solarpunk is a genre of speculative fiction that is also its own distinguished aesthetic, focusing mainly on renewable energy, living in harmony with nature, and the better future envisioned through b",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://aesthetics.fandom.com/wiki/Solarpunk",
       "name": "Solarpunk",
@@ -4054,8 +4054,8 @@
       "description": "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://agilelearningcenters.org",
       "name": "Agile Learning Centers, Education Evolved",
@@ -4069,8 +4069,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://worldbuild.ai",
       "name": "FLI Worldbuilding Contest",
@@ -4084,8 +4084,8 @@
       "description": "Jacque Fresco is an industrial designer and social engineer. He\u2019s also active in the field of Human Factors, where he developed an integrated social system.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.thevenusproject.com/the-venus-project/jacque-fresco/",
       "name": "Jacque Fresco | The Venus Project",
@@ -4099,8 +4099,8 @@
       "description": "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://globalcarbonreward.org/",
       "name": "Global Carbon Reward - Climate Initiative",
@@ -4114,8 +4114,8 @@
       "description": "<p>Our mission is to support a model of growth that allows America\u2019s cities, towns and neighborhoods to become financially strong and resilient. Join the Strong towns movement today.</p>",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.strongtowns.org/",
       "name": "Strong Towns",
@@ -4129,8 +4129,8 @@
       "description": "Learn for free about math, art, computer programming, economics, physics, chemistry, biology, medicine, finance, history, and more. Khan Academy is a nonprofit with the mission of providing a free, wo",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.khanacademy.org/",
       "name": "Khan Academy | Free Online Courses, Lessons & Practice",
@@ -4144,8 +4144,8 @@
       "description": "How happy Is the planet",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://happyplanetindex.org/",
       "name": "Happy Planet Index \u2013 How happy Is the planet",
@@ -4159,8 +4159,8 @@
       "description": "The task manager for DAOs and decentralized work",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://dework.xyz/",
       "name": "Dework",
@@ -4174,8 +4174,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://pol.is/home",
       "name": "Polis",
@@ -4189,8 +4189,8 @@
       "description": "Calm technology is maintained by Amber Case",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://calmtech.com/",
       "name": "Calm Technology",
@@ -4204,8 +4204,8 @@
       "description": "We are Mobius, a home for people creating Liberatory Technology products, systems and narratives.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.mobi.us.org/",
       "name": "Home",
@@ -4219,8 +4219,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.gesetze-im-internet.de/englisch_gg/englisch_gg.html",
       "name": "Basic Law for the Federal Republic of Germany",
@@ -4234,8 +4234,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://partnershiponai.org/",
       "name": "Home - Partnership on AI",
@@ -4249,8 +4249,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://en.wikipedia.org/wiki/Normality_principle",
       "name": "Normality principle - Wikipedia",
@@ -4264,8 +4264,8 @@
       "description": "The Consilience Project ... The Consilience Project is developing a transmedia body of social theory and philosophy that explains and seeks solutions to the unique\u00a0...",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.linkedin.com/in/danielschmachtenberger",
       "name": "Daniel Schmachtenberger - The Consilience Project",
@@ -4279,8 +4279,8 @@
       "description": "Regeneration means putting life at the center of every action and decision. It is inclusive, engaging, and generous. And everyone can do it.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://regeneration.org/",
       "name": "Welcome to Regeneration | Project Regeneration",
@@ -4294,8 +4294,8 @@
       "description": "In search for solutions against disinformation, radicalisation or online manipulation? This is our field of expertise. Tiltstudio.co",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.tiltstudio.co/",
       "name": "Resilience against disinformation - Tilt",
@@ -4309,8 +4309,8 @@
       "description": "Jun 25, 2021 ... We've explored many different problems on Your Undivided Attention \u2014 addiction, disinformation, polarization, climate change, and more.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://your-undivided-attention.simplecast.com/episodes/a-problem-well-stated-is-half-solved-0nI8m2G3",
       "name": "A Problem Well-Stated is Half-Solved | Your Undivided Attention",
@@ -4324,8 +4324,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://e-estonia.com",
       "name": "Home page - e-Estonia",
@@ -4339,8 +4339,8 @@
       "description": "&amp;nbsp; About Us The Cities Coalition for Digital Rights, launched by the Cities of Amsterdam, Barcelona and New York in November 2018 and now with a membership of over 50 cities worldwide,",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://citiesfordigitalrights.org/thecoalition",
       "name": "About us",
@@ -4354,8 +4354,8 @@
       "description": "Solarpunk is a genre of speculative fiction that is also its own distinguished aesthetic, focusing mainly on renewable energy, living in harmony with nature, and the better future envisioned through b",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://aesthetics.fandom.com/wiki/Solarpunk",
       "name": "Solarpunk",
@@ -4369,8 +4369,8 @@
       "description": "Jigsaw is a unit within Google that explores threats to open societies, and builds technology that inspires scalable solutions.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://jigsaw.google.com/",
       "name": "Jigsaw",
@@ -4384,8 +4384,8 @@
       "description": "Hylo amplifies cooperation among people regenerating our communities and our planet, enabling collective action through emergent, decentralized collaboration.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.hylo.com/",
       "name": "Hylo \u2014 Social Coordination for a Thriving Planet",
@@ -4399,8 +4399,8 @@
       "description": "The Thriving Places Index measures the local conditions for wellbeing, and whether those conditions are being delivered fairly and sustainably. It consists of a broad set of indicators grouped into th",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.thrivingplacesindex.org/",
       "name": "Thriving Places Index",
@@ -4414,8 +4414,8 @@
       "description": "IdeaLoom is a Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, reach a common understanding, and develop solutions beyond what each particip",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.idealoom.org/",
       "name": "IdeaLoom",
@@ -4429,8 +4429,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.systemicpeace.org",
       "name": "index",
@@ -4444,8 +4444,8 @@
       "description": "Solarpunk is a genre of speculative fiction that is also its own distinguished aesthetic, focusing mainly on renewable energy, living in harmony with nature, and the better future envisioned through b",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://aesthetics.fandom.com/wiki/Solarpunk",
       "name": "Solarpunk",
@@ -4459,8 +4459,8 @@
       "description": "The Consilience Project is a non-profit media organization that aims to help catalyze a cultural movement toward higher-quality sensemaking.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://consilienceproject.org/",
       "name": "The Consilience Project",
@@ -4474,8 +4474,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://hdr.undp.org/data-center/human-development-index",
       "name": "Human Development Index | Human Development Reports",
@@ -4489,8 +4489,8 @@
       "description": "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://ecocation.org/eco-efficiency-vs-eco-effectiveness/",
       "name": "Eco Efficiency vs Eco Effectiveness - EcoCation",
@@ -4504,8 +4504,8 @@
       "description": "IFTF Fast Futures: Foresight for Beginners in 90 minutes. August 10 \u2022 10:00am PDT / 17:00 UTC \u2022 $99 \u2022 An online foresight learning experience for beginners in \u00a0...",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.iftf.org/home/",
       "name": "IFTF: Home",
@@ -4519,8 +4519,8 @@
       "description": "Das Zertifikat \u00ab2000-Watt-Areal\u00bb zeichnet Siedlungsgebiete aus, die sich f\u00fcr den Klimaschutz einsetzen und einen nachhaltigen Umgang mit Ressourcen vorweisen.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.2000watt.swiss/english.html",
       "name": "2000-Watt society and 2000-Watt Site",
@@ -4534,8 +4534,8 @@
       "description": "Regrid is the leading provider of nationwide land parcels and location context data, with over 155 million property boundaries and records.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://regrid.com",
       "name": "Regrid | Nationwide Land Parcels & Location Context Data for Everyone",
@@ -4549,8 +4549,8 @@
       "description": "We are a community of activists, artists, entrepreneurs, and scholars committed to using mechanism design to inspire radical social change.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.radicalxchange.org/",
       "name": "RadicalxChange",
@@ -4564,8 +4564,8 @@
       "description": "Buycott is a free app to vote with your wallet. Boycott bad products and find sustainable alternatives.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.buycott.com/",
       "name": "Buycott",
@@ -4579,8 +4579,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.effectivealtruism.org",
       "name": "Effective Altruism",
@@ -4594,8 +4594,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.oecdbetterlifeindex.org/",
       "name": "OECD Better Life Index",
@@ -4609,8 +4609,8 @@
       "description": "A federated social network for individuals and communities to design, operate and control their own digital lives.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://bonfirenetworks.org",
       "name": "Bonfire",
@@ -4624,8 +4624,8 @@
       "description": "Genuine Progress Indicator takes into account the well-being of a nation by incorporating environmental and social factors which are not measured by GDP.",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://gnhusa.org/genuine-progress-indicator/",
       "name": "Genuine Progress Indicator - Gross National Happiness USA",
@@ -4639,8 +4639,8 @@
       "description": "Civilization Research Institute is focused on advancing humanity's collective intelligence. \u00b7 We believe that improving collective sensemaking \u2014 our ability to make\u00a0...",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://www.civilizationresearchinstitute.org/",
       "name": "Civilization Research Institute",
@@ -4654,8 +4654,8 @@
       "description": "\ud83e\udd2f Meta-Crisis Meta-Resource",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://metacrisis.org",
       "name": "\ud83e\udd2f Meta-Crisis Meta-Resource",
@@ -4669,8 +4669,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://donellameadows.org/archives/leverage-points-places-to-intervene-in-a-system/",
       "name": "Leverage Points: Places to Intervene in a System",
@@ -4684,8 +4684,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://frontporchforum.com",
       "name": "",
@@ -4699,8 +4699,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://futureoflife.org/",
       "name": "Home - Future of Life Institute",
@@ -4714,8 +4714,8 @@
       "description": "Transforming the way humans inhabit the Earth",
       "contentType": "organization",
       "tags": [
-        "governance",
-        "organization"
+        "organization",
+        "governance"
       ],
       "url": "https://regenesisgroup.com/how-we-work/",
       "name": "How we work",
@@ -4729,10 +4729,10 @@
       "description": "Dr. Amara Okonkwo is a cryptographer specializing in verifiable AI alignment. She's spent fifteen years studying how to create cryptographic proofs that AI systems actually follow the principles they ",
       "contentType": "concept",
       "tags": [
-        "user:technical_expert",
-        "concept",
+        "epic:governance",
         "governance",
-        "epic:governance"
+        "concept",
+        "user:technical_expert"
       ],
       "category": "governance"
     },
@@ -5456,8 +5456,8 @@
       "description": "Stories of great urban planning and urban experiences from the Netherlands and beyond. There are a lot of reasons why Dutch cities are so great; it\u2019s not just bikes. Unfortunately I\u2019ve been overwhelme",
       "contentType": "video",
       "tags": [
-        "video",
-        "governance"
+        "governance",
+        "video"
       ],
       "url": "https://www.youtube.com/c/notjustbikes",
       "name": "Not Just Bikes",
@@ -5471,8 +5471,8 @@
       "description": "An international movement of communities reimagining and rebuilding our world.",
       "contentType": "video",
       "tags": [
-        "video",
-        "governance"
+        "governance",
+        "video"
       ],
       "url": "https://www.youtube.com/@TransitionTowns",
       "name": "TransitionTowns",
@@ -5486,8 +5486,8 @@
       "description": "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren\u2019s 12 principle ver...",
       "contentType": "video",
       "tags": [
-        "video",
-        "governance"
+        "governance",
+        "video"
       ],
       "url": "https://youtu.be/0mwRAf3z9ag",
       "name": "The Permaculture Principles",
@@ -5501,8 +5501,8 @@
       "description": "Rollie Williams and a ragtag team of climate communicators, creatives and comedians are here to examine climate change in a way that doesn\u2019t make you want to eat a cyanide pill. Get informed about the",
       "contentType": "video",
       "tags": [
-        "video",
-        "governance"
+        "governance",
+        "video"
       ],
       "url": "https://www.youtube.com/c/ClimateTown",
       "name": "Climate Town",
@@ -5516,10 +5516,10 @@
       "description": "Sarah Martinez never imagined herself as a constitutional architect. She's a nurse, mother of two, never politically active. Then one Tuesday morning, she receives a notification: she's been selected\u2014",
       "contentType": "concept",
       "tags": [
-        "concept",
+        "epic:governance",
         "governance",
-        "user:constitutional_council_member",
-        "epic:governance"
+        "concept",
+        "user:constitutional_council_member"
       ],
       "category": "governance"
     },
@@ -6356,10 +6356,10 @@
       "description": "James owns three ChickenMax franchises\u2014technically. He invested $400K of family money plus $600K in loans to buy the franchise rights, build out locations, install corporate-mandated equipment. Chicke",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "user:franchise_operator",
-        "autonomous-entity"
+        "autonomous-entity",
+        "concept",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -7253,10 +7253,10 @@
       "description": "Marcus managed three ChickenMax locations for corporate before the EAE acquisition. He wasn't cruel\u2014just effective at extraction. He learned to read surveillance footage for productivity gaps, schedul",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "user:manager",
-        "autonomous-entity"
+        "autonomous-entity",
+        "concept",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -7810,10 +7810,10 @@
       "description": "Ms. Johnson is a retired teacher, widow of six months, living on modest pension in the neighborhood where she's spent forty years. ChickenMax #247 is part of her routine\u2014Sunday after church, she gets ",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "user:customer",
-        "autonomous-entity"
+        "autonomous-entity",
+        "concept",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -8265,8 +8265,8 @@
       "description": "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platfo",
       "contentType": "organization",
       "tags": [
-        "autonomous-entity",
-        "organization"
+        "organization",
+        "autonomous-entity"
       ],
       "url": "https://integrityinstitute.org/",
       "name": "Integrity Institute",
@@ -8280,8 +8280,8 @@
       "description": "IdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond",
       "contentType": "organization",
       "tags": [
-        "autonomous-entity",
-        "organization"
+        "organization",
+        "autonomous-entity"
       ],
       "url": "https://www.conversence.com/pages/idealoom.html",
       "name": "Conversence&#39;s IdeaLoom platform",
@@ -8295,8 +8295,8 @@
       "description": "Design justice rethinks design processes, centers people who are normally marginalized by design, and uses collaborative, creative practices to address the deepest challenges our communities face.",
       "contentType": "organization",
       "tags": [
-        "autonomous-entity",
-        "organization"
+        "organization",
+        "autonomous-entity"
       ],
       "url": "https://designjustice.org",
       "name": "Design Justice Network",
@@ -8310,10 +8310,10 @@
       "description": "Patricia is a mid-career software engineer, household income $180K, living in the neighborhood for twelve years with her partner and two kids. She's accumulated savings\u2014$60K in index funds earning ~7%",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "user:community_investor",
-        "autonomous-entity"
+        "autonomous-entity",
+        "concept",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -9003,10 +9003,10 @@
       "description": "Tom Johnson runs Johnson Farm, forty acres of vegetables and fruit serving the local region. His grandparents farmed this land; he's trying to keep it viable in an era of corporate consolidation. Big ",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "autonomous-entity",
-        "user:supplier"
+        "concept",
+        "user:supplier",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -9917,10 +9917,10 @@
       "description": "Maria has managed ChickenMax #247 for eight years. She arrives before dawn to prep, stays late to close, covers shifts when people call out sick, and trains every new hire with patience her corporate ",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "autonomous-entity",
-        "user:worker"
+        "concept",
+        "user:worker",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -10712,10 +10712,10 @@
       "description": "Rosa owns Rosa's Auto Repair, a neighborhood institution for fifteen years. She started the business with a Small Business Administration loan, sweat equity, and dreams of independence from corporate ",
       "contentType": "concept",
       "tags": [
-        "epic:autonomous_entity",
-        "concept",
         "user:small_business_owner",
-        "autonomous-entity"
+        "autonomous-entity",
+        "concept",
+        "epic:autonomous_entity"
       ],
       "category": "autonomous-entity"
     },
@@ -11541,8 +11541,8 @@
       "description": "No description available",
       "contentType": "epic",
       "tags": [
-        "epic",
-        "public-observer"
+        "public-observer",
+        "epic"
       ],
       "category": "public-observer"
     },
@@ -11552,10 +11552,10 @@
       "description": "The politician archetype represents elected officials at various levels of government\u2014city council members, mayors, county commissioners, state legislators, school board members who've professionalize",
       "contentType": "concept",
       "tags": [
-        "user:politician",
-        "concept",
         "epic:public_observer",
-        "public-observer"
+        "public-observer",
+        "user:politician",
+        "concept"
       ],
       "category": "public-observer"
     },
@@ -12704,8 +12704,8 @@
       "description": "ONE OF BARACK OBAMA\u2019S FAVORITE BOOKS OF THE YEAR \u201cThe best science-fiction nonfiction novel I\u2019ve ever read.\u201d --Jonathan Lethem \u201cIf I could get policymakers, and citizens, everywhere to read just one b",
       "contentType": "book-chapter",
       "tags": [
-        "book-chapter",
-        "public-observer"
+        "public-observer",
+        "book-chapter"
       ],
       "url": "https://www.google.com/books/edition/_/VHZGzQEACAAJ?sa=X&ved=2ahUKEwi_pvnGhYL2AhUYhHIEHayKCDcQre8FegQIKBAb",
       "name": "The Ministry for the Future",
@@ -12719,10 +12719,10 @@
       "description": "The journalist archetype represents professional sense-makers, investigators, and accountability journalists who are supposed to inform the public and hold power accountable\u2014but increasingly can't. Lo",
       "contentType": "concept",
       "tags": [
-        "concept",
         "epic:public_observer",
+        "public-observer",
         "user:journalist",
-        "public-observer"
+        "concept"
       ],
       "category": "public-observer"
     },
@@ -13735,10 +13735,10 @@
       "description": "The teacher archetype represents educational professionals who possess irreplaceable frontline knowledge about how education policies, budget decisions, and administrative directives actually affect s",
       "contentType": "concept",
       "tags": [
-        "concept",
         "epic:public_observer",
-        "user:teacher",
-        "public-observer"
+        "public-observer",
+        "concept",
+        "user:teacher"
       ],
       "category": "public-observer"
     },
@@ -14479,10 +14479,10 @@
       "description": "The activist archetype represents individuals committed to sustained advocacy around specific civic issues\u2014environmental justice warriors tracking pollution patterns, housing advocates fighting displa",
       "contentType": "concept",
       "tags": [
-        "user:activist",
-        "concept",
         "epic:public_observer",
-        "public-observer"
+        "public-observer",
+        "concept",
+        "user:activist"
       ],
       "category": "public-observer"
     },
@@ -15104,10 +15104,10 @@
       "description": "The citizen archetype represents the general public engaging with civic democracy\u2014people who care about their communities but face overwhelming barriers to meaningful participation. They are working p",
       "contentType": "concept",
       "tags": [
-        "user:citizen",
-        "concept",
         "epic:public_observer",
-        "public-observer"
+        "public-observer",
+        "concept",
+        "user:citizen"
       ],
       "category": "public-observer"
     },
@@ -15525,10 +15525,10 @@
       "description": "The community organizer archetype represents individuals who build collective power by developing local leadership, convening diverse coalitions, and facilitating democratic participation. Unlike acti",
       "contentType": "concept",
       "tags": [
-        "user:community_organizer",
-        "concept",
         "epic:public_observer",
-        "public-observer"
+        "user:community_organizer",
+        "public-observer",
+        "concept"
       ],
       "category": "public-observer"
     },
@@ -16150,10 +16150,10 @@
       "description": "The developer interests archetype represents business stakeholders\u2014real estate developers, contractors, corporate interests, business associations\u2014who engage civic democracy processes to advance comme",
       "contentType": "concept",
       "tags": [
-        "concept",
         "epic:public_observer",
-        "user:developer_interests",
-        "public-observer"
+        "public-observer",
+        "concept",
+        "user:developer_interests"
       ],
       "category": "public-observer"
     },
@@ -17064,8 +17064,8 @@
       "description": "This is what democracy looks like? We are a non-profit organization that helps community members achieve fair, accessible and engaging public consultation processes that prioritize ensuring all voices",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://edemocracy.net",
       "name": "Home 2021 - eDemocracy Network",
@@ -17079,8 +17079,8 @@
       "description": "There is a vibrant community focused on reducing the harms of technology, diversifying the tech pipeline, and ensuring that technology is aligned with the public interest.",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://alltechishuman.org",
       "name": "Responsible Tech Guide",
@@ -17094,8 +17094,8 @@
       "description": "The International Institute for Democracy and Electoral Assistance (International IDEA) is an intergovernmental organization with the mandate to promote and\u00a0...",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://aceproject.org/about-en/full-partners/IDEA",
       "name": "International IDEA \u2014 - ACE Electoral Knowledge Network",
@@ -17109,8 +17109,8 @@
       "description": "New_ Public aims to inspire and connect designers and technologists to build more flourishing, public friendly digital spaces.",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://newpublic.org/",
       "name": "New_ Public - For Better Digital Public Spaces",
@@ -17124,8 +17124,8 @@
       "description": "New_ Public aims to inspire and connect designers and technologists to build more flourishing, public friendly digital spaces.",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://newpublic.org/",
       "name": "New_ Public - For Better Digital Public Spaces",
@@ -17139,8 +17139,8 @@
       "description": "Landano allows property owners to manage land records for their real estate property via an easy-to-use, decentralized app (dApp [https://www.ledger.com/academy/what-is-a-dapp]) and our Open Cadastral",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://www.landano.io/about/",
       "name": "About",
@@ -17154,8 +17154,8 @@
       "description": "<p>Blockchain-powered distributed governancefor communities, institutions and the world.We are a 5-year long, transdisciplinary research effort aimed at restoring trust in institutions at the communit",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://blockchaingov.eu",
       "name": "BlockchainGov",
@@ -17169,8 +17169,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://www.forwardlabs.io",
       "name": "Forward Labs",
@@ -17184,8 +17184,8 @@
       "description": "Tools for a borderless democracy. For everyone, anywhere.",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://democracy.earth",
       "name": "Democracy Earth Foundation",
@@ -17199,8 +17199,8 @@
       "description": "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://www.sociocracyforall.org/sociocracy/",
       "name": "Sociocracy - basic concepts and principles",
@@ -17214,8 +17214,8 @@
       "description": "Our objective is to promote and advance sustainable democracy and to ... International Institute for Democracy and Electoral Assistance (International IDEA )",
       "contentType": "organization",
       "tags": [
-        "public-observer",
-        "organization"
+        "organization",
+        "public-observer"
       ],
       "url": "https://www.idea.int/",
       "name": "International IDEA",
@@ -17229,10 +17229,10 @@
       "description": "The board member archetype represents volunteers or minimally-compensated citizens serving on consequential local governance bodies: school boards, planning commissions, housing authorities, library b",
       "contentType": "concept",
       "tags": [
-        "user:board_member",
-        "concept",
         "epic:public_observer",
-        "public-observer"
+        "public-observer",
+        "user:board_member",
+        "concept"
       ],
       "category": "public-observer"
     },
@@ -18211,10 +18211,10 @@
       "description": "The parent archetype represents Sarah Martinez rushing into that school board meeting still in her scrubs\u2014civic engagement activated and focused by the fierce urgency of children's needs. Parents are ",
       "contentType": "concept",
       "tags": [
-        "concept",
-        "user:parent",
         "epic:public_observer",
-        "public-observer"
+        "public-observer",
+        "concept",
+        "user:parent"
       ],
       "category": "public-observer"
     },
@@ -18967,9 +18967,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:vulnerable_temporary",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -20002,10 +20002,10 @@
       "description": "Tommy is 5 years old. He stands in the produce aisle holding his family's shopping scanner, eyes wide with wonder at the rows of strawberries. His personal_agent knows he's selecting fruit for his sis",
       "contentType": "concept",
       "tags": [
-        "user:young_child",
         "epic:value_scanner",
-        "concept",
-        "value-scanner"
+        "user:young_child",
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -20236,10 +20236,10 @@
       "description": "Wednesday morning, 7:15 AM. Six-year-old Emma wakes up to her personal_agent's gentle alarm\u2014a song she chose yesterday. Today feels different though. On her kid-sized tablet, a special message appears",
       "contentType": "concept",
       "tags": [
-        "user:young_child",
         "epic:value_scanner",
-        "concept",
-        "value-scanner"
+        "user:young_child",
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -20640,10 +20640,10 @@
       "description": "Saturday morning, 7:30 AM. Six-year-old Emma Parker stands in front of the open refrigerator, trying to decide what to eat for breakfast. Her parents are still sleeping (rare weekend luxury), and her ",
       "contentType": "concept",
       "tags": [
-        "user:young_child",
         "epic:value_scanner",
-        "concept",
-        "value-scanner"
+        "user:young_child",
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -20654,9 +20654,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:student",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -22537,9 +22537,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:idd_community",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -23572,10 +23572,10 @@
       "description": "Sarah is 34 years old, mother of Tommy (5) and Emma (8), working full-time as a teacher while managing household economics on a combined family income of $65k/year. She uses the Value Scanner to coord",
       "contentType": "concept",
       "tags": [
-        "user:adult",
         "epic:value_scanner",
-        "concept",
-        "value-scanner"
+        "user:adult",
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -25659,8 +25659,8 @@
       "description": "We\u2019re imagining, studying, and building public spaces and public goods on the internet. Listen to our podcast,Reimagining the Internet. Read the latest articles written by members of the Initiative te",
       "contentType": "video",
       "tags": [
-        "video",
-        "value-scanner"
+        "value-scanner",
+        "video"
       ],
       "url": "https://publicinfrastructure.org/",
       "name": "Home - Initiative for Digital Public Infrastructure",
@@ -25675,9 +25675,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:grandparent",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -27235,9 +27235,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:preteen",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -28557,9 +28557,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:person_with_disabilities",
-        "value-scanner"
+        "user:person_with_disabilities"
       ],
       "category": "value-scanner"
     },
@@ -30439,8 +30439,8 @@
       "description": "This paper looks at philosophical questions that arise in the context of AI alignment. It defends three propositions. First, normative and technical aspects of the AI alignment problem are interrelate",
       "contentType": "concept",
       "tags": [
-        "concept",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "url": "https://www.deepmind.com/publications/artificial-intelligence-values-and-alignment",
       "name": "Artificial Intelligence, Values and Alignment",
@@ -30455,9 +30455,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:elderly",
-        "value-scanner"
+        "user:elderly"
       ],
       "category": "value-scanner"
     },
@@ -32015,9 +32015,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:young_adult",
-        "value-scanner"
+        "user:young_adult"
       ],
       "category": "value-scanner"
     },
@@ -33914,10 +33914,10 @@
       "description": "Emma is 8 years old and ready for more responsibility than her younger brother Tommy. She uses the Value Scanner independently in the cereal aisle, comparing prices and nutrition information with her ",
       "contentType": "concept",
       "tags": [
-        "user:child",
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "value-scanner"
+        "user:child"
       ],
       "category": "value-scanner"
     },
@@ -34862,8 +34862,8 @@
       "description": "Transition Network encourage communities to come together and rebuild our world. Step up and address the big challenges we face by starting local.",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://transitionnetwork.org/",
       "name": "Transition Network | Transition Towns | The Circular Economy",
@@ -34877,8 +34877,8 @@
       "description": "With a DoneGood gift card your giftee can shop thousands of unique and purposeful goods\u2014and know that no matter what they choose, they\u2019re doing good for the planet and for the person who made their gi",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://donegood.co/",
       "name": "Sustainable Shopping \u2013 Eco-Friendly, Fair Trade Clothing, Shoes & More",
@@ -34892,8 +34892,8 @@
       "description": "Amplifying cooperation in service to regeneration in the Bay Area bioregion through technology, collective action and rebuilding the commons",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://www.terran.io/",
       "name": "Home",
@@ -34907,8 +34907,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://valueflo.ws/",
       "name": "Valueflows",
@@ -34922,8 +34922,8 @@
       "description": "Commons Engine solves real-world problems through helping to generate commons-resource sharing organizations",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://commonsengine.org",
       "name": "Commons Engine \u2013 Designing Commons-Oriented Economies",
@@ -34937,8 +34937,8 @@
       "description": "The Global Internet Forum to Counter Terrorism brings together the technology industry, government, civil society, and academia to foster collaboration and information-sharing to counter terrorist and",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://gifct.org/",
       "name": "GIFCT | Global Internet Forum to Counter Terrorism",
@@ -34952,8 +34952,8 @@
       "description": "We are building the technological tools and social patterns and practices to enable the next economy \u2014 one that is distributed, equitable, and regenerative.",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://metacurrency.org/about/",
       "name": "Our Philosophy",
@@ -34967,8 +34967,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://www.regenerat.es/",
       "name": "The Regenerates | Regenesis Institute for Regenerative Practice",
@@ -34982,8 +34982,8 @@
       "description": "Door PublicSpaces zijn in 2026 zijn alle privacy officers en CTO\u2019s van publieke organisaties in Nederland op de hoogte van alternatieve digitale instrumenten gebaseerd op publieke waarden.",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://publicspaces.net",
       "name": "Wij willen het internet terug - PublicSpaces",
@@ -34997,8 +34997,8 @@
       "description": "Commons Transition showcases practical experiences and policy proposals for a more humane and environmentally grounded mode of societal organization.",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://commonstransition.org/",
       "name": "Commons Transition - Commons Transition",
@@ -35012,8 +35012,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://www.prosocial.world/about",
       "name": "About",
@@ -35027,8 +35027,8 @@
       "description": "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://powerledger.io",
       "name": "Powerledger Energy Projects",
@@ -35042,8 +35042,8 @@
       "description": "Read about our Story, Mission, and Strategic Priorities",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation",
       "name": "About - P2P Foundation",
@@ -35057,8 +35057,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://learningequality.org/kolibri/",
       "name": "Kolibri : A Free, Open Source Education for All | Learning Equality",
@@ -35072,8 +35072,8 @@
       "description": "[Description to be added]",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://www.p2plab.gr/en/",
       "name": "P2P Lab \u2190 research collective",
@@ -35087,8 +35087,8 @@
       "description": "B Lab is a global nonprofit network transforming the global economy to benefit all people, communities, and the planet. We won\u2019t stop until all business is a force for good.",
       "contentType": "organization",
       "tags": [
-        "value-scanner",
-        "organization"
+        "organization",
+        "value-scanner"
       ],
       "url": "https://www.bcorporation.net/en-us/",
       "name": "B Lab Global Site",
@@ -35103,9 +35103,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:single_parent",
-        "value-scanner"
+        "user:single_parent"
       ],
       "category": "value-scanner"
     },
@@ -36969,9 +36969,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:retired",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -38546,9 +38546,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:worker",
-        "value-scanner"
+        "user:worker"
       ],
       "category": "value-scanner"
     },
@@ -39703,9 +39703,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:senior",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -41483,10 +41483,10 @@
       "description": "James is 48, working part-time as an IT contractor while providing full-time care for his husband David, who has early-onset Alzheimer's at age 52. James's care responsibilities are comprehensive and ",
       "contentType": "concept",
       "tags": [
-        "user:caregiver",
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "value-scanner"
+        "user:caregiver"
       ],
       "category": "value-scanner"
     },
@@ -43061,9 +43061,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
-        "concept",
         "user:middle_aged",
-        "value-scanner"
+        "value-scanner",
+        "concept"
       ],
       "category": "value-scanner"
     },
@@ -45080,9 +45080,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -45314,9 +45314,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -45327,9 +45327,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -45561,9 +45561,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -45574,9 +45574,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -46913,9 +46913,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -46926,9 +46926,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:parent",
-        "value-scanner"
+        "user:parent"
       ],
       "category": "value-scanner"
     },
@@ -46939,9 +46939,9 @@
       "contentType": "concept",
       "tags": [
         "epic:value_scanner",
+        "value-scanner",
         "concept",
-        "user:teen",
-        "value-scanner"
+        "user:teen"
       ],
       "category": "value-scanner"
     },
@@ -48753,8 +48753,8 @@
       "description": "No description available",
       "contentType": "epic",
       "tags": [
-        "epic",
-        "social-medium"
+        "social-medium",
+        "epic"
       ],
       "category": "social-medium"
     },
@@ -48764,10 +48764,10 @@
       "description": "A displaced person is someone separated from their community due to various causes including climate disasters, economic hardship, domestic violence, gentrification, or internal conflict. Unlike refug",
       "contentType": "concept",
       "tags": [
-        "user:displaced_person",
-        "concept",
         "epic:social_medium",
-        "social-medium"
+        "social-medium",
+        "concept",
+        "user:displaced_person"
       ],
       "category": "social-medium"
     },
@@ -48947,10 +48947,10 @@
       "description": "A community moderator is someone who maintains healthy, productive spaces at various governance layers. Unlike platform moderators enforcing top-down rules, Elohim moderators serve their communities b",
       "contentType": "concept",
       "tags": [
-        "concept",
-        "user:community_moderator",
         "epic:social_medium",
-        "social-medium"
+        "social-medium",
+        "user:community_moderator",
+        "concept"
       ],
       "category": "social-medium"
     },
@@ -49045,9 +49045,9 @@
       "description": "An activist is a person engaged in organized efforts for social, political, environmental, or cultural change. In the Social Medium context, activists range from grassroots community organizers to int",
       "contentType": "concept",
       "tags": [
-        "concept",
         "epic:social_medium",
         "social-medium",
+        "concept",
         "user:activist"
       ],
       "category": "social-medium"
@@ -49398,10 +49398,10 @@
       "description": "A refugee is someone who has fled their country due to persecution, war, or violence and has been granted international protection. In the Social Medium context, refugees need to maintain connections ",
       "contentType": "concept",
       "tags": [
-        "concept",
-        "user:refugee",
         "epic:social_medium",
-        "social-medium"
+        "social-medium",
+        "concept",
+        "user:refugee"
       ],
       "category": "social-medium"
     },
@@ -49496,10 +49496,10 @@
       "description": "A content creator is someone who produces educational, cultural, artistic, or informational content for communities. Unlike traditional social media influencers who optimize for engagement, Elohim con",
       "contentType": "concept",
       "tags": [
-        "user:content_creator",
-        "concept",
         "epic:social_medium",
-        "social-medium"
+        "social-medium",
+        "user:content_creator",
+        "concept"
       ],
       "category": "social-medium"
     },
@@ -49679,8 +49679,8 @@
       "description": "\u200bEmail us your stories at hello@newpublic.org with 'Flash Fiction' in the subject line. Deadline: 9/1/21. Theme: Social Media Word Limit: 500 words",
       "contentType": "concept",
       "tags": [
-        "concept",
-        "social-medium"
+        "social-medium",
+        "concept"
       ],
       "url": "https://newpublic.substack.com/",
       "name": "New_ Public",
@@ -49694,10 +49694,10 @@
       "description": "A child user represents young people (ages 8-17) learning to navigate digital space safely and wisely. In the Social Medium context, children have protected profiles that start with minimal reach and ",
       "contentType": "concept",
       "tags": [
-        "user:child",
-        "concept",
         "epic:social_medium",
-        "social-medium"
+        "social-medium",
+        "user:child",
+        "concept"
       ],
       "category": "social-medium"
     },
@@ -49962,8 +49962,8 @@
       "description": "A free online course for product teams building technology that strengthens human capacity.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://www.humanetech.com/course",
       "name": "Foundations of Humane Technology Course",
@@ -49977,8 +49977,8 @@
       "description": "Top Stories from around you and around the world. Compare how different news publishers frame the same news",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://ground.news",
       "name": "Ground News",
@@ -49992,8 +49992,8 @@
       "description": "LCA software used to give you one footprint at a time. With our Environmental Intelligence Platform, you can generate hundreds. Try out now.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://ecochain.com/solutions/",
       "name": "Solutions - Ecochain",
@@ -50007,8 +50007,8 @@
       "description": "Make big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://ethelo.com/",
       "name": "Public Engagement and Online Decision-Making | Ethelo",
@@ -50022,8 +50022,8 @@
       "description": "Make your community sustainable. Collect and spend money transparently.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://opencollective.com/",
       "name": "Open Collective",
@@ -50037,8 +50037,8 @@
       "description": "PubHubs - Sociaal platform gebaseerd op publieke waarden.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://pubhubs.net/en/",
       "name": "PubHubs",
@@ -50052,8 +50052,8 @@
       "description": "A resource that provides guidance for designing ethically humane digital products through patterns focused on user well-being.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://humanebydesign.com",
       "name": "Humane by Design",
@@ -50067,8 +50067,8 @@
       "description": "Supporting Government\u2019s digital transformation.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://www.digital.govt.nz",
       "name": "Home",
@@ -50082,8 +50082,8 @@
       "description": "The blockchain dispute resolution layer. Fast, open and affordable justice for all.",
       "contentType": "organization",
       "tags": [
-        "social-medium",
-        "organization"
+        "organization",
+        "social-medium"
       ],
       "url": "https://kleros.io/",
       "name": "Homepage",
@@ -50097,10 +50097,10 @@
       "description": "An elder user represents older adults (typically 65+) who seek meaningful connection, wish to share accumulated wisdom, and desire to remain engaged with family and community. In the Social Medium con",
       "contentType": "concept",
       "tags": [
-        "concept",
         "epic:social_medium",
         "social-medium",
-        "user:elder"
+        "user:elder",
+        "concept"
       ],
       "category": "social-medium"
     },
@@ -50365,8 +50365,8 @@
       "description": "No description available",
       "contentType": "epic",
       "tags": [
-        "epic",
-        "economic-coordination"
+        "economic-coordination",
+        "epic"
       ],
       "category": "economic-coordination"
     },
@@ -50905,8 +50905,3582 @@
         "landing-page"
       ],
       "category": "landing-page-concept"
+    },
+    {
+      "id": "fct-module-01-church-dilemma",
+      "title": "FCT 1: The Church Dilemma",
+      "description": "Disclaimers & Rules, ",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-introduction",
+        "foundations",
+        "attention-economy",
+        "metacrisis"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-02-systems-thinking",
+      "title": "FCT 2: Systems Thinking",
+      "description": "Welcome to an exploration of complex and complicated systems through the lens of our Christian faith. This journey will introduce you to the distinct characteristics of these two types of systems and ",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-1",
+        "foundations",
+        "systems-thinking"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-03-problem-well-stated",
+      "title": "FCT 3: A Problem Well Stated",
+      "description": "We can't have the power of gods without the wisdom, love and prudence of gods.  \\- Daniel Schmachtenberger",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-1",
+        "foundations",
+        "metacrisis",
+        "attention-economy"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom",
+      "title": "FCT 4: Setting the Stage: Scaling Wisdom",
+      "description": "Review, evolution of Trust  \\- https://ncase.me/trust/ ",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-1",
+        "setting-stage",
+        "trust-evolution",
+        "systems-thinking"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature",
+      "title": "FCT 5: Respecting Human Nature",
+      "description": "As humans, we inherit evolutionary conditioning that developed over millions of years.  \nTo navigate the complex world around us, our brains have to make fast decisions on incomplete data. We have evo",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-2",
+        "human-nature",
+        "human-dignity",
+        "attention-economy"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-06-harmful-consequences",
+      "title": "FCT 6: Minimizing Harmful Consequences",
+      "description": "When a company becomes wildly profitable it often does so by moving out of balance:  \n\\-towards extraction and away from stewardship  \n\\-towards efficiency and away from resilience  \n\\-towards competi",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-3",
+        "human-nature",
+        "externalities"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-07-regeneration",
+      "title": "FCT 7: Regeneration and Reconciliation",
+      "description": "It\u2019s tempting to think that all we need is more technology to solve all our problems. After all, hasn\u2019t technology solved so many of our problems to date?  \nOnce we\u2019re operating at an unsustainably ex",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-3",
+        "values",
+        "regeneration"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-08-centering-love",
+      "title": "FCT 8: Centering Values: Love",
+      "description": "On Christ The Solid Rock I Stand (hymn)",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-4",
+        "values",
+        "values-centered"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit",
+      "title": "FCT 9: Centering Values: Fruits of the Spirit",
+      "description": "Modern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are oft",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-4",
+        "values",
+        "values-centered"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-10-recognize-distortions",
+      "title": "FCT 10: Creating Shared Understanding: Recognize Distortions",
+      "description": "C.S.Lewis (Mere Christianity) \"God can show Himself as He reall is only to real men. And that means not simply t omen who are individually good, but to men who are united together in a body, loving on",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-5",
+        "understanding",
+        "shared-understanding"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking",
+      "title": "FCT 11: Creating Shared Understanding: Collaboration",
+      "description": "Creating a Healthier Information Ecosystem: A Christian Perspective  \nAs followers of Christ, we are called to be salt and light in the world (Matthew 5:13-16), which includes fostering a healthy info",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-5",
+        "understanding",
+        "shared-understanding"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-12-fairness-justice",
+      "title": "FCT 12: Supporting Fairness and Justice",
+      "description": "Justice as Active Participation in God's Kingdom  \nIn our digital age, the concept of justice takes on new dimensions, yet its core remains rooted in the timeless wisdom of Scripture. As we navigate t",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-6",
+        "action",
+        "justice-fairness"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-13-helping-thrive",
+      "title": "FCT 13: Helping People Thrive",
+      "description": "Welcome to \"Thriving in Christ's Abundance: A Christian Approach to Humane Technology.\" As we embark on this journey together, let us reflect on the words of Jesus in John 10:9-11:  \n\"I am the door. I",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-7",
+        "action",
+        "human-flourishing"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-14-ready-to-act",
+      "title": "FCT 14: Ready To Act: Embodying Christ in the Digital Age",
+      "description": "Ready to Act: Embodying Christ in the Digital Age,\" the final module of our Foundations for Christians and Technology course. As we conclude this journey, we stand at a pivotal moment\u2014where our faith ",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-module-8",
+        "action",
+        "human-flourishing",
+        "values-centered"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-module-15-retrospective",
+      "title": "FCT 15: Digital Discipleship Retrospective",
+      "description": "Digital Discipleship Retrospective",
+      "contentType": "course-module",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "cht-conclusion",
+        "action",
+        "human-flourishing"
+      ],
+      "category": "fct"
+    },
+    {
+      "id": "fct-bible-genisis-11-1",
+      "title": "Genisis 11:1",
+      "description": "Scripture reference used in FCT Module 1",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "genisis",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-deuteronomy-6-8",
+      "title": "Deuteronomy 6:8",
+      "description": "Scripture reference used in FCT Module 1",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "deuteronomy",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-14-22-31",
+      "title": "Matthew 14:22-31",
+      "description": "Scripture reference used in FCT Module 1",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-jeremiah-17-1",
+      "title": "Jeremiah 17:1",
+      "description": "Scripture reference used in FCT Module 1",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "jeremiah",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-romans-12-2",
+      "title": "Romans 12:2",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "romans",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-2-kings-23-10",
+      "title": "2 Kings 23:10",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "2-kings",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-12-12-27",
+      "title": "1 Corinthians 12:12-27",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ephesians-4-11-16",
+      "title": "Ephesians 4:11-16",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ephesians",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-4-23",
+      "title": "Proverbs 4:23",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-romans-12-1-8",
+      "title": "Romans 12:1-8",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "romans",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-zechariah-4-10",
+      "title": "Zechariah 4:10",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "zechariah",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-13-31-32",
+      "title": "Matthew 13:31-32",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-17-20-23",
+      "title": "John 17:20-23",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-12-12-27",
+      "title": "1 Corinthians 12:12-27",
+      "description": "Scripture reference used in FCT Module 2",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-3-5-6",
+      "title": "Proverbs 3:5-6",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-genesis-11-1-9",
+      "title": "Genesis 11:1-9",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "genesis",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-genesis-9-8-17",
+      "title": "Genesis 9:8-17",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "genesis",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-exodus-19-5-6",
+      "title": "Exodus 19:5-6",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "exodus",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-5-1-7",
+      "title": "Matthew 5:1-7",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-13-34-35",
+      "title": "John 13:34-35",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-luke-12-1",
+      "title": "Luke 12:1",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "luke",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-2-corinthians-5-17-19",
+      "title": "2 Corinthians 5:17-19",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "2-corinthians",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-1-25-29",
+      "title": "1 Corinthians 1:25-29",
+      "description": "Scripture reference used in FCT Module 3",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "foundations"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-10-16",
+      "title": "Matthew 10:16",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-5-9",
+      "title": "Matthew 5:9",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-3-18",
+      "title": "James 3:18",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-3-17",
+      "title": "James 3:17",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-25-14-30",
+      "title": "Matthew 25:14-30",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-genesis-2-15",
+      "title": "Genesis 2:15",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "genesis",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-12-12-27",
+      "title": "1 Corinthians 12:12-27",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-luke-10-25-37",
+      "title": "Luke 10:25-37",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "luke",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-micah-6-8",
+      "title": "Micah 6:8",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "micah",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-5-3-12",
+      "title": "Matthew 5:3-12",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-acts-2-1-12",
+      "title": "Acts 2:1-12",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "acts",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-kings-3-16-28",
+      "title": "1 Kings 3:16-28",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-kings",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-daniel-1-8-20",
+      "title": "Daniel 1:8-20",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "daniel",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-5-1-7",
+      "title": "Matthew 5:1-7",
+      "description": "Scripture reference used in FCT Module 4",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "setting-stage"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-deuteronomy-11-1",
+      "title": "Deuteronomy 11:1",
+      "description": "Scripture reference used in FCT Module 5",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "deuteronomy",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-revelation-3-20",
+      "title": "Revelation 3:20",
+      "description": "Scripture reference used in FCT Module 5",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "revelation",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-hebrews-3-1",
+      "title": "Hebrews 3:1",
+      "description": "Scripture reference used in FCT Module 5",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "hebrews",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-colossians-3-1-3",
+      "title": "Colossians 3:1-3",
+      "description": "Scripture reference used in FCT Module 5",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "colossians",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-genesis-2-15",
+      "title": "Genesis 2:15",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "genesis",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-22-39",
+      "title": "Matthew 22:39",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-philippians-1-9-10",
+      "title": "Philippians 1:9-10",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "philippians",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-revelation-21-5",
+      "title": "Revelation 21:5",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "revelation",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-amos-3-7",
+      "title": "Amos 3:7",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "amos",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-3-6-9",
+      "title": "1 Corinthians 3:6-9",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-galatians-6-4-5",
+      "title": "Galatians 6:4-5",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "galatians",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-1-5",
+      "title": "James 1:5",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-2-peter-3-8-9",
+      "title": "2 Peter 3:8-9",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "2-peter",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-micah-6-8",
+      "title": "Micah 6:8",
+      "description": "Scripture reference used in FCT Module 6",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "micah",
+        "human-nature"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-acts-2-42-47",
+      "title": "Acts 2:42-47",
+      "description": "Scripture reference used in FCT Module 7",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "acts",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-haggai-1-2",
+      "title": "Haggai 1:2",
+      "description": "Scripture reference used in FCT Module 7",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "haggai",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ephesians-4-15-16",
+      "title": "Ephesians 4:15-16",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ephesians",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-5-17",
+      "title": "Matthew 5:17",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-22-36-40",
+      "title": "Matthew 22:36-40",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-13-34-35",
+      "title": "John 13:34-35",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-luke-6-31",
+      "title": "Luke 6:31",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "luke",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-romans-13-8",
+      "title": "Romans 13:8",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "romans",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-romans-13-10",
+      "title": "Romans 13:10",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "romans",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-galatians-5-14",
+      "title": "Galatians 5:14",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "galatians",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-2-8",
+      "title": "James 2:8",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-micah-6-7-8",
+      "title": "Micah 6:7-8",
+      "description": "Scripture reference used in FCT Module 8",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "micah",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-7-15-19",
+      "title": "Matthew 7:15-19",
+      "description": "Scripture reference used in FCT Module 9",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-1-27",
+      "title": "James 1:27",
+      "description": "Scripture reference used in FCT Module 9",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "values"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-14-6",
+      "title": "John 14:6",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-13-6",
+      "title": "1 Corinthians 13:6",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-3-john-1-4",
+      "title": "3 John 1:4",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "3-john",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-exodus-20-16",
+      "title": "Exodus 20:16",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "exodus",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-12-22",
+      "title": "Proverbs 12:22",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-colossians-3-9-10",
+      "title": "Colossians 3:9-10",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "colossians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-6-16-19",
+      "title": "Proverbs 6:16-19",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-psalm-101-5",
+      "title": "Psalm 101:5",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "psalm",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-3-5-6",
+      "title": "James 3:5-6",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-26-28",
+      "title": "Proverbs 26:28",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ephesians-4-25",
+      "title": "Ephesians 4:25",
+      "description": "Scripture reference used in FCT Module 10",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ephesians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-17-20-23",
+      "title": "John 17:20-23",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-1-10",
+      "title": "1 Corinthians 1:10",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-14-6",
+      "title": "John 14:6",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-philippians-2-3-4",
+      "title": "Philippians 2:3-4",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "philippians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-4-10",
+      "title": "James 4:10",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-peter-5-5",
+      "title": "1 Peter 5:5",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-peter",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-acts-2-42-47",
+      "title": "Acts 2:42-47",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "acts",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-hebrews-10-24-25",
+      "title": "Hebrews 10:24-25",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "hebrews",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-genesis-1-26-28",
+      "title": "Genesis 1:26-28",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "genesis",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-12-10",
+      "title": "Proverbs 12:10",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-13-4-7",
+      "title": "1 Corinthians 13:4-7",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-colossians-3-12-14",
+      "title": "Colossians 3:12-14",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "colossians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-15-22",
+      "title": "Proverbs 15:22",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ecclesiastes-4-9-12",
+      "title": "Ecclesiastes 4:9-12",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ecclesiastes",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-22-37-39",
+      "title": "Matthew 22:37-39",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-philippians-4-8",
+      "title": "Philippians 4:8",
+      "description": "Scripture reference used in FCT Module 11",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "philippians",
+        "understanding"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-micah-6-8",
+      "title": "Micah 6:8",
+      "description": "Scripture reference used in FCT Module 12",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "micah",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-luke-14-15-24",
+      "title": "Luke 14:15-24",
+      "description": "Scripture reference used in FCT Module 12",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "luke",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-luke-14-22-23",
+      "title": "Luke 14:22-23",
+      "description": "Scripture reference used in FCT Module 12",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "luke",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-luke-14-13-14",
+      "title": "Luke 14:13-14",
+      "description": "Scripture reference used in FCT Module 12",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "luke",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-john-10-10",
+      "title": "John 10:10",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "john",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-psalm-1-3",
+      "title": "Psalm 1:3",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "psalm",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ecclesiastes-3-1-8",
+      "title": "Ecclesiastes 3:1-8",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ecclesiastes",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-romans-5-3-5",
+      "title": "Romans 5:3-5",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "romans",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-thessalonians-5-18",
+      "title": "1 Thessalonians 5:18",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-thessalonians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-exodus-35-31-32",
+      "title": "Exodus 35:31-32",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "exodus",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-philippians-4-11-13",
+      "title": "Philippians 4:11-13",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "philippians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-1-5",
+      "title": "James 1:5",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-13-4-7",
+      "title": "1 Corinthians 13:4-7",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-17-17",
+      "title": "Proverbs 17:17",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-galatians-6-4-5",
+      "title": "Galatians 6:4-5",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "galatians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-6-33",
+      "title": "Matthew 6:33",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-acts-4-32-35",
+      "title": "Acts 4:32-35",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "acts",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-31-8-9",
+      "title": "Proverbs 31:8-9",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ephesians-5-15-16",
+      "title": "Ephesians 5:15-16",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ephesians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-psalm-90-12",
+      "title": "Psalm 90:12",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "psalm",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-joshua-24-15",
+      "title": "Joshua 24:15",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "joshua",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-10-31",
+      "title": "1 Corinthians 10:31",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-colossians-3-23-24",
+      "title": "Colossians 3:23-24",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "colossians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-philippians-4-8",
+      "title": "Philippians 4:8",
+      "description": "Scripture reference used in FCT Module 13",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "philippians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-5-13-16",
+      "title": "Matthew 5:13-16",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-james-1-22",
+      "title": "James 1:22",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "james",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-colossians-3-23-24",
+      "title": "Colossians 3:23-24",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "colossians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-corinthians-10-31",
+      "title": "1 Corinthians 10:31",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-corinthians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-ephesians-2-10",
+      "title": "Ephesians 2:10",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "ephesians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-proverbs-3-27",
+      "title": "Proverbs 3:27",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "proverbs",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-micah-6-8",
+      "title": "Micah 6:8",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "micah",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-romans-12-2",
+      "title": "Romans 12:2",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "romans",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-1-peter-4-10",
+      "title": "1 Peter 4:10",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "1-peter",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-philippians-2-3-4",
+      "title": "Philippians 2:3-4",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "philippians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-galatians-6-9-10",
+      "title": "Galatians 6:9-10",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "galatians",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-matthew-25-14-30",
+      "title": "Matthew 25:14-30",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "matthew",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-acts-1-8",
+      "title": "Acts 1:8",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "acts",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-2-timothy-1-7",
+      "title": "2 Timothy 1:7",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "2-timothy",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-bible-jeremiah-29-7",
+      "title": "Jeremiah 29:7",
+      "description": "Scripture reference used in FCT Module 14",
+      "contentType": "bible-verse",
+      "tags": [
+        "bible",
+        "scripture",
+        "fct",
+        "jeremiah",
+        "action"
+      ],
+      "category": "scripture"
+    },
+    {
+      "id": "fct-media-00-video-the-hidden-tribes-of",
+      "title": "The Hidden Tribes of America",
+      "description": "The Hidden Tribes of America",
+      "contentType": "video",
+      "tags": [
+        "video",
+        "fct",
+        "foundations"
+      ],
+      "category": "social-fragmentation"
+    },
+    {
+      "id": "fct-media-00-documentary-the-social-dilemma",
+      "title": "The Social Dilemma",
+      "description": "The Social Dilemma (2020)",
+      "contentType": "documentary",
+      "tags": [
+        "documentary",
+        "fct",
+        "foundations"
+      ],
+      "category": "attention-economy"
+    },
+    {
+      "id": "fct-media-00-documentary-after-truth-disinfor",
+      "title": "After Truth: Disinformation and the Cost of Fake News",
+      "description": "After Truth: Disinformation and the Cost of Fake News (2020)",
+      "contentType": "documentary",
+      "tags": [
+        "documentary",
+        "fct",
+        "foundations"
+      ],
+      "category": "information-literacy"
+    },
+    {
+      "id": "fct-media-00-documentary-coded-bias",
+      "title": "Coded Bias",
+      "description": "Coded Bias (2020)",
+      "contentType": "documentary",
+      "tags": [
+        "documentary",
+        "fct",
+        "foundations"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-05-video-jesus-camp",
+      "title": "Jesus Camp",
+      "description": "Jesus Camp (2006)",
+      "contentType": "video",
+      "tags": [
+        "video",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-05-video-love-your-neighbor-a",
+      "title": "love your neighbor as yourself",
+      "description": "love your neighbor as yourself",
+      "contentType": "video",
+      "tags": [
+        "video",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-05-video-shiny-happy-people-d",
+      "title": "Shiny Happy People: Duggar Family Secrets",
+      "description": "Shiny Happy People: Duggar Family Secrets (2023)",
+      "contentType": "video",
+      "tags": [
+        "video",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-07-documentary-poverty-inc",
+      "title": "Poverty, Inc.",
+      "description": "Poverty, Inc. (2014)",
+      "contentType": "documentary",
+      "tags": [
+        "documentary",
+        "fct",
+        "values"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-07-documentary-13th",
+      "title": "13th",
+      "description": "13th (2016)",
+      "contentType": "documentary",
+      "tags": [
+        "documentary",
+        "fct",
+        "values"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-00-book-at-the-blue-hole-boo",
+      "title": "\\* At the Blue Hole (book",
+      "description": "Book by Jack Reese",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "church-crisis"
+    },
+    {
+      "id": "fct-media-00-book-why-were-polarized",
+      "title": "Why We're Polarized",
+      "description": "Book by Ezra Klein",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "social-fragmentation"
+    },
+    {
+      "id": "fct-media-00-book-the-death-of-experti",
+      "title": "The Death of Expertise",
+      "description": "Book by Tom Nichols",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "institutional-collapse"
+    },
+    {
+      "id": "fct-media-00-book-the-organized-mind",
+      "title": "The Organized Mind",
+      "description": "Book by Daniel Levitin",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "cognitive-science"
+    },
+    {
+      "id": "fct-media-00-book-is-google-making-us-",
+      "title": "Is Google Making Us Stupid?",
+      "description": "Book by Nicholas Carr",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "cognitive-science"
+    },
+    {
+      "id": "fct-media-00-book-post-truth",
+      "title": "Post-Truth",
+      "description": "Book by Lee Mc",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "public-discourse"
+    },
+    {
+      "id": "fct-media-00-book-the-death-of-truth",
+      "title": "The Death of Truth",
+      "description": "Book by Michiko Kakutani",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "public-discourse"
+    },
+    {
+      "id": "fct-media-00-book-the-knowledge-illusi",
+      "title": "The Knowledge Illusion",
+      "description": "Book by Steven Sloman",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "knowledge-systems"
+    },
+    {
+      "id": "fct-media-00-book-the-enigma-of-reason",
+      "title": "The Enigma of Reason",
+      "description": "Book by Hugo Mercier",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "knowledge-systems"
+    },
+    {
+      "id": "fct-media-00-book-the-shallows-what-th",
+      "title": "The Shallows: What the Internet Is Doing to Our Brains",
+      "description": "Book by Nicholas Carr",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "deep-thinking"
+    },
+    {
+      "id": "fct-media-00-book-deep-work",
+      "title": "Deep Work",
+      "description": "Book by Cal Newport",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "deep-thinking"
+    },
+    {
+      "id": "fct-media-00-book-web-literacy-for-stu",
+      "title": "Web Literacy for Student Fact-Checkers",
+      "description": "Book by Mike Caulfield",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "information-literacy"
+    },
+    {
+      "id": "fct-media-00-book-thinking-fast-and-sl",
+      "title": "Thinking, Fast and Slow",
+      "description": "Book by Daniel Kahneman",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "deep-thinking"
+    },
+    {
+      "id": "fct-media-00-book-the-art-of-thinking-",
+      "title": "The Art of Thinking Clearly",
+      "description": "Book by Rolf Dobelli",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "deep-thinking"
+    },
+    {
+      "id": "fct-media-01-book-antifragility-strong",
+      "title": "Antifragility: Strong Towns supports building systems that thrive under stress, inspired",
+      "description": "Book by Nassim Taleb",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "foundations"
+      ],
+      "category": "deep-thinking"
+    },
+    {
+      "id": "fct-media-10-book-everything-you-think",
+      "title": "Everything you think you know about addiction is wrong",
+      "description": "Book by Johann Hari",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "understanding"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-10-book-the-knowledge-illusi",
+      "title": "The Knowledge Illusion: Why We Never Think Alone",
+      "description": "Book by Steven Sloman",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "understanding"
+      ],
+      "category": "knowledge-systems"
+    },
+    {
+      "id": "fct-media-11-book-revisit-this-interac",
+      "title": "Revisit this interactive demonstration",
+      "description": "Book by Vi Hart",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-poverty-by-america",
+      "title": "Poverty, by America",
+      "description": "Book by Matthew Desmond",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-the-color-of-law",
+      "title": "The Color of Law",
+      "description": "Book by Richard Rothstein",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-the-sum-of-us",
+      "title": "The Sum of Us",
+      "description": "Book by Heather Mc",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-evicted",
+      "title": "Evicted",
+      "description": "Book by Matthew Desmond",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-the-new-jim-crow",
+      "title": "The New Jim Crow",
+      "description": "Book by Michelle Alexander",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-automating-inequalit",
+      "title": "Automating Inequality",
+      "description": "Book by Virginia Eubanks",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-directed",
+      "title": "directed",
+      "description": "Book by Ava Du",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-11-book-the-characteristics-",
+      "title": "The Characteristics of White Supremacy Culture",
+      "description": "Book by Tema Okun",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-media-12-book-the-new-parish",
+      "title": "The New Parish",
+      "description": "Book by Paul Sparks",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-from-the-garden-to-t",
+      "title": "From the Garden to the City",
+      "description": "Book by John Dyer",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-the-tech-wise-family",
+      "title": "The Tech-Wise Family",
+      "description": "Book by Andy Crouch",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-digital-minimalism",
+      "title": "Digital Minimalism",
+      "description": "Book by Cal Newport",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-the-next-story-faith",
+      "title": "The Next Story: Faith, Friends, Family, and the Digital World",
+      "description": "Book by Tim Challies",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-transhumanism-and-th",
+      "title": "Transhumanism and the Image of God",
+      "description": "Book by Jacob Shatzer",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-habits-of-the-high-t",
+      "title": "Habits of the High-Tech Heart",
+      "description": "Book by Quentin Schultze",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-12-ways-your-phone-i",
+      "title": "12 Ways Your Phone Is Changing You",
+      "description": "Book by Tony Reinke",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-13-book-ethics-in-the-age-of",
+      "title": "Ethics in the Age of Technology",
+      "description": "Book by George Hunsberger",
+      "contentType": "book",
+      "tags": [
+        "book",
+        "fct",
+        "action"
+      ],
+      "category": "fct-media"
+    },
+    {
+      "id": "fct-media-00-podcast-the-rise-and-fall-of",
+      "title": "The Rise and Fall of Mars Hill",
+      "description": "Podcast recommended in FCT Module 1",
+      "contentType": "podcast",
+      "tags": [
+        "podcast",
+        "fct",
+        "audio",
+        "foundations"
+      ],
+      "category": "church-crisis"
+    },
+    {
+      "id": "fct-media-00-podcast-bodies-behind-the-bu",
+      "title": "Bodies Behind the Bus",
+      "description": "Podcast recommended in FCT Module 1",
+      "contentType": "podcast",
+      "tags": [
+        "podcast",
+        "fct",
+        "audio",
+        "foundations"
+      ],
+      "category": "church-crisis"
+    },
+    {
+      "id": "fct-media-11-podcast-the-ezra-klein-show-",
+      "title": "\"The Ezra Klein Show\" episode with Tressie McMillan Cottom",
+      "description": "Podcast recommended in FCT Module 12",
+      "contentType": "podcast",
+      "tags": [
+        "podcast",
+        "fct",
+        "audio",
+        "action"
+      ],
+      "category": "algorithmic-bias"
+    },
+    {
+      "id": "fct-contributor-jack-reese",
+      "title": "Jack Reese",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-ezra-klein",
+      "title": "Ezra Klein",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-tom-nichols",
+      "title": "Tom Nichols",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-daniel-levitin",
+      "title": "Daniel Levitin",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-nicholas-carr",
+      "title": "Nicholas Carr",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-lee-mc",
+      "title": "Lee Mc",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-michiko-kakutani",
+      "title": "Michiko Kakutani",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-steven-sloman",
+      "title": "Steven Sloman",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-hugo-mercier",
+      "title": "Hugo Mercier",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-cal-newport",
+      "title": "Cal Newport",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-mike-caulfield",
+      "title": "Mike Caulfield",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-daniel-kahneman",
+      "title": "Daniel Kahneman",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-rolf-dobelli",
+      "title": "Rolf Dobelli",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-nassim-taleb",
+      "title": "Nassim Taleb",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-johann-hari",
+      "title": "Johann Hari",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-vi-hart",
+      "title": "Vi Hart",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-matthew-desmond",
+      "title": "Matthew Desmond",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-richard-rothstein",
+      "title": "Richard Rothstein",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-heather-mc",
+      "title": "Heather Mc",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-michelle-alexander",
+      "title": "Michelle Alexander",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-virginia-eubanks",
+      "title": "Virginia Eubanks",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-ava-du",
+      "title": "Ava Du",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-tema-okun",
+      "title": "Tema Okun",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-paul-sparks",
+      "title": "Paul Sparks",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-john-dyer",
+      "title": "John Dyer",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-andy-crouch",
+      "title": "Andy Crouch",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-tim-challies",
+      "title": "Tim Challies",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-jacob-shatzer",
+      "title": "Jacob Shatzer",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-quentin-schultze",
+      "title": "Quentin Schultze",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-tony-reinke",
+      "title": "Tony Reinke",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-contributor-george-hunsberger",
+      "title": "George Hunsberger",
+      "description": "Author, speaker, or creator referenced in FCT",
+      "contentType": "contributor",
+      "tags": [
+        "contributor",
+        "fct",
+        "person"
+      ],
+      "category": "contributor"
+    },
+    {
+      "id": "fct-org-netflix",
+      "title": "Netflix",
+      "description": "Streaming Service referenced in FCT",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "fct",
+        "streaming-service"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "fct-org-hbo",
+      "title": "HBO",
+      "description": "Streaming Service referenced in FCT",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "fct",
+        "streaming-service"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "fct-module-01-church-dilemma-discussion",
+      "title": "Discussion: The Church Dilemma",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "foundations"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-02-systems-thinking-discussion",
+      "title": "Discussion: Systems Thinking",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "foundations"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-discussion",
+      "title": "Discussion: A Problem Well Stated",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "foundations"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom-discussion",
+      "title": "Discussion: Setting the Stage: Scaling Wisdom",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "setting-stage"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-discussion",
+      "title": "Discussion: Respecting Human Nature",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-discussion",
+      "title": "Discussion: Minimizing Harmful Consequences",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-07-regeneration-discussion",
+      "title": "Discussion: Regeneration and Reconciliation",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "values"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-08-centering-love-discussion",
+      "title": "Discussion: Centering Values: Love",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "values"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-discussion",
+      "title": "Discussion: Centering Values: Fruits of the Spirit",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "values"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-discussion",
+      "title": "Discussion: Creating Shared Understanding: Recognize Distortions",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "understanding"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-discussion",
+      "title": "Discussion: Creating Shared Understanding: Collaboration",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "understanding"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-12-fairness-justice-discussion",
+      "title": "Discussion: Supporting Fairness and Justice",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "action"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-13-helping-thrive-discussion",
+      "title": "Discussion: Helping People Thrive",
+      "description": "Group discussion and reflection activity",
+      "contentType": "activity",
+      "tags": [
+        "activity",
+        "discussion",
+        "fct",
+        "action"
+      ],
+      "category": "fct-activity"
+    },
+    {
+      "id": "fct-module-01-church-dilemma-story",
+      "title": "Story: The Church Dilemma",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "foundations"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-02-systems-thinking-story",
+      "title": "Multipolar Trap Analysis:",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "foundations"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-story",
+      "title": "Story: A Problem Well Stated",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "foundations"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom-story",
+      "title": "Scaling Wisdom: Lessons from Righteous Old Testament Leaders",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "setting-stage"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-story",
+      "title": "Biblical Example of Sacred Attention: Mary and Martha",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "human-nature"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-story",
+      "title": "\"Joseph and the Seven Years of Plenty and Famine\"",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "human-nature"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-07-regeneration-story",
+      "title": "Matthew 6: Giving to the Needy",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "values"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-08-centering-love-story",
+      "title": "Story: Centering Values: Love",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "values"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-story",
+      "title": "Story: Centering Values: Fruits of the Spirit",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "values"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-story",
+      "title": "But there's a sobering reality behind this facade.",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "understanding"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-story",
+      "title": "The Tale of Two Villages: Trustville and Skeptica",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "understanding"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-12-fairness-justice-story",
+      "title": "The Path to Justice: Lessons from Post-War Germany",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "action"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-13-helping-thrive-story",
+      "title": "Recognizing and Addressing Real Needs:",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "action"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-14-ready-to-act-story",
+      "title": "Story: Ready To Act: Embodying Christ in the Digital Age",
+      "description": "Biblical story or example illustrating module concepts",
+      "contentType": "narrative",
+      "tags": [
+        "story",
+        "narrative",
+        "fct",
+        "biblical-example",
+        "action"
+      ],
+      "category": "fct-narrative"
+    },
+    {
+      "id": "fct-module-01-church-dilemma-application",
+      "title": "Application: The Church Dilemma",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "foundations"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-02-systems-thinking-application",
+      "title": "Application: Systems Thinking",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "foundations"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-03-problem-well-stated-application",
+      "title": "Application: A Problem Well Stated",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "foundations"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-04-scaling-wisdom-application",
+      "title": "Application: Setting the Stage: Scaling Wisdom",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "setting-stage"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-05-respecting-human-nature-application",
+      "title": "Application: Respecting Human Nature",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-06-harmful-consequences-application",
+      "title": "Application: Minimizing Harmful Consequences",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "human-nature"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-07-regeneration-application",
+      "title": "Application: Regeneration and Reconciliation",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "values"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-08-centering-love-application",
+      "title": "Application: Centering Values: Love",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "values"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-09-fruits-of-spirit-application",
+      "title": "Application: Centering Values: Fruits of the Spirit",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "values"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-10-recognize-distortions-application",
+      "title": "Application: Creating Shared Understanding: Recognize Distortions",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "understanding"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-11-collaboration-sensemaking-application",
+      "title": "Application: Creating Shared Understanding: Collaboration",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "understanding"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-12-fairness-justice-application",
+      "title": "Application: Supporting Fairness and Justice",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "action"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-13-helping-thrive-application",
+      "title": "Application: Helping People Thrive",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "action"
+      ],
+      "category": "fct-practice"
+    },
+    {
+      "id": "fct-module-14-ready-to-act-application",
+      "title": "Application: Ready To Act: Embodying Christ in the Digital Age",
+      "description": "Practical application and action steps",
+      "contentType": "practice",
+      "tags": [
+        "application",
+        "practice",
+        "fct",
+        "action"
+      ],
+      "category": "fct-practice"
     }
   ],
-  "lastUpdated": "2025-11-28T17:14:13.694937",
-  "totalCount": 3136
+  "lastUpdated": "2025-11-28T21:10:19.507813",
+  "totalCount": 3403
 }

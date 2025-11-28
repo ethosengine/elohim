@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-05-respecting-human-nature"
   },
-  "createdAt": "2025-11-28T02:53:21.858604",
-  "updatedAt": "2025-11-28T02:53:21.858605"
+  "createdAt": "2025-11-28T21:10:19.201021",
+  "updatedAt": "2025-11-28T21:10:19.201022",
+  "did": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Respecting Human Nature",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-05-respecting-human-nature-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Respecting Human Nature - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-05-respecting-human-nature-application",
+    "identifier": "did:web:elohim.host:content:fct:module 5 - respecting human nature - our attention is sacred",
+    "name": "Application: Respecting Human Nature",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.201021",
+    "dateModified": "2025-11-28T21:10:19.201022",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

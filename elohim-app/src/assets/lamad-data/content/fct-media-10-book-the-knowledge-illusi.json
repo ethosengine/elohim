@@ -25,6 +25,36 @@
     "author": "Steven Sloman"
   },
   "_contributor": "Steven Sloman",
-  "createdAt": "2025-11-28T02:53:21.887685",
-  "updatedAt": "2025-11-28T02:53:21.887686"
+  "createdAt": "2025-11-28T21:10:19.218281",
+  "updatedAt": "2025-11-28T21:10:19.218283",
+  "did": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Knowledge Illusion: Why We Never Think Alone",
+    "ogDescription": "Book by Steven Sloman",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-10-book-the-knowledge-illusi",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Knowledge Illusion: Why We Never Think Alone - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-10-book-the-knowledge-illusi",
+    "identifier": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+    "name": "The Knowledge Illusion: Why We Never Think Alone",
+    "description": "Book by Steven Sloman",
+    "dateCreated": "2025-11-28T21:10:19.218281",
+    "dateModified": "2025-11-28T21:10:19.218283",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Steven Sloman"
+    }
+  }
 }

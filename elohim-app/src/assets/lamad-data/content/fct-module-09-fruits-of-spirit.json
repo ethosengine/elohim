@@ -51,6 +51,34 @@
     "bookCount": 0,
     "bibleVerseCount": 2
   },
-  "createdAt": "2025-11-28T02:53:21.876319",
-  "updatedAt": "2025-11-28T02:53:21.876320"
+  "createdAt": "2025-11-28T21:10:19.210782",
+  "updatedAt": "2025-11-28T21:10:19.210783",
+  "did": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 9: Centering Values: Fruits of the Spirit",
+    "ogDescription": "Modern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are oft",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.210782",
+    "articleModifiedTime": "2025-11-28T21:10:19.210783",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 9: Centering Values: Fruits of the Spirit - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-09-fruits-of-spirit",
+    "identifier": "did:web:elohim.host:content:fct:module 9 - centering values - metrics are not neutral, centering the fruits of the spirit",
+    "name": "FCT 9: Centering Values: Fruits of the Spirit",
+    "description": "Modern technology companies rely heavily on easily quantifiable metrics to drive decision-making, often optimized through A/B testing.  \nMetrics like revenue, daily active users, or time spent are often essential for managing massive systems with hundreds of thousands to billions of data points. Quantification enables efficient decision-making that appears rigorous and objective. Metrics and A/B tests summarize vast amounts of data, providing comfort in what appears to be an ever more empirical ",
+    "dateCreated": "2025-11-28T21:10:19.210782",
+    "dateModified": "2025-11-28T21:10:19.210783",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

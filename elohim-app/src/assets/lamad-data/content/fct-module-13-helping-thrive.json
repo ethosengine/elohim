@@ -69,6 +69,34 @@
     "bookCount": 1,
     "bibleVerseCount": 20
   },
-  "createdAt": "2025-11-28T02:53:21.899588",
-  "updatedAt": "2025-11-28T02:53:21.899589"
+  "createdAt": "2025-11-28T21:10:19.224514",
+  "updatedAt": "2025-11-28T21:10:19.224516",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 13: Helping People Thrive",
+    "ogDescription": "Welcome to \"Thriving in Christ's Abundance: A Christian Approach to Humane Technology.\" As we embark on this journey together, let us reflect on the words of Jesus in John 10:9-11:  \n\"I am the door. I",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-13-helping-thrive",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.224514",
+    "articleModifiedTime": "2025-11-28T21:10:19.224516",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 13: Helping People Thrive - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-13-helping-thrive",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "FCT 13: Helping People Thrive",
+    "description": "Welcome to \"Thriving in Christ's Abundance: A Christian Approach to Humane Technology.\" As we embark on this journey together, let us reflect on the words of Jesus in John 10:9-11:  \n\"I am the door. If anyone enters by me, he will be saved and will go in and out and find pasture. The thief comes only to steal and kill and destroy. I came that they may have life and have it abundantly. I am the good shepherd. The good shepherd lays down his life for the sheep.\"  \nIn this powerful passage, Jesus p",
+    "dateCreated": "2025-11-28T21:10:19.224514",
+    "dateModified": "2025-11-28T21:10:19.224516",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

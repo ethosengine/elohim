@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-14-ready-to-act"
   },
-  "createdAt": "2025-11-28T02:53:21.902491",
-  "updatedAt": "2025-11-28T02:53:21.902492"
+  "createdAt": "2025-11-28T21:10:19.225438",
+  "updatedAt": "2025-11-28T21:10:19.225439",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Ready To Act: Embodying Christ in the Digital Age",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-14-ready-to-act-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Ready To Act: Embodying Christ in the Digital Age - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-14-ready-to-act-application",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Application: Ready To Act: Embodying Christ in the Digital Age",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.225438",
+    "dateModified": "2025-11-28T21:10:19.225439",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

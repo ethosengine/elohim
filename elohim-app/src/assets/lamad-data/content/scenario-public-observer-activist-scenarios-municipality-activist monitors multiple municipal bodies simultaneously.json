@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-municipality-activist monitors multiple municipal bodies simultaneously",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:municipality-activist monitors multiple municipal bodies simultaneously",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist monitors multiple municipal bodies simultaneously",
   "description": "Activist monitors multiple municipal bodies simultaneously",
   "content": "Scenario: Activist monitors multiple municipal bodies simultaneously\n    Given the activist's issue spans city council, planning commission, and housing authority\n    And attending all meetings is physically impossible\n    When the Observer monitors all civic bodies\n    Then the activist receives alerts for relevant agenda items\n    And sees summaries of decisions across all bodies\n    And identifies coordination opportunities across agencies\n    And sustainable multi-body surveillance becomes possible\n    And activist capacity multiplies through automation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist monitors multiple municipal bodies simultaneously",
+    "ogDescription": "Activist monitors multiple municipal bodies simultaneously",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-municipality-activist monitors multiple municipal bodies simultaneously",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist monitors multiple municipal bodies simultaneously - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-municipality-activist monitors multiple municipal bodies simultaneously",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:municipality-activist monitors multiple municipal bodies simultaneously",
+    "name": "Activist monitors multiple municipal bodies simultaneously",
+    "description": "Activist monitors multiple municipal bodies simultaneously",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

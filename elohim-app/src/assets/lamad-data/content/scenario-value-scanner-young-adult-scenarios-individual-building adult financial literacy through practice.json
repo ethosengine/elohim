@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-individual-building adult financial literacy through practice",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-building adult financial literacy through practice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building adult financial literacy through practice",
   "description": "Building adult financial literacy through practice",
   "content": "Scenario: Building adult financial literacy through practice\n    Given Aisha received no practical finance education in school\n    And she's learning by doing with real consequences\n    When Aisha makes financial decisions in the scanner\n    Then the personal_agent should provide contextual education\n    And it should explain trade-offs in accessible language\n    And it should help her understand opportunity costs\n    And education should integrate seamlessly with decision-making\n    And Aisha should build financial competence through supported practice\n    And the system should prevent catastrophic mistakes while enabling learning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building adult financial literacy through practice",
+    "ogDescription": "Building adult financial literacy through practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-building adult financial literacy through practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building adult financial literacy through practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-building adult financial literacy through practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-building adult financial literacy through practice",
+    "name": "Building adult financial literacy through practice",
+    "description": "Building adult financial literacy through practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

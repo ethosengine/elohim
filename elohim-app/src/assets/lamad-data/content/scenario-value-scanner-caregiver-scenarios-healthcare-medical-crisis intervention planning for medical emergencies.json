@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-crisis intervention planning for medical emergencies",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-crisis intervention planning for medical emergencies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Crisis intervention planning for medical emergencies",
   "description": "Crisis intervention planning for medical emergencies",
   "content": "Scenario: Crisis intervention planning for medical emergencies\n    Given David's condition could deteriorate suddenly\n    And medical crises require rapid coordinated response\n    When the healthcare_elohim prepares for crisis\n    Then it should maintain emergency care plan\n    And it should ensure all providers have emergency contacts\n    And it should coordinate with emergency services\n    And it should prepare James for likely crisis scenarios\n    And medical emergencies should have planned responses\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Crisis intervention planning for medical emergencies",
+    "ogDescription": "Crisis intervention planning for medical emergencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-crisis intervention planning for medical emergencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crisis intervention planning for medical emergencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-crisis intervention planning for medical emergencies",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-crisis intervention planning for medical emergencies",
+    "name": "Crisis intervention planning for medical emergencies",
+    "description": "Crisis intervention planning for medical emergencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

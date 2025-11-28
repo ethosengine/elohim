@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-community-activist coordinates neighborhood tenant association",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist coordinates neighborhood tenant association",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist coordinates neighborhood tenant association",
   "description": "Activist coordinates neighborhood tenant association",
   "content": "Scenario: Activist coordinates neighborhood tenant association\n    Given multiple tenants face similar landlord issues\n    And the activist is organizing tenant power\n    When the Observer facilitates secure coordination\n    Then tenants can connect without landlord surveillance\n    And see patterns across different units and buildings\n    And coordinate collective bargaining for repairs\n    And track landlord compliance with commitments\n    And individual tenant struggles become collective action\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist coordinates neighborhood tenant association",
+    "ogDescription": "Activist coordinates neighborhood tenant association",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist coordinates neighborhood tenant association",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist coordinates neighborhood tenant association - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist coordinates neighborhood tenant association",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist coordinates neighborhood tenant association",
+    "name": "Activist coordinates neighborhood tenant association",
+    "description": "Activist coordinates neighborhood tenant association",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

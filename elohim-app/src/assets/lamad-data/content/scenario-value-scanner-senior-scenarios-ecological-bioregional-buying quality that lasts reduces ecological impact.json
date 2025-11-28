@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-buying quality that lasts reduces ecological impact",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:ecological-bioregional-buying quality that lasts reduces ecological impact",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Buying quality that lasts reduces ecological impact",
   "description": "Buying quality that lasts reduces ecological impact",
   "content": "Scenario: Buying quality that lasts reduces ecological impact\n    Given Margaret learned to buy fewer, better things\n    And durability reduces waste and resource extraction\n    When Margaret makes purchasing decisions\n    Then her personal_agent should support quality-over-quantity choices\n    And the bioregional_elohim should track durability practices\n    And buying quality should be recognized as ecological stewardship\n    And Margaret's knowledge of durability should inform others\n    And consumption patterns should favor longevity\n    And throwaway culture should be countered by senior wisdom\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Buying quality that lasts reduces ecological impact",
+    "ogDescription": "Buying quality that lasts reduces ecological impact",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-ecological-bioregional-buying quality that lasts reduces ecological impact",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Buying quality that lasts reduces ecological impact - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-ecological-bioregional-buying quality that lasts reduces ecological impact",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:ecological-bioregional-buying quality that lasts reduces ecological impact",
+    "name": "Buying quality that lasts reduces ecological impact",
+    "description": "Buying quality that lasts reduces ecological impact",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

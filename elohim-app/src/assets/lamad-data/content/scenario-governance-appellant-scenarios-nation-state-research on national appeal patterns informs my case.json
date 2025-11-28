@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-nation-state-research on national appeal patterns informs my case",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state-research on national appeal patterns informs my case",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Research on national appeal patterns informs my case",
   "description": "Research on national appeal patterns informs my case",
   "content": "Scenario: Research on national appeal patterns informs my case\n    Given Dr. Chen has analyzed thousands of national appeals\n    And his research identifies patterns I should know about\n    When I prepare my national-level appeal\n    Then I can access research findings about success factors\n    And I understand which constitutional arguments have prevailed\n    And I see where protocol improvements emerged from appeals\n    And I learn from anonymized cases similar to mine\n    And Research democratizes knowledge of how to appeal effectively\n    And My appeal benefits from collective learning across appellants\n    And Individual justice and systemic knowledge work together\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Research on national appeal patterns informs my case",
+    "ogDescription": "Research on national appeal patterns informs my case",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-nation-state-research on national appeal patterns informs my case",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Research on national appeal patterns informs my case - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-nation-state-research on national appeal patterns informs my case",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state-research on national appeal patterns informs my case",
+    "name": "Research on national appeal patterns informs my case",
+    "description": "Research on national appeal patterns informs my case",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

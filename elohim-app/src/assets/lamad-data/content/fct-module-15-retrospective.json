@@ -44,6 +44,34 @@
     "bookCount": 0,
     "bibleVerseCount": 0
   },
-  "createdAt": "2025-11-28T02:53:21.902775",
-  "updatedAt": "2025-11-28T02:53:21.902776"
+  "createdAt": "2025-11-28T21:10:19.225723",
+  "updatedAt": "2025-11-28T21:10:19.225725",
+  "did": "did:web:elohim.host:content:fct:module 15 - digital discipleship retrospective",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 15: Digital Discipleship Retrospective",
+    "ogDescription": "Digital Discipleship Retrospective",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-15-retrospective",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.225723",
+    "articleModifiedTime": "2025-11-28T21:10:19.225725",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 15: Digital Discipleship Retrospective - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-15-retrospective",
+    "identifier": "did:web:elohim.host:content:fct:module 15 - digital discipleship retrospective",
+    "name": "FCT 15: Digital Discipleship Retrospective",
+    "description": "Digital Discipleship Retrospective",
+    "dateCreated": "2025-11-28T21:10:19.225723",
+    "dateModified": "2025-11-28T21:10:19.225725",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-bioregional construction material knowledge and sourcing",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-bioregional construction material knowledge and sourcing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional construction material knowledge and sourcing",
   "description": "Bioregional construction material knowledge and sourcing",
   "content": "Scenario: Bioregional construction material knowledge and sourcing\n    Given Frank knows regional building materials and their properties\n    And bioregional materials reduce transportation and support local economy\n    When the bioregional_elohim coordinates material knowledge\n    Then it should help Frank teach about regional construction materials\n    And facilitate use of bioregionally-appropriate building techniques\n    And recognize his knowledge of local material properties\n    And strengthen bioregional building culture and economy\n    And connect construction practices to place-based sustainability\n    And Frank's experience should inform bioregional building standards\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional construction material knowledge and sourcing",
+    "ogDescription": "Bioregional construction material knowledge and sourcing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-bioregional construction material knowledge and sourcing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional construction material knowledge and sourcing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-bioregional construction material knowledge and sourcing",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-bioregional construction material knowledge and sourcing",
+    "name": "Bioregional construction material knowledge and sourcing",
+    "description": "Bioregional construction material knowledge and sourcing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-community celebrates successful transition as demonstration model",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-community celebrates successful transition as demonstration model",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community celebrates successful transition as demonstration model",
   "description": "Community celebrates successful transition as demonstration model",
   "content": "Scenario: Community celebrates successful transition as demonstration model\n    Given neighborhood watched Rosa's difficult decision and graceful transition\n    And other small business owners face similar ownership burden challenges\n    When transition proves successful for all stakeholders\n    Then community honors Rosa at public celebration of democratic conversion\n    And her story becomes model encouraging other small business owners to consider conversion\n    And neighborhood gains confidence in democratic ownership as viable alternative\n    And successful transition demonstrates community can support democratic economy\n    And community_elohim shares transition story to inspire broader movement\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Community celebrates successful transition as demonstration model",
+    "ogDescription": "Community celebrates successful transition as demonstration model",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-community celebrates successful transition as demonstration model",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community celebrates successful transition as demonstration model - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-community celebrates successful transition as demonstration model",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-community celebrates successful transition as demonstration model",
+    "name": "Community celebrates successful transition as demonstration model",
+    "description": "Community celebrates successful transition as demonstration model",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

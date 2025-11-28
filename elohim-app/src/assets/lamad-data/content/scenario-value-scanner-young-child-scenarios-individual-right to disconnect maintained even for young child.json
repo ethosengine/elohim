@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-individual-right to disconnect maintained even for young child",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-right to disconnect maintained even for young child",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Right to disconnect maintained even for young child",
   "description": "Right to disconnect maintained even for young child",
   "content": "Scenario: Right to disconnect maintained even for young child\n    Given Tommy has been using the Value Scanner\n    And constitutional constraints apply at all layers\n    When Tommy or his parents choose to disconnect\n    Then the system must honor the disconnection immediately\n    And no data retention beyond legal requirements should occur\n    And Tommy's right to not participate must be respected\n    And no manipulative patterns to retain usage should be employed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.199597",
-  "updatedAt": "2025-11-21T18:54:29.199597"
+  "openGraphMetadata": {
+    "ogTitle": "Right to disconnect maintained even for young child",
+    "ogDescription": "Right to disconnect maintained even for young child",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-right to disconnect maintained even for young child",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Right to disconnect maintained even for young child - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-right to disconnect maintained even for young child",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-right to disconnect maintained even for young child",
+    "name": "Right to disconnect maintained even for young child",
+    "description": "Right to disconnect maintained even for young child",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

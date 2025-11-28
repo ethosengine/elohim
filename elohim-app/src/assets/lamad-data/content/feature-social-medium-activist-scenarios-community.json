@@ -1,6 +1,8 @@
 {
   "id": "feature-social-medium-activist-scenarios-community",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:community",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Community Organizing for Activist",
   "description": "As an activist in the social_medium system Operating at the community governance layer I want to organize local action and build community power So that communities can address local issues through collective action",
   "content": "@epic:social_medium\n@user_type:activist\n@governance_layer:community\n@related_users:community_moderator,content_creator,elder,child\n@related_layers:individual,neighborhood,district\n@elohim_agents:moderation_agent,coordination_agent,protection_agent\n\nFeature: Community Organizing for Activist\n  As an activist in the social_medium system\n  Operating at the community governance layer\n  I want to organize local action and build community power\n  So that communities can address local issues through collective action\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the community governance context is active\n    And the activist has established trust within their local community\n\n  Scenario: Activist creates community organizing space\n    Given the activist wants to address local housing affordability\n    When they create a housing justice organizing space\n    And they invite community members through trusted connections\n    And they establish space charter emphasizing transparency and consensus\n    Then the organizing space is created at community layer\n    And invitations travel through web of trust\n    And the space has tools for decision-making and coordination\n    And community members can contribute safely within the space\n    And the moderation agent helps maintain healthy dialogue\n\n  Scenario: Activist shares evidence-based call to action\n    Given the activist has researched city council voting records on housing\n    And they have compiled data showing repeated votes against affordability\n    When they create a contribution calling for community action\n    And they attach verified sources and documentation\n    And they propose attending the next city council meeting\n    Then the system evaluates the evidence quality\n    And the contribution reaches all organizing space members immediately\n    And it reaches wider community with evidence-based reach boost\n    And community members can endorse the call to action\n    And coordination tools help organize attendance and testimony\n\n  Scenario: Activist builds coalition across neighborhood boundaries\n    Given multiple neighborhoods face similar housing challenges\n    And the activist has credibility in their own neighborhood\n    When they reach out to activists in adjacent neighborhoods\n    And they propose forming a district-level coalition\n    Then cross-neighborhood connections are negotiated through mutual trust\n    And a district-layer organizing space is created\n    And patterns from successful housing campaigns surface as resources\n    And the coalition coordinates action while respecting local autonomy\n    And each neighborhood maintains its own decision-making process\n\n  Scenario: Activist prevents infiltration attempt\n    Given the housing justice space has 50 active community members\n    When a new member joins and immediately tries to promote violent tactics\n    And they create multiple inflammatory contributions\n    Then the earned reach system prevents wide distribution\n    And the community_moderator is alerted to potential infiltration\n    And existing members see community trust analysis\n    And the space can collectively decide on appropriate response\n    And the protection agent documents the incident for pattern recognition\n    And organizing continues safely without disruption\n",
@@ -28,6 +30,32 @@
     "epic": "social_medium",
     "scenarioCount": 4
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Community Organizing for Activist",
+    "ogDescription": "As an activist in the social_medium system Operating at the community governance layer I want to organize local action and build community power So that communities can address local issues through co",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-activist-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Organizing for Activist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-activist-scenarios-community",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:community",
+    "name": "Community Organizing for Activist",
+    "description": "As an activist in the social_medium system Operating at the community governance layer I want to organize local action and build community power So that communities can address local issues through collective action",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

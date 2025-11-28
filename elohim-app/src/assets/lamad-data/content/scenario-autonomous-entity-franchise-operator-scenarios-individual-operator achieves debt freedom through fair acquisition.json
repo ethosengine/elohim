@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator achieves debt freedom through fair acquisition",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:individual-operator achieves debt freedom through fair acquisition",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Operator achieves debt freedom through fair acquisition",
   "description": "Operator achieves debt freedom through fair acquisition",
   "content": "Scenario: Operator achieves debt freedom through fair acquisition\n    Given James owes $600K in franchise loans after $1M initial investment\n    And corporate extracts 40% of revenue before he sees any profit\n    When EAE offers $750K acquisition for three franchise locations\n    Then James pays off $600K debt completely\n    And receives $150K return on $400K family investment over five years\n    And debt burden that dominated his life for years is lifted\n    And financial freedom comes without worker exploitation or community betrayal\n    And workplace_elohim ensures acquisition pricing is fair to all parties\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Operator achieves debt freedom through fair acquisition",
+    "ogDescription": "Operator achieves debt freedom through fair acquisition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-individual-operator achieves debt freedom through fair acquisition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Operator achieves debt freedom through fair acquisition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-individual-operator achieves debt freedom through fair acquisition",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:individual-operator achieves debt freedom through fair acquisition",
+    "name": "Operator achieves debt freedom through fair acquisition",
+    "description": "Operator achieves debt freedom through fair acquisition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

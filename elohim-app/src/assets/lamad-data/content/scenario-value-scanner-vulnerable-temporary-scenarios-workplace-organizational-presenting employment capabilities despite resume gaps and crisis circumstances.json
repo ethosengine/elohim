@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-presenting employment capabilities despite resume gaps and crisis circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-presenting employment capabilities despite resume gaps and crisis circumstances",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Presenting employment capabilities despite resume gaps and crisis circumstances",
   "description": "Presenting employment capabilities despite resume gaps and crisis circumstances",
   "content": "Scenario: Presenting employment capabilities despite resume gaps and crisis circumstances\n    Given I have gaps in my employment history due to domestic violence and crisis\n    And potential employers may discriminate based on gaps or circumstances\n    When I apply for employment opportunities\n    Then the workplace_elohim helps me present my capabilities effectively\n    And provides strategies for explaining employment gaps honestly but strategically\n    And helps me articulate transferable skills and competencies\n    And recognizes my crisis navigation as demonstrating valuable skills\n    And validates that gaps don't erase my professional capability\n    And my personal_agent helps me craft application materials\n    And tracks my employment search efforts and outcomes\n    And celebrates my courage in seeking employment during recovery\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Presenting employment capabilities despite resume gaps and crisis circumstances",
+    "ogDescription": "Presenting employment capabilities despite resume gaps and crisis circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-presenting employment capabilities despite resume gaps and crisis circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Presenting employment capabilities despite resume gaps and crisis circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-presenting employment capabilities despite resume gaps and crisis circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-presenting employment capabilities despite resume gaps and crisis circumstances",
+    "name": "Presenting employment capabilities despite resume gaps and crisis circumstances",
+    "description": "Presenting employment capabilities despite resume gaps and crisis circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

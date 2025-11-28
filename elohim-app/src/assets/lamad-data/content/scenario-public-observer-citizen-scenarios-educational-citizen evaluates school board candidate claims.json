@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-citizen-scenarios-educational-citizen evaluates school board candidate claims",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen evaluates school board candidate claims",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Citizen evaluates school board candidate claims",
   "description": "Citizen evaluates school board candidate claims",
   "content": "Scenario: Citizen evaluates school board candidate claims\n    Given a school board candidate promises to improve education quality\n    And the election is approaching\n    When the citizen reviews Observer analysis\n    Then they see the candidate's specific policy positions\n    And view comparisons to successful districts' approaches\n    And understand likely impacts of proposed policies\n    And can evaluate campaign promises against evidence\n    And informed voting becomes accessible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-citizen-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Citizen evaluates school board candidate claims",
+    "ogDescription": "Citizen evaluates school board candidate claims",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen evaluates school board candidate claims",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen evaluates school board candidate claims - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen evaluates school board candidate claims",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen evaluates school board candidate claims",
+    "name": "Citizen evaluates school board candidate claims",
+    "description": "Citizen evaluates school board candidate claims",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

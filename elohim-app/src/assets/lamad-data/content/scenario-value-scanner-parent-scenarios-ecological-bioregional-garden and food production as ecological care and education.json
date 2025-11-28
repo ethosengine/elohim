@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-garden and food production as ecological care and education",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-garden and food production as ecological care and education",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Garden and food production as ecological care and education",
   "description": "Garden and food production as ecological care and education",
   "content": "Scenario: Garden and food production as ecological care and education\n    Given Sarah wants children to understand food systems\n    And growing food teaches ecological relationships\n    When Sarah gardens with Tommy and Emma\n    Then the ecological_elohim should recognize gardening as multi-dimensional care\n    And it should value food production, education, and ecological benefit\n    And teaching children to grow food should accumulate care tokens\n    And the system should recognize food sovereignty work\n    And Sarah's effort to build children's food system understanding should be valued\n    And gardening should be recognized as ecological care labor\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Garden and food production as ecological care and education",
+    "ogDescription": "Garden and food production as ecological care and education",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-garden and food production as ecological care and education",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Garden and food production as ecological care and education - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-garden and food production as ecological care and education",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-garden and food production as ecological care and education",
+    "name": "Garden and food production as ecological care and education",
+    "description": "Garden and food production as ecological care and education",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

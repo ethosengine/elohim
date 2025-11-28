@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-03-problem-well-stated"
   },
-  "createdAt": "2025-11-28T02:53:21.854034",
-  "updatedAt": "2025-11-28T02:53:21.854035"
+  "createdAt": "2025-11-28T21:10:19.196190",
+  "updatedAt": "2025-11-28T21:10:19.196191",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: A Problem Well Stated",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: A Problem Well Stated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-application",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "Application: A Problem Well Stated",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.196190",
+    "dateModified": "2025-11-28T21:10:19.196191",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

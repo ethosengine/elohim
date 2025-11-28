@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-legislator distinguishes constituent calls from corporate astroturf",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator distinguishes constituent calls from corporate astroturf",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Legislator distinguishes constituent calls from corporate astroturf",
   "description": "Legislator distinguishes constituent calls from corporate astroturf",
   "content": "Scenario: Legislator distinguishes constituent calls from corporate astroturf\n    Given the politician's office receives 500 calls opposing regulation\n    And callers claim to be concerned constituents\n    When the Observer analyzes campaign origins\n    Then they see calls coordinated by corporate lobbying firm\n    And identify script language and coordinated timing\n    And distinguish 12 genuine constituent concerns from 488 manufactured contacts\n    And understand industry opposition versus authentic community sentiment\n    And vote based on constituent interests not manufactured pressure\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Legislator distinguishes constituent calls from corporate astroturf",
+    "ogDescription": "Legislator distinguishes constituent calls from corporate astroturf",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator distinguishes constituent calls from corporate astroturf",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Legislator distinguishes constituent calls from corporate astroturf - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator distinguishes constituent calls from corporate astroturf",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator distinguishes constituent calls from corporate astroturf",
+    "name": "Legislator distinguishes constituent calls from corporate astroturf",
+    "description": "Legislator distinguishes constituent calls from corporate astroturf",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

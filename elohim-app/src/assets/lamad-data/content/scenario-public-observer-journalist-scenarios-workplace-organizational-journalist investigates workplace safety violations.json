@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates workplace safety violations",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist investigates workplace safety violations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist investigates workplace safety violations",
   "description": "Journalist investigates workplace safety violations",
   "content": "Scenario: Journalist investigates workplace safety violations\n    Given workers report unsafe conditions at warehouse\n    And the journalist covers workplace safety\n    When the Observer analyzes employer's safety violation history\n    Then the journalist finds company has 47 OSHA violations in 5 years\n    And sees pattern of violations detected but minimally fined\n    And documents worker injuries and company's inadequate response\n    And shows same company violates safety rules at facilities in other states\n    And publishes investigation forcing regulatory accountability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates workplace safety violations",
+    "ogDescription": "Journalist investigates workplace safety violations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates workplace safety violations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates workplace safety violations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates workplace safety violations",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist investigates workplace safety violations",
+    "name": "Journalist investigates workplace safety violations",
+    "description": "Journalist investigates workplace safety violations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

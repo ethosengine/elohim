@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-family boundary management as care recipient's family intrudes",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family boundary management as care recipient's family intrudes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family boundary management as care recipient's family intrudes",
   "description": "Family boundary management as care recipient's family intrudes",
   "content": "Scenario: Family boundary management as care recipient's family intrudes\n    Given David's parents have opinions about his care\n    And they may question James's decisions\n    When family boundaries are negotiated\n    Then the family_elohim should support James's care authority\n    And it should recognize him as primary caregiver and spouse\n    And it should help James maintain appropriate boundaries\n    And David's family should provide support, not interference\n    And family governance should respect caregiving relationship\n    And boundaries should be clear when family dynamics become difficult\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Family boundary management as care recipient's family intrudes",
+    "ogDescription": "Family boundary management as care recipient's family intrudes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family boundary management as care recipient's family intrudes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family boundary management as care recipient's family intrudes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family boundary management as care recipient's family intrudes",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family boundary management as care recipient's family intrudes",
+    "name": "Family boundary management as care recipient's family intrudes",
+    "description": "Family boundary management as care recipient's family intrudes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

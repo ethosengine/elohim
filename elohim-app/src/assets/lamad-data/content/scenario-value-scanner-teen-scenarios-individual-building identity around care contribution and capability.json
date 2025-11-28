@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-individual-building identity around care contribution and capability",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-building identity around care contribution and capability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building identity around care contribution and capability",
   "description": "Building identity around care contribution and capability",
   "content": "Scenario: Building identity around care contribution and capability\n    Given Jasmine has made substantial care contributions over months\n    And she balances multiple demanding contexts successfully\n    When she reflects on her Value Scanner usage and care economy participation\n    Then she should experience herself as a capable, contributing adult\n    And her identity should be forming around care for others and community\n    And she should understand that her work has genuine economic value\n    And she should expect to be taken seriously in economic conversations\n    And she should internalize that care economy principles are normal\n    And her self-concept should reflect her actual capability and contribution\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Building identity around care contribution and capability",
+    "ogDescription": "Building identity around care contribution and capability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-building identity around care contribution and capability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building identity around care contribution and capability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-building identity around care contribution and capability",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-building identity around care contribution and capability",
+    "name": "Building identity around care contribution and capability",
+    "description": "Building identity around care contribution and capability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

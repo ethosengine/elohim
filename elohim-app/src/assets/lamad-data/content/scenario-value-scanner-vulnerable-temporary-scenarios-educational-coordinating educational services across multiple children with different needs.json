@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational services across multiple children with different needs",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-coordinating educational services across multiple children with different needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating educational services across multiple children with different needs",
   "description": "Coordinating educational services across multiple children with different needs",
   "content": "Scenario: Coordinating educational services across multiple children with different needs\n    Given I have multiple children (ages 4 and 7) with different educational contexts\n    And each child has unique needs, schools, and support requirements\n    When I manage educational coordination for multiple children\n    Then the Value Scanner tracks each child's educational needs separately\n    And coordinates across different schools, teachers, and support services\n    And helps me prioritize when children's needs conflict\n    And ensures neither child's education suffers due to complexity\n    And my personal_agent manages multiple educational calendars and requirements\n    And recognizes multi-child educational coordination as substantial labor\n    And validates that managing multiple children's education is complex\n    And prevents educational tasks from overwhelming me\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating educational services across multiple children with different needs",
+    "ogDescription": "Coordinating educational services across multiple children with different needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational services across multiple children with different needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating educational services across multiple children with different needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-coordinating educational services across multiple children with different needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-coordinating educational services across multiple children with different needs",
+    "name": "Coordinating educational services across multiple children with different needs",
+    "description": "Coordinating educational services across multiple children with different needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

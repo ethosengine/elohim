@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-community-journalist develops sources through community surveillance",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist develops sources through community surveillance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist develops sources through community surveillance",
   "description": "Journalist develops sources through community surveillance",
   "content": "Scenario: Journalist develops sources through community surveillance\n    Given the journalist needs community perspectives on proposed development\n    And doesn't know who has relevant knowledge\n    When the Observer identifies community members affected by issue\n    Then the journalist sees residents who testified at past meetings\n    And identifies homeowners on blocks facing displacement\n    And finds small business owners who will lose customers\n    And contacts informed sources with lived experience\n    And community journalism reflects actual community voices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist develops sources through community surveillance",
+    "ogDescription": "Journalist develops sources through community surveillance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist develops sources through community surveillance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist develops sources through community surveillance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist develops sources through community surveillance",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist develops sources through community surveillance",
+    "name": "Journalist develops sources through community surveillance",
+    "description": "Journalist develops sources through community surveillance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

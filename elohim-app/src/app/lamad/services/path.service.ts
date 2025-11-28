@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 import { AgentService } from './agent.service';
-import { LearningPath, PathStep, PathStepView, PathIndex } from '../models/learning-path.model';
+import { LearningPath, PathStep, PathStepView, PathIndex, PathChapter } from '../models/learning-path.model';
 import { ContentNode } from '../models/content-node.model';
 import { AgentProgress } from '../models/agent.model';
 
@@ -244,6 +244,403 @@ export class PathService {
   isPathCompleted(pathId: string): Observable<boolean> {
     return this.getCompletionPercentage(pathId).pipe(
       map(percentage => percentage === 100)
+    );
+  }
+
+  // =========================================================================
+  // CROSS-PATH COMPLETION TRACKING (Khan Academy-style)
+  // =========================================================================
+
+  /**
+   * Get path completion based on unique content, not just steps.
+   *
+   * This enables Khan Academy-style shared completion:
+   * - If "1st Grade Math" is 100% complete (80 unique content nodes)
+   * - And "Early Math Review" has 40 unique content nodes (20 shared)
+   * - Then "Early Math Review" shows ~50% completion (20 shared / 40 total)
+   *
+   * Returns both traditional step-based and content-based completion metrics.
+   */
+  getPathCompletionByContent(
+    pathId: string,
+    agentId?: string
+  ): Observable<{
+    totalSteps: number;
+    completedSteps: number;
+    totalUniqueContent: number;
+    completedUniqueContent: number;
+    contentCompletionPercentage: number;
+    stepCompletionPercentage: number;
+    sharedContentCompleted: number; // Completed via other paths
+  }> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId),
+      completedContentIds: this.agentService.getCompletedContentIds(agentId)
+    }).pipe(
+      map(({ path, progress, completedContentIds }) => {
+        const totalSteps = path.steps.length;
+        const completedSteps = progress?.completedStepIndices.length || 0;
+
+        // Extract unique content IDs from this path
+        const pathContentIds = new Set(
+          path.steps.map(step => step.resourceId)
+        );
+        const totalUniqueContent = pathContentIds.size;
+
+        // Calculate how many unique content nodes are completed
+        let completedUniqueContent = 0;
+        let sharedContentCompleted = 0;
+
+        for (const contentId of pathContentIds) {
+          if (completedContentIds.has(contentId)) {
+            completedUniqueContent++;
+
+            // Check if completed in THIS path vs other paths
+            const completedInThisPath = progress?.completedStepIndices.some(
+              stepIndex => path.steps[stepIndex]?.resourceId === contentId
+            );
+            if (!completedInThisPath) {
+              sharedContentCompleted++;
+            }
+          }
+        }
+
+        const contentCompletionPercentage = totalUniqueContent > 0
+          ? Math.round((completedUniqueContent / totalUniqueContent) * 100)
+          : 0;
+
+        const stepCompletionPercentage = totalSteps > 0
+          ? Math.round((completedSteps / totalSteps) * 100)
+          : 0;
+
+        return {
+          totalSteps,
+          completedSteps,
+          totalUniqueContent,
+          completedUniqueContent,
+          contentCompletionPercentage,
+          stepCompletionPercentage,
+          sharedContentCompleted
+        };
+      })
+    );
+  }
+
+  /**
+   * Get a step with global completion status.
+   *
+   * Unlike composeStepView (which only checks THIS path's progress),
+   * this checks if the content has been completed in ANY path.
+   *
+   * Useful for showing "Already mastered in X" badges in UI.
+   */
+  getStepWithCompletionStatus(
+    pathId: string,
+    stepIndex: number,
+    agentId?: string
+  ): Observable<PathStepView & {
+    isCompletedGlobally: boolean;
+    completedInOtherPath: boolean;
+  }> {
+    return this.getPath(pathId).pipe(
+      switchMap(path => {
+        const resourceId = path.steps[stepIndex].resourceId;
+
+        return forkJoin({
+          stepView: this.getPathStep(pathId, stepIndex),
+          isCompletedGlobally: this.agentService.isContentCompleted(resourceId, agentId)
+        }).pipe(
+          map(({ stepView, isCompletedGlobally }) => {
+            const completedInThisPath = stepView.isCompleted;
+            const completedInOtherPath = isCompletedGlobally && !completedInThisPath;
+
+            return {
+              ...stepView,
+              isCompletedGlobally,
+              completedInOtherPath
+            };
+          })
+        );
+      })
+    );
+  }
+
+  /**
+   * Get all steps for a path with global completion status.
+   *
+   * Batch version for performance - loads all steps at once.
+   * Use this for path overview pages that show all steps.
+   */
+  getAllStepsWithCompletionStatus(
+    pathId: string,
+    agentId?: string
+  ): Observable<Array<PathStepView & {
+    isCompletedGlobally: boolean;
+    completedInOtherPath: boolean;
+  }>> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId),
+      completedContentIds: this.agentService.getCompletedContentIds(agentId)
+    }).pipe(
+      switchMap(({ path, progress, completedContentIds }) => {
+        // Load all content nodes for this path
+        const contentLoads = path.steps.map(step =>
+          this.dataLoader.getContent(step.resourceId)
+        );
+
+        return forkJoin(contentLoads).pipe(
+          map(contentNodes => {
+            return path.steps.map((step, index) => {
+              const content = contentNodes[index];
+              const isCompletedInThisPath = progress?.completedStepIndices.includes(index) ?? false;
+              const isCompletedGlobally = completedContentIds.has(step.resourceId);
+              const completedInOtherPath = isCompletedGlobally && !isCompletedInThisPath;
+
+              const baseView = this.composeStepView(path, step, index, content, progress);
+
+              return {
+                ...baseView,
+                isCompletedGlobally,
+                completedInOtherPath
+              };
+            });
+          })
+        );
+      })
+    );
+  }
+
+  // =========================================================================
+  // BULK LOADING & CHAPTER NAVIGATION
+  // =========================================================================
+
+  /**
+   * Get multiple steps at once (bulk loading).
+   *
+   * Use for:
+   * - Prefetching next N steps while user reads current step
+   * - Loading entire chapter for offline reading
+   * - Populating step list UI efficiently
+   *
+   * @param pathId The learning path ID
+   * @param startIndex Start index (inclusive)
+   * @param count Number of steps to load
+   */
+  getBulkSteps(
+    pathId: string,
+    startIndex: number,
+    count: number
+  ): Observable<PathStepView[]> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId)
+    }).pipe(
+      switchMap(({ path, progress }) => {
+        // Validate range
+        const endIndex = Math.min(startIndex + count, path.steps.length);
+        if (startIndex < 0 || startIndex >= path.steps.length) {
+          return of([]);
+        }
+
+        // Extract steps in range
+        const stepsToLoad = path.steps.slice(startIndex, endIndex);
+
+        // Load content for all steps in parallel
+        const contentLoads = stepsToLoad.map(step =>
+          this.dataLoader.getContent(step.resourceId)
+        );
+
+        return forkJoin(contentLoads).pipe(
+          map(contentNodes => {
+            return stepsToLoad.map((step, offsetIndex) => {
+              const actualIndex = startIndex + offsetIndex;
+              const content = contentNodes[offsetIndex];
+              return this.composeStepView(path, step, actualIndex, content, progress);
+            });
+          })
+        );
+      })
+    );
+  }
+
+  /**
+   * Get the next N steps from current position.
+   *
+   * Useful for:
+   * - Prefetching while user reads current step
+   * - "What's coming next?" preview sections
+   * - Preloading for smoother navigation
+   *
+   * @param pathId The learning path ID
+   * @param currentIndex Current step index
+   * @param n Number of steps to fetch (default: 3)
+   */
+  getNextNSteps(
+    pathId: string,
+    currentIndex: number,
+    n: number = 3
+  ): Observable<PathStepView[]> {
+    return this.getBulkSteps(pathId, currentIndex + 1, n);
+  }
+
+  /**
+   * Get all steps in a specific chapter.
+   *
+   * Only works for paths that use chapter structure.
+   * Returns empty array if path has no chapters or chapter not found.
+   *
+   * @param pathId The learning path ID
+   * @param chapterId The chapter ID
+   */
+  getChapterSteps(
+    pathId: string,
+    chapterId: string
+  ): Observable<PathStepView[]> {
+    return this.getPath(pathId).pipe(
+      switchMap(path => {
+        // Check if path uses chapters
+        if (!path.chapters || path.chapters.length === 0) {
+          return of([]);
+        }
+
+        // Find the chapter
+        const chapter = path.chapters.find(ch => ch.id === chapterId);
+        if (!chapter) {
+          return of([]);
+        }
+
+        // Calculate absolute step indices for this chapter
+        let absoluteStartIndex = 0;
+        for (const ch of path.chapters) {
+          if (ch.id === chapterId) {
+            break;
+          }
+          absoluteStartIndex += ch.steps.length;
+        }
+
+        // Load all steps in this chapter
+        return this.getBulkSteps(pathId, absoluteStartIndex, chapter.steps.length);
+      })
+    );
+  }
+
+  /**
+   * Get the next chapter in a path.
+   *
+   * Returns null if:
+   * - Path has no chapters
+   * - Current chapter is the last one
+   * - Current chapter not found
+   *
+   * @param pathId The learning path ID
+   * @param currentChapterId The current chapter ID
+   */
+  getNextChapter(
+    pathId: string,
+    currentChapterId: string
+  ): Observable<PathStepView[] | null> {
+    return this.getPath(pathId).pipe(
+      switchMap(path => {
+        // Check if path uses chapters
+        if (!path.chapters || path.chapters.length === 0) {
+          return of(null);
+        }
+
+        // Find current chapter index
+        const currentChapterIndex = path.chapters.findIndex(
+          ch => ch.id === currentChapterId
+        );
+
+        if (currentChapterIndex === -1) {
+          return of(null);
+        }
+
+        // Check if there's a next chapter
+        if (currentChapterIndex >= path.chapters.length - 1) {
+          return of(null);
+        }
+
+        // Get next chapter
+        const nextChapter = path.chapters[currentChapterIndex + 1];
+        return this.getChapterSteps(pathId, nextChapter.id);
+      })
+    );
+  }
+
+  /**
+   * Get the first step of a chapter.
+   *
+   * Useful for "Start Chapter" buttons in UI.
+   *
+   * @param pathId The learning path ID
+   * @param chapterId The chapter ID
+   */
+  getChapterFirstStep(
+    pathId: string,
+    chapterId: string
+  ): Observable<PathStepView | null> {
+    return this.getChapterSteps(pathId, chapterId).pipe(
+      map(steps => steps.length > 0 ? steps[0] : null)
+    );
+  }
+
+  /**
+   * Get chapter summaries for path overview.
+   *
+   * Includes progress information if user has started the path.
+   *
+   * @param pathId The learning path ID
+   */
+  getChapterSummaries(pathId: string): Observable<Array<{
+    chapter: PathChapter;
+    completedSteps: number;
+    totalSteps: number;
+    isComplete: boolean;
+    completionPercentage: number;
+  }>> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId)
+    }).pipe(
+      map(({ path, progress }) => {
+        // Path must use chapters
+        if (!path.chapters || path.chapters.length === 0) {
+          return [];
+        }
+
+        let absoluteStepIndex = 0;
+        return path.chapters.map(chapter => {
+          const totalSteps = chapter.steps.length;
+
+          // Calculate completed steps in this chapter
+          let completedSteps = 0;
+          if (progress) {
+            for (let i = 0; i < totalSteps; i++) {
+              const stepIndex = absoluteStepIndex + i;
+              if (progress.completedStepIndices.includes(stepIndex)) {
+                completedSteps++;
+              }
+            }
+          }
+
+          absoluteStepIndex += totalSteps;
+
+          const isComplete = completedSteps === totalSteps;
+          const completionPercentage = totalSteps > 0
+            ? Math.round((completedSteps / totalSteps) * 100)
+            : 0;
+
+          return {
+            chapter,
+            completedSteps,
+            totalSteps,
+            isComplete,
+            completionPercentage
+          };
+        });
+      })
     );
   }
 }

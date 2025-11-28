@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-recognizing when workplace demands become unsustainable",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-recognizing when workplace demands become unsustainable",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognizing when workplace demands become unsustainable",
   "description": "Recognizing when workplace demands become unsustainable",
   "content": "Scenario: Recognizing when workplace demands become unsustainable\n    Given Aisha faces intense workplace expectations\n    And she often works long hours\n    When the personal_agent monitors her workplace patterns\n    Then it should flag when demands are unsustainable\n    And it should recognize that she's worked through lunch repeatedly\n    And it should identify when work-life balance is failing\n    And the system should help her see overwork clearly\n    And she should be supported in setting boundaries\n    And workplace care economy should prevent exploitation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing when workplace demands become unsustainable",
+    "ogDescription": "Recognizing when workplace demands become unsustainable",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-recognizing when workplace demands become unsustainable",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing when workplace demands become unsustainable - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-recognizing when workplace demands become unsustainable",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-recognizing when workplace demands become unsustainable",
+    "name": "Recognizing when workplace demands become unsustainable",
+    "description": "Recognizing when workplace demands become unsustainable",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

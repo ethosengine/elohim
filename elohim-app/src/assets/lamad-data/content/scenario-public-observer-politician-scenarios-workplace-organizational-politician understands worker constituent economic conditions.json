@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician understands worker constituent economic conditions",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician understands worker constituent economic conditions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician understands worker constituent economic conditions",
   "description": "Politician understands worker constituent economic conditions",
   "content": "Scenario: Politician understands worker constituent economic conditions\n    Given the politician represents working-class district\n    And hears business community claim workers are thriving\n    When the Observer analyzes local economic and wage patterns\n    Then they see median wages insufficient for local housing costs\n    And identify workers holding multiple jobs to survive\n    And understand constituent economic stress beyond unemployment numbers\n    And learn which industries pay poverty wages requiring public assistance\n    And champion worker-centered economic policy with evidence\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician understands worker constituent economic conditions",
+    "ogDescription": "Politician understands worker constituent economic conditions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician understands worker constituent economic conditions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician understands worker constituent economic conditions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician understands worker constituent economic conditions",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician understands worker constituent economic conditions",
+    "name": "Politician understands worker constituent economic conditions",
+    "description": "Politician understands worker constituent economic conditions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

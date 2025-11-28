@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-refugee-scenarios-global-refugee connects with cultural community in diaspora",
+  "did": "did:web:elohim.host:content:social-medium:refugee:scenarios:global-refugee connects with cultural community in diaspora",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Refugee connects with cultural community in diaspora",
   "description": "Refugee connects with cultural community in diaspora",
   "content": "Scenario: Refugee connects with cultural community in diaspora\n    Given Amira wants to maintain Syrian cultural connections\n    When she joins the Syrian diaspora cultural community\n    And the community includes refugees across multiple countries\n    Then she finds others who share her language and culture\n    And cultural practices, recipes, and traditions are preserved\n    And she participates in Arabic language maintenance\n    And her children can learn their cultural heritage\n    And the community provides mutual support across diaspora\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-refugee-scenarios-global",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Refugee connects with cultural community in diaspora",
+    "ogDescription": "Refugee connects with cultural community in diaspora",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-refugee-scenarios-global-refugee connects with cultural community in diaspora",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Refugee connects with cultural community in diaspora - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-refugee-scenarios-global-refugee connects with cultural community in diaspora",
+    "identifier": "did:web:elohim.host:content:social-medium:refugee:scenarios:global-refugee connects with cultural community in diaspora",
+    "name": "Refugee connects with cultural community in diaspora",
+    "description": "Refugee connects with cultural community in diaspora",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-municipality-municipal working parent policies informed by care economy data",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal working parent policies informed by care economy data",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal working parent policies informed by care economy data",
   "description": "Municipal working parent policies informed by care economy data",
   "content": "Scenario: Municipal working parent policies informed by care economy data\n    Given Sarah balances full-time work with parenting\n    And municipal policy affects working parents' capacity to care\n    When municipal employment policies are considered\n    Then care economy data should show working parents' time constraints\n    And policy should recognize workers' care responsibilities\n    And municipal employers should adopt family-friendly policies\n    And Sarah's advocacy should be strengthened by care economy evidence\n    And municipal policy should support work-life integration\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal working parent policies informed by care economy data",
+    "ogDescription": "Municipal working parent policies informed by care economy data",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal working parent policies informed by care economy data",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal working parent policies informed by care economy data - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal working parent policies informed by care economy data",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal working parent policies informed by care economy data",
+    "name": "Municipal working parent policies informed by care economy data",
+    "description": "Municipal working parent policies informed by care economy data",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

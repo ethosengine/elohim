@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-educational-child joins school homework help space",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:educational-child joins school homework help space",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child joins school homework help space",
   "description": "Child joins school homework help space",
   "content": "Scenario: Child joins school homework help space\n    Given Emma's school has a homework help space on the Elohim network\n    And the space is moderated by teachers and parent volunteers\n    When Emma joins the space through her school connection\n    Then she gains access to homework help from peers and mentors\n    And all participants are verified members of the school community\n    And the moderation agent maintains supportive atmosphere\n    And predatory behavior is structurally impossible\n    And Emma can ask questions and help classmates\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-educational",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child joins school homework help space",
+    "ogDescription": "Child joins school homework help space",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-educational-child joins school homework help space",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child joins school homework help space - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-educational-child joins school homework help space",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:educational-child joins school homework help space",
+    "name": "Child joins school homework help space",
+    "description": "Child joins school homework help space",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

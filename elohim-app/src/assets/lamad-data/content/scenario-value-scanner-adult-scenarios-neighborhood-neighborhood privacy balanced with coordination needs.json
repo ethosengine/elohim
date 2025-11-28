@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood privacy balanced with coordination needs",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood privacy balanced with coordination needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood privacy balanced with coordination needs",
   "description": "Neighborhood privacy balanced with coordination needs",
   "content": "Scenario: Neighborhood privacy balanced with coordination needs\n    Given neighborhood care economy requires some data sharing\n    And Sarah values her household privacy\n    When Sarah participates in neighborhood coordination\n    Then she should control what information neighbors see\n    And household details should remain private unless shared\n    And the neighborhood_elohim should only share aggregated patterns\n    And Sarah's privacy should be protected while enabling coordination\n    And participation should not require sacrificing privacy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood privacy balanced with coordination needs",
+    "ogDescription": "Neighborhood privacy balanced with coordination needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood privacy balanced with coordination needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood privacy balanced with coordination needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood privacy balanced with coordination needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood privacy balanced with coordination needs",
+    "name": "Neighborhood privacy balanced with coordination needs",
+    "description": "Neighborhood privacy balanced with coordination needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

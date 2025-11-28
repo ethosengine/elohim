@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-household-communication and decision-making supported amid stress",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-communication and decision-making supported amid stress",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Communication and decision-making supported amid stress",
   "description": "Communication and decision-making supported amid stress",
   "content": "Scenario: Communication and decision-making supported amid stress\n    Given Robert and Jennifer are both under substantial stress\n    And care demands can strain even strong partnerships\n    And important household decisions must be made collaboratively\n    When household_elohim facilitates communication\n    Then it should provide structured decision-making support\n    And ensure both partners have voice in household governance\n    And surface when stress is affecting communication\n    And prompt for check-ins: \"You haven't had a planning conversation in 3 weeks\"\n    And support them in maintaining partnership health\n    And recognize that their relationship needs protection amid care demands\n    And prevent household governance breakdown under stress\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Communication and decision-making supported amid stress",
+    "ogDescription": "Communication and decision-making supported amid stress",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-communication and decision-making supported amid stress",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Communication and decision-making supported amid stress - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-communication and decision-making supported amid stress",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-communication and decision-making supported amid stress",
+    "name": "Communication and decision-making supported amid stress",
+    "description": "Communication and decision-making supported amid stress",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

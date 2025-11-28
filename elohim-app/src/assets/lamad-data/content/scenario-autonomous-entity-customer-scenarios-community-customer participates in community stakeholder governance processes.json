@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-customer-scenarios-community-customer participates in community stakeholder governance processes",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:community-customer participates in community stakeholder governance processes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Customer participates in community stakeholder governance processes",
   "description": "Customer participates in community stakeholder governance processes",
   "content": "Scenario: Customer participates in community stakeholder governance processes\n    Given democratic businesses can include community members in governance\n    And Ms. Johnson has community knowledge and cares about neighborhood\n    When stakeholder participation is offered to engaged customers\n    Then she attends quarterly stakeholder meetings providing input\n    And suggests senior meal program addressing neighborhood isolation\n    And votes on community program priorities (advisory role)\n    And participation connects her individual needs to collective governance\n    And community_elohim facilitates stakeholder participation ensuring worker autonomy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-customer-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Customer participates in community stakeholder governance processes",
+    "ogDescription": "Customer participates in community stakeholder governance processes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-community-customer participates in community stakeholder governance processes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer participates in community stakeholder governance processes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-community-customer participates in community stakeholder governance processes",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:community-customer participates in community stakeholder governance processes",
+    "name": "Customer participates in community stakeholder governance processes",
+    "description": "Customer participates in community stakeholder governance processes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

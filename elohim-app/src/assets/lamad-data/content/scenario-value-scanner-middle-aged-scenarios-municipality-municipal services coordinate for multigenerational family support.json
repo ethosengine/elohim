@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal services coordinate for multigenerational family support",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal services coordinate for multigenerational family support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal services coordinate for multigenerational family support",
   "description": "Municipal services coordinate for multigenerational family support",
   "content": "Scenario: Municipal services coordinate for multigenerational family support\n    Given Robert's family needs span eldercare, young adult support, and household services\n    And municipal services are often siloed by department\n    And coordinated service delivery would better serve families\n    When municipal_elohim coordinates service delivery\n    Then it should help Robert navigate municipal services across departments\n    And connect aging services, youth programs, housing assistance, and employment support\n    And surface relevant municipal resources across his family's needs\n    And demonstrate how integrated service delivery serves families\n    And advocate for municipal coordination across service silos\n    And build municipal systems that recognize multigenerational family reality\n    And reduce burden of navigating fragmented municipal services\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal services coordinate for multigenerational family support",
+    "ogDescription": "Municipal services coordinate for multigenerational family support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal services coordinate for multigenerational family support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal services coordinate for multigenerational family support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal services coordinate for multigenerational family support",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal services coordinate for multigenerational family support",
+    "name": "Municipal services coordinate for multigenerational family support",
+    "description": "Municipal services coordinate for multigenerational family support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

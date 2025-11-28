@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-sustainable building practices in habitat construction work",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-sustainable building practices in habitat construction work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Sustainable building practices in Habitat construction work",
   "description": "Sustainable building practices in Habitat construction work",
   "content": "Scenario: Sustainable building practices in Habitat construction work\n    Given Frank volunteers 20 hours/week in construction\n    And building practices have significant environmental impact\n    When the bioregional_elohim tracks Frank's construction work\n    Then it should recognize opportunities for sustainable building techniques\n    And suggest energy-efficient construction methods\n    And facilitate use of recycled or sustainable materials\n    And help Frank apply his skills to ecological building\n    And quantify environmental benefit of sustainable construction choices\n    And recognize that his labor can serve both housing and ecological goals\n    And Habitat work should model sustainable building practices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Sustainable building practices in Habitat construction work",
+    "ogDescription": "Sustainable building practices in Habitat construction work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-sustainable building practices in habitat construction work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sustainable building practices in Habitat construction work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-sustainable building practices in habitat construction work",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-sustainable building practices in habitat construction work",
+    "name": "Sustainable building practices in Habitat construction work",
+    "description": "Sustainable building practices in Habitat construction work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

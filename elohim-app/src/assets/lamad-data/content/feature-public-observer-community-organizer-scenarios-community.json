@@ -1,6 +1,8 @@
 {
   "id": "feature-public-observer-community-organizer-scenarios-community",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Community-Level Coalition Building for Community Organizer",
   "description": "As a community organizer in the public_observer system Operating at the community governance layer I want to build collective power through hyperlocal organizing and leadership development So that communities discover their own agency and create sustained civic infrastructure",
   "content": "@epic:public_observer\n@user_type:community_organizer\n@governance_layer:community\n@related_users:citizen,parent,activist,board_member\n@related_layers:municipality,neighborhood\n@elohim_agents:public_observer,community_elohim,coalition_elohim\n\nFeature: Community-Level Coalition Building for Community Organizer\n  As a community organizer in the public_observer system\n  Operating at the community governance layer\n  I want to build collective power through hyperlocal organizing and leadership development\n  So that communities discover their own agency and create sustained civic infrastructure\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_organizer user is registered in the system\n    And the community governance context is active\n\n  Scenario: Organizer detects organizing opportunity from community complaint patterns\n    Given 47 residents across three blocks have reported the same landlord issues\n    And most residents don't know others are affected\n    When the Observer detects the shared grievance pattern\n    Then the organizer sees the organizing opportunity alert\n    And receives contact information for residents who opted in\n    And views specific issues by building and timeline\n    And gets recommended organizing approach for tenant association\n    And isolated frustration becomes basis for collective action\n\n  Scenario: Organizer creates accessible education materials for community meeting\n    Given the organizer is holding meeting about proposed zoning changes\n    And community members have limited policy literacy and speak multiple languages\n    When the organizer requests education materials from Observer\n    Then they receive one-page summary in plain language\n    And get versions in Spanish, Mandarin, and Vietnamese\n    And see visual infographics showing community impact\n    And access deeper detail for residents who want more information\n    And 47-page staff report becomes accessible to whole community\n\n  Scenario: Organizer develops community leader for public testimony\n    Given a tenant has never spoken at public meetings\n    And they want to testify about rent burden at city council\n    When the organizer uses Observer to support leadership development\n    Then the tenant receives accessible data on local rent patterns\n    And gets sample testimony framework personalized to their experience\n    And sees common questions and effective response strategies\n    And practices using Observer's preparation tools\n    And emerges as powerful community voice not dependent on organizer\n\n  Scenario: Organizer coordinates block club coalition on neighborhood safety\n    Given five block clubs care about pedestrian safety improvements\n    And members work different shifts and speak different languages\n    When the organizer uses Observer for coalition coordination\n    Then all members see shared information base in their languages\n    And can engage asynchronously on their schedules\n    And track who's committed to testify at traffic commission\n    And coordinate meeting attendance across 35 residents\n    And coalition functions at scale without exhausting organizer\n\n  Scenario: Organizer tracks accountability for community park improvements\n    Given the organizer led campaign that won park renovation commitment\n    And city promised completion in six months\n    When the Observer tracks implementation progress\n    Then the organizer sees weekly updates on construction status\n    And receives alerts when timeline slips\n    And documents the victory for community to see their power\n    And has evidence to pressure officials if implementation stalls\n    And communities learn their organizing creates real change\n",
@@ -29,6 +31,32 @@
     "epic": "public_observer",
     "scenarioCount": 5
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Community-Level Coalition Building for Community Organizer",
+    "ogDescription": "As a community organizer in the public_observer system Operating at the community governance layer I want to build collective power through hyperlocal organizing and leadership development So that com",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-community-organizer-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community-Level Coalition Building for Community Organizer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-community-organizer-scenarios-community",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community",
+    "name": "Community-Level Coalition Building for Community Organizer",
+    "description": "As a community organizer in the public_observer system Operating at the community governance layer I want to build collective power through hyperlocal organizing and leadership development So that communities discover their own agency and create sustained civic infrastructure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

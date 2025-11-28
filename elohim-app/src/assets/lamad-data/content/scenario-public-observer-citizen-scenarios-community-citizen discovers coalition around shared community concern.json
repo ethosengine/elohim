@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-citizen-scenarios-community-citizen discovers coalition around shared community concern",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:community-citizen discovers coalition around shared community concern",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Citizen discovers coalition around shared community concern",
   "description": "Citizen discovers coalition around shared community concern",
   "content": "Scenario: Citizen discovers coalition around shared community concern\n    Given 14 neighbors are concerned about playground safety\n    And the citizen has reported the same concern\n    When the Public Observer detects the alignment pattern\n    Then the citizen receives an opt-in coalition notification\n    And they can coordinate with other concerned residents\n    And they see aggregated data on playground conditions\n    And they can participate in coordinated advocacy\n    And isolation becomes collective action\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-citizen-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Citizen discovers coalition around shared community concern",
+    "ogDescription": "Citizen discovers coalition around shared community concern",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-community-citizen discovers coalition around shared community concern",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen discovers coalition around shared community concern - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-community-citizen discovers coalition around shared community concern",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:community-citizen discovers coalition around shared community concern",
+    "name": "Citizen discovers coalition around shared community concern",
+    "description": "Citizen discovers coalition around shared community concern",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-individual-making retirement care contributions visible at individual level",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-making retirement care contributions visible at individual level",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Making retirement care contributions visible at individual level",
   "description": "Making retirement care contributions visible at individual level",
   "content": "Scenario: Making retirement care contributions visible at individual level\n    Given Margaret provides 15 hours/week grandchild care\n    And she volunteers 10 hours/week in community\n    And she provides 8 hours/week elder care for her mother\n    When Margaret's care contributions are tracked\n    Then her personal_agent should quantify all care labor\n    And it should calculate market value (~$15k/year grandchild care)\n    And it should accumulate care tokens for all contributions\n    And it should make visible that she's highly productive\n    And Margaret should experience herself as valuable contributor\n    And the data should counter cultural narrative of retired as \"not working\"\n    And her contributions should be recognized, not invisible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Making retirement care contributions visible at individual level",
+    "ogDescription": "Making retirement care contributions visible at individual level",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-making retirement care contributions visible at individual level",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Making retirement care contributions visible at individual level - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-making retirement care contributions visible at individual level",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-making retirement care contributions visible at individual level",
+    "name": "Making retirement care contributions visible at individual level",
+    "description": "Making retirement care contributions visible at individual level",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

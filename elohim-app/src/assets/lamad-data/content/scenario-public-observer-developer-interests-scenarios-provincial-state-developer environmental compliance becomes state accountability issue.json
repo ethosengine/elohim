@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-developer environmental compliance becomes state accountability issue",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer environmental compliance becomes state accountability issue",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer environmental compliance becomes state accountability issue",
   "description": "Developer environmental compliance becomes state accountability issue",
   "content": "Scenario: Developer environmental compliance becomes state accountability issue\n    Given a developer's projects consistently violate state environmental standards\n    But receives minimal enforcement from state regulators\n    When the Observer documents violation patterns and regulatory response\n    Then analysis shows: 67 violations across 8 projects over 5 years\n    And penalties total $180K while profits exceed $40M\n    And state regulators approve new permits despite violation history\n    And regulatory capture becomes statistically undeniable\n    And developer faces pressure for genuine environmental compliance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer environmental compliance becomes state accountability issue",
+    "ogDescription": "Developer environmental compliance becomes state accountability issue",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer environmental compliance becomes state accountability issue",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer environmental compliance becomes state accountability issue - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer environmental compliance becomes state accountability issue",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer environmental compliance becomes state accountability issue",
+    "name": "Developer environmental compliance becomes state accountability issue",
+    "description": "Developer environmental compliance becomes state accountability issue",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

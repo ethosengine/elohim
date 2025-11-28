@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-global-coordinating response to authoritarian threats to protocol",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-coordinating response to authoritarian threats to protocol",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating response to authoritarian threats to protocol",
   "description": "Coordinating response to authoritarian threats to protocol",
   "content": "Scenario: Coordinating response to authoritarian threats to protocol\n    Given authoritarian regimes may attack protocol infrastructure\n    And democratic nations must respond collectively\n    When I participate in democratic coalition\n    Then we share: threat intelligence and defensive strategies\n    And we coordinate: mutual support for communities under threat\n    And we establish: sanctuary systems for protocol refugees\n    And we resist: authoritarian pressure through solidarity\n    And we provide: resources for communities defending sovereignty\n    And we demonstrate: that democracy protects itself\n    And we show: authoritarian capture is not inevitable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating response to authoritarian threats to protocol",
+    "ogDescription": "Coordinating response to authoritarian threats to protocol",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-coordinating response to authoritarian threats to protocol",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating response to authoritarian threats to protocol - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-coordinating response to authoritarian threats to protocol",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-coordinating response to authoritarian threats to protocol",
+    "name": "Coordinating response to authoritarian threats to protocol",
+    "description": "Coordinating response to authoritarian threats to protocol",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

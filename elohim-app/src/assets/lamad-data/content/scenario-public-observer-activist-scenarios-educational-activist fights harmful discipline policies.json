@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-educational-activist fights harmful discipline policies",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist fights harmful discipline policies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist fights harmful discipline policies",
   "description": "Activist fights harmful discipline policies",
   "content": "Scenario: Activist fights harmful discipline policies\n    Given suspension and expulsion rates seem racially disparate\n    And the activist advocates for restorative justice\n    When the Observer tracks discipline outcomes by race\n    Then the activist shows Black students suspended at 3x rate\n    And for same behaviors as white students who receive warnings\n    And zero-tolerance policies fuel school-to-prison pipeline\n    And presents evidence-based alternatives from other districts\n    And policy reform campaign gains statistical backbone\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist fights harmful discipline policies",
+    "ogDescription": "Activist fights harmful discipline policies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist fights harmful discipline policies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist fights harmful discipline policies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist fights harmful discipline policies",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist fights harmful discipline policies",
+    "name": "Activist fights harmful discipline policies",
+    "description": "Activist fights harmful discipline policies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

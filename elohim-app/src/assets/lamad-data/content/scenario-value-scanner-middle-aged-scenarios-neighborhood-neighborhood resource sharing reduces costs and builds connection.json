@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood resource sharing reduces costs and builds connection",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood resource sharing reduces costs and builds connection",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood resource sharing reduces costs and builds connection",
   "description": "Neighborhood resource sharing reduces costs and builds connection",
   "content": "Scenario: Neighborhood resource sharing reduces costs and builds connection\n    Given Robert has tools, equipment, and skills\n    And buying everything individually is expensive and wasteful\n    And neighbors have resources that Robert occasionally needs\n    When neighborhood_elohim facilitates resource sharing\n    Then it should coordinate tool libraries, equipment sharing, and skill exchange\n    And track contributions: \"Robert has lent tools 12 times, borrowed 8 times\"\n    And reduce household expenses through sharing\n    And build relationships through resource exchange\n    And demonstrate care economy principles at neighborhood scale\n    And reduce consumption through sharing economy\n    And strengthen neighborhood bonds through mutual support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood resource sharing reduces costs and builds connection",
+    "ogDescription": "Neighborhood resource sharing reduces costs and builds connection",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood resource sharing reduces costs and builds connection",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood resource sharing reduces costs and builds connection - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood resource sharing reduces costs and builds connection",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood resource sharing reduces costs and builds connection",
+    "name": "Neighborhood resource sharing reduces costs and builds connection",
+    "description": "Neighborhood resource sharing reduces costs and builds connection",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

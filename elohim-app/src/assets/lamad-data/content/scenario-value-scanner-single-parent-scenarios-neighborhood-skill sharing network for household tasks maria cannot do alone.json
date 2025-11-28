@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-skill sharing network for household tasks maria cannot do alone",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-skill sharing network for household tasks maria cannot do alone",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Skill sharing network for household tasks Maria cannot do alone",
   "description": "Skill sharing network for household tasks Maria cannot do alone",
   "content": "Scenario: Skill sharing network for household tasks Maria cannot do alone\n    Given some household tasks are difficult or impossible for one person\n    And Maria cannot afford to hire professionals for everything\n    When Maria needs help with household tasks requiring multiple people or specialized skills\n    Then the neighborhood_elohim should coordinate skill sharing network\n    And neighbors should exchange help based on different capabilities\n    And Maria should access household help through reciprocal labor exchange\n    And skill sharing should enable household maintenance without money or partner\n    And neighborhood cooperation should solve single-parent capability gaps\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Skill sharing network for household tasks Maria cannot do alone",
+    "ogDescription": "Skill sharing network for household tasks Maria cannot do alone",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-skill sharing network for household tasks maria cannot do alone",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Skill sharing network for household tasks Maria cannot do alone - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-skill sharing network for household tasks maria cannot do alone",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-skill sharing network for household tasks maria cannot do alone",
+    "name": "Skill sharing network for household tasks Maria cannot do alone",
+    "description": "Skill sharing network for household tasks Maria cannot do alone",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

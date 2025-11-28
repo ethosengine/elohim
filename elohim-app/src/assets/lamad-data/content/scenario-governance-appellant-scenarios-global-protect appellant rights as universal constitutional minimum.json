@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-global-protect appellant rights as universal constitutional minimum",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:global-protect appellant rights as universal constitutional minimum",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Protect appellant rights as universal constitutional minimum",
   "description": "Protect appellant rights as universal constitutional minimum",
   "content": "Scenario: Protect appellant rights as universal constitutional minimum\n    Given authoritarian government attempts to suppress appeals\n    And the government wants agents to operate without oversight\n    When global Constitutional Council evaluates the attempt\n    Then the council reaffirms appeal rights as universal minimum\n    And the council declares that human dignity requires recourse\n    And no jurisdiction can eliminate appellant rights while claiming protocol alignment\n    And international community recognizes council authority\n    And appellants worldwide are protected by global constitutional floor\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Protect appellant rights as universal constitutional minimum",
+    "ogDescription": "Protect appellant rights as universal constitutional minimum",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-protect appellant rights as universal constitutional minimum",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protect appellant rights as universal constitutional minimum - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-protect appellant rights as universal constitutional minimum",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:global-protect appellant rights as universal constitutional minimum",
+    "name": "Protect appellant rights as universal constitutional minimum",
+    "description": "Protect appellant rights as universal constitutional minimum",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

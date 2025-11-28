@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-family-family emergency response across distance",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-family emergency response across distance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family emergency response across distance",
   "description": "Family emergency response across distance",
   "content": "Scenario: Family emergency response across distance\n    Given family emergencies can occur while Kenji is at school\n    And he may need to return home or provide remote support\n    When family crisis occurs (illness, accident, death)\n    Then the family_elohim should coordinate crisis response\n    And it should help Kenji balance academic obligations with family needs\n    And it should facilitate his care contributions from distance if he can't travel\n    And it should connect him to campus support if family crisis affects his functioning\n    And the system should recognize family crisis impact on student\n    And emergency coordination should include geographically distant students\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Family emergency response across distance",
+    "ogDescription": "Family emergency response across distance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-family emergency response across distance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family emergency response across distance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-family emergency response across distance",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-family emergency response across distance",
+    "name": "Family emergency response across distance",
+    "description": "Family emergency response across distance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

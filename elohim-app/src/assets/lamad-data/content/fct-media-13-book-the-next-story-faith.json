@@ -25,6 +25,36 @@
     "author": "Tim Challies"
   },
   "_contributor": "Tim Challies",
-  "createdAt": "2025-11-28T02:53:21.902098",
-  "updatedAt": "2025-11-28T02:53:21.902099"
+  "createdAt": "2025-11-28T21:10:19.225018",
+  "updatedAt": "2025-11-28T21:10:19.225019",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Next Story: Faith, Friends, Family, and the Digital World",
+    "ogDescription": "Book by Tim Challies",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-the-next-story-faith",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Next Story: Faith, Friends, Family, and the Digital World - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-the-next-story-faith",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "The Next Story: Faith, Friends, Family, and the Digital World",
+    "description": "Book by Tim Challies",
+    "dateCreated": "2025-11-28T21:10:19.225018",
+    "dateModified": "2025-11-28T21:10:19.225019",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Tim Challies"
+    }
+  }
 }

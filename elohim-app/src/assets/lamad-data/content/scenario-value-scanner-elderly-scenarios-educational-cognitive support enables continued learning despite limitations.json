@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-educational-cognitive support enables continued learning despite limitations",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-cognitive support enables continued learning despite limitations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Cognitive support enables continued learning despite limitations",
   "description": "Cognitive support enables continued learning despite limitations",
   "content": "Scenario: Cognitive support enables continued learning despite limitations\n    Given Helen's dementia affects learning and memory\n    And cognitive support can enable continued engagement\n    When Helen participates in educational activities\n    Then her personal_agent should provide cognitive scaffolding\n    And material should be adapted to her cognitive capabilities\n    And she should experience success, not frustration\n    And limitations should be accommodated, not treated as disqualification\n    And the protocol should enable learning despite cognitive changes\n    And Helen should remain engaged with intellectual life\n    And dementia should not end her identity as learner\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Cognitive support enables continued learning despite limitations",
+    "ogDescription": "Cognitive support enables continued learning despite limitations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-cognitive support enables continued learning despite limitations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Cognitive support enables continued learning despite limitations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-cognitive support enables continued learning despite limitations",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-cognitive support enables continued learning despite limitations",
+    "name": "Cognitive support enables continued learning despite limitations",
+    "description": "Cognitive support enables continued learning despite limitations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,13 +1,15 @@
 {
   "id": "value-scanner-organizations-powerledger-energy-projects-readme",
+  "did": "did:web:elohim.host:content:value-scanner:organizations:powerledger-energy-projects:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.",
   "content": "---\nnode_type: organization\norg_id: powerledger_energy_projects\nname: \"Powerledger Energy Projects\"\nurl: \"https://powerledger.io\"\ngem_id: \"LuIgVi7yJZX0dLgsNgPn\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [social_medium]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How Powerledger Energy Projects inspires the value_scanner epic]\"\n    parallel_work: []\n  social_medium:\n    inspiration: \"[How Powerledger Energy Projects inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Powerledger Energy Projects\n\n## Description\n\nThe operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how Powerledger Energy Projects relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: social_medium\n\n[How Powerledger Energy Projects also inspires the social_medium epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://powerledger.io\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `social_medium` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
   "contentFormat": "markdown",
   "tags": [
-    "value-scanner",
-    "organization"
+    "organization",
+    "value-scanner"
   ],
   "sourcePath": "value_scanner/organizations/powerledger_energy_projects/README.md",
   "relatedNodeIds": [
@@ -39,6 +41,30 @@
       }
     }
   },
-  "createdAt": "2025-11-21T18:54:29.193597",
-  "updatedAt": "2025-11-21T18:54:29.193597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/value-scanner-organizations-powerledger-energy-projects-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/value-scanner-organizations-powerledger-energy-projects-readme",
+    "identifier": "did:web:elohim.host:content:value-scanner:organizations:powerledger-energy-projects:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

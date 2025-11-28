@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-neighborhood-neighborhood shopping patterns affect local product availability",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-neighborhood shopping patterns affect local product availability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood shopping patterns affect local product availability",
   "description": "Neighborhood shopping patterns affect local product availability",
   "content": "Scenario: Neighborhood shopping patterns affect local product availability\n    Given Emma shops at local grocery store\n    And the store stocks products based on community demand\n    When Emma consistently chooses certain products\n    Then she should learn her choices influence what stores carry\n    And her personal_agent should explain \"When families buy local produce, stores stock more of it\"\n    And Emma should understand demand shapes supply at community level\n    And she should see connection between individual choice and collective power\n    And economic literacy should include understanding market dynamics\n    And she should learn communities shape local economies\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood shopping patterns affect local product availability",
+    "ogDescription": "Neighborhood shopping patterns affect local product availability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-neighborhood shopping patterns affect local product availability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood shopping patterns affect local product availability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-neighborhood shopping patterns affect local product availability",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-neighborhood shopping patterns affect local product availability",
+    "name": "Neighborhood shopping patterns affect local product availability",
+    "description": "Neighborhood shopping patterns affect local product availability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

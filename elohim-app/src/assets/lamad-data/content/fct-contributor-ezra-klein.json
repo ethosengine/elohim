@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-01-church-dilemma"
   },
-  "createdAt": "2025-11-28T02:53:21.847268",
-  "updatedAt": "2025-11-28T02:53:21.847270"
+  "createdAt": "2025-11-28T21:10:19.189598",
+  "updatedAt": "2025-11-28T21:10:19.189599",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Ezra Klein",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-ezra-klein",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Ezra Klein - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-ezra-klein",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Ezra Klein",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.189598",
+    "dateModified": "2025-11-28T21:10:19.189599",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

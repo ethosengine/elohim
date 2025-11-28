@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal data and transparency support informed civic participation",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal data and transparency support informed civic participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal data and transparency support informed civic participation",
   "description": "Municipal data and transparency support informed civic participation",
   "content": "Scenario: Municipal data and transparency support informed civic participation\n    Given Robert participates in municipal governance\n    And effective participation requires access to information\n    And municipal data is often hard to access or understand\n    When municipal_elohim provides municipal data access\n    Then it should surface relevant municipal data for Robert's interests\n    And help him understand municipal budgets, demographics, and service utilization\n    And provide analysis tools for municipal information\n    And support informed civic participation through data transparency\n    And demonstrate that democratic governance requires accessible information\n    And build municipal transparency that enables resident engagement\n    And empower residents to participate meaningfully in governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal data and transparency support informed civic participation",
+    "ogDescription": "Municipal data and transparency support informed civic participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal data and transparency support informed civic participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal data and transparency support informed civic participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal data and transparency support informed civic participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal data and transparency support informed civic participation",
+    "name": "Municipal data and transparency support informed civic participation",
+    "description": "Municipal data and transparency support informed civic participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

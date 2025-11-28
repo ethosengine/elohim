@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-responsible developer advocates for sensible state housing policy",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-responsible developer advocates for sensible state housing policy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responsible developer advocates for sensible state housing policy",
   "description": "Responsible developer advocates for sensible state housing policy",
   "content": "Scenario: Responsible developer advocates for sensible state housing policy\n    Given state housing regulations create barriers to affordable development\n    And a responsible developer wants to build more affordable housing\n    When the Observer provides state policy navigation and advocacy tools\n    Then the developer understands state regulatory framework\n    And identifies which regulations genuinely protect community versus serve NIMBYism\n    And engages in transparent policy advocacy for streamlined affordable housing approval\n    And makes case based on evidence not just developer profit\n    And transparent advocacy distinguishes from corrupt lobbying\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Responsible developer advocates for sensible state housing policy",
+    "ogDescription": "Responsible developer advocates for sensible state housing policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-responsible developer advocates for sensible state housing policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responsible developer advocates for sensible state housing policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-responsible developer advocates for sensible state housing policy",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-responsible developer advocates for sensible state housing policy",
+    "name": "Responsible developer advocates for sensible state housing policy",
+    "description": "Responsible developer advocates for sensible state housing policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

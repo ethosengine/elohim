@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-ecological care as spiritual and ethical practice",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-ecological care as spiritual and ethical practice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Ecological care as spiritual and ethical practice",
   "description": "Ecological care as spiritual and ethical practice",
   "content": "Scenario: Ecological care as spiritual and ethical practice\n    Given Kenji's environmental values are deeply held\n    And ecological care connects to meaning and purpose\n    When the bioregional_elohim supports Kenji's values\n    Then it should recognize ecological stewardship as ethical practice\n    And it should validate his care for planet as meaningful\n    And it should connect ecological care to larger purpose\n    And it should support integration of values across life domains\n    And the system should honor ecological care as spiritual practice\n    And Kenji should experience planetary care as part of life meaning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Ecological care as spiritual and ethical practice",
+    "ogDescription": "Ecological care as spiritual and ethical practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-ecological care as spiritual and ethical practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Ecological care as spiritual and ethical practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-ecological care as spiritual and ethical practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-ecological care as spiritual and ethical practice",
+    "name": "Ecological care as spiritual and ethical practice",
+    "description": "Ecological care as spiritual and ethical practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

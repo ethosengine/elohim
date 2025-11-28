@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-transitioning from primarily receiving to balanced care economy participation",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-transitioning from primarily receiving to balanced care economy participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transitioning from primarily receiving to balanced care economy participation",
   "description": "Transitioning from primarily receiving to balanced care economy participation",
   "content": "Scenario: Transitioning from primarily receiving to balanced care economy participation\n    Given I am moving from acute crisis toward greater stability\n    And my capacity to contribute is increasing\n    When I rebuild capability to contribute more to community\n    Then the Value Scanner supports my transition to greater contribution\n    And celebrates increasing capacity without pressuring premature independence\n    And helps me find meaningful ways to contribute as I'm able\n    And validates that recovery enables greater community participation\n    And tracks my evolving care economy participation over time\n    And my personal_agent identifies contribution opportunities matching increasing capacity\n    And recognizes that care economy support enabled my rebuilding\n    And supports gradual shift toward balanced reciprocity\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Transitioning from primarily receiving to balanced care economy participation",
+    "ogDescription": "Transitioning from primarily receiving to balanced care economy participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-transitioning from primarily receiving to balanced care economy participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transitioning from primarily receiving to balanced care economy participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-transitioning from primarily receiving to balanced care economy participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-transitioning from primarily receiving to balanced care economy participation",
+    "name": "Transitioning from primarily receiving to balanced care economy participation",
+    "description": "Transitioning from primarily receiving to balanced care economy participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

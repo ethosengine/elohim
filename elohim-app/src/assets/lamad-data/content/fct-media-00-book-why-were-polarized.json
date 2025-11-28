@@ -25,6 +25,36 @@
     "author": "Ezra Klein"
   },
   "_contributor": "Ezra Klein",
-  "createdAt": "2025-11-28T02:53:21.847260",
-  "updatedAt": "2025-11-28T02:53:21.847261"
+  "createdAt": "2025-11-28T21:10:19.189590",
+  "updatedAt": "2025-11-28T21:10:19.189591",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Why We're Polarized",
+    "ogDescription": "Book by Ezra Klein",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-why-were-polarized",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Why We're Polarized - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-why-were-polarized",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Why We're Polarized",
+    "description": "Book by Ezra Klein",
+    "dateCreated": "2025-11-28T21:10:19.189590",
+    "dateModified": "2025-11-28T21:10:19.189591",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Ezra Klein"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-individual-supporting maria's boundaries against impossible external demands",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-supporting maria's boundaries against impossible external demands",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Supporting Maria's boundaries against impossible external demands",
   "description": "Supporting Maria's boundaries against impossible external demands",
   "content": "Scenario: Supporting Maria's boundaries against impossible external demands\n    Given everyone wants more from Maria\u2014employers, schools, children, family, community\n    And she has finite capacity with no partner to share load\n    When external demands are placed on Maria\n    Then the personal_agent should monitor her total commitments\n    And it should help her evaluate what she can realistically handle\n    And it should support her in saying no when necessary\n    And it should remind her that she's already doing more than humanly sustainable\n    And Maria should have AI support for boundary-setting\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Supporting Maria's boundaries against impossible external demands",
+    "ogDescription": "Supporting Maria's boundaries against impossible external demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-supporting maria's boundaries against impossible external demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting Maria's boundaries against impossible external demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-supporting maria's boundaries against impossible external demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-supporting maria's boundaries against impossible external demands",
+    "name": "Supporting Maria's boundaries against impossible external demands",
+    "description": "Supporting Maria's boundaries against impossible external demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

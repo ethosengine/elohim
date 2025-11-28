@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-retirement planning integrates care economy participation",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-retirement planning integrates care economy participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Retirement planning integrates care economy participation",
   "description": "Retirement planning integrates care economy participation",
   "content": "Scenario: Retirement planning integrates care economy participation\n    Given Robert is in pre-retirement years\n    And retirement planning should include care economy dimensions\n    And his care contributions should be valued in retirement\n    When workplace_elohim supports retirement planning\n    Then it should help him plan retirement that honors care economy participation\n    And surface how accumulated care tokens could support retirement\n    And explore retirement roles that leverage care economy expertise\n    And help him transition from full-time employment to care economy contribution\n    And recognize that retirement can include meaningful care economy participation\n    And build retirement vision that includes continued community contribution\n    And demonstrate that care economy operates across full lifecycle\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Retirement planning integrates care economy participation",
+    "ogDescription": "Retirement planning integrates care economy participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-retirement planning integrates care economy participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Retirement planning integrates care economy participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-retirement planning integrates care economy participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-retirement planning integrates care economy participation",
+    "name": "Retirement planning integrates care economy participation",
+    "description": "Retirement planning integrates care economy participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

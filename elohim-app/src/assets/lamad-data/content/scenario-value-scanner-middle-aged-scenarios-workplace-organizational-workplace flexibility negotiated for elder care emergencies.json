@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace flexibility negotiated for elder care emergencies",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-workplace flexibility negotiated for elder care emergencies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace flexibility negotiated for elder care emergencies",
   "description": "Workplace flexibility negotiated for elder care emergencies",
   "content": "Scenario: Workplace flexibility negotiated for elder care emergencies\n    Given Robert's parents ages 78 and 75 have occasional health emergencies\n    And he needs workplace flexibility to respond to care crises\n    And his professional position gives him standing to negotiate\n    When workplace_elohim supports flexibility negotiation\n    Then it should help Robert advocate for flexible work arrangements\n    And provide data about productivity maintenance with flexibility\n    And support him in negotiating remote work options for care emergencies\n    And help him demonstrate that flexibility enables sustainable high performance\n    And build workplace policy that accommodates care emergencies\n    And prevent him from choosing between professional standing and family care\n    And demonstrate that care-friendly workplaces benefit employer and employee\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace flexibility negotiated for elder care emergencies",
+    "ogDescription": "Workplace flexibility negotiated for elder care emergencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace flexibility negotiated for elder care emergencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace flexibility negotiated for elder care emergencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace flexibility negotiated for elder care emergencies",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-workplace flexibility negotiated for elder care emergencies",
+    "name": "Workplace flexibility negotiated for elder care emergencies",
+    "description": "Workplace flexibility negotiated for elder care emergencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

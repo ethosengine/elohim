@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical provider education about caregiver as care partner",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medical provider education about caregiver as care partner",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Medical provider education about caregiver as care partner",
   "description": "Medical provider education about caregiver as care partner",
   "content": "Scenario: Medical provider education about caregiver as care partner\n    Given some providers dismiss or ignore family caregivers\n    And this undermines care quality and caregiver well-being\n    When the healthcare_elohim advocates for caregiver role\n    Then it should educate providers about caregiver expertise\n    And it should demonstrate caregivers improve care outcomes\n    And it should advocate for caregiver partnership in care teams\n    And providers should be trained to work with family caregivers\n    And healthcare culture should recognize caregivers as essential partners\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Medical provider education about caregiver as care partner",
+    "ogDescription": "Medical provider education about caregiver as care partner",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical provider education about caregiver as care partner",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Medical provider education about caregiver as care partner - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical provider education about caregiver as care partner",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medical provider education about caregiver as care partner",
+    "name": "Medical provider education about caregiver as care partner",
+    "description": "Medical provider education about caregiver as care partner",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

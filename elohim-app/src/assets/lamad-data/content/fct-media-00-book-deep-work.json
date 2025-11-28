@@ -25,6 +25,36 @@
     "author": "Cal Newport"
   },
   "_contributor": "Cal Newport",
-  "createdAt": "2025-11-28T02:53:21.848125",
-  "updatedAt": "2025-11-28T02:53:21.848126"
+  "createdAt": "2025-11-28T21:10:19.190460",
+  "updatedAt": "2025-11-28T21:10:19.190461",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Deep Work",
+    "ogDescription": "Book by Cal Newport",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-deep-work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Deep Work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-deep-work",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Deep Work",
+    "description": "Book by Cal Newport",
+    "dateCreated": "2025-11-28T21:10:19.190460",
+    "dateModified": "2025-11-28T21:10:19.190461",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Cal Newport"
+    }
+  }
 }

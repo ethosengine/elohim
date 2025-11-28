@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-family-family budget constraints shape real economic learning",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:family-family budget constraints shape real economic learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family budget constraints shape real economic learning",
   "description": "Family budget constraints shape real economic learning",
   "content": "Scenario: Family budget constraints shape real economic learning\n    Given the family income is $40,000/year\n    And Emma is learning genuine resource constraint\n    When Emma makes purchasing decisions\n    Then her personal_agent should provide real budget information\n    And the agent should say \"We have $30 left for groceries this week\"\n    And Emma should experience actual financial limits\n    And her choices should have real impact on family resources\n    And she should learn stewardship through authentic constraint\n    And economic education should reflect family's actual circumstances\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Family budget constraints shape real economic learning",
+    "ogDescription": "Family budget constraints shape real economic learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-family budget constraints shape real economic learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family budget constraints shape real economic learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-family budget constraints shape real economic learning",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:family-family budget constraints shape real economic learning",
+    "name": "Family budget constraints shape real economic learning",
+    "description": "Family budget constraints shape real economic learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

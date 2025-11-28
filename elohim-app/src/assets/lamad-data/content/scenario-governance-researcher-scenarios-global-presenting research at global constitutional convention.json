@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-global-presenting research at global constitutional convention",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:global-presenting research at global constitutional convention",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Presenting research at Global Constitutional Convention",
   "description": "Presenting research at Global Constitutional Convention",
   "content": "Scenario: Presenting research at Global Constitutional Convention\n    Given convention delegates need evidence to inform constitutional decisions\n    And I am invited to present research on sortition effectiveness\n    When I address 10,000 randomly-selected citizens from around the world\n    Then I summarize: what research shows about democratic AI governance\n    And I present: honestly about successes, failures, and uncertainties\n    And I explain: the superintelligence governance legitimacy question\n    And I acknowledge: the limits of my knowledge and research\n    And I clarify: that delegates must make values choices research cannot resolve\n    And I serve: democracy by informing not replacing citizen judgment\n    And My scholarship demonstrates: how expertise serves rather than dominates democracy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Presenting research at Global Constitutional Convention",
+    "ogDescription": "Presenting research at Global Constitutional Convention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-presenting research at global constitutional convention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Presenting research at Global Constitutional Convention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-presenting research at global constitutional convention",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:global-presenting research at global constitutional convention",
+    "name": "Presenting research at Global Constitutional Convention",
+    "description": "Presenting research at Global Constitutional Convention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

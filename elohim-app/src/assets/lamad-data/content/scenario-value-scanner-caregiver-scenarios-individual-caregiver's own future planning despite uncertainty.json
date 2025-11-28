@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-individual-caregiver's own future planning despite uncertainty",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-caregiver's own future planning despite uncertainty",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Caregiver's own future planning despite uncertainty",
   "description": "Caregiver's own future planning despite uncertainty",
   "content": "Scenario: Caregiver's own future planning despite uncertainty\n    Given James faces uncertain future as David's condition progresses\n    And he needs to plan for multiple scenarios\n    When James considers his own future needs\n    Then the personal_agent should help him plan for scenarios\n    And it should recognize his vulnerability as caregiver\n    And his care token accumulation should build toward future security\n    And his own aging and care needs should be part of planning\n    And the protocol should help James prepare for his own vulnerability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Caregiver's own future planning despite uncertainty",
+    "ogDescription": "Caregiver's own future planning despite uncertainty",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-caregiver's own future planning despite uncertainty",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Caregiver's own future planning despite uncertainty - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-caregiver's own future planning despite uncertainty",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-caregiver's own future planning despite uncertainty",
+    "name": "Caregiver's own future planning despite uncertainty",
+    "description": "Caregiver's own future planning despite uncertainty",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

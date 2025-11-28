@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-preventing oldest child from becoming surrogate parent to younger siblings",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-preventing oldest child from becoming surrogate parent to younger siblings",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Preventing oldest child from becoming surrogate parent to younger siblings",
   "description": "Preventing oldest child from becoming surrogate parent to younger siblings",
   "content": "Scenario: Preventing oldest child from becoming surrogate parent to younger siblings\n    Given Maria's 14-year-old may feel responsible for younger siblings\n    And parentification is common and harmful in single-parent families\n    When the family_elohim monitors family dynamics\n    Then it should detect if teen is taking on too much parental responsibility\n    And it should alert Maria to concerning patterns\n    And it should help her accept appropriate help while preventing harmful role-reversal\n    And it should protect her teen's adolescence and development\n    And the protocol should prevent damage from well-intentioned but unhealthy dynamics\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Preventing oldest child from becoming surrogate parent to younger siblings",
+    "ogDescription": "Preventing oldest child from becoming surrogate parent to younger siblings",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-preventing oldest child from becoming surrogate parent to younger siblings",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing oldest child from becoming surrogate parent to younger siblings - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-preventing oldest child from becoming surrogate parent to younger siblings",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-preventing oldest child from becoming surrogate parent to younger siblings",
+    "name": "Preventing oldest child from becoming surrogate parent to younger siblings",
+    "description": "Preventing oldest child from becoming surrogate parent to younger siblings",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

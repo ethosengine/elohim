@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-personal agent prevents accessibility barriers proactively",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-personal agent prevents accessibility barriers proactively",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent prevents accessibility barriers proactively",
   "description": "Personal agent prevents accessibility barriers proactively",
   "content": "Scenario: Personal agent prevents accessibility barriers proactively\n    Given Alex encounters accessibility barriers constantly\n    And the personal_agent monitors Alex's environment\n    When Alex plans activities or purchases\n    Then the agent should identify accessibility barriers in advance\n    And it should provide information about accommodations available\n    And it should suggest accessible alternatives when needed\n    And it should help Alex advocate for improved accessibility\n    And barrier documentation should support systems change advocacy\n    And Alex should experience fewer surprises and obstacles\n    And the protocol should reduce disability-related stress\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent prevents accessibility barriers proactively",
+    "ogDescription": "Personal agent prevents accessibility barriers proactively",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-personal agent prevents accessibility barriers proactively",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent prevents accessibility barriers proactively - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-personal agent prevents accessibility barriers proactively",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-personal agent prevents accessibility barriers proactively",
+    "name": "Personal agent prevents accessibility barriers proactively",
+    "description": "Personal agent prevents accessibility barriers proactively",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

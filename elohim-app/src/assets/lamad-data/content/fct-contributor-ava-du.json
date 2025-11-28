@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-12-fairness-justice"
   },
-  "createdAt": "2025-11-28T02:53:21.893041",
-  "updatedAt": "2025-11-28T02:53:21.893042"
+  "createdAt": "2025-11-28T21:10:19.220228",
+  "updatedAt": "2025-11-28T21:10:19.220229",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Ava Du",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-ava-du",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Ava Du - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-ava-du",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Ava Du",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.220228",
+    "dateModified": "2025-11-28T21:10:19.220229",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

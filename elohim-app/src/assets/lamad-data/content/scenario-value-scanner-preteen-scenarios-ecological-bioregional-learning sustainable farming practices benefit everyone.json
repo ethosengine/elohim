@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-learning sustainable farming practices benefit everyone",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-learning sustainable farming practices benefit everyone",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning sustainable farming practices benefit everyone",
   "description": "Learning sustainable farming practices benefit everyone",
   "content": "Scenario: Learning sustainable farming practices benefit everyone\n    Given Marcus is developing systems thinking\n    And agricultural practices affect long-term food security\n    When Marcus learns about food production methods\n    Then the personal_agent should explain sustainable vs. extractive farming\n    And it should teach that care for soil creates long-term abundance\n    And it should connect farm stewardship to household stewardship\n    And he should understand that ecological care serves human flourishing\n    And sustainable agriculture should be framed through care economy\n    And his generation should expect farming that cares for land\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning sustainable farming practices benefit everyone",
+    "ogDescription": "Learning sustainable farming practices benefit everyone",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-learning sustainable farming practices benefit everyone",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning sustainable farming practices benefit everyone - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-learning sustainable farming practices benefit everyone",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-learning sustainable farming practices benefit everyone",
+    "name": "Learning sustainable farming practices benefit everyone",
+    "description": "Learning sustainable farming practices benefit everyone",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

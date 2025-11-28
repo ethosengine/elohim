@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-nation-state-responding to national security agencies' concerns",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-responding to national security agencies' concerns",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responding to national security agencies' concerns",
   "description": "Responding to national security agencies' concerns",
   "content": "Scenario: Responding to national security agencies' concerns\n    Given intelligence agencies claim protocol creates vulnerabilities\n    And they request backdoors or monitoring capabilities\n    When I evaluate security claims critically\n    Then I consult: cryptographers about technical impossibility\n    And I examine: whether concerns are legitimate or pretext\n    And I compare: risks of backdoors vs risks they claim to address\n    And I consider: historical abuse of security exceptions\n    And I establish: oversight mechanisms if special provisions needed\n    And I resist: security becoming excuse for unaccountable power\n    And I protect: democracy even under security claims\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Responding to national security agencies' concerns",
+    "ogDescription": "Responding to national security agencies' concerns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-responding to national security agencies' concerns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responding to national security agencies' concerns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-responding to national security agencies' concerns",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-responding to national security agencies' concerns",
+    "name": "Responding to national security agencies' concerns",
+    "description": "Responding to national security agencies' concerns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding ecological impact of consumption choices",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-understanding ecological impact of consumption choices",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Understanding ecological impact of consumption choices",
   "description": "Understanding ecological impact of consumption choices",
   "content": "Scenario: Understanding ecological impact of consumption choices\n    Given Aisha's food choices affect environmental systems\n    And she wants to minimize negative impacts\n    When Aisha selects items in the Value Scanner\n    Then the bioregional_elohim should show environmental impact\n    And it should explain ecological consequences of different options\n    And it should make invisible environmental costs visible\n    And she should understand how consumption affects ecosystems\n    And ecological literacy should inform decision-making\n    And environmental impact should be transparent\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Understanding ecological impact of consumption choices",
+    "ogDescription": "Understanding ecological impact of consumption choices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding ecological impact of consumption choices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding ecological impact of consumption choices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding ecological impact of consumption choices",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-understanding ecological impact of consumption choices",
+    "name": "Understanding ecological impact of consumption choices",
+    "description": "Understanding ecological impact of consumption choices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-educational-learning value literacy through concrete application",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-learning value literacy through concrete application",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning value literacy through concrete application",
   "description": "Learning value literacy through concrete application",
   "content": "Scenario: Learning value literacy through concrete application\n    Given abstract economic theory is less effective than practice\n    And Aisha learns best through direct experience\n    When Aisha uses the Value Scanner\n    Then value education should happen through application\n    And concepts should be taught in context of real decisions\n    And theory should emerge from practice\n    And learning should be concrete and immediately applicable\n    And value literacy should develop through lived experience\n    And education should be embodied, not abstract\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning value literacy through concrete application",
+    "ogDescription": "Learning value literacy through concrete application",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-learning value literacy through concrete application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning value literacy through concrete application - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-learning value literacy through concrete application",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-learning value literacy through concrete application",
+    "name": "Learning value literacy through concrete application",
+    "description": "Learning value literacy through concrete application",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

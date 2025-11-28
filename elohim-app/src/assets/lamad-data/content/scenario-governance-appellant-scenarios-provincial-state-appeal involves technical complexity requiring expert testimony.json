@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-provincial-state-appeal involves technical complexity requiring expert testimony",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal involves technical complexity requiring expert testimony",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal involves technical complexity requiring expert testimony",
   "description": "Appeal involves technical complexity requiring expert testimony",
   "content": "Scenario: Appeal involves technical complexity requiring expert testimony\n    Given my appeal concerns cryptographic verification of agent reasoning\n    And I question whether the agent actually followed claimed constitutional principles\n    When Technical Expert Dr. Amara Okonkwo testifies to the Constitutional Council\n    Then she explains the cryptographic proof in accessible language\n    And She clarifies what confidence levels mean and their limitations\n    And She acknowledges uncertainties in the technical analysis\n    And She presents competing interpretations when experts disagree\n    And She informs but doesn't dictate the council's judgment\n    And The council weighs technical information alongside human wisdom\n    And I understand the technical basis of the decision through her explanation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal involves technical complexity requiring expert testimony",
+    "ogDescription": "Appeal involves technical complexity requiring expert testimony",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal involves technical complexity requiring expert testimony",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal involves technical complexity requiring expert testimony - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal involves technical complexity requiring expert testimony",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal involves technical complexity requiring expert testimony",
+    "name": "Appeal involves technical complexity requiring expert testimony",
+    "description": "Appeal involves technical complexity requiring expert testimony",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

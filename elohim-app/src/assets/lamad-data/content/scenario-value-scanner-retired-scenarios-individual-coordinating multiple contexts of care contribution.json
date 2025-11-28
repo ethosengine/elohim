@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-individual-coordinating multiple contexts of care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-coordinating multiple contexts of care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating multiple contexts of care contribution",
   "description": "Coordinating multiple contexts of care contribution",
   "content": "Scenario: Coordinating multiple contexts of care contribution\n    Given Frank contributes across multiple contexts simultaneously\n    And he volunteers with Habitat, provides family care, serves on council\n    When his personal_agent tracks contributions across contexts\n    Then it should integrate volunteer work, family care, and civic participation\n    And it should coordinate scheduling across multiple commitments\n    And it should prevent overcommitment and burnout\n    And it should surface conflicts and help prioritize\n    And Frank should see his full contribution across all contexts\n    And multi-context participation should be supported and celebrated\n    And the system should help him balance diverse contributions effectively\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating multiple contexts of care contribution",
+    "ogDescription": "Coordinating multiple contexts of care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-coordinating multiple contexts of care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating multiple contexts of care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-coordinating multiple contexts of care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-coordinating multiple contexts of care contribution",
+    "name": "Coordinating multiple contexts of care contribution",
+    "description": "Coordinating multiple contexts of care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

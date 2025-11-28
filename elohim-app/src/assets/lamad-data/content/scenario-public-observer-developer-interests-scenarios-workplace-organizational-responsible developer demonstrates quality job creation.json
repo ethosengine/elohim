@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-workplace-organizational-responsible developer demonstrates quality job creation",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:workplace-organizational-responsible developer demonstrates quality job creation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responsible developer demonstrates quality job creation",
   "description": "Responsible developer demonstrates quality job creation",
   "content": "Scenario: Responsible developer demonstrates quality job creation\n    Given a responsible developer prioritizes workforce development\n    And creates genuine employment opportunities for local residents\n    When the Observer documents employment track record\n    Then analysis shows: 85% of jobs went to local residents\n    And median wage is $24/hour with benefits\n    And developer provides apprenticeship programs for construction trades\n    And permanent jobs offer career advancement opportunities\n    And quality employment becomes competitive advantage for approvals\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Responsible developer demonstrates quality job creation",
+    "ogDescription": "Responsible developer demonstrates quality job creation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-workplace-organizational-responsible developer demonstrates quality job creation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responsible developer demonstrates quality job creation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-workplace-organizational-responsible developer demonstrates quality job creation",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:workplace-organizational-responsible developer demonstrates quality job creation",
+    "name": "Responsible developer demonstrates quality job creation",
+    "description": "Responsible developer demonstrates quality job creation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

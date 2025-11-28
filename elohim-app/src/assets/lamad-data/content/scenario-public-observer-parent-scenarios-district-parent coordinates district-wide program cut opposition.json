@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-district-parent coordinates district-wide program cut opposition",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:district-parent coordinates district-wide program cut opposition",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent coordinates district-wide program cut opposition",
   "description": "Parent coordinates district-wide program cut opposition",
   "content": "Scenario: Parent coordinates district-wide program cut opposition\n    Given the district plans to eliminate music programs to save money\n    And the parent's child participates in the school band\n    When the Observer connects parents across all affected schools\n    Then 230 parents from 8 schools join coordinated advocacy\n    And coalition presents unified data on music program benefits\n    And shows alternative cost-saving options that preserve programs\n    And district-wide parent power prevents divide-and-conquer\n    And music programs are preserved through collective action\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-district",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent coordinates district-wide program cut opposition",
+    "ogDescription": "Parent coordinates district-wide program cut opposition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-district-parent coordinates district-wide program cut opposition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent coordinates district-wide program cut opposition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-district-parent coordinates district-wide program cut opposition",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:district-parent coordinates district-wide program cut opposition",
+    "name": "Parent coordinates district-wide program cut opposition",
+    "description": "Parent coordinates district-wide program cut opposition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

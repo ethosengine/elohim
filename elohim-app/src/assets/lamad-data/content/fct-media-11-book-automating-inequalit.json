@@ -25,6 +25,36 @@
     "author": "Virginia Eubanks"
   },
   "_contributor": "Virginia Eubanks",
-  "createdAt": "2025-11-28T02:53:21.892946",
-  "updatedAt": "2025-11-28T02:53:21.892948"
+  "createdAt": "2025-11-28T21:10:19.220137",
+  "updatedAt": "2025-11-28T21:10:19.220139",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Automating Inequality",
+    "ogDescription": "Book by Virginia Eubanks",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-automating-inequalit",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Automating Inequality - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-automating-inequalit",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Automating Inequality",
+    "description": "Book by Virginia Eubanks",
+    "dateCreated": "2025-11-28T21:10:19.220137",
+    "dateModified": "2025-11-28T21:10:19.220139",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Virginia Eubanks"
+    }
+  }
 }

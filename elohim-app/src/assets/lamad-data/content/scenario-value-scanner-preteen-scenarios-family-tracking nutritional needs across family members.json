@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-tracking nutritional needs across family members",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-tracking nutritional needs across family members",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Tracking nutritional needs across family members",
   "description": "Tracking nutritional needs across family members",
   "content": "Scenario: Tracking nutritional needs across family members\n    Given Marcus is responsible for feeding himself and Keisha\n    And Keisha has specific dietary needs and preferences\n    When Marcus plans meals and shops\n    Then the personal_agent should track both their nutritional requirements\n    And it should alert Marcus to Keisha's needs: \"Keisha needs more iron this week\"\n    And it should help him find affordable foods that meet her requirements\n    And age-appropriate nutrition for both should be maintained\n    And Marcus should have tools to ensure Keisha's healthy development\n    And nutritional tracking should prevent inadequate diet\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Tracking nutritional needs across family members",
+    "ogDescription": "Tracking nutritional needs across family members",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-tracking nutritional needs across family members",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Tracking nutritional needs across family members - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-tracking nutritional needs across family members",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-tracking nutritional needs across family members",
+    "name": "Tracking nutritional needs across family members",
+    "description": "Tracking nutritional needs across family members",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

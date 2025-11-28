@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator mental health and wellbeing improves across converted locations",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-franchise operator mental health and wellbeing improves across converted locations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Franchise operator mental health and wellbeing improves across converted locations",
   "description": "Franchise operator mental health and wellbeing improves across converted locations",
   "content": "Scenario: Franchise operator mental health and wellbeing improves across converted locations\n    Given franchise operation causes severe stress from dual extraction and moral injury\n    And operators suffer isolation, anxiety, and health problems from franchise burden\n    When conversions liberate operators from extraction trap\n    Then operator mental health improves measurably (reduced anxiety, better sleep, lower stress)\n    And peer support network among converted operators provides community\n    And health outcomes are documented showing franchise model's human cost\n    And sector awareness grows about franchise operation's psychological toll\n    And industry_sector_elohim documents wellbeing improvements advocating for conversion support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Franchise operator mental health and wellbeing improves across converted locations",
+    "ogDescription": "Franchise operator mental health and wellbeing improves across converted locations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator mental health and wellbeing improves across converted locations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise operator mental health and wellbeing improves across converted locations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator mental health and wellbeing improves across converted locations",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-franchise operator mental health and wellbeing improves across converted locations",
+    "name": "Franchise operator mental health and wellbeing improves across converted locations",
+    "description": "Franchise operator mental health and wellbeing improves across converted locations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

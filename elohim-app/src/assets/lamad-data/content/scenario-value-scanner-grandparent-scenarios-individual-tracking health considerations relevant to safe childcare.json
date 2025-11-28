@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-individual-tracking health considerations relevant to safe childcare",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-tracking health considerations relevant to safe childcare",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Tracking health considerations relevant to safe childcare",
   "description": "Tracking health considerations relevant to safe childcare",
   "content": "Scenario: Tracking health considerations relevant to safe childcare\n    Given Margaret takes medications and has health conditions\n    And she needs to provide safe, active care for young children\n    When the personal_agent monitors Margaret's health status\n    Then it should track whether health enables safe childcare\n    And it should flag if medications or conditions affect caregiving capacity\n    And it should suggest when to communicate limitations to family\n    And it should support Margaret's health management\n    And it should ensure children's safety while preserving Margaret's dignity\n    And health monitoring should enable safe, sustainable care provision\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Tracking health considerations relevant to safe childcare",
+    "ogDescription": "Tracking health considerations relevant to safe childcare",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-tracking health considerations relevant to safe childcare",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Tracking health considerations relevant to safe childcare - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-tracking health considerations relevant to safe childcare",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-tracking health considerations relevant to safe childcare",
+    "name": "Tracking health considerations relevant to safe childcare",
+    "description": "Tracking health considerations relevant to safe childcare",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

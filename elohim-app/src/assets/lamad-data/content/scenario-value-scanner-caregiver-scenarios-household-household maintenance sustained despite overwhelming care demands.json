@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household maintenance sustained despite overwhelming care demands",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household maintenance sustained despite overwhelming care demands",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household maintenance sustained despite overwhelming care demands",
   "description": "Household maintenance sustained despite overwhelming care demands",
   "content": "Scenario: Household maintenance sustained despite overwhelming care demands\n    Given James is overwhelmed with caregiving responsibilities\n    And routine household maintenance is difficult to maintain\n    When household maintenance needs arise\n    Then the household_elohim should connect to community support\n    And neighbors should be able to assist with household tasks\n    And care economy should enable mutual aid for household maintenance\n    And James should access help without depleting limited finances\n    And household should remain functional despite care intensity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household maintenance sustained despite overwhelming care demands",
+    "ogDescription": "Household maintenance sustained despite overwhelming care demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household maintenance sustained despite overwhelming care demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household maintenance sustained despite overwhelming care demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household maintenance sustained despite overwhelming care demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household maintenance sustained despite overwhelming care demands",
+    "name": "Household maintenance sustained despite overwhelming care demands",
+    "description": "Household maintenance sustained despite overwhelming care demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

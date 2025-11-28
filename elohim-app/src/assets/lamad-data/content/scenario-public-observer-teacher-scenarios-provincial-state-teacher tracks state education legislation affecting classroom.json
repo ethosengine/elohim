@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher tracks state education legislation affecting classroom",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher tracks state education legislation affecting classroom",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher tracks state education legislation affecting classroom",
   "description": "Teacher tracks state education legislation affecting classroom",
   "content": "Scenario: Teacher tracks state education legislation affecting classroom\n    Given state legislature is considering education bills\n    And teachers can't track complex legislative processes while teaching\n    When the Observer monitors state education legislation\n    Then teachers receive alerts on bills affecting their work\n    And get plain-language summaries of education policy changes\n    And see projected impact on classroom teaching and learning\n    And access advocacy pathways (testimony, legislator contact, coalition)\n    And state policy becomes visible and actionable for frontline professionals\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher tracks state education legislation affecting classroom",
+    "ogDescription": "Teacher tracks state education legislation affecting classroom",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher tracks state education legislation affecting classroom",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher tracks state education legislation affecting classroom - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher tracks state education legislation affecting classroom",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher tracks state education legislation affecting classroom",
+    "name": "Teacher tracks state education legislation affecting classroom",
+    "description": "Teacher tracks state education legislation affecting classroom",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

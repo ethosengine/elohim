@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry leadership diversity includes care economy advocates",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry leadership diversity includes care economy advocates",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Industry leadership diversity includes care economy advocates",
   "description": "Industry leadership diversity includes care economy advocates",
   "content": "Scenario: Industry leadership diversity includes care economy advocates\n    Given industry leadership shapes sector culture and policy\n    And care economy advocates need representation in leadership\n    And Robert has accumulated experience and standing\n    When industry_elohim supports leadership advancement\n    Then it should help Robert pursue industry leadership positions\n    And recognize his care economy expertise as leadership qualification\n    And support him in bringing care economy perspective to leadership\n    And build industry leadership that includes caregivers and care economy advocates\n    And advance care economy through leadership representation\n    And demonstrate that care experience qualifies for industry leadership\n    And transform industry through leadership diversity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Industry leadership diversity includes care economy advocates",
+    "ogDescription": "Industry leadership diversity includes care economy advocates",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry leadership diversity includes care economy advocates",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Industry leadership diversity includes care economy advocates - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry leadership diversity includes care economy advocates",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry leadership diversity includes care economy advocates",
+    "name": "Industry leadership diversity includes care economy advocates",
+    "description": "Industry leadership diversity includes care economy advocates",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

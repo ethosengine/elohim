@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-school-teacher reveals disparate working conditions",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher reveals disparate working conditions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher reveals disparate working conditions",
   "description": "Teacher reveals disparate working conditions",
   "content": "Scenario: Teacher reveals disparate working conditions\n    Given some teachers have adequate planning time while others don't\n    And resource distribution within school is inequitable\n    When the Observer documents working conditions by department\n    Then disparities become visible (English: 45min planning, Math: 90min)\n    And teachers identify structural causes vs individual complaints\n    And principal sees evidence requiring fair scheduling\n    And working conditions equity improves school-wide\n    And transparency drives fairness\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-school",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher reveals disparate working conditions",
+    "ogDescription": "Teacher reveals disparate working conditions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher reveals disparate working conditions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher reveals disparate working conditions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher reveals disparate working conditions",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher reveals disparate working conditions",
+    "name": "Teacher reveals disparate working conditions",
+    "description": "Teacher reveals disparate working conditions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

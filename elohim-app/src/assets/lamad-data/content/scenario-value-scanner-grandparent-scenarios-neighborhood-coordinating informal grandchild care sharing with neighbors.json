@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating informal grandchild care sharing with neighbors",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-coordinating informal grandchild care sharing with neighbors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating informal grandchild care sharing with neighbors",
   "description": "Coordinating informal grandchild care sharing with neighbors",
   "content": "Scenario: Coordinating informal grandchild care sharing with neighbors\n    Given Margaret cares for her grandchildren regularly\n    And other neighborhood grandparents also provide childcare\n    When Margaret coordinates with other grandparents\n    Then the neighborhood_elohim should facilitate care coordination\n    And it should help grandparents share resources and support\n    And it should enable mutual aid among neighborhood grandparents\n    And grandparents should form care networks for collective benefit\n    And neighborhood care economy should strengthen through elder collaboration\n    And Margaret should connect with other grandparents in similar roles\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating informal grandchild care sharing with neighbors",
+    "ogDescription": "Coordinating informal grandchild care sharing with neighbors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating informal grandchild care sharing with neighbors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating informal grandchild care sharing with neighbors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating informal grandchild care sharing with neighbors",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-coordinating informal grandchild care sharing with neighbors",
+    "name": "Coordinating informal grandchild care sharing with neighbors",
+    "description": "Coordinating informal grandchild care sharing with neighbors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

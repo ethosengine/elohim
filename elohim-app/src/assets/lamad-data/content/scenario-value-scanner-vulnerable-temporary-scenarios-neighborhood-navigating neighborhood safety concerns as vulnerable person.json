@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-navigating neighborhood safety concerns as vulnerable person",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-navigating neighborhood safety concerns as vulnerable person",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Navigating neighborhood safety concerns as vulnerable person",
   "description": "Navigating neighborhood safety concerns as vulnerable person",
   "content": "Scenario: Navigating neighborhood safety concerns as vulnerable person\n    Given I have heightened safety concerns due to domestic violence\n    And I am learning a new neighborhood's safety landscape\n    When I assess and navigate neighborhood safety\n    Then the Value Scanner helps me identify safe routes and spaces\n    And surfaces information about neighborhood safety patterns\n    And connects me to neighbors who can provide safety support\n    And helps me teach children neighborhood safety practices\n    And tracks safety concerns and incidents\n    And my personal_agent alerts me to potential safety issues\n    And recognizes safety navigation as constant cognitive labor\n    And validates that my vigilance is appropriate\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Navigating neighborhood safety concerns as vulnerable person",
+    "ogDescription": "Navigating neighborhood safety concerns as vulnerable person",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-navigating neighborhood safety concerns as vulnerable person",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating neighborhood safety concerns as vulnerable person - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-navigating neighborhood safety concerns as vulnerable person",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-navigating neighborhood safety concerns as vulnerable person",
+    "name": "Navigating neighborhood safety concerns as vulnerable person",
+    "description": "Navigating neighborhood safety concerns as vulnerable person",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

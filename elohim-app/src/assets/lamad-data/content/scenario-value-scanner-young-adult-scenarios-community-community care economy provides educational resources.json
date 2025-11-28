@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-community-community care economy provides educational resources",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-community care economy provides educational resources",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community care economy provides educational resources",
   "description": "Community care economy provides educational resources",
   "content": "Scenario: Community care economy provides educational resources\n    Given Aisha wants to develop new skills\n    And community education resources exist\n    When Aisha seeks skill development opportunities\n    Then the community_elohim should surface learning resources\n    And it should connect her to workshops, classes, or mentoring\n    And her care contributions should enable access to education\n    And community knowledge should be shared through care economy\n    And lifelong learning should be supported at community level\n    And skill development should be accessible through care participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Community care economy provides educational resources",
+    "ogDescription": "Community care economy provides educational resources",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-community care economy provides educational resources",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care economy provides educational resources - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-community-community care economy provides educational resources",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:community-community care economy provides educational resources",
+    "name": "Community care economy provides educational resources",
+    "description": "Community care economy provides educational resources",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

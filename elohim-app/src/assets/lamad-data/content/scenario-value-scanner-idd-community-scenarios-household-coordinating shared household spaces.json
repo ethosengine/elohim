@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-coordinating shared household spaces",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-coordinating shared household spaces",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating shared household spaces",
   "description": "Coordinating shared household spaces",
   "content": "Scenario: Coordinating shared household spaces\n    Given Jordan shares the living room with three housemates\n    And conflicts sometimes arise about TV use or noise\n    When Jordan wants to watch their favorite show\n    Then the household schedule shows shared space availability\n    And Jordan can book TV time using the visual scheduling interface\n    And the system helps housemates negotiate conflicts fairly\n    And Jordan's preferences matter as much as other housemates\n    And the household_elohim facilitates respectful conflict resolution\n    And Jordan learns about shared space cooperation\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating shared household spaces",
+    "ogDescription": "Coordinating shared household spaces",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-coordinating shared household spaces",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating shared household spaces - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-coordinating shared household spaces",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-coordinating shared household spaces",
+    "name": "Coordinating shared household spaces",
+    "description": "Coordinating shared household spaces",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

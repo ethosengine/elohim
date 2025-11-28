@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-worker-scenarios-industry-sector-workers coordinate sector-wide minimum standards",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:industry-sector-workers coordinate sector-wide minimum standards",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workers coordinate sector-wide minimum standards",
   "description": "Workers coordinate sector-wide minimum standards",
   "content": "Scenario: Workers coordinate sector-wide minimum standards\n    Given different EAE food entities have varying wage and benefit levels\n    And workers want to prevent race-to-bottom competition\n    When food service sector workers hold coordination meeting\n    Then workers from multiple entities propose sector minimum wage ($18/hour)\n    And workers deliberate on benefits standards (paid sick leave, health insurance)\n    And sector workers vote to adopt coordinated minimums\n    And industry_sector_elohim helps enforce standards across network\n    And local entities can exceed minimums but not undercut them\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-worker-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Workers coordinate sector-wide minimum standards",
+    "ogDescription": "Workers coordinate sector-wide minimum standards",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-industry-sector-workers coordinate sector-wide minimum standards",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workers coordinate sector-wide minimum standards - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-industry-sector-workers coordinate sector-wide minimum standards",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:industry-sector-workers coordinate sector-wide minimum standards",
+    "name": "Workers coordinate sector-wide minimum standards",
+    "description": "Workers coordinate sector-wide minimum standards",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

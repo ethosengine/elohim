@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace culture shift through middle management advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-workplace culture shift through middle management advocacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace culture shift through middle management advocacy",
   "description": "Workplace culture shift through middle management advocacy",
   "content": "Scenario: Workplace culture shift through middle management advocacy\n    Given Robert has influence as mid-level manager\n    And workplace culture often penalizes care responsibilities\n    And middle managers can model care-friendly leadership\n    When workplace_elohim supports culture change\n    Then it should help Robert model care economy principles in his management\n    And support him in being transparent about his care responsibilities\n    And help him advocate for team members' care needs\n    And build workplace culture where care is normalized rather than hidden\n    And demonstrate that managers can lead cultural transformation\n    And create workplace environment where caregiving is supported\n    And leverage his position for systemic culture change\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace culture shift through middle management advocacy",
+    "ogDescription": "Workplace culture shift through middle management advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace culture shift through middle management advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace culture shift through middle management advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace culture shift through middle management advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-workplace culture shift through middle management advocacy",
+    "name": "Workplace culture shift through middle management advocacy",
+    "description": "Workplace culture shift through middle management advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

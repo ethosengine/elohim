@@ -25,6 +25,36 @@
     "author": "Matthew Desmond"
   },
   "_contributor": "Matthew Desmond",
-  "createdAt": "2025-11-28T02:53:21.892527",
-  "updatedAt": "2025-11-28T02:53:21.892528"
+  "createdAt": "2025-11-28T21:10:19.219706",
+  "updatedAt": "2025-11-28T21:10:19.219707",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Poverty, by America",
+    "ogDescription": "Book by Matthew Desmond",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-11-book-poverty-by-america",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Poverty, by America - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-11-book-poverty-by-america",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Poverty, by America",
+    "description": "Book by Matthew Desmond",
+    "dateCreated": "2025-11-28T21:10:19.219706",
+    "dateModified": "2025-11-28T21:10:19.219707",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Matthew Desmond"
+    }
+  }
 }

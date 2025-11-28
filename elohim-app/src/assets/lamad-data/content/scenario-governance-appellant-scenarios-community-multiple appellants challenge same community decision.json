@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-community-multiple appellants challenge same community decision",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-multiple appellants challenge same community decision",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Multiple appellants challenge same community decision",
   "description": "Multiple appellants challenge same community decision",
   "content": "Scenario: Multiple appellants challenge same community decision\n    Given several community members appeal the same Community Elohim decision\n    And we all believe a community resource decision was unjust\n    When Constitutional Council reviews the multiple related appeals\n    Then they treat this as collective concern requiring community deliberation\n    And They evaluate if the decision violated community consensus\n    And They examine if community participation in the decision was adequate\n    And They may convene community assembly to deliberate the issue\n    And The appeals trigger democratic engagement not just individual recourse\n    And Community governance evolves through collective voice\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Multiple appellants challenge same community decision",
+    "ogDescription": "Multiple appellants challenge same community decision",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-multiple appellants challenge same community decision",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multiple appellants challenge same community decision - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-multiple appellants challenge same community decision",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-multiple appellants challenge same community decision",
+    "name": "Multiple appellants challenge same community decision",
+    "description": "Multiple appellants challenge same community decision",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

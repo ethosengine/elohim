@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-04-scaling-wisdom"
   },
-  "createdAt": "2025-11-28T02:53:21.854566",
-  "updatedAt": "2025-11-28T02:53:21.854567"
+  "createdAt": "2025-11-28T21:10:19.196737",
+  "updatedAt": "2025-11-28T21:10:19.196738",
+  "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Scaling Wisdom: Lessons from Righteous Old Testament Leaders",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Scaling Wisdom: Lessons from Righteous Old Testament Leaders - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-story",
+    "identifier": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+    "name": "Scaling Wisdom: Lessons from Righteous Old Testament Leaders",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.196737",
+    "dateModified": "2025-11-28T21:10:19.196738",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

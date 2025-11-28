@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-activist-scenarios-individual-activist detects surveillance attempt and activates sanctuary",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:individual-activist detects surveillance attempt and activates sanctuary",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist detects surveillance attempt and activates sanctuary",
   "description": "Activist detects surveillance attempt and activates sanctuary",
   "content": "Scenario: Activist detects surveillance attempt and activates sanctuary\n    Given the activist is organizing a climate justice campaign\n    And they have shared organizing documents with their local group\n    When the system detects repeated unauthorized access attempts to their node\n    And the protection agent identifies a pattern indicating state surveillance\n    Then the activist receives immediate alert with threat assessment\n    And sanctuary protocol options are presented\n    And the activist can choose to fragment data across sanctuary institutions\n    And organizing continues through secure channels\n    And the community is alerted to heightened security measures\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-activist-scenarios-individual",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist detects surveillance attempt and activates sanctuary",
+    "ogDescription": "Activist detects surveillance attempt and activates sanctuary",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-individual-activist detects surveillance attempt and activates sanctuary",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist detects surveillance attempt and activates sanctuary - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-individual-activist detects surveillance attempt and activates sanctuary",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:individual-activist detects surveillance attempt and activates sanctuary",
+    "name": "Activist detects surveillance attempt and activates sanctuary",
+    "description": "Activist detects surveillance attempt and activates sanctuary",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

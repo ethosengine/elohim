@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-frugality as environmental practice recognized and valued",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-frugality as environmental practice recognized and valued",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Frugality as environmental practice recognized and valued",
   "description": "Frugality as environmental practice recognized and valued",
   "content": "Scenario: Frugality as environmental practice recognized and valued\n    Given Helen's resource constraint requires careful consumption\n    And frugality reduces environmental impact\n    When Helen makes resource-conscious decisions\n    Then her frugality should be recognized as environmental stewardship\n    And poverty should not be stigmatized when it reduces consumption\n    And her low-impact lifestyle should be valued, not pitied\n    And care tokens should reflect environmental benefit of reduced consumption\n    And the protocol should challenge assumption that consumption equals flourishing\n    And Helen's economic constraint should be reframed as ecological wisdom\n    And environmental movement should learn from those who live with less by necessity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Frugality as environmental practice recognized and valued",
+    "ogDescription": "Frugality as environmental practice recognized and valued",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-frugality as environmental practice recognized and valued",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Frugality as environmental practice recognized and valued - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-frugality as environmental practice recognized and valued",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-frugality as environmental practice recognized and valued",
+    "name": "Frugality as environmental practice recognized and valued",
+    "description": "Frugality as environmental practice recognized and valued",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

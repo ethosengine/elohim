@@ -25,6 +25,32 @@
     "sourceModule": "fct-module-04-scaling-wisdom",
     "activityType": "discussion"
   },
-  "createdAt": "2025-11-28T02:53:21.854557",
-  "updatedAt": "2025-11-28T02:53:21.854559"
+  "createdAt": "2025-11-28T21:10:19.196730",
+  "updatedAt": "2025-11-28T21:10:19.196731",
+  "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Setting the Stage: Scaling Wisdom",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Setting the Stage: Scaling Wisdom - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+    "name": "Discussion: Setting the Stage: Scaling Wisdom",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.196730",
+    "dateModified": "2025-11-28T21:10:19.196731",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-family-wisdom and experience sharing valued as family contribution",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-wisdom and experience sharing valued as family contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Wisdom and experience sharing valued as family contribution",
   "description": "Wisdom and experience sharing valued as family contribution",
   "content": "Scenario: Wisdom and experience sharing valued as family contribution\n    Given Frank has 70 years of life experience and decades of construction expertise\n    And his knowledge is valuable family resource\n    When family_elohim tracks knowledge sharing\n    Then Frank's guidance to adult children should be recognized\n    And teaching grandchildren life and practical skills should be valued\n    And sharing construction knowledge should be quantified\n    And wisdom transmission should count as care contribution\n    And family should experience Frank as source of valuable knowledge\n    And his expertise should be actively utilized, not patronized\n    And knowledge sharing should be reciprocal across generations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Wisdom and experience sharing valued as family contribution",
+    "ogDescription": "Wisdom and experience sharing valued as family contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-wisdom and experience sharing valued as family contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Wisdom and experience sharing valued as family contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-wisdom and experience sharing valued as family contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-wisdom and experience sharing valued as family contribution",
+    "name": "Wisdom and experience sharing valued as family contribution",
+    "description": "Wisdom and experience sharing valued as family contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

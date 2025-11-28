@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-elder-scenarios-neighborhood-elder coordinates neighborhood elder check-in system",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder coordinates neighborhood elder check-in system",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder coordinates neighborhood elder check-in system",
   "description": "Elder coordinates neighborhood elder check-in system",
   "content": "Scenario: Elder coordinates neighborhood elder check-in system\n    Given several elders in the neighborhood live alone\n    And Rose wants to ensure everyone has daily connection\n    When Rose proposes a daily elder check-in system\n    And volunteers agree to participate in rotation\n    Then the coordination agent helps organize the schedule\n    And each elder receives daily contact from neighbors\n    And any concerns are immediately surfaced to family and community\n    And Rose experiences agency in building community care\n    And isolation is prevented through systematic connection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder coordinates neighborhood elder check-in system",
+    "ogDescription": "Elder coordinates neighborhood elder check-in system",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder coordinates neighborhood elder check-in system",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder coordinates neighborhood elder check-in system - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder coordinates neighborhood elder check-in system",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder coordinates neighborhood elder check-in system",
+    "name": "Elder coordinates neighborhood elder check-in system",
+    "description": "Elder coordinates neighborhood elder check-in system",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

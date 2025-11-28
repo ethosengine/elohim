@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher builds solidarity across educator roles",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher builds solidarity across educator roles",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher builds solidarity across educator roles",
   "description": "Teacher builds solidarity across educator roles",
   "content": "Scenario: Teacher builds solidarity across educator roles\n    Given teachers, paraprofessionals, and support staff share labor interests\n    But often lack coordination and mutual understanding\n    When the Observer facilitates cross-role working conditions analysis\n    Then educators see shared challenges (understaffing, disrespect, inadequate pay)\n    And identify how working conditions affect student support\n    And build coalition across educator roles for contract negotiations\n    And solidarity emerges from shared evidence and common interests\n    And labor advocacy becomes comprehensive not siloed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher builds solidarity across educator roles",
+    "ogDescription": "Teacher builds solidarity across educator roles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher builds solidarity across educator roles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher builds solidarity across educator roles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher builds solidarity across educator roles",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher builds solidarity across educator roles",
+    "name": "Teacher builds solidarity across educator roles",
+    "description": "Teacher builds solidarity across educator roles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

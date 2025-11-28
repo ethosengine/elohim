@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-household-household schedule coordination across four people",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-household schedule coordination across four people",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household schedule coordination across four people",
   "description": "Household schedule coordination across four people",
   "content": "Scenario: Household schedule coordination across four people\n    Given Sarah coordinates schedules for herself, partner, Tommy, and Emma\n    And everyone has different needs, activities, and constraints\n    When Sarah manages the family calendar\n    Then the household_elohim should recognize this as complex coordination\n    And it should track the cognitive labor of schedule management\n    And it should value the dozens of micro-decisions required\n    And Sarah's coordination work should be made visible\n    And schedule management should accumulate significant care tokens\n    And this invisible orchestration should be recognized as skilled work\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Household schedule coordination across four people",
+    "ogDescription": "Household schedule coordination across four people",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-household schedule coordination across four people",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household schedule coordination across four people - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-household-household schedule coordination across four people",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:household-household schedule coordination across four people",
+    "name": "Household schedule coordination across four people",
+    "description": "Household schedule coordination across four people",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

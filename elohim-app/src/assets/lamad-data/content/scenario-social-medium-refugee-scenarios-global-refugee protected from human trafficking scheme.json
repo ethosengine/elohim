@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-refugee-scenarios-global-refugee protected from human trafficking scheme",
+  "did": "did:web:elohim.host:content:social-medium:refugee:scenarios:global-refugee protected from human trafficking scheme",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Refugee protected from human trafficking scheme",
   "description": "Refugee protected from human trafficking scheme",
   "content": "Scenario: Refugee protected from human trafficking scheme\n    Given Amira is seeking employment in Germany\n    When traffickers posing as employers try to contact her\n    And they offer suspiciously lucrative jobs requiring isolation\n    Then the protection agent identifies trafficking patterns\n    And the fraudulent messages never reach Amira\n    And she is protected without knowing she was targeted\n    And legitimate employment resources continue to reach her\n    And vulnerable refugees are protected from exploitation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-refugee-scenarios-global",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Refugee protected from human trafficking scheme",
+    "ogDescription": "Refugee protected from human trafficking scheme",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-refugee-scenarios-global-refugee protected from human trafficking scheme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Refugee protected from human trafficking scheme - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-refugee-scenarios-global-refugee protected from human trafficking scheme",
+    "identifier": "did:web:elohim.host:content:social-medium:refugee:scenarios:global-refugee protected from human trafficking scheme",
+    "name": "Refugee protected from human trafficking scheme",
+    "description": "Refugee protected from human trafficking scheme",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

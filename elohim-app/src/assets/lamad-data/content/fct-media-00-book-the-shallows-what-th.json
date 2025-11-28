@@ -25,6 +25,36 @@
     "author": "Nicholas Carr"
   },
   "_contributor": "Nicholas Carr",
-  "createdAt": "2025-11-28T02:53:21.848097",
-  "updatedAt": "2025-11-28T02:53:21.848098"
+  "createdAt": "2025-11-28T21:10:19.190440",
+  "updatedAt": "2025-11-28T21:10:19.190441",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The Shallows: What the Internet Is Doing to Our Brains",
+    "ogDescription": "Book by Nicholas Carr",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-the-shallows-what-th",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The Shallows: What the Internet Is Doing to Our Brains - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-the-shallows-what-th",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "The Shallows: What the Internet Is Doing to Our Brains",
+    "description": "Book by Nicholas Carr",
+    "dateCreated": "2025-11-28T21:10:19.190440",
+    "dateModified": "2025-11-28T21:10:19.190441",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Nicholas Carr"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-content-creator-scenarios-community-creator produces age-appropriate content for local youth",
+  "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community-creator produces age-appropriate content for local youth",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Creator produces age-appropriate content for local youth",
   "description": "Creator produces age-appropriate content for local youth",
   "content": "Scenario: Creator produces age-appropriate content for local youth\n    Given Sam creates content about neighborhood nature exploration\n    And the content is designed for children aged 8-12\n    When Sam contributes the content to educational spaces\n    Then the guardian agent verifies age-appropriateness\n    And local children can access the content safely\n    And parents can review and approve their children's participation\n    And Sam helps children learn about their local environment\n    And community benefits from quality youth programming\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-content-creator-scenarios-community",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Creator produces age-appropriate content for local youth",
+    "ogDescription": "Creator produces age-appropriate content for local youth",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-community-creator produces age-appropriate content for local youth",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creator produces age-appropriate content for local youth - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-community-creator produces age-appropriate content for local youth",
+    "identifier": "did:web:elohim.host:content:social-medium:content-creator:scenarios:community-creator produces age-appropriate content for local youth",
+    "name": "Creator produces age-appropriate content for local youth",
+    "description": "Creator produces age-appropriate content for local youth",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

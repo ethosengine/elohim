@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-community-journalist tracks neighborhood promises over time",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist tracks neighborhood promises over time",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist tracks neighborhood promises over time",
   "description": "Journalist tracks neighborhood promises over time",
   "content": "Scenario: Journalist tracks neighborhood promises over time\n    Given city officials promised park improvements at community meeting\n    And the journalist covers 12 neighborhoods with similar promises\n    When the Observer monitors promise implementation across neighborhoods\n    Then the journalist receives alert that 18 months have passed\n    And sees park still unimproved despite promise\n    And identifies pattern of broken promises in communities of color\n    And publishes accountability story on systematic neglect\n    And institutional memory prevents promises from being forgotten\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist tracks neighborhood promises over time",
+    "ogDescription": "Journalist tracks neighborhood promises over time",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist tracks neighborhood promises over time",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist tracks neighborhood promises over time - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist tracks neighborhood promises over time",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist tracks neighborhood promises over time",
+    "name": "Journalist tracks neighborhood promises over time",
+    "description": "Journalist tracks neighborhood promises over time",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

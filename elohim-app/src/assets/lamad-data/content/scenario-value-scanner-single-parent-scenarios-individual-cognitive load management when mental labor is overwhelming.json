@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-individual-cognitive load management when mental labor is overwhelming",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-cognitive load management when mental labor is overwhelming",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Cognitive load management when mental labor is overwhelming",
   "description": "Cognitive load management when mental labor is overwhelming",
   "content": "Scenario: Cognitive load management when mental labor is overwhelming\n    Given Maria tracks countless details across three children's lives plus household plus work\n    And she has no partner to share the mental load\n    When Maria's cognitive load becomes unsustainable\n    Then the personal_agent should actively hold complexity for her\n    And it should remember what she can't\n    And it should surface important details at the right time\n    And it should reduce rather than increase mental labor\n    And Maria should have external cognitive support that makes solo parenting more manageable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Cognitive load management when mental labor is overwhelming",
+    "ogDescription": "Cognitive load management when mental labor is overwhelming",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-cognitive load management when mental labor is overwhelming",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Cognitive load management when mental labor is overwhelming - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-cognitive load management when mental labor is overwhelming",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-cognitive load management when mental labor is overwhelming",
+    "name": "Cognitive load management when mental labor is overwhelming",
+    "description": "Cognitive load management when mental labor is overwhelming",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

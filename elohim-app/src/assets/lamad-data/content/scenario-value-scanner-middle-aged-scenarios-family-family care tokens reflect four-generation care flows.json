@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-family-family care tokens reflect four-generation care flows",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-family care tokens reflect four-generation care flows",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care tokens reflect four-generation care flows",
   "description": "Family care tokens reflect four-generation care flows",
   "content": "Scenario: Family care tokens reflect four-generation care flows\n    Given care flows in multiple directions across the family\n    And Robert receives support from siblings and provides support to parents and children\n    And care contributions need to be recognized across all flows\n    When family_elohim calculates family care tokens\n    Then it should track care across all four generations\n    And recognize Robert's care for parents and support for children\n    And value siblings' parent care contributions\n    And recognize adult children's emerging care contributions\n    And track grandparent care across the family\n    And make visible the complex web of family care reciprocity\n    And demonstrate that family functions through mutual care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care tokens reflect four-generation care flows",
+    "ogDescription": "Family care tokens reflect four-generation care flows",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-family care tokens reflect four-generation care flows",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care tokens reflect four-generation care flows - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-family care tokens reflect four-generation care flows",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-family care tokens reflect four-generation care flows",
+    "name": "Family care tokens reflect four-generation care flows",
+    "description": "Family care tokens reflect four-generation care flows",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

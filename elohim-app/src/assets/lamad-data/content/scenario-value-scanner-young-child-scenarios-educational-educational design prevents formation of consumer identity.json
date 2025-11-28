@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-educational-educational design prevents formation of consumer identity",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-educational design prevents formation of consumer identity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Educational design prevents formation of consumer identity",
   "description": "Educational design prevents formation of consumer identity",
   "content": "Scenario: Educational design prevents formation of consumer identity\n    Given consumer capitalism targets children for identity formation\n    And Tommy is highly vulnerable to conditioning\n    When Tommy learns through the Value Scanner\n    Then no gamification should train extraction thinking\n    And no points systems should create achievement addiction\n    And no rewards should condition consumption behavior\n    And identity formation should center on care, not acquisition\n    And Tommy should learn to see himself as contributor, not consumer\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Educational design prevents formation of consumer identity",
+    "ogDescription": "Educational design prevents formation of consumer identity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-educational design prevents formation of consumer identity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Educational design prevents formation of consumer identity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-educational design prevents formation of consumer identity",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-educational design prevents formation of consumer identity",
+    "name": "Educational design prevents formation of consumer identity",
+    "description": "Educational design prevents formation of consumer identity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

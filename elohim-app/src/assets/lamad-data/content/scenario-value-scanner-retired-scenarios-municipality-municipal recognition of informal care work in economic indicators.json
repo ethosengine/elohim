@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-municipality-municipal recognition of informal care work in economic indicators",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal recognition of informal care work in economic indicators",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal recognition of informal care work in economic indicators",
   "description": "Municipal recognition of informal care work in economic indicators",
   "content": "Scenario: Municipal recognition of informal care work in economic indicators\n    Given Frank provides substantial unpaid care work\n    And traditional municipal economic indicators ignore care economy\n    When the municipal_elohim tracks economic activity\n    Then it should include care work in municipal economic reporting\n    And Frank's volunteer labor should be counted in economic indicators\n    And municipal GDP should reflect care economy contributions\n    And retirement should be understood as economic participation\n    And policy should be based on complete economic picture\n    And Frank's contributions should be visible in municipal economics\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal recognition of informal care work in economic indicators",
+    "ogDescription": "Municipal recognition of informal care work in economic indicators",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal recognition of informal care work in economic indicators",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal recognition of informal care work in economic indicators - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal recognition of informal care work in economic indicators",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal recognition of informal care work in economic indicators",
+    "name": "Municipal recognition of informal care work in economic indicators",
+    "description": "Municipal recognition of informal care work in economic indicators",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

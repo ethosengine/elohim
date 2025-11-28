@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood inclusion ensures isolated residents are connected",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood inclusion ensures isolated residents are connected",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood inclusion ensures isolated residents are connected",
   "description": "Neighborhood inclusion ensures isolated residents are connected",
   "content": "Scenario: Neighborhood inclusion ensures isolated residents are connected\n    Given some neighbors are isolated due to age, disability, or circumstance\n    And Robert has capacity to reach out\n    And neighborhood care economy should include everyone\n    When neighborhood_elohim identifies isolated residents\n    Then it should surface opportunities to connect with isolated neighbors\n    And help Robert offer appropriate support\n    And recognize his outreach as valuable care contribution\n    And build inclusive neighborhood where no one is invisible\n    And prevent isolation that harms individual and neighborhood wellbeing\n    And demonstrate that care economy includes intentional inclusion\n    And strengthen neighborhood by ensuring everyone belongs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood inclusion ensures isolated residents are connected",
+    "ogDescription": "Neighborhood inclusion ensures isolated residents are connected",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood inclusion ensures isolated residents are connected",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood inclusion ensures isolated residents are connected - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood inclusion ensures isolated residents are connected",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood inclusion ensures isolated residents are connected",
+    "name": "Neighborhood inclusion ensures isolated residents are connected",
+    "description": "Neighborhood inclusion ensures isolated residents are connected",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

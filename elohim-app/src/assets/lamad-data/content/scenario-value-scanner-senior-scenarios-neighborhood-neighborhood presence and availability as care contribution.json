@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-neighborhood-neighborhood presence and availability as care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood-neighborhood presence and availability as care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood presence and availability as care contribution",
   "description": "Neighborhood presence and availability as care contribution",
   "content": "Scenario: Neighborhood presence and availability as care contribution\n    Given Margaret is present in the neighborhood during working hours\n    And she can respond to neighborhood needs in real-time\n    When the neighborhood_elohim tracks presence-based care\n    Then Margaret's availability should be recognized as valuable\n    And her ability to receive packages for working neighbors should be tracked\n    And her presence during emergencies should be valued\n    And the care contribution of simply being present should be visible\n    And neighborhood benefits from retiree presence should be quantified\n    And Margaret should understand her availability has real value\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood presence and availability as care contribution",
+    "ogDescription": "Neighborhood presence and availability as care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-neighborhood-neighborhood presence and availability as care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood presence and availability as care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-neighborhood-neighborhood presence and availability as care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood-neighborhood presence and availability as care contribution",
+    "name": "Neighborhood presence and availability as care contribution",
+    "description": "Neighborhood presence and availability as care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

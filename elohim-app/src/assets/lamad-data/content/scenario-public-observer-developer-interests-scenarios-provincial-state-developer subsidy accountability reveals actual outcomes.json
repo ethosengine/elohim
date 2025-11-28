@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-developer subsidy accountability reveals actual outcomes",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer subsidy accountability reveals actual outcomes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer subsidy accountability reveals actual outcomes",
   "description": "Developer subsidy accountability reveals actual outcomes",
   "content": "Scenario: Developer subsidy accountability reveals actual outcomes\n    Given a developer received $10M state tax credit for \"affordable housing\"\n    And claimed it would produce 200 affordable units\n    When the Observer tracks subsidy outcomes\n    Then analysis shows: only 35 units meet affordability criteria\n    And most units are market-rate generating developer profit\n    And state subsidy mostly subsidized luxury development\n    And taxpayers see poor return on public investment\n    And accountability creates pressure for subsidy reform\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer subsidy accountability reveals actual outcomes",
+    "ogDescription": "Developer subsidy accountability reveals actual outcomes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer subsidy accountability reveals actual outcomes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer subsidy accountability reveals actual outcomes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer subsidy accountability reveals actual outcomes",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer subsidy accountability reveals actual outcomes",
+    "name": "Developer subsidy accountability reveals actual outcomes",
+    "description": "Developer subsidy accountability reveals actual outcomes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

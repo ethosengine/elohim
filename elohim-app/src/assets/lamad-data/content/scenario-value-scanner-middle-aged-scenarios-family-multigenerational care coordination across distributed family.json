@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-family-multigenerational care coordination across distributed family",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-multigenerational care coordination across distributed family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Multigenerational care coordination across distributed family",
   "description": "Multigenerational care coordination across distributed family",
   "content": "Scenario: Multigenerational care coordination across distributed family\n    Given Robert's parents live in Florida\n    And his children attend college in different states\n    And his grandchild occasionally needs care\n    And Robert's siblings share parent care responsibilities\n    When family_elohim coordinates care across geography\n    Then it should track care needs across multiple households\n    And coordinate with Robert's siblings on parent care distribution\n    And help Robert support his children remotely\n    And manage occasional grandchild care\n    And surface conflicts across generational needs\n    And provide sophisticated coordination across distance\n    And ensure no household or person is overwhelmed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Multigenerational care coordination across distributed family",
+    "ogDescription": "Multigenerational care coordination across distributed family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-multigenerational care coordination across distributed family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multigenerational care coordination across distributed family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-multigenerational care coordination across distributed family",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-multigenerational care coordination across distributed family",
+    "name": "Multigenerational care coordination across distributed family",
+    "description": "Multigenerational care coordination across distributed family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

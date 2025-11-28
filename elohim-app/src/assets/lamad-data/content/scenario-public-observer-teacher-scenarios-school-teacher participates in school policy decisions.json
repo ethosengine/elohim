@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-school-teacher participates in school policy decisions",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher participates in school policy decisions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher participates in school policy decisions",
   "description": "Teacher participates in school policy decisions",
   "content": "Scenario: Teacher participates in school policy decisions\n    Given the school site council is revising discipline policy\n    And teachers have frontline knowledge about what works\n    When the Observer facilitates teacher input on policy options\n    Then teachers share evidence-based practices anonymously\n    And successful approaches from other schools are surfaced\n    And student outcome data informs policy design\n    And final policy reflects teacher professional expertise\n    And school governance becomes genuinely participatory\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-school",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher participates in school policy decisions",
+    "ogDescription": "Teacher participates in school policy decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher participates in school policy decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher participates in school policy decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher participates in school policy decisions",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher participates in school policy decisions",
+    "name": "Teacher participates in school policy decisions",
+    "description": "Teacher participates in school policy decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-educational-developing social skills through structured learning",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-developing social skills through structured learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developing social skills through structured learning",
   "description": "Developing social skills through structured learning",
   "content": "Scenario: Developing social skills through structured learning\n    Given Jordan wants to improve conversation skills\n    And social skills education can support relationship building\n    When Jordan participates in social skills group\n    Then the group uses accessible teaching methods (role-play, video modeling)\n    And Jordan practices skills with peer learners\n    And successes are celebrated and challenges are normalized\n    And Jordan's social confidence grows through practice\n    And improved skills enhance Jordan's community participation\n    And Jordan experiences personal growth and capability development\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Developing social skills through structured learning",
+    "ogDescription": "Developing social skills through structured learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-developing social skills through structured learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developing social skills through structured learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-developing social skills through structured learning",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-developing social skills through structured learning",
+    "name": "Developing social skills through structured learning",
+    "description": "Developing social skills through structured learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal economic development metrics expand beyond job quantity to job quality",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal economic development metrics expand beyond job quantity to job quality",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal economic development metrics expand beyond job quantity to job quality",
   "description": "Municipal economic development metrics expand beyond job quantity to job quality",
   "content": "Scenario: Municipal economic development metrics expand beyond job quantity to job quality\n    Given cities typically measure economic development by jobs created\n    And job quality (wages, benefits, dignity, ownership) is often ignored\n    When Rosa's conversion demonstrates high-quality job creation\n    Then municipality tracks worker ownership, living wages, and benefits in economic development data\n    And democratic conversions score highly on job quality metrics\n    And city economic development strategy prioritizes quality over quantity\n    And officials recognize one living-wage worker-owner job exceeds three poverty-wage positions\n    And municipality_elohim provides quality-focused metrics and documentation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal economic development metrics expand beyond job quantity to job quality",
+    "ogDescription": "Municipal economic development metrics expand beyond job quantity to job quality",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal economic development metrics expand beyond job quantity to job quality",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal economic development metrics expand beyond job quantity to job quality - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal economic development metrics expand beyond job quantity to job quality",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal economic development metrics expand beyond job quantity to job quality",
+    "name": "Municipal economic development metrics expand beyond job quantity to job quality",
+    "description": "Municipal economic development metrics expand beyond job quantity to job quality",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

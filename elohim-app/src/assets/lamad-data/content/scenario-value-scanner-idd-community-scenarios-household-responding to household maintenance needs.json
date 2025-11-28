@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-responding to household maintenance needs",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-responding to household maintenance needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responding to household maintenance needs",
   "description": "Responding to household maintenance needs",
   "content": "Scenario: Responding to household maintenance needs\n    Given Jordan notices the bathroom sink is leaking\n    And household members should report maintenance issues\n    When Jordan uses the maintenance request feature\n    Then the interface allows simple issue reporting with pictures\n    And Jordan can photograph the problem or select from issue pictures\n    And the household_elohim routes the request appropriately\n    And Jordan receives confirmation and updates in accessible format\n    And Jordan's observant contribution is celebrated\n    And Jordan learns responsibility for shared home care\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Responding to household maintenance needs",
+    "ogDescription": "Responding to household maintenance needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-responding to household maintenance needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responding to household maintenance needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-responding to household maintenance needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-responding to household maintenance needs",
+    "name": "Responding to household maintenance needs",
+    "description": "Responding to household maintenance needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

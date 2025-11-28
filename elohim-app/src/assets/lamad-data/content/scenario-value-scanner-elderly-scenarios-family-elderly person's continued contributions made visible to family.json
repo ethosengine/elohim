@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-family-elderly person's continued contributions made visible to family",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-elderly person's continued contributions made visible to family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elderly person's continued contributions made visible to family",
   "description": "Elderly person's continued contributions made visible to family",
   "content": "Scenario: Elderly person's continued contributions made visible to family\n    Given Helen shares family stories with great-grandchildren\n    And she provides wisdom from 82 years of experience\n    When Helen contributes to family flourishing\n    Then her contributions should be visible in care economy tracking\n    And family should see that Helen still gives, not just receives\n    And care tokens should reflect her mentoring and wisdom sharing\n    And reciprocity should be visible even when care flows are asymmetric\n    And Helen should experience herself as valued contributor, not burden\n    And younger generations should learn that elders have worth\n    And the protocol should make visible what market economics erases\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Elderly person's continued contributions made visible to family",
+    "ogDescription": "Elderly person's continued contributions made visible to family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-elderly person's continued contributions made visible to family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elderly person's continued contributions made visible to family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-elderly person's continued contributions made visible to family",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-elderly person's continued contributions made visible to family",
+    "name": "Elderly person's continued contributions made visible to family",
+    "description": "Elderly person's continued contributions made visible to family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

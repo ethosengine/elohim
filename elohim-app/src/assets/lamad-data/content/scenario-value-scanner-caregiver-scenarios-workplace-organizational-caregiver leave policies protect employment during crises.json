@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-caregiver leave policies protect employment during crises",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-caregiver leave policies protect employment during crises",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Caregiver leave policies protect employment during crises",
   "description": "Caregiver leave policies protect employment during crises",
   "content": "Scenario: Caregiver leave policies protect employment during crises\n    Given caregiving crises occur unpredictably\n    And James may need to take sudden leave for David's care\n    When the workplace_elohim advocates for leave policies\n    Then caregiver leave should be available like parental leave\n    And leave should be protected employment, not termination risk\n    And James should access leave without penalty\n    And workplace should recognize adult care like child care\n    And caregiver leave should be employment protection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Caregiver leave policies protect employment during crises",
+    "ogDescription": "Caregiver leave policies protect employment during crises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-caregiver leave policies protect employment during crises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Caregiver leave policies protect employment during crises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-caregiver leave policies protect employment during crises",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-caregiver leave policies protect employment during crises",
+    "name": "Caregiver leave policies protect employment during crises",
+    "description": "Caregiver leave policies protect employment during crises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-citizen-scenarios-educational-citizen decodes education policy jargon",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen decodes education policy jargon",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Citizen decodes education policy jargon",
   "description": "Citizen decodes education policy jargon",
   "content": "Scenario: Citizen decodes education policy jargon\n    Given the school board discusses \"instructional efficiency optimization\"\n    And the citizen attends or reviews the meeting\n    When the Observer translates the education-ese\n    Then the citizen learns this means cutting teaching assistants\n    And understands the impact is larger class sizes\n    And sees the real effect on children's learning\n    And can respond to actual impacts vs bureaucratic language\n    And education policy becomes accessible to non-experts\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-citizen-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Citizen decodes education policy jargon",
+    "ogDescription": "Citizen decodes education policy jargon",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen decodes education policy jargon",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Citizen decodes education policy jargon - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-citizen-scenarios-educational-citizen decodes education policy jargon",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:educational-citizen decodes education policy jargon",
+    "name": "Citizen decodes education policy jargon",
+    "description": "Citizen decodes education policy jargon",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

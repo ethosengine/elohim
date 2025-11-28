@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-06-harmful-consequences"
   },
-  "createdAt": "2025-11-28T02:53:21.866689",
-  "updatedAt": "2025-11-28T02:53:21.866690"
+  "createdAt": "2025-11-28T21:10:19.207003",
+  "updatedAt": "2025-11-28T21:10:19.207004",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Minimizing Harmful Consequences",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Minimizing Harmful Consequences - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-application",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "Application: Minimizing Harmful Consequences",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.207003",
+    "dateModified": "2025-11-28T21:10:19.207004",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

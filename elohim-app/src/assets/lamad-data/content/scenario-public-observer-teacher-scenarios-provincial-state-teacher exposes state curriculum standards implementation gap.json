@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher exposes state curriculum standards implementation gap",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher exposes state curriculum standards implementation gap",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher exposes state curriculum standards implementation gap",
   "description": "Teacher exposes state curriculum standards implementation gap",
   "content": "Scenario: Teacher exposes state curriculum standards implementation gap\n    Given state adopted new curriculum standards three years ago\n    But provided no implementation funding or professional development\n    When teachers document implementation reality through Observer\n    Then statewide data shows 68% of teachers lack standards-aligned materials\n    And 71% received no professional development on new standards\n    And student assessment results reflect implementation failure\n    And teachers coordinate testimony to state education committee\n    And policy implementation accountability emerges from teacher evidence\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher exposes state curriculum standards implementation gap",
+    "ogDescription": "Teacher exposes state curriculum standards implementation gap",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher exposes state curriculum standards implementation gap",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher exposes state curriculum standards implementation gap - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher exposes state curriculum standards implementation gap",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher exposes state curriculum standards implementation gap",
+    "name": "Teacher exposes state curriculum standards implementation gap",
+    "description": "Teacher exposes state curriculum standards implementation gap",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

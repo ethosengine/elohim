@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry standards influenced toward care-friendly practices",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry standards influenced toward care-friendly practices",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Industry standards influenced toward care-friendly practices",
   "description": "Industry standards influenced toward care-friendly practices",
   "content": "Scenario: Industry standards influenced toward care-friendly practices\n    Given Robert has professional standing in his industry\n    And industry standards affect millions of workers\n    And care-friendly standards would benefit workers across the sector\n    When industry_elohim connects Robert to standards development\n    Then it should identify opportunities to influence industry standards\n    And help him advocate for care leave, flexible work, and family support standards\n    And connect him to industry associations and standards bodies\n    And surface how care-friendly standards improve productivity and retention\n    And support him in leveraging professional position for sector transformation\n    And build industry practices that normalize care responsibilities\n    And demonstrate that industry standards can advance care economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Industry standards influenced toward care-friendly practices",
+    "ogDescription": "Industry standards influenced toward care-friendly practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry standards influenced toward care-friendly practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Industry standards influenced toward care-friendly practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry standards influenced toward care-friendly practices",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry standards influenced toward care-friendly practices",
+    "name": "Industry standards influenced toward care-friendly practices",
+    "description": "Industry standards influenced toward care-friendly practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

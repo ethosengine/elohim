@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-community-deliberating with structured process ensuring all voices heard",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-deliberating with structured process ensuring all voices heard",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Deliberating with structured process ensuring all voices heard",
   "description": "Deliberating with structured process ensuring all voices heard",
   "content": "Scenario: Deliberating with structured process ensuring all voices heard\n    Given our council has diverse perspectives that could lead to conflict\n    And we need to reach judgment together\n    When we follow deliberation protocols\n    Then all members: share initial reactions and concerns\n    And we identify: points of agreement and disagreement\n    And we examine: constitutional principles explicitly\n    And we research: relevant precedents from previous cases\n    And we consult: experts when technical questions arise\n    And we avoid: rushed judgment or groupthink\n    And we ensure: quieter members are heard not dominated\n    And we reach: decision through genuine collective deliberation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Deliberating with structured process ensuring all voices heard",
+    "ogDescription": "Deliberating with structured process ensuring all voices heard",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-deliberating with structured process ensuring all voices heard",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Deliberating with structured process ensuring all voices heard - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-deliberating with structured process ensuring all voices heard",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-deliberating with structured process ensuring all voices heard",
+    "name": "Deliberating with structured process ensuring all voices heard",
+    "description": "Deliberating with structured process ensuring all voices heard",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

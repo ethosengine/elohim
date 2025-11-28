@@ -25,6 +25,32 @@
     "sourceModule": "fct-module-07-regeneration",
     "activityType": "discussion"
   },
-  "createdAt": "2025-11-28T02:53:21.870263",
-  "updatedAt": "2025-11-28T02:53:21.870264"
+  "createdAt": "2025-11-28T21:10:19.208023",
+  "updatedAt": "2025-11-28T21:10:19.208024",
+  "did": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Regeneration and Reconciliation",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-07-regeneration-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Regeneration and Reconciliation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-07-regeneration-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 7 - regeneration and reconciliation - changing the paradim of church success.",
+    "name": "Discussion: Regeneration and Reconciliation",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.208023",
+    "dateModified": "2025-11-28T21:10:19.208024",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

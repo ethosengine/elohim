@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment measures success through bioregional flourishing indicators",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-community investment measures success through bioregional flourishing indicators",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community investment measures success through bioregional flourishing indicators",
   "description": "Community investment measures success through bioregional flourishing indicators",
   "content": "Scenario: Community investment measures success through bioregional flourishing indicators\n    Given traditional investment measures only financial returns\n    And Patricia wants holistic measurement of investment impacts\n    When bioregional investment develops comprehensive success metrics\n    Then returns are measured as: financial (5% annually), ecological (carbon sequestered, biodiversity supported)\n    And social indicators (living wages, democratic governance, community wellbeing)\n    And bioregional health (watershed quality, soil carbon, ecosystem resilience)\n    And investment success is holistic bioregional flourishing, not just profit\n    And bioregional_elohim provides comprehensive impact measurement framework\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Community investment measures success through bioregional flourishing indicators",
+    "ogDescription": "Community investment measures success through bioregional flourishing indicators",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment measures success through bioregional flourishing indicators",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community investment measures success through bioregional flourishing indicators - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment measures success through bioregional flourishing indicators",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-community investment measures success through bioregional flourishing indicators",
+    "name": "Community investment measures success through bioregional flourishing indicators",
+    "description": "Community investment measures success through bioregional flourishing indicators",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

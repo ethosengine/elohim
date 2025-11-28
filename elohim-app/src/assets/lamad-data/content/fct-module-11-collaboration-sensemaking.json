@@ -65,6 +65,34 @@
     "bookCount": 2,
     "bibleVerseCount": 16
   },
-  "createdAt": "2025-11-28T02:53:21.887873",
-  "updatedAt": "2025-11-28T02:53:21.887874"
+  "createdAt": "2025-11-28T21:10:19.218469",
+  "updatedAt": "2025-11-28T21:10:19.218471",
+  "did": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+  "activityPubType": "Article",
+  "openGraphMetadata": {
+    "ogTitle": "FCT 11: Creating Shared Understanding: Collaboration",
+    "ogDescription": "Creating a Healthier Information Ecosystem: A Christian Perspective  \nAs followers of Christ, we are called to be salt and light in the world (Matthew 5:13-16), which includes fostering a healthy info",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-28T21:10:19.218469",
+    "articleModifiedTime": "2025-11-28T21:10:19.218471",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/course-module.jpg",
+    "ogImageAlt": "FCT 11: Creating Shared Understanding: Collaboration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "LearningResource",
+    "@id": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking",
+    "identifier": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+    "name": "FCT 11: Creating Shared Understanding: Collaboration",
+    "description": "Creating a Healthier Information Ecosystem: A Christian Perspective  \nAs followers of Christ, we are called to be salt and light in the world (Matthew 5:13-16), which includes fostering a healthy information ecosystem that promotes truth, love, and understanding. In our digital age, this task has become increasingly complex and urgent. The Apostle Paul's words in Ephesians 4:15 to \"speak the truth in love\" take on new meaning in our hyper-connected world. To address this challenge, we can consid",
+    "dateCreated": "2025-11-28T21:10:19.218469",
+    "dateModified": "2025-11-28T21:10:19.218471",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

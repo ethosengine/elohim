@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-presenting to 10,000 global citizens on superintelligence governance",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-presenting to 10,000 global citizens on superintelligence governance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Presenting to 10,000 global citizens on superintelligence governance",
   "description": "Presenting to 10,000 global citizens on superintelligence governance",
   "content": "Scenario: Presenting to 10,000 global citizens on superintelligence governance\n    Given Global Constitutional Convention deliberates superintelligent AI oversight\n    And I am invited to provide technical expert testimony\n    When I address delegates from every nation and culture\n    Then I explain: what \"superintelligence\" means technically\n    And I clarify: when agents might exceed human comprehension\n    And I present: technical mechanisms for constitutional alignment\n    And I explore: whether \"explain-down\" capability is possible\n    And I acknowledge: deep uncertainty about solvability\n    And I translate: across language and cultural barriers\n    And I demonstrate: how expertise serves global democracy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Presenting to 10,000 global citizens on superintelligence governance",
+    "ogDescription": "Presenting to 10,000 global citizens on superintelligence governance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-presenting to 10,000 global citizens on superintelligence governance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Presenting to 10,000 global citizens on superintelligence governance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-presenting to 10,000 global citizens on superintelligence governance",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-presenting to 10,000 global citizens on superintelligence governance",
+    "name": "Presenting to 10,000 global citizens on superintelligence governance",
+    "description": "Presenting to 10,000 global citizens on superintelligence governance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

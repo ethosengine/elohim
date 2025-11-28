@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer develops worker leaders for city council testimony",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer develops worker leaders for city council testimony",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer develops worker leaders for city council testimony",
   "description": "Organizer develops worker leaders for city council testimony",
   "content": "Scenario: Organizer develops worker leaders for city council testimony\n    Given restaurant workers face wage theft and unsafe conditions\n    And most have never engaged in civic advocacy\n    When the organizer supports leadership development via Observer\n    Then workers receive accessible data on wage theft patterns\n    And get testimony framework they can personalize with their stories\n    And see labor protection policies from other cities\n    And practice addressing council member questions\n    And workers become powerful advocates for their own interests\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer develops worker leaders for city council testimony",
+    "ogDescription": "Organizer develops worker leaders for city council testimony",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer develops worker leaders for city council testimony",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer develops worker leaders for city council testimony - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer develops worker leaders for city council testimony",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer develops worker leaders for city council testimony",
+    "name": "Organizer develops worker leaders for city council testimony",
+    "description": "Organizer develops worker leaders for city council testimony",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

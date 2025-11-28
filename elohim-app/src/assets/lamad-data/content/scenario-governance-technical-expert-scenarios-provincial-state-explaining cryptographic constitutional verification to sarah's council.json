@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-provincial-state-explaining cryptographic constitutional verification to sarah's council",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-explaining cryptographic constitutional verification to sarah's council",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Explaining cryptographic constitutional verification to Sarah's council",
   "description": "Explaining cryptographic constitutional verification to Sarah's council",
   "content": "Scenario: Explaining cryptographic constitutional verification to Sarah's council\n    Given Sarah Martinez's Regional Council reviews Marcus's mental health appeal\n    And the case involves cryptographic verification questions\n    When I provide expert testimony about the technical details\n    Then I translate: cryptographic proofs into accessible language\n    And I explain: using analogies (locked box showing answer without revealing secret)\n    And I clarify: what confidence levels mean and their limitations\n    And I acknowledge: where analogies break down and complexity remains\n    And I avoid: jargon that excludes or confuses\n    And I ensure: Sarah understands enough to judge constitutionality\n    And I inform: without dictating the decision\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Explaining cryptographic constitutional verification to Sarah's council",
+    "ogDescription": "Explaining cryptographic constitutional verification to Sarah's council",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-explaining cryptographic constitutional verification to sarah's council",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Explaining cryptographic constitutional verification to Sarah's council - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-explaining cryptographic constitutional verification to sarah's council",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-explaining cryptographic constitutional verification to sarah's council",
+    "name": "Explaining cryptographic constitutional verification to Sarah's council",
+    "description": "Explaining cryptographic constitutional verification to Sarah's council",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -27,6 +27,32 @@
     "year": "2020"
   },
   "_organization": "HBO",
-  "createdAt": "2025-11-28T02:53:21.847169",
-  "updatedAt": "2025-11-28T02:53:21.847170"
+  "createdAt": "2025-11-28T21:10:19.189502",
+  "updatedAt": "2025-11-28T21:10:19.189503",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "After Truth: Disinformation and the Cost of Fake News",
+    "ogDescription": "After Truth: Disinformation and the Cost of Fake News (2020)",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-documentary-after-truth-disinfor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/documentary.jpg",
+    "ogImageAlt": "After Truth: Disinformation and the Cost of Fake News - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-documentary-after-truth-disinfor",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "After Truth: Disinformation and the Cost of Fake News",
+    "description": "After Truth: Disinformation and the Cost of Fake News (2020)",
+    "dateCreated": "2025-11-28T21:10:19.189502",
+    "dateModified": "2025-11-28T21:10:19.189503",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

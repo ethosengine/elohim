@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-accessible household coordination reduces disability-related stress",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-accessible household coordination reduces disability-related stress",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessible household coordination reduces disability-related stress",
   "description": "Accessible household coordination reduces disability-related stress",
   "content": "Scenario: Accessible household coordination reduces disability-related stress\n    Given navigating household management with disability is inherently stressful\n    And inaccessible systems compound that stress\n    When the household_elohim coordinates household functions\n    Then it should actively reduce Alex's cognitive load\n    And it should prevent accessibility barriers from becoming crises\n    And it should provide gentle reminders and support\n    And coordination should feel like genuine assistance\n    And Alex should experience less stress, not more\n    And the protocol should recognize that accessibility reduces disability\n    And good design should make Alex's household management easier than current systems\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessible household coordination reduces disability-related stress",
+    "ogDescription": "Accessible household coordination reduces disability-related stress",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-accessible household coordination reduces disability-related stress",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessible household coordination reduces disability-related stress - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-accessible household coordination reduces disability-related stress",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-accessible household coordination reduces disability-related stress",
+    "name": "Accessible household coordination reduces disability-related stress",
+    "description": "Accessible household coordination reduces disability-related stress",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

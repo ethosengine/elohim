@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-personal flourishing recognized as legitimate goal",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-personal flourishing recognized as legitimate goal",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal flourishing recognized as legitimate goal",
   "description": "Personal flourishing recognized as legitimate goal",
   "content": "Scenario: Personal flourishing recognized as legitimate goal\n    Given Alex has the right to pursue their own flourishing\n    And society often treats disabled lives as tragedies\n    When the personal_agent supports Alex's well-being\n    Then it should frame Alex's flourishing as inherent right\n    And it should support Alex's self-determined goals\n    And disability should not be assumed to diminish quality of life\n    And Alex's life should be treated as valuable as anyone's\n    And personal goals should be respected, not pitied\n    And the protocol should embody belief in Alex's full humanity\n    And Alex should experience affirmation of their worth\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal flourishing recognized as legitimate goal",
+    "ogDescription": "Personal flourishing recognized as legitimate goal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-personal flourishing recognized as legitimate goal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal flourishing recognized as legitimate goal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-personal flourishing recognized as legitimate goal",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-personal flourishing recognized as legitimate goal",
+    "name": "Personal flourishing recognized as legitimate goal",
+    "description": "Personal flourishing recognized as legitimate goal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

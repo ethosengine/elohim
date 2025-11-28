@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood respite network for caregiver breaks",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood respite network for caregiver breaks",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood respite network for caregiver breaks",
   "description": "Neighborhood respite network for caregiver breaks",
   "content": "Scenario: Neighborhood respite network for caregiver breaks\n    Given James needs regular breaks or he will burn out\n    And formal respite care is expensive and hard to access\n    When the neighborhood_elohim organizes respite network\n    Then it should coordinate neighbors willing to provide respite\n    And it should schedule regular respite periods for James\n    And neighbors should be trained for basic Alzheimer's care\n    And respite should be reliable and consistent\n    And neighborhood should provide systematic respite support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood respite network for caregiver breaks",
+    "ogDescription": "Neighborhood respite network for caregiver breaks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood respite network for caregiver breaks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood respite network for caregiver breaks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood respite network for caregiver breaks",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood respite network for caregiver breaks",
+    "name": "Neighborhood respite network for caregiver breaks",
+    "description": "Neighborhood respite network for caregiver breaks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-individual-accessible interface accommodates aging-related needs without patronizing",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-accessible interface accommodates aging-related needs without patronizing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessible interface accommodates aging-related needs without patronizing",
   "description": "Accessible interface accommodates aging-related needs without patronizing",
   "content": "Scenario: Accessible interface accommodates aging-related needs without patronizing\n    Given Margaret has age-related vision and dexterity changes\n    And she is a competent adult with decades of nursing experience\n    When Margaret uses the Value Scanner\n    Then the interface should have large, high-contrast fonts\n    And touch targets should be generous and forgiving\n    And voice interface options should be available\n    And navigation should be simple and consistent\n    And the pace should be patient without being condescending\n    And the tone should be respectful, never infantilizing\n    And Margaret should feel empowered and capable\n    And accessibility should enhance rather than diminish dignity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessible interface accommodates aging-related needs without patronizing",
+    "ogDescription": "Accessible interface accommodates aging-related needs without patronizing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-accessible interface accommodates aging-related needs without patronizing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessible interface accommodates aging-related needs without patronizing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-accessible interface accommodates aging-related needs without patronizing",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-accessible interface accommodates aging-related needs without patronizing",
+    "name": "Accessible interface accommodates aging-related needs without patronizing",
+    "description": "Accessible interface accommodates aging-related needs without patronizing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

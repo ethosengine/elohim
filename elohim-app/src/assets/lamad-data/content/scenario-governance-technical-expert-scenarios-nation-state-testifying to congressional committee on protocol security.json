@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-nation-state-testifying to congressional committee on protocol security",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-testifying to congressional committee on protocol security",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Testifying to congressional committee on protocol security",
   "description": "Testifying to congressional committee on protocol security",
   "content": "Scenario: Testifying to congressional committee on protocol security\n    Given Congress considers legislation affecting protocol\n    And technical security assessment is needed\n    When I testify to legislative committee\n    Then I explain: cryptographic foundations and their robustness\n    And I assess: attack vectors and defense mechanisms\n    And I clarify: what regulation would help vs harm security\n    And I present: evidence from adversarial testing\n    And I maintain: independence from political pressure\n    And I avoid: either advocacy or false neutrality\n    And I serve: informed democratic policy making\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Testifying to congressional committee on protocol security",
+    "ogDescription": "Testifying to congressional committee on protocol security",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-testifying to congressional committee on protocol security",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Testifying to congressional committee on protocol security - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-nation-state-testifying to congressional committee on protocol security",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:nation-state-testifying to congressional committee on protocol security",
+    "name": "Testifying to congressional committee on protocol security",
+    "description": "Testifying to congressional committee on protocol security",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

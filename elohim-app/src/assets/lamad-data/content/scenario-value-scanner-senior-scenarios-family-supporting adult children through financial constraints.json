@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-family-supporting adult children through financial constraints",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-supporting adult children through financial constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Supporting adult children through financial constraints",
   "description": "Supporting adult children through financial constraints",
   "content": "Scenario: Supporting adult children through financial constraints\n    Given Margaret has very limited resources herself\n    And her adult children sometimes face financial challenges\n    When Margaret provides non-financial support\n    Then her care contributions should be recognized as valuable\n    And the family_elohim should show how her labor saves money\n    And childcare provided prevents need for paid care\n    And her contributions have real economic impact\n    And Margaret's value to family doesn't require financial resources\n    And care economy should be visible alongside financial economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Supporting adult children through financial constraints",
+    "ogDescription": "Supporting adult children through financial constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-supporting adult children through financial constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting adult children through financial constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-supporting adult children through financial constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-supporting adult children through financial constraints",
+    "name": "Supporting adult children through financial constraints",
+    "description": "Supporting adult children through financial constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

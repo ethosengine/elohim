@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-district-teacher coalition challenges harmful curriculum mandate",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher coalition challenges harmful curriculum mandate",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher coalition challenges harmful curriculum mandate",
   "description": "Teacher coalition challenges harmful curriculum mandate",
   "content": "Scenario: Teacher coalition challenges harmful curriculum mandate\n    Given district mandates scripted curriculum contradicting best practices\n    And individual teacher objections are dismissed as \"resistance\"\n    When 180 teachers coordinate through Observer platform\n    Then collective professional voice becomes undeniable\n    And teachers present research on curriculum approach\n    And document student engagement declining since mandate\n    And propose evidence-based alternative approaches\n    And collective expertise creates pressure for policy reconsideration\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-district",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher coalition challenges harmful curriculum mandate",
+    "ogDescription": "Teacher coalition challenges harmful curriculum mandate",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher coalition challenges harmful curriculum mandate",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher coalition challenges harmful curriculum mandate - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher coalition challenges harmful curriculum mandate",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher coalition challenges harmful curriculum mandate",
+    "name": "Teacher coalition challenges harmful curriculum mandate",
+    "description": "Teacher coalition challenges harmful curriculum mandate",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

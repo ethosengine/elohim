@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-understanding labor value in first professional role",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-understanding labor value in first professional role",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Understanding labor value in first professional role",
   "description": "Understanding labor value in first professional role",
   "content": "Scenario: Understanding labor value in first professional role\n    Given Aisha is working her first full-time job\n    And she's unsure if compensation is fair\n    When the workplace_elohim analyzes her position\n    Then it should provide market rate information\n    And it should help her understand her labor's actual value\n    And it should identify if compensation is equitable\n    And the system should empower negotiation with information\n    And she should learn to advocate for fair compensation\n    And workplace care economy should make value transparent\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Understanding labor value in first professional role",
+    "ogDescription": "Understanding labor value in first professional role",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-understanding labor value in first professional role",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding labor value in first professional role - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-understanding labor value in first professional role",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-understanding labor value in first professional role",
+    "name": "Understanding labor value in first professional role",
+    "description": "Understanding labor value in first professional role",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

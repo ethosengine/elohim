@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-worker-scenarios-workplace-organizational-workers exercise governance voice weighted by documented contribution",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-workers exercise governance voice weighted by documented contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workers exercise governance voice weighted by documented contribution",
   "description": "Workers exercise governance voice weighted by documented contribution",
   "content": "Scenario: Workers exercise governance voice weighted by documented contribution\n    Given REA accounting documents each worker's contributions over time\n    And democratic governance weights votes by contribution and seniority\n    When workers vote on major strategic decisions\n    Then Maria's 8 years of documented expertise weights her vote higher\n    And newer workers have proportional but meaningful voice\n    And weighting is transparent and democratically adjustable\n    And workplace_elohim ensures weighting doesn't become oligarchic\n    And all workers maintain baseline voice protecting their dignity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-worker-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Workers exercise governance voice weighted by documented contribution",
+    "ogDescription": "Workers exercise governance voice weighted by documented contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-workers exercise governance voice weighted by documented contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workers exercise governance voice weighted by documented contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-worker-scenarios-workplace-organizational-workers exercise governance voice weighted by documented contribution",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:workplace-organizational-workers exercise governance voice weighted by documented contribution",
+    "name": "Workers exercise governance voice weighted by documented contribution",
+    "description": "Workers exercise governance voice weighted by documented contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

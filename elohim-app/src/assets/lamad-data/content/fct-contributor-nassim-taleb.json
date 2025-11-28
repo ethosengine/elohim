@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-02-systems-thinking"
   },
-  "createdAt": "2025-11-28T02:53:21.849671",
-  "updatedAt": "2025-11-28T02:53:21.849672"
+  "createdAt": "2025-11-28T21:10:19.191978",
+  "updatedAt": "2025-11-28T21:10:19.191979",
+  "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Nassim Taleb",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-nassim-taleb",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Nassim Taleb - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-nassim-taleb",
+    "identifier": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+    "name": "Nassim Taleb",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.191978",
+    "dateModified": "2025-11-28T21:10:19.191979",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

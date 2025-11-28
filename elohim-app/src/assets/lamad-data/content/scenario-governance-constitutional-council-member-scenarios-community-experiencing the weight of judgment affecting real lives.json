@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-community-experiencing the weight of judgment affecting real lives",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-experiencing the weight of judgment affecting real lives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Experiencing the weight of judgment affecting real lives",
   "description": "Experiencing the weight of judgment affecting real lives",
   "content": "Scenario: Experiencing the weight of judgment affecting real lives\n    Given my decision will affect Marcus's mental health support\n    And I cannot hide behind procedure or defer to experts\n    When I must judge knowing uncertainty and consequences\n    Then I feel: the burden of democratic responsibility\n    And I grapple: with possibility I might be wrong\n    And I draw on: my experience as nurse who has seen suffering\n    And I consider: my role as mother navigating care and autonomy\n    And I accept: that I must judge despite uncertainty\n    And I am supported: through compensation, training, and respect\n    And I learn: what democratic participation means at deepest level\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Experiencing the weight of judgment affecting real lives",
+    "ogDescription": "Experiencing the weight of judgment affecting real lives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-experiencing the weight of judgment affecting real lives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Experiencing the weight of judgment affecting real lives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-experiencing the weight of judgment affecting real lives",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-experiencing the weight of judgment affecting real lives",
+    "name": "Experiencing the weight of judgment affecting real lives",
+    "description": "Experiencing the weight of judgment affecting real lives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

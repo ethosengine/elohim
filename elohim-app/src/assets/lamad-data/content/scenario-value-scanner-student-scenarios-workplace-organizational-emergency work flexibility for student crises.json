@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-workplace-organizational-emergency work flexibility for student crises",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-emergency work flexibility for student crises",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Emergency work flexibility for student crises",
   "description": "Emergency work flexibility for student crises",
   "content": "Scenario: Emergency work flexibility for student crises\n    Given students face emergencies (illness, family crisis, housing instability)\n    And rigid work schedules can worsen crises\n    When Kenji experiences emergency situation\n    Then the workplace_elohim should help him communicate need for emergency time off\n    And it should advocate for employer flexibility during crisis\n    And it should recognize emergency accommodation as care economy practice\n    And employers should support workers through crises\n    And the system should help Kenji access emergency workplace support\n    And care economy workplaces respond to worker emergencies with flexibility\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Emergency work flexibility for student crises",
+    "ogDescription": "Emergency work flexibility for student crises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-emergency work flexibility for student crises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency work flexibility for student crises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-emergency work flexibility for student crises",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-emergency work flexibility for student crises",
+    "name": "Emergency work flexibility for student crises",
+    "description": "Emergency work flexibility for student crises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-individual-developmental stage appropriate learning through concrete experience",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-developmental stage appropriate learning through concrete experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developmental stage appropriate learning through concrete experience",
   "description": "Developmental stage appropriate learning through concrete experience",
   "content": "Scenario: Developmental stage appropriate learning through concrete experience\n    Given Tommy is learning value literacy\n    And he is at the concrete operational stage\n    When Tommy makes a care decision in the scanner\n    Then the personal_agent should frame choices as care adventures\n    And complex economic concepts should not be presented\n    And learning should happen through story and relationship\n    And the agent should ask \"What will make Emma smile?\" not \"What's the best value?\"\n    And Tommy should build neural pathways around care-based decision making\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.199597",
-  "updatedAt": "2025-11-21T18:54:29.199597"
+  "openGraphMetadata": {
+    "ogTitle": "Developmental stage appropriate learning through concrete experience",
+    "ogDescription": "Developmental stage appropriate learning through concrete experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-developmental stage appropriate learning through concrete experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developmental stage appropriate learning through concrete experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-developmental stage appropriate learning through concrete experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-developmental stage appropriate learning through concrete experience",
+    "name": "Developmental stage appropriate learning through concrete experience",
+    "description": "Developmental stage appropriate learning through concrete experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

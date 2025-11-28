@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-municipality-municipal food security programs integrate with care economy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal food security programs integrate with care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal food security programs integrate with care economy",
   "description": "Municipal food security programs integrate with care economy",
   "content": "Scenario: Municipal food security programs integrate with care economy\n    Given municipal food assistance programs exist\n    And many residents participate in care economy food cooperatives\n    When municipal food security is addressed\n    Then the municipal_elohim should coordinate with existing programs\n    And care economy food cooperatives should receive municipal support\n    And care tokens should integrate with food assistance\n    And municipal food policy should recognize cooperative models\n    And care economy should enhance, not replace, public food security\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal food security programs integrate with care economy",
+    "ogDescription": "Municipal food security programs integrate with care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal food security programs integrate with care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal food security programs integrate with care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal food security programs integrate with care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal food security programs integrate with care economy",
+    "name": "Municipal food security programs integrate with care economy",
+    "description": "Municipal food security programs integrate with care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

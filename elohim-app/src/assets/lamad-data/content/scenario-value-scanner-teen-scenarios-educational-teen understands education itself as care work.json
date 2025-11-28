@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-educational-teen understands education itself as care work",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-teen understands education itself as care work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teen understands education itself as care work",
   "description": "Teen understands education itself as care work",
   "content": "Scenario: Teen understands education itself as care work\n    Given Jasmine invests time and effort in her education\n    And education develops capability to serve future flourishing\n    When educational_elohim frames her learning\n    Then education should be understood as care work for her future self\n    And investment in capability building should be recognized as care labor\n    And she should learn that education serves collective as well as individual good\n    And understand that her developing capabilities will serve community needs\n    And see education as part of care economy, not separate from it\n    And internalize that learning is valuable beyond market return\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Teen understands education itself as care work",
+    "ogDescription": "Teen understands education itself as care work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-teen understands education itself as care work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen understands education itself as care work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-teen understands education itself as care work",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-teen understands education itself as care work",
+    "name": "Teen understands education itself as care work",
+    "description": "Teen understands education itself as care work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

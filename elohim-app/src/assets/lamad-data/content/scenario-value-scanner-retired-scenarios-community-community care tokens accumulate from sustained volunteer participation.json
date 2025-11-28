@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-community-community care tokens accumulate from sustained volunteer participation",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-community care tokens accumulate from sustained volunteer participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community care tokens accumulate from sustained volunteer participation",
   "description": "Community care tokens accumulate from sustained volunteer participation",
   "content": "Scenario: Community care tokens accumulate from sustained volunteer participation\n    Given Frank has volunteered consistently over years\n    And his contributions are substantial and ongoing\n    When the community_elohim calculates care tokens\n    Then tokens should accumulate from Frank's volunteer hours\n    And skill level should affect token value (skilled trades valued highly)\n    And sustained participation should be recognized over time\n    And accumulated tokens should represent Frank's community standing\n    And tokens should create claims on community resources and support\n    And his years of contribution should be visible and valued\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Community care tokens accumulate from sustained volunteer participation",
+    "ogDescription": "Community care tokens accumulate from sustained volunteer participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-community care tokens accumulate from sustained volunteer participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care tokens accumulate from sustained volunteer participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-community care tokens accumulate from sustained volunteer participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-community care tokens accumulate from sustained volunteer participation",
+    "name": "Community care tokens accumulate from sustained volunteer participation",
+    "description": "Community care tokens accumulate from sustained volunteer participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

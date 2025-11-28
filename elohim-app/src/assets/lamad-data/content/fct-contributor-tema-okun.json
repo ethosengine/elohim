@@ -25,6 +25,32 @@
     "category": "contributor",
     "sourceModule": "fct-module-12-fairness-justice"
   },
-  "createdAt": "2025-11-28T02:53:21.893282",
-  "updatedAt": "2025-11-28T02:53:21.893283"
+  "createdAt": "2025-11-28T21:10:19.220456",
+  "updatedAt": "2025-11-28T21:10:19.220457",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Tema Okun",
+    "ogDescription": "Author, speaker, or creator referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-contributor-tema-okun",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/contributor.jpg",
+    "ogImageAlt": "Tema Okun - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-contributor-tema-okun",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Tema Okun",
+    "description": "Author, speaker, or creator referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.220456",
+    "dateModified": "2025-11-28T21:10:19.220457",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

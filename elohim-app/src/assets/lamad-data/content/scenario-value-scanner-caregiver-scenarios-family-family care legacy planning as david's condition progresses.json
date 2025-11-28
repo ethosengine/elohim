@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-family care legacy planning as david's condition progresses",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family care legacy planning as david's condition progresses",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care legacy planning as David's condition progresses",
   "description": "Family care legacy planning as David's condition progresses",
   "content": "Scenario: Family care legacy planning as David's condition progresses\n    Given David's condition will continue to worsen\n    And James may eventually need institutional care support\n    When family plans for David's future care\n    Then the family_elohim should facilitate family care planning\n    And it should help family discuss difficult future scenarios\n    And it should coordinate family resources for potential needs\n    And family should plan together for multiple care scenarios\n    And care legacy planning should involve whole family\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care legacy planning as David's condition progresses",
+    "ogDescription": "Family care legacy planning as David's condition progresses",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family care legacy planning as david's condition progresses",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care legacy planning as David's condition progresses - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family care legacy planning as david's condition progresses",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family care legacy planning as david's condition progresses",
+    "name": "Family care legacy planning as David's condition progresses",
+    "description": "Family care legacy planning as David's condition progresses",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

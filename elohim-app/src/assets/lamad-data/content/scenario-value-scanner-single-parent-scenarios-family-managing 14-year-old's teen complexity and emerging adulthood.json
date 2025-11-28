@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-managing 14-year-old's teen complexity and emerging adulthood",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-managing 14-year-old's teen complexity and emerging adulthood",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing 14-year-old's teen complexity and emerging adulthood",
   "description": "Managing 14-year-old's teen complexity and emerging adulthood",
   "content": "Scenario: Managing 14-year-old's teen complexity and emerging adulthood\n    Given her oldest is navigating adolescence with all its challenges\n    And teens need parent as secure base while pushing for independence\n    When Maria parents her teenager\n    Then the family_elohim should provide teen development guidance\n    And it should help her maintain connection despite natural teen separation\n    And it should remind her to stay engaged even when teen seems not to want her\n    And it should help her navigate discipline, boundaries, and growing autonomy\n    And Maria should successfully parent a teen without co-parent support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing 14-year-old's teen complexity and emerging adulthood",
+    "ogDescription": "Managing 14-year-old's teen complexity and emerging adulthood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-managing 14-year-old's teen complexity and emerging adulthood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing 14-year-old's teen complexity and emerging adulthood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-managing 14-year-old's teen complexity and emerging adulthood",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-managing 14-year-old's teen complexity and emerging adulthood",
+    "name": "Managing 14-year-old's teen complexity and emerging adulthood",
+    "description": "Managing 14-year-old's teen complexity and emerging adulthood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

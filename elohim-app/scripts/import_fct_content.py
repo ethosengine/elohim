@@ -56,6 +56,210 @@ def gen_id(prefix: str) -> str:
 
 
 # =============================================================================
+# STANDARDS-ALIGNED HELPER FUNCTIONS
+# =============================================================================
+
+def generate_did(source_path: str, node_type: str = "content") -> str:
+    """Generate W3C DID from source path."""
+    path_part = source_path.replace(".md", "").replace(".feature", "")
+    path_part = path_part.replace("/", ":").replace("_", "-").lower()
+    path_part = re.sub(r"-+", "-", path_part.strip("-"))
+    return f"did:web:elohim.host:{node_type}:{path_part}"
+
+
+# ActivityPub type mapping
+ACTIVITYPUB_TYPE_MAPPING = {
+    "epic": "Article",
+    "feature": "Article",
+    "scenario": "Note",
+    "video": "Video",
+    "book": "Document",
+    "book-chapter": "Document",
+    "bible-verse": "Note",
+    "course-module": "Article",
+    "simulation": "Application",
+    "assessment": "Question",
+    "concept": "Page",
+    "organization": "Organization",
+    "podcast": "AudioObject",
+    "article": "Article",
+}
+
+
+def infer_activitypub_type(content_type: str) -> str:
+    """Map ContentType to ActivityStreams vocabulary."""
+    return ACTIVITYPUB_TYPE_MAPPING.get(content_type, "Page")
+
+
+def get_git_timestamps(file_path: Path) -> dict:
+    """Extract creation and modification dates from git history."""
+    import subprocess
+
+    try:
+        # Get first commit (creation)
+        created = subprocess.check_output(
+            ["git", "log", "--diff-filter=A", "--format=%aI", "--", str(file_path)],
+            cwd=str(Path.cwd()),
+            stderr=subprocess.DEVNULL
+        ).decode().strip().split('\n')[0]
+
+        # Get last commit (modification)
+        modified = subprocess.check_output(
+            ["git", "log", "-1", "--format=%aI", "--", str(file_path)],
+            cwd=str(Path.cwd()),
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+
+        return {
+            "created": created if created else datetime.now().isoformat(),
+            "modified": modified if modified else datetime.now().isoformat()
+        }
+    except Exception:
+        # Fallback to file system timestamps
+        now = datetime.now().isoformat()
+        try:
+            mtime = datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
+            return {"created": mtime, "modified": mtime}
+        except:
+            return {"created": now, "modified": now}
+
+
+def generate_open_graph_metadata(
+    title: str,
+    description: str,
+    node_id: str,
+    content_type: str,
+    frontmatter: dict,
+    timestamps: dict
+) -> dict:
+    """Generate Open Graph metadata for social sharing."""
+    og = {
+        "ogTitle": title,
+        "ogDescription": description[:200] if description else title,
+        "ogType": "article" if content_type in ["epic", "feature", "scenario", "course-module", "article"] else "website",
+        "ogUrl": f"https://elohim-protocol.org/content/{node_id}",
+        "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    }
+
+    # Add timestamps for articles
+    if content_type in ["epic", "feature", "scenario", "concept", "course-module", "article"]:
+        og["articlePublishedTime"] = timestamps.get("created")
+        og["articleModifiedTime"] = timestamps.get("modified")
+
+    # Placeholder image (UI devs can override)
+    og["ogImage"] = f"https://elohim-protocol.org/assets/images/og-defaults/{content_type}.jpg"
+    og["ogImageAlt"] = f"{title} - Elohim Protocol"
+
+    return og
+
+
+# Schema.org type mapping
+SCHEMA_TYPE_MAPPING = {
+    "epic": "Article",
+    "feature": "Article",
+    "video": "VideoObject",
+    "book": "Book",
+    "book-chapter": "Chapter",
+    "organization": "Organization",
+    "assessment": "Quiz",
+    "course-module": "LearningResource",
+    "bible-verse": "CreativeWork",
+    "podcast": "PodcastEpisode",
+    "article": "Article",
+}
+
+
+def generate_linked_data(
+    node_id: str,
+    did: str,
+    content_type: str,
+    title: str,
+    description: str,
+    timestamps: dict,
+    frontmatter: dict
+) -> dict:
+    """Generate JSON-LD for semantic web compliance."""
+    schema_type = SCHEMA_TYPE_MAPPING.get(content_type, "CreativeWork")
+
+    linked_data = {
+        "@context": "https://schema.org/",
+        "@type": schema_type,
+        "@id": f"https://elohim-protocol.org/content/{node_id}",
+        "identifier": did,
+        "name": title,
+        "description": description,
+        "dateCreated": timestamps.get("created"),
+        "dateModified": timestamps.get("modified"),
+        "publisher": {
+            "@type": "Organization",
+            "@id": "https://elohim-protocol.org",
+            "name": "Elohim Protocol"
+        }
+    }
+
+    # Add author if available
+    if frontmatter.get("author_name") or frontmatter.get("author"):
+        author_name = frontmatter.get("author_name") or frontmatter.get("author")
+        linked_data["author"] = {
+            "@type": "Person",
+            "name": author_name
+        }
+
+    return linked_data
+
+
+def add_standards_fields(node: dict, source_file: Optional[Path] = None) -> dict:
+    """Add standards-aligned fields to an existing content node.
+
+    This helper function augments nodes created elsewhere in the script
+    with DID, ActivityPub, Open Graph, and JSON-LD fields.
+    """
+    node_id = node.get("id", "unknown")
+    content_type = node.get("contentType", "concept")
+    title = node.get("title", "Untitled")
+
+    # Get description - handle both string and dict content
+    description = node.get("description", "")
+    if not description and isinstance(node.get("content"), dict):
+        description = node.get("content", {}).get("introduction", "")[:500]
+    if not description:
+        description = title
+
+    # Generate DID from source path or node ID
+    source_path = node.get("sourcePath", node_id)
+    node_did = generate_did(source_path, "content")
+
+    # Get timestamps - use git if source file provided, otherwise use existing or now
+    if source_file and source_file.exists():
+        timestamps = get_git_timestamps(source_file)
+    else:
+        timestamps = {
+            "created": node.get("createdAt", now_iso()),
+            "modified": node.get("updatedAt", now_iso())
+        }
+
+    # Generate standards metadata
+    frontmatter = node.get("metadata", {})
+    og_metadata = generate_open_graph_metadata(
+        title, description, node_id, content_type, frontmatter, timestamps
+    )
+    linked_data = generate_linked_data(
+        node_id, node_did, content_type, title, description, timestamps, frontmatter
+    )
+    activitypub_type = infer_activitypub_type(content_type)
+
+    # Add standards fields to node
+    node["did"] = node_did
+    node["activityPubType"] = activitypub_type
+    node["openGraphMetadata"] = og_metadata
+    node["linkedData"] = linked_data
+    node["createdAt"] = timestamps["created"]
+    node["updatedAt"] = timestamps["modified"]
+
+    return node
+
+
+# =============================================================================
 # SHARED CONCEPTS - Content that bridges FCT and Elohim Protocol
 # =============================================================================
 
@@ -1657,12 +1861,14 @@ def main():
     # 2. Write ALL content nodes (modules + extracted children + media + contributors + orgs)
     print("\n2. Writing Content Nodes...")
 
-    def write_nodes(nodes, label):
+    def write_nodes(nodes, label, source_file=None):
         for node in nodes:
+            # Add standards-aligned fields before writing
+            node = add_standards_fields(node, source_file)
             node_file = CONTENT_DIR / f"{node['id']}.json"
             node_file.write_text(json.dumps(node, indent=2))
         if nodes:
-            print(f"   ✓ {label}: {len(nodes)}")
+            print(f"   ✓ {label}: {len(nodes)} (with standards fields)")
 
     write_nodes(all_module_nodes, "Modules")
     write_nodes(all_bible_nodes, "Bible verses")

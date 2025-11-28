@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-individual-developing sustainable shopping habits independently",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-developing sustainable shopping habits independently",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developing sustainable shopping habits independently",
   "description": "Developing sustainable shopping habits independently",
   "content": "Scenario: Developing sustainable shopping habits independently\n    Given Aisha is establishing her adult shopping patterns\n    And she wants to reduce food waste\n    When Aisha scans items at the store\n    Then the personal_agent should track purchase patterns\n    And it should identify what she consistently uses versus what spoils\n    And it should suggest sustainable alternatives\n    And the system should help her build efficient shopping habits\n    And waste reduction analytics should inform future decisions\n    And Aisha should develop adult competence through practice\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Developing sustainable shopping habits independently",
+    "ogDescription": "Developing sustainable shopping habits independently",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-developing sustainable shopping habits independently",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developing sustainable shopping habits independently - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-developing sustainable shopping habits independently",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-developing sustainable shopping habits independently",
+    "name": "Developing sustainable shopping habits independently",
+    "description": "Developing sustainable shopping habits independently",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

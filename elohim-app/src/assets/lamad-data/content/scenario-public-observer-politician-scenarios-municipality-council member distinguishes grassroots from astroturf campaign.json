@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-municipality-council member distinguishes grassroots from astroturf campaign",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member distinguishes grassroots from astroturf campaign",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Council member distinguishes grassroots from astroturf campaign",
   "description": "Council member distinguishes grassroots from astroturf campaign",
   "content": "Scenario: Council member distinguishes grassroots from astroturf campaign\n    Given the politician receives flood of emails opposing rent control\n    And campaigns look like authentic constituent concern\n    When the Observer analyzes communication patterns\n    Then they see template messages from industry lobbying firm\n    And identify coordinated timing and identical language\n    And distinguish 5 genuine constituent concerns from 200 manufactured messages\n    And understand actual constituent sentiment versus manipulation\n    And make decisions based on real community needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Council member distinguishes grassroots from astroturf campaign",
+    "ogDescription": "Council member distinguishes grassroots from astroturf campaign",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member distinguishes grassroots from astroturf campaign",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Council member distinguishes grassroots from astroturf campaign - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member distinguishes grassroots from astroturf campaign",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member distinguishes grassroots from astroturf campaign",
+    "name": "Council member distinguishes grassroots from astroturf campaign",
+    "description": "Council member distinguishes grassroots from astroturf campaign",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-provincial-state-journalist monitors multiple state agencies despite limited capacity",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state-journalist monitors multiple state agencies despite limited capacity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist monitors multiple state agencies despite limited capacity",
   "description": "Journalist monitors multiple state agencies despite limited capacity",
   "content": "Scenario: Journalist monitors multiple state agencies despite limited capacity\n    Given the journalist covers state government\n    And must track legislature, education department, environmental agency, and 8 others\n    When the Observer monitors all state agencies and legislative committees\n    Then the journalist reviews all consequential meetings and decisions\n    And receives alerts for newsworthy developments\n    And tracks legislation through committee process automatically\n    And comprehensive state surveillance becomes sustainable\n    And important policy changes don't escape coverage\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist monitors multiple state agencies despite limited capacity",
+    "ogDescription": "Journalist monitors multiple state agencies despite limited capacity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-provincial-state-journalist monitors multiple state agencies despite limited capacity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist monitors multiple state agencies despite limited capacity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-provincial-state-journalist monitors multiple state agencies despite limited capacity",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state-journalist monitors multiple state agencies despite limited capacity",
+    "name": "Journalist monitors multiple state agencies despite limited capacity",
+    "description": "Journalist monitors multiple state agencies despite limited capacity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

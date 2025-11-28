@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-accessing crisis resources without losing dignity",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-accessing crisis resources without losing dignity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing crisis resources without losing dignity",
   "description": "Accessing crisis resources without losing dignity",
   "content": "Scenario: Accessing crisis resources without losing dignity\n    Given I need immediate assistance with food and housing\n    And I am worried about stigma and degradation\n    When I access support through the care economy network\n    Then resources are provided based on my care contributions, not means-testing\n    And I am treated as a community member deserving support\n    And there is no requirement to prove I'm \"needy enough\"\n    And I don't have to expose private trauma to gatekeepers\n    And assistance is framed as reciprocal care, not charity\n    And the system recognizes my parenting labor as valuable contribution\n    And my dignity is preserved throughout the support process\n    And I maintain my standing as a person, not a \"case\"\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing crisis resources without losing dignity",
+    "ogDescription": "Accessing crisis resources without losing dignity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-accessing crisis resources without losing dignity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing crisis resources without losing dignity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-accessing crisis resources without losing dignity",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-accessing crisis resources without losing dignity",
+    "name": "Accessing crisis resources without losing dignity",
+    "description": "Accessing crisis resources without losing dignity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

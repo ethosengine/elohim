@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-educational-learning agency within appropriate boundaries",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-learning agency within appropriate boundaries",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning agency within appropriate boundaries",
   "description": "Learning agency within appropriate boundaries",
   "content": "Scenario: Learning agency within appropriate boundaries\n    Given Tommy needs to develop healthy sense of agency\n    And he also needs safety and guidance\n    When Tommy makes choices in the Value Scanner\n    Then he should experience genuine decision-making power\n    And he should learn that his choices have real consequences\n    And he should discover natural limits through experience\n    And boundaries should teach safety, not powerlessness\n    And he should learn both capability and humility\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning agency within appropriate boundaries",
+    "ogDescription": "Learning agency within appropriate boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-learning agency within appropriate boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning agency within appropriate boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-learning agency within appropriate boundaries",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-learning agency within appropriate boundaries",
+    "name": "Learning agency within appropriate boundaries",
+    "description": "Learning agency within appropriate boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

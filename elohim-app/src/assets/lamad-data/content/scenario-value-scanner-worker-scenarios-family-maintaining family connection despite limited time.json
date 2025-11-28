@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-family-maintaining family connection despite limited time",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-maintaining family connection despite limited time",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Maintaining family connection despite limited time",
   "description": "Maintaining family connection despite limited time",
   "content": "Scenario: Maintaining family connection despite limited time\n    Given my work schedule leaves minimal time for family\n    When I want to stay connected to parents and siblings\n    Then the family_elohim should help me maintain meaningful connection\n    And suggest efficient ways to participate in family care\n    And recognize that my work constraints don't diminish my care commitment\n    And coordinate around my limited availability\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Maintaining family connection despite limited time",
+    "ogDescription": "Maintaining family connection despite limited time",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-maintaining family connection despite limited time",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Maintaining family connection despite limited time - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-maintaining family connection despite limited time",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-maintaining family connection despite limited time",
+    "name": "Maintaining family connection despite limited time",
+    "description": "Maintaining family connection despite limited time",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

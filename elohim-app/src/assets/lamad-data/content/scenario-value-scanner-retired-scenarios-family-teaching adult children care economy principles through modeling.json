@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-family-teaching adult children care economy principles through modeling",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-teaching adult children care economy principles through modeling",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching adult children care economy principles through modeling",
   "description": "Teaching adult children care economy principles through modeling",
   "content": "Scenario: Teaching adult children care economy principles through modeling\n    Given Frank's adult children are watching his care contributions\n    And he's modeling post-employment care economy participation\n    When family_elohim surfaces care patterns\n    Then it should help Frank teach care economy to next generation\n    And adult children should see that contribution continues through retirement\n    And they should learn that care flows across generations\n    And Frank's example should prepare them for their own aging\n    And care reciprocity should be transmitted generationally\n    And family care culture should strengthen through visible modeling\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching adult children care economy principles through modeling",
+    "ogDescription": "Teaching adult children care economy principles through modeling",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-teaching adult children care economy principles through modeling",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching adult children care economy principles through modeling - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-teaching adult children care economy principles through modeling",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-teaching adult children care economy principles through modeling",
+    "name": "Teaching adult children care economy principles through modeling",
+    "description": "Teaching adult children care economy principles through modeling",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

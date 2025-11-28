@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-in-law family dynamics around david's care",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-in-law family dynamics around david's care",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "In-law family dynamics around David's care",
   "description": "In-law family dynamics around David's care",
   "content": "Scenario: In-law family dynamics around David's care\n    Given David's parents struggle with their son's diagnosis\n    And they may have complicated feelings about James's caregiving\n    When the family_elohim navigates in-law relationships\n    Then it should recognize complex family dynamics\n    And it should support James's relationship with David's family\n    And it should help manage their grief without undermining James\n    And in-law relationships should be supportive of James's caregiving\n    And family care economy should include chosen family bonds\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "In-law family dynamics around David's care",
+    "ogDescription": "In-law family dynamics around David's care",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-in-law family dynamics around david's care",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "In-law family dynamics around David's care - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-in-law family dynamics around david's care",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-in-law family dynamics around david's care",
+    "name": "In-law family dynamics around David's care",
+    "description": "In-law family dynamics around David's care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

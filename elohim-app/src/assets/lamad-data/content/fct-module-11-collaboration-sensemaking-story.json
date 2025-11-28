@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-11-collaboration-sensemaking"
   },
-  "createdAt": "2025-11-28T02:53:21.887717",
-  "updatedAt": "2025-11-28T02:53:21.887718"
+  "createdAt": "2025-11-28T21:10:19.218308",
+  "updatedAt": "2025-11-28T21:10:19.218309",
+  "did": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "The Tale of Two Villages: Trustville and Skeptica",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "The Tale of Two Villages: Trustville and Skeptica - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking-story",
+    "identifier": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+    "name": "The Tale of Two Villages: Trustville and Skeptica",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.218308",
+    "dateModified": "2025-11-28T21:10:19.218309",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

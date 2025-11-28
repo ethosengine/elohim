@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-14-ready-to-act"
   },
-  "createdAt": "2025-11-28T02:53:21.902487",
-  "updatedAt": "2025-11-28T02:53:21.902488"
+  "createdAt": "2025-11-28T21:10:19.225434",
+  "updatedAt": "2025-11-28T21:10:19.225435",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Story: Ready To Act: Embodying Christ in the Digital Age",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-14-ready-to-act-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Story: Ready To Act: Embodying Christ in the Digital Age - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-14-ready-to-act-story",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Story: Ready To Act: Embodying Christ in the Digital Age",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.225434",
+    "dateModified": "2025-11-28T21:10:19.225435",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

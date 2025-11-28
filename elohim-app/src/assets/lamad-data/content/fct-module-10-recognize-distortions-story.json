@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-10-recognize-distortions"
   },
-  "createdAt": "2025-11-28T02:53:21.881970",
-  "updatedAt": "2025-11-28T02:53:21.881971"
+  "createdAt": "2025-11-28T21:10:19.214682",
+  "updatedAt": "2025-11-28T21:10:19.214684",
+  "did": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "But there's a sobering reality behind this facade.",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "But there's a sobering reality behind this facade. - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-10-recognize-distortions-story",
+    "identifier": "did:web:elohim.host:content:fct:module 10 - creating shared understanding - recognize distortions",
+    "name": "But there's a sobering reality behind this facade.",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.214682",
+    "dateModified": "2025-11-28T21:10:19.214684",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

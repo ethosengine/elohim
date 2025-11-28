@@ -25,6 +25,36 @@
     "author": "Paul Sparks"
   },
   "_contributor": "Paul Sparks",
-  "createdAt": "2025-11-28T02:53:21.899372",
-  "updatedAt": "2025-11-28T02:53:21.899374"
+  "createdAt": "2025-11-28T21:10:19.224337",
+  "updatedAt": "2025-11-28T21:10:19.224338",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The New Parish",
+    "ogDescription": "Book by Paul Sparks",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-12-book-the-new-parish",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The New Parish - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-12-book-the-new-parish",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "The New Parish",
+    "description": "Book by Paul Sparks",
+    "dateCreated": "2025-11-28T21:10:19.224337",
+    "dateModified": "2025-11-28T21:10:19.224338",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Paul Sparks"
+    }
+  }
 }

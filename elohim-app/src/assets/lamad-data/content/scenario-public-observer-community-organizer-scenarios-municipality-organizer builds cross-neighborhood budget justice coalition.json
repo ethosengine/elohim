@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer builds cross-neighborhood budget justice coalition",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer builds cross-neighborhood budget justice coalition",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer builds cross-neighborhood budget justice coalition",
   "description": "Organizer builds cross-neighborhood budget justice coalition",
   "content": "Scenario: Organizer builds cross-neighborhood budget justice coalition\n    Given parents care about after-school programs being cut\n    And seniors need meal delivery services maintained\n    And workers depend on subsidized transit\n    When the organizer uses Observer to identify alignment\n    Then they see all three groups affected by same budget priorities\n    And facilitate coordination across five neighborhoods\n    And maintain shared information base on budget impacts\n    And coordinate 100 residents for budget hearing testimony\n    And diverse communities unite around shared municipal interests\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer builds cross-neighborhood budget justice coalition",
+    "ogDescription": "Organizer builds cross-neighborhood budget justice coalition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer builds cross-neighborhood budget justice coalition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer builds cross-neighborhood budget justice coalition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer builds cross-neighborhood budget justice coalition",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer builds cross-neighborhood budget justice coalition",
+    "name": "Organizer builds cross-neighborhood budget justice coalition",
+    "description": "Organizer builds cross-neighborhood budget justice coalition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

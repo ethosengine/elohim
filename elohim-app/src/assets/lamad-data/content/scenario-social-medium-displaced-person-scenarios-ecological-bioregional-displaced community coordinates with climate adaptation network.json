@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates with climate adaptation network",
+  "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:ecological-bioregional-displaced community coordinates with climate adaptation network",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Displaced community coordinates with climate adaptation network",
   "description": "Displaced community coordinates with climate adaptation network",
   "content": "Scenario: Displaced community coordinates with climate adaptation network\n    Given multiple coastal communities face similar climate displacement\n    When they form a climate displacement affinity network\n    And they share strategies for community preservation\n    Then communities learn from each other's experiences\n    And successful resettlement patterns are documented and shared\n    And coordinated advocacy for climate displacement support emerges\n    And the network coordinates with climate justice activists\n    And systemic support for climate migrants is organized\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Displaced community coordinates with climate adaptation network",
+    "ogDescription": "Displaced community coordinates with climate adaptation network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates with climate adaptation network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Displaced community coordinates with climate adaptation network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates with climate adaptation network",
+    "identifier": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:ecological-bioregional-displaced community coordinates with climate adaptation network",
+    "name": "Displaced community coordinates with climate adaptation network",
+    "description": "Displaced community coordinates with climate adaptation network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

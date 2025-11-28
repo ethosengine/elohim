@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-individual-personal data privacy under adult's complete control",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-personal data privacy under adult's complete control",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal data privacy under adult's complete control",
   "description": "Personal data privacy under adult's complete control",
   "content": "Scenario: Personal data privacy under adult's complete control\n    Given Sarah's care contributions generate detailed personal data\n    And this data reveals intimate patterns of her life\n    When Sarah's data is collected and stored\n    Then she must have complete control over all data sharing\n    And she should decide what partner sees, what children see, what community sees\n    And workplace should never access personal care economy data\n    And her privacy must be absolute unless she chooses to share\n    And she should manage family members' privacy while maintaining oversight of children\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal data privacy under adult's complete control",
+    "ogDescription": "Personal data privacy under adult's complete control",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-personal data privacy under adult's complete control",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal data privacy under adult's complete control - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-personal data privacy under adult's complete control",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-personal data privacy under adult's complete control",
+    "name": "Personal data privacy under adult's complete control",
+    "description": "Personal data privacy under adult's complete control",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

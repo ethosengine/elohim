@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-community-protecting protocol sovereignty from state overreach",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community-protecting protocol sovereignty from state overreach",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Protecting protocol sovereignty from state overreach",
   "description": "Protecting protocol sovereignty from state overreach",
   "content": "Scenario: Protecting protocol sovereignty from state overreach\n    Given state government attempts regulation compromising protocol\n    And I believe this violates community sovereignty\n    When I advocate for protecting local autonomy\n    Then I testify: at state legislative hearings\n    And I coalition: with other community leaders\n    And I present: evidence that regulation would harm local governance\n    And I defend: subsidiarity principle and community choice\n    And I resist: one-size-fits-all mandates from higher layers\n    And I maintain: that communities adopted protocol voluntarily\n    And I protect: democratic self-governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Protecting protocol sovereignty from state overreach",
+    "ogDescription": "Protecting protocol sovereignty from state overreach",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-protecting protocol sovereignty from state overreach",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protecting protocol sovereignty from state overreach - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-protecting protocol sovereignty from state overreach",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:community-protecting protocol sovereignty from state overreach",
+    "name": "Protecting protocol sovereignty from state overreach",
+    "description": "Protecting protocol sovereignty from state overreach",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

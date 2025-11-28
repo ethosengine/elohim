@@ -550,4 +550,200 @@ export class ContentService {
 
     return null;
   }
+
+  // =========================================================================
+  // OPEN STANDARDS METADATA ACCESSORS
+  // =========================================================================
+
+  /**
+   * Get Open Graph metadata for social sharing.
+   *
+   * Use this when rendering social share buttons or generating meta tags.
+   * Returns null if content doesn't have Open Graph metadata.
+   *
+   * Example usage:
+   * ```typescript
+   * contentService.getOpenGraphMetadata(contentId).subscribe(og => {
+   *   if (og) {
+   *     this.metaService.updateTag({ property: 'og:title', content: og.ogTitle });
+   *     this.metaService.updateTag({ property: 'og:description', content: og.ogDescription });
+   *   }
+   * });
+   * ```
+   */
+  getOpenGraphMetadata(resourceId: string): Observable<any | null> {
+    return this.dataLoader.getContent(resourceId).pipe(
+      map(content => content.openGraphMetadata || null),
+      catchError(() => of(null))
+    );
+  }
+
+  /**
+   * Get ActivityPub object representation.
+   *
+   * Returns an ActivityPub-compatible object for federated social web integration.
+   * Combines content data with ActivityPub type and context.
+   *
+   * Use this when:
+   * - Publishing content to ActivityPub instances (Mastodon, Pleroma, etc.)
+   * - Generating ActivityStreams JSON
+   * - Federating content across the social web
+   *
+   * Example usage:
+   * ```typescript
+   * contentService.getActivityPubObject(contentId).subscribe(apObject => {
+   *   // Post to ActivityPub server
+   *   this.activityPubService.publish(apObject);
+   * });
+   * ```
+   */
+  getActivityPubObject(resourceId: string): Observable<any | null> {
+    return this.dataLoader.getContent(resourceId).pipe(
+      map(content => {
+        if (!content.activityPubType) {
+          return null;
+        }
+
+        // Build ActivityPub object
+        const apObject: any = {
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          type: content.activityPubType,
+          id: content.did || `https://elohim-protocol.org/content/${content.id}`,
+          name: content.title || content.name,
+          content: content.description,
+          published: content.createdAt,
+          updated: content.updatedAt,
+          url: content.url || `https://elohim-protocol.org/content/${content.id}`
+        };
+
+        // Add author if available
+        if (content.authorId) {
+          apObject.attributedTo = content.authorId;
+        }
+
+        // Add tags
+        if (content.tags && content.tags.length > 0) {
+          apObject.tag = content.tags.map(tag => ({
+            type: 'Hashtag',
+            name: `#${tag}`
+          }));
+        }
+
+        return apObject;
+      }),
+      catchError(() => of(null))
+    );
+  }
+
+  /**
+   * Get JSON-LD (Linked Data) metadata.
+   *
+   * Returns Schema.org-compatible JSON-LD for semantic web interoperability.
+   *
+   * Use this when:
+   * - Embedding structured data in HTML pages (for SEO)
+   * - Integrating with semantic web tools
+   * - Exporting content for knowledge graphs
+   * - Generating Schema.org markup for search engines
+   *
+   * Example usage:
+   * ```typescript
+   * contentService.getJsonLd(contentId).subscribe(jsonLd => {
+   *   if (jsonLd) {
+   *     // Inject into page as <script type="application/ld+json">
+   *     this.renderer.appendChild(document.head, this.createJsonLdScript(jsonLd));
+   *   }
+   * });
+   * ```
+   */
+  getJsonLd(resourceId: string): Observable<any | null> {
+    return this.dataLoader.getContent(resourceId).pipe(
+      map(content => content.linkedData || null),
+      catchError(() => of(null))
+    );
+  }
+
+  /**
+   * Get W3C Decentralized Identifier (DID).
+   *
+   * Returns the DID string for cryptographic identity verification.
+   * DIDs enable content to be referenced across decentralized systems.
+   *
+   * Format: `did:web:elohim.host:content:{path}`
+   *
+   * Use this when:
+   * - Verifying content authenticity
+   * - Referencing content in blockchain/DHT systems
+   * - Creating cryptographic proofs
+   * - Cross-platform content identification
+   */
+  getDid(resourceId: string): Observable<string | null> {
+    return this.dataLoader.getContent(resourceId).pipe(
+      map(content => content.did || null),
+      catchError(() => of(null))
+    );
+  }
+
+  /**
+   * Get all standards metadata at once.
+   *
+   * Returns a combined object with all open standards fields.
+   * More efficient than making separate calls.
+   *
+   * Use this for content detail pages that need all metadata.
+   */
+  getStandardsMetadata(resourceId: string): Observable<{
+    did: string | null;
+    activityPubType: string | null;
+    activityPubObject: any | null;
+    openGraph: any | null;
+    jsonLd: any | null;
+  }> {
+    return this.dataLoader.getContent(resourceId).pipe(
+      map(content => ({
+        did: content.did || null,
+        activityPubType: content.activityPubType || null,
+        activityPubObject: content.activityPubType ? this.buildActivityPubObject(content) : null,
+        openGraph: content.openGraphMetadata || null,
+        jsonLd: content.linkedData || null
+      })),
+      catchError(() => of({
+        did: null,
+        activityPubType: null,
+        activityPubObject: null,
+        openGraph: null,
+        jsonLd: null
+      }))
+    );
+  }
+
+  /**
+   * Helper to build ActivityPub object from content.
+   * Extracted for reuse between methods.
+   */
+  private buildActivityPubObject(content: ContentNode): any {
+    const apObject: any = {
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      type: content.activityPubType,
+      id: content.did || `https://elohim-protocol.org/content/${content.id}`,
+      name: content.title || content.name,
+      content: content.description,
+      published: content.createdAt,
+      updated: content.updatedAt,
+      url: content.url || `https://elohim-protocol.org/content/${content.id}`
+    };
+
+    if (content.authorId) {
+      apObject.attributedTo = content.authorId;
+    }
+
+    if (content.tags && content.tags.length > 0) {
+      apObject.tag = content.tags.map(tag => ({
+        type: 'Hashtag',
+        name: `#${tag}`
+      }));
+    }
+
+    return apObject;
+  }
 }

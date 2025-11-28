@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-climate grief and loss acknowledged in elderly experience",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-climate grief and loss acknowledged in elderly experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Climate grief and loss acknowledged in elderly experience",
   "description": "Climate grief and loss acknowledged in elderly experience",
   "content": "Scenario: Climate grief and loss acknowledged in elderly experience\n    Given Helen has witnessed massive environmental change\n    And loss of familiar ecosystems causes grief\n    When Helen expresses climate grief\n    Then her emotional response should be validated and supported\n    And loss of familiar nature should be acknowledged as legitimate grief\n    And the protocol should recognize that elders witness most environmental loss\n    And climate change impacts include psychological dimensions\n    And Helen's grief should be honored, not dismissed\n    And witnessing ecological destruction across lifetime should be recognized as trauma\n    And elder perspectives should inform community understanding of what's being lost\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Climate grief and loss acknowledged in elderly experience",
+    "ogDescription": "Climate grief and loss acknowledged in elderly experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-climate grief and loss acknowledged in elderly experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Climate grief and loss acknowledged in elderly experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-climate grief and loss acknowledged in elderly experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-climate grief and loss acknowledged in elderly experience",
+    "name": "Climate grief and loss acknowledged in elderly experience",
+    "description": "Climate grief and loss acknowledged in elderly experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

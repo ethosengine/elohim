@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-community-conducting ethnographic research in riverside community",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:community-conducting ethnographic research in riverside community",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Conducting ethnographic research in Riverside community",
   "description": "Conducting ethnographic research in Riverside community",
   "content": "Scenario: Conducting ethnographic research in Riverside community\n    Given I have selected Riverside (population 45,000) for intensive case study\n    And I have secured ethical approval and community consent\n    When I begin multi-month observation of protocol implementation\n    Then I can attend Constitutional Council meetings as observer\n    And I can interview appellants like Marcus about their appeal experience\n    And I can participate in community deliberations about protocol\n    And I can track resource flows and wellbeing indicators\n    And I can document challenges and successes as they emerge\n    And The community retains ownership of data about themselves\n    And My research serves community improvement not just academic publication\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Conducting ethnographic research in Riverside community",
+    "ogDescription": "Conducting ethnographic research in Riverside community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-conducting ethnographic research in riverside community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Conducting ethnographic research in Riverside community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-conducting ethnographic research in riverside community",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:community-conducting ethnographic research in riverside community",
+    "name": "Conducting ethnographic research in Riverside community",
+    "description": "Conducting ethnographic research in Riverside community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

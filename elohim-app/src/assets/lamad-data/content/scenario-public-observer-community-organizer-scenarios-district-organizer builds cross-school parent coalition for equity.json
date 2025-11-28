@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-district-organizer builds cross-school parent coalition for equity",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district-organizer builds cross-school parent coalition for equity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer builds cross-school parent coalition for equity",
   "description": "Organizer builds cross-school parent coalition for equity",
   "content": "Scenario: Organizer builds cross-school parent coalition for equity\n    Given parents at five underfunded schools face similar challenges\n    And most parents don't know the pattern is district-wide\n    When the organizer uses Observer to document resource inequities\n    Then they show per-pupil spending gaps across schools\n    And map distribution of enrichment programs and experienced teachers\n    And connect parents from different schools around shared interests\n    And facilitate coalition demanding equitable resource formula\n    And individual school struggles become district equity campaign\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-district",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer builds cross-school parent coalition for equity",
+    "ogDescription": "Organizer builds cross-school parent coalition for equity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-district-organizer builds cross-school parent coalition for equity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer builds cross-school parent coalition for equity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-district-organizer builds cross-school parent coalition for equity",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district-organizer builds cross-school parent coalition for equity",
+    "name": "Organizer builds cross-school parent coalition for equity",
+    "description": "Organizer builds cross-school parent coalition for equity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

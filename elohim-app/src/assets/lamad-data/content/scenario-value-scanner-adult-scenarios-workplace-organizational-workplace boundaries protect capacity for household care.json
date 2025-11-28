@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-workplace boundaries protect capacity for household care",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-workplace boundaries protect capacity for household care",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace boundaries protect capacity for household care",
   "description": "Workplace boundaries protect capacity for household care",
   "content": "Scenario: Workplace boundaries protect capacity for household care\n    Given Sarah's care responsibilities require substantial time and energy\n    And work can expand to consume all available capacity\n    When workplace demands are placed on Sarah\n    Then the workplace_elohim should monitor total demands\n    And it should alert Sarah when work threatens care capacity\n    And it should help her maintain boundaries\n    And workplace should respect that Sarah has legitimate care obligations\n    And boundaries should protect Sarah's sustainability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace boundaries protect capacity for household care",
+    "ogDescription": "Workplace boundaries protect capacity for household care",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-workplace boundaries protect capacity for household care",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace boundaries protect capacity for household care - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-workplace boundaries protect capacity for household care",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-workplace boundaries protect capacity for household care",
+    "name": "Workplace boundaries protect capacity for household care",
+    "description": "Workplace boundaries protect capacity for household care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

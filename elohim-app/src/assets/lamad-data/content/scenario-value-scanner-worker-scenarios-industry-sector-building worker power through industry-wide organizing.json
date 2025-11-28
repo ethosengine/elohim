@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-industry-sector-building worker power through industry-wide organizing",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-building worker power through industry-wide organizing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building worker power through industry-wide organizing",
   "description": "Building worker power through industry-wide organizing",
   "content": "Scenario: Building worker power through industry-wide organizing\n    Given individual workers and workplaces have limited power\n    When workers organize across the industry\n    Then the protocol should facilitate industry-wide organizing\n    And support union drives and worker organization formation\n    And coordinate collective action across workplaces\n    And build worker power sufficient to transform industry conditions\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building worker power through industry-wide organizing",
+    "ogDescription": "Building worker power through industry-wide organizing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-building worker power through industry-wide organizing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building worker power through industry-wide organizing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-building worker power through industry-wide organizing",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-building worker power through industry-wide organizing",
+    "name": "Building worker power through industry-wide organizing",
+    "description": "Building worker power through industry-wide organizing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

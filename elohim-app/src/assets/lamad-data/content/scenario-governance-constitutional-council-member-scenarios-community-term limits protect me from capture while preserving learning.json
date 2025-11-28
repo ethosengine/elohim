@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-community-term limits protect me from capture while preserving learning",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-term limits protect me from capture while preserving learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Term limits protect me from capture while preserving learning",
   "description": "Term limits protect me from capture while preserving learning",
   "content": "Scenario: Term limits protect me from capture while preserving learning\n    Given I have served my 3-month community council term\n    And I have developed constitutional literacy and deliberation skills\n    When my term ends and I return to nursing work\n    Then I cannot: serve consecutive terms or be reappointed\n    And I cannot: build career in council governance\n    And I am protected: from lobbying, corruption, or capture\n    And I carry forward: constitutional understanding into community life\n    And I remain: engaged citizen with enhanced democratic capacity\n    And my institutional knowledge: is preserved through documentation\n    And fresh perspectives: replace mine to prevent ossification\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Term limits protect me from capture while preserving learning",
+    "ogDescription": "Term limits protect me from capture while preserving learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-term limits protect me from capture while preserving learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Term limits protect me from capture while preserving learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-term limits protect me from capture while preserving learning",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-term limits protect me from capture while preserving learning",
+    "name": "Term limits protect me from capture while preserving learning",
+    "description": "Term limits protect me from capture while preserving learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

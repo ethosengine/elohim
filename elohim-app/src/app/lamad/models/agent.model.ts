@@ -110,6 +110,21 @@ export interface AgentProgress {
 
   // Achievement attestations earned through this path
   attestationsEarned: string[];
+
+  /**
+   * Global content completion tracking (Khan Academy-style shared completion)
+   *
+   * Tracks which content nodes (by resourceId) have been completed across ALL paths.
+   * This enables cross-path completion views:
+   * - If content X is completed in "1st Grade Math", it shows as completed in "Early Math Review"
+   * - Path completion calculated by unique content mastered, not just step indices
+   *
+   * Storage note: Stored as array in JSON, converted to Set in services for O(1) lookup.
+   * Typical learner completes <500 content nodes = <10KB storage, well within localStorage limits.
+   *
+   * Special pathId '__global__' is used to store this field for cross-path tracking.
+   */
+  completedContentIds?: string[];
 }
 
 /**

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-educational-parent coordinates opposition to program cuts",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent coordinates opposition to program cuts",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent coordinates opposition to program cuts",
   "description": "Parent coordinates opposition to program cuts",
   "content": "Scenario: Parent coordinates opposition to program cuts\n    Given the board proposes eliminating elementary music programs\n    And the parent's child participates in school band\n    When the Observer connects parents across district whose children affected\n    Then 230 families from 8 schools form coordinated coalition\n    And present unified testimony on music education benefits\n    And propose alternative budget cuts that preserve student programs\n    And district-wide parent power prevents program elimination\n    And children's enrichment programs are preserved\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent coordinates opposition to program cuts",
+    "ogDescription": "Parent coordinates opposition to program cuts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent coordinates opposition to program cuts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent coordinates opposition to program cuts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent coordinates opposition to program cuts",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent coordinates opposition to program cuts",
+    "name": "Parent coordinates opposition to program cuts",
+    "description": "Parent coordinates opposition to program cuts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

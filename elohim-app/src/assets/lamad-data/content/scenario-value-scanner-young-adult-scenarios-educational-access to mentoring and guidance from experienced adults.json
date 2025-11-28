@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-educational-access to mentoring and guidance from experienced adults",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-access to mentoring and guidance from experienced adults",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Access to mentoring and guidance from experienced adults",
   "description": "Access to mentoring and guidance from experienced adults",
   "content": "Scenario: Access to mentoring and guidance from experienced adults\n    Given Aisha can benefit from elder wisdom\n    And mentoring relationships support development\n    When Aisha seeks guidance\n    Then the system should connect her to mentors\n    And it should facilitate intergenerational knowledge transfer\n    And experienced adults should share practical wisdom\n    And mentoring should be valued as care work\n    And the educational layer should include relationship-based learning\n    And she should have access to guidance beyond peer knowledge\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Access to mentoring and guidance from experienced adults",
+    "ogDescription": "Access to mentoring and guidance from experienced adults",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-access to mentoring and guidance from experienced adults",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Access to mentoring and guidance from experienced adults - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-educational-access to mentoring and guidance from experienced adults",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:educational-access to mentoring and guidance from experienced adults",
+    "name": "Access to mentoring and guidance from experienced adults",
+    "description": "Access to mentoring and guidance from experienced adults",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

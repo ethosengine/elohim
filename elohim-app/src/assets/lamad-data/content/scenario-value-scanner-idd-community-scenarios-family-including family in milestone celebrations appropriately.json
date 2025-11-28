@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-family-including family in milestone celebrations appropriately",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-including family in milestone celebrations appropriately",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Including family in milestone celebrations appropriately",
   "description": "Including family in milestone celebrations appropriately",
   "content": "Scenario: Including family in milestone celebrations appropriately\n    Given Jordan is celebrating one year at their library job\n    And Jordan wants family to recognize this achievement\n    When Jordan plans a celebration\n    Then Jordan decides who to invite from family\n    And the personal_agent helps Jordan send invitations\n    And the celebration honors Jordan's accomplishment as a worker\n    And family celebrates Jordan's success, not just their participation\n    And Jordan experiences family recognizing their adult achievements\n    And Jordan's contributions are valued, not just their effort\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Including family in milestone celebrations appropriately",
+    "ogDescription": "Including family in milestone celebrations appropriately",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-including family in milestone celebrations appropriately",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Including family in milestone celebrations appropriately - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-including family in milestone celebrations appropriately",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-including family in milestone celebrations appropriately",
+    "name": "Including family in milestone celebrations appropriately",
+    "description": "Including family in milestone celebrations appropriately",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

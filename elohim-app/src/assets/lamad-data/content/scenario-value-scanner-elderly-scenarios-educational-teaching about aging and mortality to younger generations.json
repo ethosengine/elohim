@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-educational-teaching about aging and mortality to younger generations",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-teaching about aging and mortality to younger generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching about aging and mortality to younger generations",
   "description": "Teaching about aging and mortality to younger generations",
   "content": "Scenario: Teaching about aging and mortality to younger generations\n    Given Helen faces mortality consciously\n    And younger generations need education about aging and death\n    When Helen shares her experience of aging\n    Then this should be recognized as valuable teaching\n    And younger people should learn from her direct experience\n    And education about mortality should come from those facing it\n    And Helen should be recognized as expert on her own aging\n    And the protocol should facilitate difficult but necessary conversations\n    And death education should be normalized through elder participation\n    And Helen's voice should teach community about aging with dignity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching about aging and mortality to younger generations",
+    "ogDescription": "Teaching about aging and mortality to younger generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-teaching about aging and mortality to younger generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching about aging and mortality to younger generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-teaching about aging and mortality to younger generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-teaching about aging and mortality to younger generations",
+    "name": "Teaching about aging and mortality to younger generations",
+    "description": "Teaching about aging and mortality to younger generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

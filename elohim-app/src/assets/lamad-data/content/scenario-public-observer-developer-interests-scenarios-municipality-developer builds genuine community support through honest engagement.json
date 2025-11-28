@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer builds genuine community support through honest engagement",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-developer builds genuine community support through honest engagement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer builds genuine community support through honest engagement",
   "description": "Developer builds genuine community support through honest engagement",
   "content": "Scenario: Developer builds genuine community support through honest engagement\n    Given a developer is planning mixed-use development\n    And recognizes that authentic community input creates sustainable projects\n    When the Observer facilitates real community engagement\n    Then the developer accesses genuine community priorities not astroturf voices\n    And learns neighborhood actually needs affordable retail space and childcare\n    And adjusts project design to address real community needs\n    And negotiates community benefits agreement with accountability tracking\n    And builds lasting community relationships not managed opposition\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer builds genuine community support through honest engagement",
+    "ogDescription": "Developer builds genuine community support through honest engagement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-developer builds genuine community support through honest engagement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer builds genuine community support through honest engagement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-developer builds genuine community support through honest engagement",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-developer builds genuine community support through honest engagement",
+    "name": "Developer builds genuine community support through honest engagement",
+    "description": "Developer builds genuine community support through honest engagement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

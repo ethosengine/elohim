@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-educational-teaching that care work creates economic value",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-teaching that care work creates economic value",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching that care work creates economic value",
   "description": "Teaching that care work creates economic value",
   "content": "Scenario: Teaching that care work creates economic value\n    Given traditional economics makes care work invisible\n    And Emma is forming foundational economic understanding\n    When Emma performs care labor through scanner decisions\n    Then the system should explicitly teach care creates value\n    And her personal_agent should say \"Your stewardship helped your family\"\n    And care contributions should be valued concretely\n    And she should learn caring for others is economically valuable\n    And care economy framework should be established as baseline\n    And she should understand care before being exposed to extraction economics\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching that care work creates economic value",
+    "ogDescription": "Teaching that care work creates economic value",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-teaching that care work creates economic value",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching that care work creates economic value - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-teaching that care work creates economic value",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-teaching that care work creates economic value",
+    "name": "Teaching that care work creates economic value",
+    "description": "Teaching that care work creates economic value",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

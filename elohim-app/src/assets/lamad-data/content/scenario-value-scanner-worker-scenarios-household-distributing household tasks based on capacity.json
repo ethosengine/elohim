@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-household-distributing household tasks based on capacity",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-distributing household tasks based on capacity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Distributing household tasks based on capacity",
   "description": "Distributing household tasks based on capacity",
   "content": "Scenario: Distributing household tasks based on capacity\n    Given different household members have different time and energy\n    And my work leaves me with minimal capacity\n    When we allocate household responsibilities\n    Then the protocol should suggest distribution based on actual capacity\n    And recognize that my 50+ hour work week limits my availability\n    And propose fair alternatives when I can't do time-intensive tasks\n    And help us find equitable arrangements\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Distributing household tasks based on capacity",
+    "ogDescription": "Distributing household tasks based on capacity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-distributing household tasks based on capacity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Distributing household tasks based on capacity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-distributing household tasks based on capacity",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-distributing household tasks based on capacity",
+    "name": "Distributing household tasks based on capacity",
+    "description": "Distributing household tasks based on capacity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

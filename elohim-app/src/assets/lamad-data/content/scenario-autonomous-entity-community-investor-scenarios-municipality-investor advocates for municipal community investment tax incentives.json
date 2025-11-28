@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-investor advocates for municipal community investment tax incentives",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-investor advocates for municipal community investment tax incentives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor advocates for municipal community investment tax incentives",
   "description": "Investor advocates for municipal community investment tax incentives",
   "content": "Scenario: Investor advocates for municipal community investment tax incentives\n    Given municipality offers tax breaks for corporate investment\n    And community investment lacks equivalent policy support\n    When Patricia and other investors organize for policy change\n    Then they advocate to city council for community investment tax credits\n    And propose municipal matching funds for community investment pools\n    And credible advocacy comes from investors who've proven model viability\n    And municipal policy evolves to support community investment and democratic ownership\n    And municipality_elohim coordinates investor advocacy and policy development\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor advocates for municipal community investment tax incentives",
+    "ogDescription": "Investor advocates for municipal community investment tax incentives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-investor advocates for municipal community investment tax incentives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor advocates for municipal community investment tax incentives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-investor advocates for municipal community investment tax incentives",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-investor advocates for municipal community investment tax incentives",
+    "name": "Investor advocates for municipal community investment tax incentives",
+    "description": "Investor advocates for municipal community investment tax incentives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

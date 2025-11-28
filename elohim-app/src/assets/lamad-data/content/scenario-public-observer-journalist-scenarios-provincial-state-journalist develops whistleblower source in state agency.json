@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-provincial-state-journalist develops whistleblower source in state agency",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state-journalist develops whistleblower source in state agency",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist develops whistleblower source in state agency",
   "description": "Journalist develops whistleblower source in state agency",
   "content": "Scenario: Journalist develops whistleblower source in state agency\n    Given a state employee witnesses fraud in contract process\n    And fears career retaliation for exposing misconduct\n    When the Observer provides secure protected channel\n    Then the whistleblower shares evidence of fraudulent contracts\n    And journalist investigates without exposing source\n    And verifies claims through additional reporting and records\n    And publishes investigation leading to official inquiry\n    And source protection enables accountability journalism\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist develops whistleblower source in state agency",
+    "ogDescription": "Journalist develops whistleblower source in state agency",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-provincial-state-journalist develops whistleblower source in state agency",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist develops whistleblower source in state agency - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-provincial-state-journalist develops whistleblower source in state agency",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state-journalist develops whistleblower source in state agency",
+    "name": "Journalist develops whistleblower source in state agency",
+    "description": "Journalist develops whistleblower source in state agency",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

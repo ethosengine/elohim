@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-navigating family judgment and stigma about my circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-navigating family judgment and stigma about my circumstances",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Navigating family judgment and stigma about my circumstances",
   "description": "Navigating family judgment and stigma about my circumstances",
   "content": "Scenario: Navigating family judgment and stigma about my circumstances\n    Given some family members judge me for leaving, for being \"difficult,\" for accessing assistance\n    And I am vulnerable to internalizing family shame and blame\n    When family members express stigmatizing attitudes\n    Then the family_elohim helps me recognize and resist family stigma\n    And validates that leaving abuse was right and necessary\n    And provides supportive reframing of stigmatizing narratives\n    And helps me set boundaries with judgmental family members\n    And connects me to peer support from others who understand\n    And my personal_agent reminds me that my choices were brave and appropriate\n    And recognizes resisting family judgment as emotional labor\n    And supports my right to distance from unsupportive family\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Navigating family judgment and stigma about my circumstances",
+    "ogDescription": "Navigating family judgment and stigma about my circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-navigating family judgment and stigma about my circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Navigating family judgment and stigma about my circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-navigating family judgment and stigma about my circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-navigating family judgment and stigma about my circumstances",
+    "name": "Navigating family judgment and stigma about my circumstances",
+    "description": "Navigating family judgment and stigma about my circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

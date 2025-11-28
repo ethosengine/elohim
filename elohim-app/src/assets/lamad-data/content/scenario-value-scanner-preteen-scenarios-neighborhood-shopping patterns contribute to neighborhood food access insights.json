@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-neighborhood-shopping patterns contribute to neighborhood food access insights",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-shopping patterns contribute to neighborhood food access insights",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Shopping patterns contribute to neighborhood food access insights",
   "description": "Shopping patterns contribute to neighborhood food access insights",
   "content": "Scenario: Shopping patterns contribute to neighborhood food access insights\n    Given Marcus shops regularly at neighborhood stores\n    And he tracks prices and availability across locations\n    When Marcus's anonymized shopping data is aggregated\n    Then it should contribute to neighborhood food access mapping\n    And the neighborhood_elohim should identify food deserts\n    And pricing patterns should be visible at neighborhood scale\n    And Marcus's data should help others navigate local food systems\n    And collective knowledge should reduce individual burden\n    And his contributions should improve neighborhood food security\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Shopping patterns contribute to neighborhood food access insights",
+    "ogDescription": "Shopping patterns contribute to neighborhood food access insights",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-shopping patterns contribute to neighborhood food access insights",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Shopping patterns contribute to neighborhood food access insights - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-shopping patterns contribute to neighborhood food access insights",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-shopping patterns contribute to neighborhood food access insights",
+    "name": "Shopping patterns contribute to neighborhood food access insights",
+    "description": "Shopping patterns contribute to neighborhood food access insights",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

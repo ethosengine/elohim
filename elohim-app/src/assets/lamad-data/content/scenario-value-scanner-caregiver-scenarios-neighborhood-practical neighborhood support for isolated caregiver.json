@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-practical neighborhood support for isolated caregiver",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-practical neighborhood support for isolated caregiver",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Practical neighborhood support for isolated caregiver",
   "description": "Practical neighborhood support for isolated caregiver",
   "content": "Scenario: Practical neighborhood support for isolated caregiver\n    Given James cannot easily leave David alone\n    And small practical tasks become difficult\n    When neighbors offer practical support\n    Then the neighborhood_elohim should coordinate helpful offers\n    And neighbors could pick up groceries or prescriptions\n    And they could help with yard work or home maintenance\n    And they could check in and provide human connection\n    And practical support should reduce James's isolation\n    And neighborhood mutual aid should serve caregivers actively\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Practical neighborhood support for isolated caregiver",
+    "ogDescription": "Practical neighborhood support for isolated caregiver",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-practical neighborhood support for isolated caregiver",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Practical neighborhood support for isolated caregiver - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-practical neighborhood support for isolated caregiver",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-practical neighborhood support for isolated caregiver",
+    "name": "Practical neighborhood support for isolated caregiver",
+    "description": "Practical neighborhood support for isolated caregiver",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

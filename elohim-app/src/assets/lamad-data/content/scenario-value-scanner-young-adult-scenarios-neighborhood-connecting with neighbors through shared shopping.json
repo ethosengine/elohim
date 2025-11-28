@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-connecting with neighbors through shared shopping",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-connecting with neighbors through shared shopping",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Connecting with neighbors through shared shopping",
   "description": "Connecting with neighbors through shared shopping",
   "content": "Scenario: Connecting with neighbors through shared shopping\n    Given Aisha shops at local grocery stores\n    And other neighbors shop at the same stores\n    When the neighborhood_elohim identifies potential connections\n    Then it should suggest connecting with nearby residents\n    And it should surface bulk buying opportunities\n    And it should facilitate resource sharing among neighbors\n    And introductions should be based on mutual care interests\n    And the system should help build neighborhood relationships organically\n    And community should form through practical cooperation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Connecting with neighbors through shared shopping",
+    "ogDescription": "Connecting with neighbors through shared shopping",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-connecting with neighbors through shared shopping",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting with neighbors through shared shopping - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-connecting with neighbors through shared shopping",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-connecting with neighbors through shared shopping",
+    "name": "Connecting with neighbors through shared shopping",
+    "description": "Connecting with neighbors through shared shopping",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

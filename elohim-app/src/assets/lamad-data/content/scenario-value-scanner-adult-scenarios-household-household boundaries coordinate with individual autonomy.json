@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-household-household boundaries coordinate with individual autonomy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-household boundaries coordinate with individual autonomy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household boundaries coordinate with individual autonomy",
   "description": "Household boundaries coordinate with individual autonomy",
   "content": "Scenario: Household boundaries coordinate with individual autonomy\n    Given Sarah has individual autonomy over her choices\n    And she also participates in household governance\n    When Sarah makes decisions affecting the household\n    Then household boundaries should be negotiated, not imposed\n    And Sarah should maintain individual agency within household context\n    And household_elohim should balance individual and collective needs\n    And neither Sarah nor partner should dominate household governance\n    And equitable partnership should be structurally supported\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Household boundaries coordinate with individual autonomy",
+    "ogDescription": "Household boundaries coordinate with individual autonomy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-household boundaries coordinate with individual autonomy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household boundaries coordinate with individual autonomy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-household boundaries coordinate with individual autonomy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-household boundaries coordinate with individual autonomy",
+    "name": "Household boundaries coordinate with individual autonomy",
+    "description": "Household boundaries coordinate with individual autonomy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

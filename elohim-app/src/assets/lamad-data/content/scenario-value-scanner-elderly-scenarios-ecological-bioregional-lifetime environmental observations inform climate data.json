@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-lifetime environmental observations inform climate data",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-lifetime environmental observations inform climate data",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Lifetime environmental observations inform climate data",
   "description": "Lifetime environmental observations inform climate data",
   "content": "Scenario: Lifetime environmental observations inform climate data\n    Given Helen has observed local environmental changes over 8+ decades\n    And her memory includes baseline data from pre-industrial era\n    When Helen shares environmental observations\n    Then her knowledge should be captured for ecological archives\n    And her observations should inform local climate understanding\n    And personal experience should be valued alongside scientific data\n    And care tokens should reflect her contribution to environmental knowledge\n    And the protocol should recognize elders as environmental historians\n    And Helen's lifetime of observation should contribute to bioregional stewardship\n    And indigenous elder knowledge methods should inform data collection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Lifetime environmental observations inform climate data",
+    "ogDescription": "Lifetime environmental observations inform climate data",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-lifetime environmental observations inform climate data",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Lifetime environmental observations inform climate data - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-lifetime environmental observations inform climate data",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-lifetime environmental observations inform climate data",
+    "name": "Lifetime environmental observations inform climate data",
+    "description": "Lifetime environmental observations inform climate data",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

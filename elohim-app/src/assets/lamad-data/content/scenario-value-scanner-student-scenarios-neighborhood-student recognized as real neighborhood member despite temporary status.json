@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-neighborhood-student recognized as real neighborhood member despite temporary status",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-student recognized as real neighborhood member despite temporary status",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Student recognized as real neighborhood member despite temporary status",
   "description": "Student recognized as real neighborhood member despite temporary status",
   "content": "Scenario: Student recognized as real neighborhood member despite temporary status\n    Given Kenji will likely move after graduation\n    And neighborhoods often treat students as temporary non-members\n    When the neighborhood_elohim tracks neighborhood participation\n    Then it should recognize students as current, real residents\n    And it should value Kenji's presence now, not discount it as temporary\n    And it should include him in neighborhood decision-making\n    And temporary residency should not exclude from community membership\n    And the system should counteract student marginalization\n    And Kenji should experience genuine neighborhood belonging\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Student recognized as real neighborhood member despite temporary status",
+    "ogDescription": "Student recognized as real neighborhood member despite temporary status",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-student recognized as real neighborhood member despite temporary status",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Student recognized as real neighborhood member despite temporary status - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-student recognized as real neighborhood member despite temporary status",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-student recognized as real neighborhood member despite temporary status",
+    "name": "Student recognized as real neighborhood member despite temporary status",
+    "description": "Student recognized as real neighborhood member despite temporary status",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

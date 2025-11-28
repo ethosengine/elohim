@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-household-household maintenance prevents costly emergencies",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-household maintenance prevents costly emergencies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household maintenance prevents costly emergencies",
   "description": "Household maintenance prevents costly emergencies",
   "content": "Scenario: Household maintenance prevents costly emergencies\n    Given Aisha is learning household maintenance\n    And prevention is cheaper than emergency repairs\n    When the personal_agent tracks household maintenance\n    Then it should provide preventive maintenance schedules\n    And it should flag issues before they become emergencies\n    And it should educate about maintenance tasks Aisha might not know\n    And the system should protect her from expensive neglect\n    And household competence should include preventive thinking\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Household maintenance prevents costly emergencies",
+    "ogDescription": "Household maintenance prevents costly emergencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-household maintenance prevents costly emergencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household maintenance prevents costly emergencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-household maintenance prevents costly emergencies",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-household maintenance prevents costly emergencies",
+    "name": "Household maintenance prevents costly emergencies",
+    "description": "Household maintenance prevents costly emergencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

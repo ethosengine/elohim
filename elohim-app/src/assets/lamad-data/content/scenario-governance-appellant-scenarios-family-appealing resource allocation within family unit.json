@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-family-appealing resource allocation within family unit",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:family-appealing resource allocation within family unit",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appealing resource allocation within family unit",
   "description": "Appealing resource allocation within family unit",
   "content": "Scenario: Appealing resource allocation within family unit\n    Given Family Elohim allocated household resources in a way I believe is unfair\n    And I feel my needs were deprioritized compared to other family members\n    When I appeal the resource allocation decision\n    Then the agent must justify how it balanced competing family member needs\n    And The Constitutional Council evaluates if constitutional principles were followed\n    And They consider cultural context of family resource sharing\n    And They examine if I had meaningful input into the decision process\n    And The appeal can result in modified allocation or preference updates\n    And Family members can collaboratively set allocation principles going forward\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-family",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appealing resource allocation within family unit",
+    "ogDescription": "Appealing resource allocation within family unit",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-appealing resource allocation within family unit",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appealing resource allocation within family unit - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-appealing resource allocation within family unit",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:family-appealing resource allocation within family unit",
+    "name": "Appealing resource allocation within family unit",
+    "description": "Appealing resource allocation within family unit",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

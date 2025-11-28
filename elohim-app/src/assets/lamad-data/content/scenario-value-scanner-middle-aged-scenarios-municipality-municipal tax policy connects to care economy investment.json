@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal tax policy connects to care economy investment",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal tax policy connects to care economy investment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal tax policy connects to care economy investment",
   "description": "Municipal tax policy connects to care economy investment",
   "content": "Scenario: Municipal tax policy connects to care economy investment\n    Given Robert pays substantial property and income taxes\n    And taxes should support care infrastructure\n    And he has voice in how tax revenue is used\n    When municipal_elohim connects taxation to care economy\n    Then it should help him understand how his taxes fund care infrastructure\n    And surface opportunities to advocate for care economy tax priorities\n    And connect him to municipal revenue and taxation policy discussions\n    And support advocacy for progressive taxation that funds care\n    And build municipal tax policy that supports care economy\n    And demonstrate that taxation is community investment in care\n    And recognize that taxpayers should shape spending priorities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal tax policy connects to care economy investment",
+    "ogDescription": "Municipal tax policy connects to care economy investment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal tax policy connects to care economy investment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal tax policy connects to care economy investment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal tax policy connects to care economy investment",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal tax policy connects to care economy investment",
+    "name": "Municipal tax policy connects to care economy investment",
+    "description": "Municipal tax policy connects to care economy investment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

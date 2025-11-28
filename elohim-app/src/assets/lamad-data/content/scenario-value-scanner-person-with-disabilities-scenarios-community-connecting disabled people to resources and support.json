@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-connecting disabled people to resources and support",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-connecting disabled people to resources and support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Connecting disabled people to resources and support",
   "description": "Connecting disabled people to resources and support",
   "content": "Scenario: Connecting disabled people to resources and support\n    Given Alex has expertise about disability resources and systems\n    And many disabled people struggle to navigate complex systems\n    When Alex helps other disabled people access resources\n    Then this navigation support should be recognized as care work\n    And the community_elohim should track Alex's peer support\n    And connecting people to resources should accumulate care tokens\n    And Alex's expertise reduces others' suffering and struggle\n    And peer navigation is sophisticated skilled labor\n    And the protocol should value disability community mutual aid\n    And Alex's support enables others' flourishing\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Connecting disabled people to resources and support",
+    "ogDescription": "Connecting disabled people to resources and support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-connecting disabled people to resources and support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting disabled people to resources and support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-connecting disabled people to resources and support",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-connecting disabled people to resources and support",
+    "name": "Connecting disabled people to resources and support",
+    "description": "Connecting disabled people to resources and support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

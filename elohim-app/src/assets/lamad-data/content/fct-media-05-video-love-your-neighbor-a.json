@@ -27,6 +27,32 @@
     "year": null
   },
   "_organization": null,
-  "createdAt": "2025-11-28T02:53:21.864645",
-  "updatedAt": "2025-11-28T02:53:21.864646"
+  "createdAt": "2025-11-28T21:10:19.204913",
+  "updatedAt": "2025-11-28T21:10:19.204915",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Video",
+  "openGraphMetadata": {
+    "ogTitle": "love your neighbor as yourself",
+    "ogDescription": "love your neighbor as yourself",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-05-video-love-your-neighbor-a",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/video.jpg",
+    "ogImageAlt": "love your neighbor as yourself - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "VideoObject",
+    "@id": "https://elohim-protocol.org/content/fct-media-05-video-love-your-neighbor-a",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "love your neighbor as yourself",
+    "description": "love your neighbor as yourself",
+    "dateCreated": "2025-11-28T21:10:19.204913",
+    "dateModified": "2025-11-28T21:10:19.204915",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "feature-social-medium-refugee-scenarios-global",
+  "did": "did:web:elohim.host:content:social-medium:refugee:scenarios:global",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Cross-Border Connection and Protection for Refugee",
   "description": "As a refugee in the social_medium system Operating at the global governance layer I want to maintain connection with family and culture across borders So that I can preserve relationships and identity despite forced displacement",
   "content": "@epic:social_medium\n@user_type:refugee\n@governance_layer:global\n@related_users:displaced_person,activist,family\n@related_layers:nation_state,cultural_linguistic,family\n@elohim_agents:translation_agent,protection_agent,sanctuary_agent\n\nFeature: Cross-Border Connection and Protection for Refugee\n  As a refugee in the social_medium system\n  Operating at the global governance layer\n  I want to maintain connection with family and culture across borders\n  So that I can preserve relationships and identity despite forced displacement\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the refugee user is registered in the system\n    And the global governance context is active\n    And the refugee is Amira, who fled Syria and now lives in Germany\n\n  Scenario: Refugee maintains family connection across borders\n    Given Amira's parents and siblings remain in Syria\n    And internet access in Syria is unreliable and monitored\n    When Amira communicates with her family through Elohim\n    And the translation agent provides Arabic-German translation\n    Then communication flows securely across borders\n    And her family's privacy is protected from Syrian surveillance\n    And Amira maintains vital family bonds despite separation\n    And the distributed architecture bypasses censorship\n    And family photos and memories are safely shared\n\n  Scenario: Refugee protected from human trafficking scheme\n    Given Amira is seeking employment in Germany\n    When traffickers posing as employers try to contact her\n    And they offer suspiciously lucrative jobs requiring isolation\n    Then the protection agent identifies trafficking patterns\n    And the fraudulent messages never reach Amira\n    And she is protected without knowing she was targeted\n    And legitimate employment resources continue to reach her\n    And vulnerable refugees are protected from exploitation\n\n  Scenario: Refugee connects with cultural community in diaspora\n    Given Amira wants to maintain Syrian cultural connections\n    When she joins the Syrian diaspora cultural community\n    And the community includes refugees across multiple countries\n    Then she finds others who share her language and culture\n    And cultural practices, recipes, and traditions are preserved\n    And she participates in Arabic language maintenance\n    And her children can learn their cultural heritage\n    And the community provides mutual support across diaspora\n\n  Scenario: Refugee documents journey for family reunification\n    Given Amira is working toward bringing her family to Germany\n    When she documents her journey and establishes housing and employment\n    And she needs to prove family relationships for legal process\n    Then critical documents are cryptographically secured\n    And they're backed up across sanctuary institutions\n    And the documentation supports family reunification application\n    And legal aid organizations can access needed evidence\n    And the family reunification process is supported by secure documentation\n",
@@ -28,6 +30,32 @@
     "epic": "social_medium",
     "scenarioCount": 4
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Cross-Border Connection and Protection for Refugee",
+    "ogDescription": "As a refugee in the social_medium system Operating at the global governance layer I want to maintain connection with family and culture across borders So that I can preserve relationships and identity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-refugee-scenarios-global",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Cross-Border Connection and Protection for Refugee - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-refugee-scenarios-global",
+    "identifier": "did:web:elohim.host:content:social-medium:refugee:scenarios:global",
+    "name": "Cross-Border Connection and Protection for Refugee",
+    "description": "As a refugee in the social_medium system Operating at the global governance layer I want to maintain connection with family and culture across borders So that I can preserve relationships and identity despite forced displacement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

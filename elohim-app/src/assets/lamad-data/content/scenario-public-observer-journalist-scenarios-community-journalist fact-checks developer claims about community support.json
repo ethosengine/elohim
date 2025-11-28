@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-community-journalist fact-checks developer claims about community support",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist fact-checks developer claims about community support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist fact-checks developer claims about community support",
   "description": "Journalist fact-checks developer claims about community support",
   "content": "Scenario: Journalist fact-checks developer claims about community support\n    Given a developer claims broad community backing for project\n    And the journalist investigates at community meeting\n    When the Observer analyzes community testimony and meeting history\n    Then the journalist sees only 3 community supporters (all with developer ties)\n    And finds 47 community members opposed in past meetings\n    And verifies developer hired people to testify falsely\n    And publishes real-time fact-check of developer claims\n    And astroturfing gets exposed through systematic documentation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist fact-checks developer claims about community support",
+    "ogDescription": "Journalist fact-checks developer claims about community support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist fact-checks developer claims about community support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist fact-checks developer claims about community support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist fact-checks developer claims about community support",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist fact-checks developer claims about community support",
+    "name": "Journalist fact-checks developer claims about community support",
+    "description": "Journalist fact-checks developer claims about community support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-educational-parent expertise in child development informs school practices",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent expertise in child development informs school practices",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent expertise in child development informs school practices",
   "description": "Parent expertise in child development informs school practices",
   "content": "Scenario: Parent expertise in child development informs school practices\n    Given Sarah has professional teaching expertise\n    And she knows her children's developmental needs intimately\n    When Sarah engages with children's schools\n    Then her expertise should be recognized and valued\n    And teachers should consult Sarah's knowledge of Tommy and Emma\n    And parent-teacher relationships should be expert collaboration\n    And Sarah's observations should inform educational planning\n    And the system should position parents as expert partners\n    And parent knowledge should shape school practices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent expertise in child development informs school practices",
+    "ogDescription": "Parent expertise in child development informs school practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent expertise in child development informs school practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent expertise in child development informs school practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent expertise in child development informs school practices",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent expertise in child development informs school practices",
+    "name": "Parent expertise in child development informs school practices",
+    "description": "Parent expertise in child development informs school practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

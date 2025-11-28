@@ -25,6 +25,36 @@
     "author": "Cal Newport"
   },
   "_contributor": "Cal Newport",
-  "createdAt": "2025-11-28T02:53:21.901996",
-  "updatedAt": "2025-11-28T02:53:21.901997"
+  "createdAt": "2025-11-28T21:10:19.224945",
+  "updatedAt": "2025-11-28T21:10:19.224946",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Digital Minimalism",
+    "ogDescription": "Book by Cal Newport",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-digital-minimalism",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Digital Minimalism - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-digital-minimalism",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Digital Minimalism",
+    "description": "Book by Cal Newport",
+    "dateCreated": "2025-11-28T21:10:19.224945",
+    "dateModified": "2025-11-28T21:10:19.224946",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Cal Newport"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-affinity-network-child joins age-appropriate interest community",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child joins age-appropriate interest community",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child joins age-appropriate interest community",
   "description": "Child joins age-appropriate interest community",
   "content": "Scenario: Child joins age-appropriate interest community\n    Given Emma loves drawing manga-style art\n    When she discovers a youth manga artists community in her region\n    And the community is moderated and age-appropriate (ages 10-16)\n    Then she can request to join through her parent's approval\n    And her parents see the community charter and moderator information\n    And upon approval, she gains access to the creative space\n    And she can share art, get feedback, and learn techniques\n    And all participants are age-verified and properly supervised\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child joins age-appropriate interest community",
+    "ogDescription": "Child joins age-appropriate interest community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child joins age-appropriate interest community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child joins age-appropriate interest community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child joins age-appropriate interest community",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child joins age-appropriate interest community",
+    "name": "Child joins age-appropriate interest community",
+    "description": "Child joins age-appropriate interest community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-community-advocating for elder-friendly community policies",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-advocating for elder-friendly community policies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advocating for elder-friendly community policies",
   "description": "Advocating for elder-friendly community policies",
   "content": "Scenario: Advocating for elder-friendly community policies\n    Given Margaret represents retired community members' interests\n    And community policies affect elder well-being and participation\n    When community considers policies on housing, transportation, or services\n    Then Margaret's voice and advocacy should be valued\n    And her care contributions should give her standing in decisions\n    And elder perspective should inform community planning\n    And age-friendly policies should be prioritized\n    And community should serve members of all ages\n    And Margaret should help shape community for aging population\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for elder-friendly community policies",
+    "ogDescription": "Advocating for elder-friendly community policies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-advocating for elder-friendly community policies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for elder-friendly community policies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-advocating for elder-friendly community policies",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-advocating for elder-friendly community policies",
+    "name": "Advocating for elder-friendly community policies",
+    "description": "Advocating for elder-friendly community policies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

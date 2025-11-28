@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor sees capital enable dignified transitions for small business owners",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor sees capital enable dignified transitions for small business owners",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor sees capital enable dignified transitions for small business owners",
   "description": "Investor sees capital enable dignified transitions for small business owners",
   "content": "Scenario: Investor sees capital enable dignified transitions for small business owners\n    Given traditional buyers would exploit workers or destroy community institutions\n    And small business owners like Rosa faced impossible exit choices\n    When Patricia's investment enables exit-to-community conversions\n    Then Rosa achieves financial security ($180K) while protecting workers\n    And legacy is preserved as democratic community institution\n    And investor capital makes dignified transition possible\n    And community institutions are preserved through patient investment\n    And community_elohim facilitates transition financing and stakeholder support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor sees capital enable dignified transitions for small business owners",
+    "ogDescription": "Investor sees capital enable dignified transitions for small business owners",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor sees capital enable dignified transitions for small business owners",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor sees capital enable dignified transitions for small business owners - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor sees capital enable dignified transitions for small business owners",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor sees capital enable dignified transitions for small business owners",
+    "name": "Investor sees capital enable dignified transitions for small business owners",
+    "description": "Investor sees capital enable dignified transitions for small business owners",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

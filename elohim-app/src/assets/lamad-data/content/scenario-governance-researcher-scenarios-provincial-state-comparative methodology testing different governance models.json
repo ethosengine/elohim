@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-provincial-state-comparative methodology testing different governance models",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-comparative methodology testing different governance models",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Comparative methodology testing different governance models",
   "description": "Comparative methodology testing different governance models",
   "content": "Scenario: Comparative methodology testing different governance models\n    Given I want to compare sortition councils to alternative governance approaches\n    And some regions use elected representatives, others expert panels, others algorithms\n    When I conduct systematic comparison across governance models\n    Then I examine: decision quality (outcomes, constitutional alignment, legitimacy)\n    And I assess: participation (who governs, how accessible, how diverse)\n    And I measure: trust (public confidence in decisions)\n    And I analyze: adaptability (responding to new challenges)\n    And I compare: costs (resources required vs benefits delivered)\n    And I provide: evidence about relative strengths of different models\n    And My research serves: democratic choice among governance alternatives\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Comparative methodology testing different governance models",
+    "ogDescription": "Comparative methodology testing different governance models",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-comparative methodology testing different governance models",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Comparative methodology testing different governance models - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-comparative methodology testing different governance models",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-comparative methodology testing different governance models",
+    "name": "Comparative methodology testing different governance models",
+    "description": "Comparative methodology testing different governance models",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

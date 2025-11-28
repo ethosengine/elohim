@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-ecological-responsible developer demonstrates genuine sustainability commitment",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:ecological-responsible developer demonstrates genuine sustainability commitment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responsible developer demonstrates genuine sustainability commitment",
   "description": "Responsible developer demonstrates genuine sustainability commitment",
   "content": "Scenario: Responsible developer demonstrates genuine sustainability commitment\n    Given a developer builds with high environmental standards\n    And wants sustainability track record to be visible and valued\n    When the Observer documents environmental performance\n    Then the developer shows: LEED Platinum certification on 8 of 10 projects\n    And stormwater management exceeds regulatory requirements by 40%\n    And green infrastructure investment totals $4M beyond minimum requirements\n    And environmental commitments were kept not just promised\n    And genuine sustainability creates market differentiation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Responsible developer demonstrates genuine sustainability commitment",
+    "ogDescription": "Responsible developer demonstrates genuine sustainability commitment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-ecological-responsible developer demonstrates genuine sustainability commitment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responsible developer demonstrates genuine sustainability commitment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-ecological-responsible developer demonstrates genuine sustainability commitment",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:ecological-responsible developer demonstrates genuine sustainability commitment",
+    "name": "Responsible developer demonstrates genuine sustainability commitment",
+    "description": "Responsible developer demonstrates genuine sustainability commitment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

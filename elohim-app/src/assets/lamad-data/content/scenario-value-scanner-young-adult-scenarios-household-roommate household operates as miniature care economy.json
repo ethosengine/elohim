@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-household-roommate household operates as miniature care economy",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-roommate household operates as miniature care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Roommate household operates as miniature care economy",
   "description": "Roommate household operates as miniature care economy",
   "content": "Scenario: Roommate household operates as miniature care economy\n    Given Aisha lives with roommates\n    And the household functions as a care economy unit\n    When household care tokens are calculated\n    Then all forms of household labor should be valued\n    And cooking, cleaning, shopping, and maintenance should all count\n    And emotional labor of household coordination should be recognized\n    And care tokens should enable equitable exchange\n    And the household should function as mutual support network\n    And care economy principles should prevent household exploitation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Roommate household operates as miniature care economy",
+    "ogDescription": "Roommate household operates as miniature care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-roommate household operates as miniature care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Roommate household operates as miniature care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-roommate household operates as miniature care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-roommate household operates as miniature care economy",
+    "name": "Roommate household operates as miniature care economy",
+    "description": "Roommate household operates as miniature care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

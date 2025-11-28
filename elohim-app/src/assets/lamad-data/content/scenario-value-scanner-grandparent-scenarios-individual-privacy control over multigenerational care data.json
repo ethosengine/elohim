@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-individual-privacy control over multigenerational care data",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-privacy control over multigenerational care data",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Privacy control over multigenerational care data",
   "description": "Privacy control over multigenerational care data",
   "content": "Scenario: Privacy control over multigenerational care data\n    Given Margaret's data includes information about grandchildren and her mother\n    And health information is particularly sensitive\n    When Margaret determines data sharing preferences\n    Then she must have complete control over all her data\n    And she should choose what's shared with family members\n    And she can demonstrate care value to family if she wishes\n    And she can maintain complete privacy if she prefers\n    And health data sharing must be explicitly consented\n    And Margaret's autonomy over her information must be absolute\n    And privacy across generations must be carefully managed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Privacy control over multigenerational care data",
+    "ogDescription": "Privacy control over multigenerational care data",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-privacy control over multigenerational care data",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy control over multigenerational care data - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-individual-privacy control over multigenerational care data",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:individual-privacy control over multigenerational care data",
+    "name": "Privacy control over multigenerational care data",
+    "description": "Privacy control over multigenerational care data",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

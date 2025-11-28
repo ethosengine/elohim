@@ -27,6 +27,32 @@
     "year": "2020"
   },
   "_organization": "Netflix",
-  "createdAt": "2025-11-28T02:53:21.846899",
-  "updatedAt": "2025-11-28T02:53:21.846901"
+  "createdAt": "2025-11-28T21:10:19.189243",
+  "updatedAt": "2025-11-28T21:10:19.189245",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "The Social Dilemma",
+    "ogDescription": "The Social Dilemma (2020)",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-documentary-the-social-dilemma",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/documentary.jpg",
+    "ogImageAlt": "The Social Dilemma - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-documentary-the-social-dilemma",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "The Social Dilemma",
+    "description": "The Social Dilemma (2020)",
+    "dateCreated": "2025-11-28T21:10:19.189243",
+    "dateModified": "2025-11-28T21:10:19.189245",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

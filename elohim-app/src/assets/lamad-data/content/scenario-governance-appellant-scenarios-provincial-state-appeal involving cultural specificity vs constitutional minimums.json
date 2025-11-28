@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-provincial-state-appeal involving cultural specificity vs constitutional minimums",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal involving cultural specificity vs constitutional minimums",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal involving cultural specificity vs constitutional minimums",
   "description": "Appeal involving cultural specificity vs constitutional minimums",
   "content": "Scenario: Appeal involving cultural specificity vs constitutional minimums\n    Given my community has cultural practices that differ from regional norms\n    And an agent decision applied regional default rather than local calibration\n    When I appeal based on cultural context\n    Then Regional Constitutional Council evaluates legitimate cultural diversity\n    And They distinguish between cultural variation and constitutional violations\n    And They examine if my community had ability to calibrate protocol appropriately\n    And They consider if agent should have recognized cultural context\n    And They balance universal human dignity with cultural specificity\n    And The precedent clarifies how constitutional minimums apply across cultures\n    And My appeal protects cultural diversity within constitutional framework\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal involving cultural specificity vs constitutional minimums",
+    "ogDescription": "Appeal involving cultural specificity vs constitutional minimums",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal involving cultural specificity vs constitutional minimums",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal involving cultural specificity vs constitutional minimums - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal involving cultural specificity vs constitutional minimums",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal involving cultural specificity vs constitutional minimums",
+    "name": "Appeal involving cultural specificity vs constitutional minimums",
+    "description": "Appeal involving cultural specificity vs constitutional minimums",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

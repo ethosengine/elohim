@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood economic circulation increases through distributed ownership",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-neighborhood economic circulation increases through distributed ownership",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood economic circulation increases through distributed ownership",
   "description": "Neighborhood economic circulation increases through distributed ownership",
   "content": "Scenario: Neighborhood economic circulation increases through distributed ownership\n    Given Rosa's profit ($40K annually) left the neighborhood for her personal use\n    And value extraction limited community benefit despite Rosa's generosity\n    When democratic ownership distributes value throughout community\n    Then worker wage increases ($14 \u2192 $18/hour) circulate in neighborhood economy\n    And community programs receive dedicated funding from value circulation\n    And workers spend locally, supporting other neighborhood businesses\n    And multiplier effects amplify as spending cascades through community\n    And community_elohim documents wealth circulation vs. previous extraction\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood economic circulation increases through distributed ownership",
+    "ogDescription": "Neighborhood economic circulation increases through distributed ownership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood economic circulation increases through distributed ownership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood economic circulation increases through distributed ownership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood economic circulation increases through distributed ownership",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-neighborhood economic circulation increases through distributed ownership",
+    "name": "Neighborhood economic circulation increases through distributed ownership",
+    "description": "Neighborhood economic circulation increases through distributed ownership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

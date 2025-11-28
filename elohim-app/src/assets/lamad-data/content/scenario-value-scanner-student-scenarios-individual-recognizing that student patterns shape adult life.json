@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-individual-recognizing that student patterns shape adult life",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-recognizing that student patterns shape adult life",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognizing that student patterns shape adult life",
   "description": "Recognizing that student patterns shape adult life",
   "content": "Scenario: Recognizing that student patterns shape adult life\n    Given Kenji is forming habits and patterns that will persist\n    And his college years are when adult identity and practices solidify\n    When the personal_agent reflects on Kenji's pattern development\n    Then it should help him see that current choices shape future self\n    And it should validate that learning care economy now matters lifelong\n    And it should recognize this developmental phase as formative\n    And the agent should support intentional pattern-building\n    And the system should help Kenji become the adult he wants to be\n    And student years should be recognized as foundation-laying time\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing that student patterns shape adult life",
+    "ogDescription": "Recognizing that student patterns shape adult life",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-recognizing that student patterns shape adult life",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing that student patterns shape adult life - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-recognizing that student patterns shape adult life",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-recognizing that student patterns shape adult life",
+    "name": "Recognizing that student patterns shape adult life",
+    "description": "Recognizing that student patterns shape adult life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-educational-balancing learning work with survival work",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-balancing learning work with survival work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Balancing learning work with survival work",
   "description": "Balancing learning work with survival work",
   "content": "Scenario: Balancing learning work with survival work\n    Given Kenji must work 15 hours/week to afford basic expenses\n    And work hours compete with study time\n    When the educational_elohim helps Kenji balance competing demands\n    Then it should recognize the impossible tension between learning and survival\n    And it should help him optimize limited time across demands\n    And it should validate that he cannot do everything perfectly\n    And it should advocate for better institutional support for working students\n    And the system should recognize structural unfairness in student economics\n    And Kenji should not be blamed for constraints created by inadequate support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Balancing learning work with survival work",
+    "ogDescription": "Balancing learning work with survival work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-balancing learning work with survival work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Balancing learning work with survival work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-balancing learning work with survival work",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-balancing learning work with survival work",
+    "name": "Balancing learning work with survival work",
+    "description": "Balancing learning work with survival work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-family-family financial support coordinated through care economy",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-family financial support coordinated through care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family financial support coordinated through care economy",
   "description": "Family financial support coordinated through care economy",
   "content": "Scenario: Family financial support coordinated through care economy\n    Given Aisha's family sometimes needs financial help\n    And Aisha wants to contribute within her means\n    When Aisha provides financial support to family\n    Then the contribution should be recognized as care work\n    And it should be coordinated through family_elohim\n    And the system should help her determine sustainable amounts\n    And family financial support should be visible care contribution\n    And her limited resources should be acknowledged\n    And financial care should strengthen rather than strain relationships\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Family financial support coordinated through care economy",
+    "ogDescription": "Family financial support coordinated through care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-family financial support coordinated through care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family financial support coordinated through care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-family financial support coordinated through care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-family financial support coordinated through care economy",
+    "name": "Family financial support coordinated through care economy",
+    "description": "Family financial support coordinated through care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

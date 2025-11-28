@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-municipality-journalist exposes corruption through pattern recognition",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality-journalist exposes corruption through pattern recognition",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist exposes corruption through pattern recognition",
   "description": "Journalist exposes corruption through pattern recognition",
   "content": "Scenario: Journalist exposes corruption through pattern recognition\n    Given a developer receives zoning variances in three meetings\n    And each approval seems procedurally normal in isolation\n    When the Observer tracks developer across all city bodies\n    Then the journalist sees developer got 8 variances in 18 months\n    And identifies campaign donations to council members before each vote\n    And finds same developer denied variances in other cities for violations\n    And documents revolving door between planning staff and developer\n    And publishes investigation exposing systematic corruption\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist exposes corruption through pattern recognition",
+    "ogDescription": "Journalist exposes corruption through pattern recognition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-municipality-journalist exposes corruption through pattern recognition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist exposes corruption through pattern recognition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-municipality-journalist exposes corruption through pattern recognition",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality-journalist exposes corruption through pattern recognition",
+    "name": "Journalist exposes corruption through pattern recognition",
+    "description": "Journalist exposes corruption through pattern recognition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

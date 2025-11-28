@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-negotiating employment flexibility for childcare and recovery needs",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-negotiating employment flexibility for childcare and recovery needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Negotiating employment flexibility for childcare and recovery needs",
   "description": "Negotiating employment flexibility for childcare and recovery needs",
   "content": "Scenario: Negotiating employment flexibility for childcare and recovery needs\n    Given I need employment flexibility for childcare, therapy, legal appointments, and crisis management\n    And employers may resist flexibility or see it as liability\n    When I negotiate employment terms\n    Then the workplace_elohim helps me request appropriate accommodations\n    And provides language for negotiating flexibility professionally\n    And helps me understand my legal rights to reasonable accommodation\n    And validates that my needs are reasonable and should be accommodated\n    And identifies employers more likely to provide needed flexibility\n    And my personal_agent coaches me through negotiation conversations\n    And recognizes that advocating for my needs is professional strength\n    And supports me in finding employment compatible with my life\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Negotiating employment flexibility for childcare and recovery needs",
+    "ogDescription": "Negotiating employment flexibility for childcare and recovery needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-negotiating employment flexibility for childcare and recovery needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Negotiating employment flexibility for childcare and recovery needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-negotiating employment flexibility for childcare and recovery needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-negotiating employment flexibility for childcare and recovery needs",
+    "name": "Negotiating employment flexibility for childcare and recovery needs",
+    "description": "Negotiating employment flexibility for childcare and recovery needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

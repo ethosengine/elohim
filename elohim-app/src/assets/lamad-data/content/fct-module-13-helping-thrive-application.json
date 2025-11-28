@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-13-helping-thrive"
   },
-  "createdAt": "2025-11-28T02:53:21.899421",
-  "updatedAt": "2025-11-28T02:53:21.899422"
+  "createdAt": "2025-11-28T21:10:19.224376",
+  "updatedAt": "2025-11-28T21:10:19.224377",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Helping People Thrive",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Helping People Thrive - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-application",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "Application: Helping People Thrive",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.224376",
+    "dateModified": "2025-11-28T21:10:19.224377",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-legacy and intergenerational responsibility for bioregional health",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-legacy and intergenerational responsibility for bioregional health",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Legacy and intergenerational responsibility for bioregional health",
   "description": "Legacy and intergenerational responsibility for bioregional health",
   "content": "Scenario: Legacy and intergenerational responsibility for bioregional health\n    Given Robert's generation has substantially affected bioregional ecology\n    And his choices affect ecological inheritance for grandchildren\n    And intergenerational responsibility requires ecological repair and protection\n    When bioregional_elohim supports legacy planning\n    Then it should help Robert understand his generation's ecological impact\n    And recognize responsibility to repair damage and protect bioregional health\n    And surface opportunities for ecological restoration participation\n    And support him in building positive ecological legacy\n    And connect ecological stewardship to care for grandchildren's future\n    And demonstrate that care economy includes intergenerational ecological responsibility\n    And build commitment to bioregional health as care for future generations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Legacy and intergenerational responsibility for bioregional health",
+    "ogDescription": "Legacy and intergenerational responsibility for bioregional health",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-legacy and intergenerational responsibility for bioregional health",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Legacy and intergenerational responsibility for bioregional health - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-legacy and intergenerational responsibility for bioregional health",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-legacy and intergenerational responsibility for bioregional health",
+    "name": "Legacy and intergenerational responsibility for bioregional health",
+    "description": "Legacy and intergenerational responsibility for bioregional health",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

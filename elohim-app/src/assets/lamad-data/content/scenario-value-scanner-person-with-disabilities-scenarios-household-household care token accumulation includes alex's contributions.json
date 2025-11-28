@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-household-household care token accumulation includes alex's contributions",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-household care token accumulation includes alex's contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household care token accumulation includes Alex's contributions",
   "description": "Household care token accumulation includes Alex's contributions",
   "content": "Scenario: Household care token accumulation includes Alex's contributions\n    Given Alex participates in care token economy\n    And Alex contributes to household through management and coordination\n    When household care tokens are calculated\n    Then Alex's household management labor should be valued appropriately\n    And Alex's cognitive work of coordinating support should count\n    And care tokens should accumulate from Alex's contributions\n    And Alex should receive care token supplements based on household income level\n    And the scanner should be accessible regardless of economic status\n    And Alex should be positioned as contributor, not just recipient\n    And economic standing should reflect Alex's actual care work\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Household care token accumulation includes Alex's contributions",
+    "ogDescription": "Household care token accumulation includes Alex's contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-household care token accumulation includes alex's contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household care token accumulation includes Alex's contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-household-household care token accumulation includes alex's contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:household-household care token accumulation includes alex's contributions",
+    "name": "Household care token accumulation includes Alex's contributions",
+    "description": "Household care token accumulation includes Alex's contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

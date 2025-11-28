@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-connection to place through decades of residence",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-connection to place through decades of residence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Connection to place through decades of residence",
   "description": "Connection to place through decades of residence",
   "content": "Scenario: Connection to place through decades of residence\n    Given Helen has lived in same bioregion for 82 years\n    And deep place-based knowledge develops over lifetime\n    When bioregional governance makes land use decisions\n    Then Helen's intimate knowledge of place should inform planning\n    And longtime residents should have standing in ecological governance\n    And her connection to land should be valued in decision-making\n    And the protocol should elevate voices of those with deep place-knowledge\n    And bioregional stewardship should prioritize those who've observed place over time\n    And Helen's decades of residence should give her ecological authority\n    And land use should consider those who remember land's history\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Connection to place through decades of residence",
+    "ogDescription": "Connection to place through decades of residence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-connection to place through decades of residence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connection to place through decades of residence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-connection to place through decades of residence",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-connection to place through decades of residence",
+    "name": "Connection to place through decades of residence",
+    "description": "Connection to place through decades of residence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

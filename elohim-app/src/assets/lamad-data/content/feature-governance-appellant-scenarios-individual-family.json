@@ -1,6 +1,8 @@
 {
   "id": "feature-governance-appellant-scenarios-individual-family",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Individual/Family Governance for Appellant",
   "description": "As an appellant in the governance system Operating at the individual/family governance layer I want to challenge agent decisions that affect my personal autonomy and privacy So that I can maintain dignity while receiving care, and ensure agents remain accountable",
   "content": "@epic:governance\n@user_type:appellant\n@governance_layer:individual_family\n@related_users:constitutional_council_member,technical_expert\n@related_layers:community,provincial_state\n@elohim_agents:family_elohim,individual_elohim\n\nFeature: Individual/Family Governance for Appellant\n  As an appellant in the governance system\n  Operating at the individual/family governance layer\n  I want to challenge agent decisions that affect my personal autonomy and privacy\n  So that I can maintain dignity while receiving care, and ensure agents remain accountable\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the appellant user is registered in the system\n    And the individual/family governance context is active\n    And the appellant has a Family Elohim agent assigned\n\n  Scenario: Appeal mental health intervention that violated privacy\n    Given Marcus is experiencing behavioral changes\n    And his Family Elohim detects patterns indicating suicide risk\n    And the agent alerts his partner following graduated intervention protocol\n    When Marcus feels his privacy was violated despite life-saving intent\n    And Marcus triggers an appeal through his interface\n    Then the appeal is immediately logged with timestamp\n    And the Family Elohim provides full constitutional reasoning\n    And the reasoning includes pattern detection details with 85% confidence\n    And the reasoning explains care vs. privacy weighting\n    And Marcus receives plain language explanation within minutes\n    And the appeal is routed to Community Elohim for first-layer review\n\n  Scenario: Request explainable agent reasoning during appeal\n    Given Marcus has filed an appeal against his Family Elohim\n    And the agent made a mental health intervention decision\n    When Marcus requests detailed explanation of the decision\n    Then the agent provides layered explanation starting with plain language summary\n    And the agent explains which constitutional principles were applied\n    And the agent shows what data patterns triggered the decision\n    And the agent presents counterfactual scenarios showing what would change outcome\n    And technical audit trail is available for expert review\n    And Marcus can adjust detail level based on his understanding needs\n\n  Scenario: Pre-specify alert preferences after appeal experience\n    Given Marcus's appeal has been reviewed by Constitutional Council\n    And the council affirmed the agent's decision but recommended enhancements\n    When Marcus wants to prevent future unilateral interventions\n    Then the system allows Marcus to pre-specify his alert preferences\n    And Marcus configures family alerts to require 3-day pattern instead of immediate\n    And Marcus confirms emergency services contact only for imminent danger\n    And the preferences are cryptographically stored and verifiable\n    And future Family Elohim decisions must respect these preferences\n    And Marcus retains ability to update preferences at any time\n\n  Scenario: Track appeal status and progress\n    Given Marcus has submitted an appeal\n    When Marcus checks his appeal status\n    Then he sees current review stage clearly displayed\n    And he sees estimated timeline for each stage\n    And he receives notifications at key milestones\n    And he can compare his case to similar anonymized appeals\n    And he can access precedent cases involving mental health interventions\n    And the tracking interface is accessible on all his devices\n\n  Scenario: Appeal agent decision that involved factual error\n    Given a Family Elohim agent denies teenager permission to attend event\n    And the agent based decision on incorrect data about event location\n    And the event was actually a volunteer environmental cleanup\n    When the teenager files an appeal citing factual error\n    Then the appeal is fast-tracked for factual verification\n    And peer agents cross-reference data sources\n    And the address parsing error is identified\n    And the original decision is immediately overturned\n    And the appellant receives acknowledgment of the error\n    And the error pattern is flagged for protocol improvement\n\n  Scenario: Experience dignity throughout appeal process\n    Given Marcus is appealing an agent decision\n    And Marcus is angry and feels violated\n    When Marcus interacts with the appeal system\n    Then the system treats his anger as legitimate data about dignity violation\n    And the system does not dismiss him as irrational or ungrateful\n    And the system provides empathetic language acknowledging his concern\n    And Constitutional Council members listen without judgment\n    And Marcus's right to appeal is honored without punishment\n    And future agent interactions are not biased by his appeal history\n\n  Scenario: Access appeal interface during high emotional distress\n    Given Marcus is experiencing mental health crisis\n    And Marcus wants to appeal the agent's intervention\n    When Marcus accesses the appeal interface\n    Then the interface uses simple language requiring no legal expertise\n    And the interface requires only: complaint description and desired outcome\n    And the interface supports voice input for those unable to type\n    And the interface provides language translation automatically\n    And the interface works on any device Marcus has available\n    And the interface saves progress if Marcus needs to step away\n",
@@ -31,6 +33,32 @@
     "epic": "governance",
     "scenarioCount": 7
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Individual/Family Governance for Appellant",
+    "ogDescription": "As an appellant in the governance system Operating at the individual/family governance layer I want to challenge agent decisions that affect my personal autonomy and privacy So that I can maintain dig",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-governance-appellant-scenarios-individual-family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Individual/Family Governance for Appellant - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-governance-appellant-scenarios-individual-family",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family",
+    "name": "Individual/Family Governance for Appellant",
+    "description": "As an appellant in the governance system Operating at the individual/family governance layer I want to challenge agent decisions that affect my personal autonomy and privacy So that I can maintain dignity while receiving care, and ensure agents remain accountable",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

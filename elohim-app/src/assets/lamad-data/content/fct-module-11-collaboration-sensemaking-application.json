@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-11-collaboration-sensemaking"
   },
-  "createdAt": "2025-11-28T02:53:21.887721",
-  "updatedAt": "2025-11-28T02:53:21.887722"
+  "createdAt": "2025-11-28T21:10:19.218312",
+  "updatedAt": "2025-11-28T21:10:19.218313",
+  "did": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Creating Shared Understanding: Collaboration",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Creating Shared Understanding: Collaboration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking-application",
+    "identifier": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+    "name": "Application: Creating Shared Understanding: Collaboration",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.218312",
+    "dateModified": "2025-11-28T21:10:19.218313",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

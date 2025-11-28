@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-13-helping-thrive"
   },
-  "createdAt": "2025-11-28T02:53:21.899416",
-  "updatedAt": "2025-11-28T02:53:21.899418"
+  "createdAt": "2025-11-28T21:10:19.224372",
+  "updatedAt": "2025-11-28T21:10:19.224373",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing and Addressing Real Needs:",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Recognizing and Addressing Real Needs: - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-13-helping-thrive-story",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "Recognizing and Addressing Real Needs:",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.224372",
+    "dateModified": "2025-11-28T21:10:19.224373",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

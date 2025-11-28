@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-parental leave recognized as essential workplace benefit",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-parental leave recognized as essential workplace benefit",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parental leave recognized as essential workplace benefit",
   "description": "Parental leave recognized as essential workplace benefit",
   "content": "Scenario: Parental leave recognized as essential workplace benefit\n    Given parents need time for infant care, adoption, family crisis\n    And parental leave is essential for child well-being\n    When the workplace_elohim assesses workplace policies\n    Then it should flag inadequate parental leave as care economy violation\n    And it should help Sarah advocate for better leave policies\n    And the system should recognize parental leave as basic necessity\n    And workplace should provide substantial paid parental leave\n    And care economy principles should require workplace support for new parents\n    And Sarah should have support for advocating for family leave\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Parental leave recognized as essential workplace benefit",
+    "ogDescription": "Parental leave recognized as essential workplace benefit",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-parental leave recognized as essential workplace benefit",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parental leave recognized as essential workplace benefit - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-parental leave recognized as essential workplace benefit",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-parental leave recognized as essential workplace benefit",
+    "name": "Parental leave recognized as essential workplace benefit",
+    "description": "Parental leave recognized as essential workplace benefit",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

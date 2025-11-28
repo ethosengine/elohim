@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood youth gain apprenticeship and ownership pathways",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-neighborhood youth gain apprenticeship and ownership pathways",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood youth gain apprenticeship and ownership pathways",
   "description": "Neighborhood youth gain apprenticeship and ownership pathways",
   "content": "Scenario: Neighborhood youth gain apprenticeship and ownership pathways\n    Given community lacks skilled trades training and economic opportunity for youth\n    And Rosa's expertise could benefit next generation but individual ownership prevents scaling\n    When democratic governance creates youth apprenticeship program\n    Then neighborhood youth learn auto repair skills with paid training\n    And apprentices can become worker-owners after demonstrating competency\n    And economic opportunity stays in community, not extracting to corporate chains\n    And intergenerational knowledge transfer strengthens community resilience\n    And community_elohim documents youth pathways from apprenticeship to ownership\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood youth gain apprenticeship and ownership pathways",
+    "ogDescription": "Neighborhood youth gain apprenticeship and ownership pathways",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood youth gain apprenticeship and ownership pathways",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood youth gain apprenticeship and ownership pathways - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-community-neighborhood youth gain apprenticeship and ownership pathways",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:community-neighborhood youth gain apprenticeship and ownership pathways",
+    "name": "Neighborhood youth gain apprenticeship and ownership pathways",
+    "description": "Neighborhood youth gain apprenticeship and ownership pathways",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-02-systems-thinking"
   },
-  "createdAt": "2025-11-28T02:53:21.853174",
-  "updatedAt": "2025-11-28T02:53:21.853175"
+  "createdAt": "2025-11-28T21:10:19.195290",
+  "updatedAt": "2025-11-28T21:10:19.195291",
+  "did": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Multipolar Trap Analysis:",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-02-systems-thinking-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Multipolar Trap Analysis: - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-02-systems-thinking-story",
+    "identifier": "did:web:elohim.host:content:fct:module 2 - systems thinking",
+    "name": "Multipolar Trap Analysis:",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.195290",
+    "dateModified": "2025-11-28T21:10:19.195291",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

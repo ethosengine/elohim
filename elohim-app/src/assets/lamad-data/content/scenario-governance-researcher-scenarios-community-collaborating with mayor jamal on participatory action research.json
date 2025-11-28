@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-community-collaborating with mayor jamal on participatory action research",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:community-collaborating with mayor jamal on participatory action research",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Collaborating with Mayor Jamal on participatory action research",
   "description": "Collaborating with Mayor Jamal on participatory action research",
   "content": "Scenario: Collaborating with Mayor Jamal on participatory action research\n    Given I want research to serve community not just extract data\n    And Mayor Jamal wants evidence to improve local governance\n    When we co-design research questions and methods\n    Then community priorities shape what we study\n    And Local residents participate in data collection\n    And We jointly interpret findings considering context I might miss\n    And Research addresses actual needs not just academic curiosity\n    And Riverside learns from comparative findings across communities\n    And Results improve local implementation immediately\n    And Research relationship respects community autonomy and knowledge\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Collaborating with Mayor Jamal on participatory action research",
+    "ogDescription": "Collaborating with Mayor Jamal on participatory action research",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-collaborating with mayor jamal on participatory action research",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Collaborating with Mayor Jamal on participatory action research - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-collaborating with mayor jamal on participatory action research",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:community-collaborating with mayor jamal on participatory action research",
+    "name": "Collaborating with Mayor Jamal on participatory action research",
+    "description": "Collaborating with Mayor Jamal on participatory action research",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

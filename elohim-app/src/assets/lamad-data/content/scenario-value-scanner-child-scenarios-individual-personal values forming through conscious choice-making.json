@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-individual-personal values forming through conscious choice-making",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-personal values forming through conscious choice-making",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal values forming through conscious choice-making",
   "description": "Personal values forming through conscious choice-making",
   "content": "Scenario: Personal values forming through conscious choice-making\n    Given Emma is making repeated value-based decisions\n    And she is old enough to articulate reasons for choices\n    When Emma reflects on why she makes certain choices\n    Then her personal_agent should help her identify her values\n    And the agent should ask \"What matters to you about this choice?\"\n    And Emma should begin to consciously understand her value framework\n    And her values should be forming through reflection, not imposition\n    And she should develop moral reasoning capacity\n    And individual value formation should be supported\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal values forming through conscious choice-making",
+    "ogDescription": "Personal values forming through conscious choice-making",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-personal values forming through conscious choice-making",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal values forming through conscious choice-making - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-personal values forming through conscious choice-making",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-personal values forming through conscious choice-making",
+    "name": "Personal values forming through conscious choice-making",
+    "description": "Personal values forming through conscious choice-making",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

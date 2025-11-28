@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-06-harmful-consequences"
   },
-  "createdAt": "2025-11-28T02:53:21.866685",
-  "updatedAt": "2025-11-28T02:53:21.866686"
+  "createdAt": "2025-11-28T21:10:19.207000",
+  "updatedAt": "2025-11-28T21:10:19.207001",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "\"Joseph and the Seven Years of Plenty and Famine\"",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "\"Joseph and the Seven Years of Plenty and Famine\" - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-story",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "\"Joseph and the Seven Years of Plenty and Famine\"",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.207000",
+    "dateModified": "2025-11-28T21:10:19.207001",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

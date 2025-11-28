@@ -1,6 +1,8 @@
 {
   "id": "feature-social-medium-activist-scenarios-individual",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:individual",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Individual Digital Sovereignty for Activist",
   "description": "As an activist in the social_medium system Operating at the individual governance layer I want to maintain my digital sovereignty and personal security So that I can organize for change without fear of surveillance or suppression",
   "content": "@epic:social_medium\n@user_type:activist\n@governance_layer:individual\n@related_users:community_moderator,content_creator\n@related_layers:community,affinity_network\n@elohim_agents:protection_agent,sanctuary_agent\n\nFeature: Individual Digital Sovereignty for Activist\n  As an activist in the social_medium system\n  Operating at the individual governance layer\n  I want to maintain my digital sovereignty and personal security\n  So that I can organize for change without fear of surveillance or suppression\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the activist user is registered in the system\n    And the individual governance context is active\n    And the activist has personal node with encrypted storage\n\n  Scenario: Activist establishes protected digital identity\n    Given the activist is setting up their personal node\n    When they configure their activist identity with privacy controls\n    And they designate trusted sanctuary institutions for backup\n    And they enable multi-factor authentication with biometric verification\n    Then their identity is cryptographically secured on their personal node\n    And their data is encrypted end-to-end\n    And sanctuary protocols are established with designated institutions\n    And the system confirms digital sovereignty is established\n\n  Scenario: Activist detects surveillance attempt and activates sanctuary\n    Given the activist is organizing a climate justice campaign\n    And they have shared organizing documents with their local group\n    When the system detects repeated unauthorized access attempts to their node\n    And the protection agent identifies a pattern indicating state surveillance\n    Then the activist receives immediate alert with threat assessment\n    And sanctuary protocol options are presented\n    And the activist can choose to fragment data across sanctuary institutions\n    And organizing continues through secure channels\n    And the community is alerted to heightened security measures\n\n  Scenario: Activist manages multiple digital identities safely\n    Given the activist works on both local neighborhood issues and sensitive human rights cases\n    When they create separate personas for different organizing contexts\n    Then each persona has independent privacy settings\n    And connections between personas are cryptographically isolated\n    And the activist can switch contexts without cross-contamination\n    And each persona's contributions earn reach independently\n    And protection protocols apply to all personas\n\n  Scenario: Activist recovers data after device seizure\n    Given the activist's device was confiscated during a protest\n    And their data was pre-distributed to sanctuary institutions\n    When the activist obtains new hardware and initiates recovery\n    And they authenticate through biometric and social verification\n    And the sanctuary institutions verify the activist's safety and free will\n    Then all organizing data, contacts, and history are restored\n    And the compromised device's access is permanently revoked\n    And the activist resumes organizing with full digital sovereignty\n    And the network logs the rights violation for documentation\n",
@@ -28,6 +30,32 @@
     "epic": "social_medium",
     "scenarioCount": 4
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Individual Digital Sovereignty for Activist",
+    "ogDescription": "As an activist in the social_medium system Operating at the individual governance layer I want to maintain my digital sovereignty and personal security So that I can organize for change without fear o",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-activist-scenarios-individual",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Individual Digital Sovereignty for Activist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-activist-scenarios-individual",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:individual",
+    "name": "Individual Digital Sovereignty for Activist",
+    "description": "As an activist in the social_medium system Operating at the individual governance layer I want to maintain my digital sovereignty and personal security So that I can organize for change without fear of surveillance or suppression",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

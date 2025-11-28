@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace culture education reduces ableism",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-workplace culture education reduces ableism",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace culture education reduces ableism",
   "description": "Workplace culture education reduces ableism",
   "content": "Scenario: Workplace culture education reduces ableism\n    Given workplace culture often reflects ableist assumptions\n    And coworkers may lack disability awareness\n    When the workplace_elohim detects cultural issues\n    Then it should help Alex identify patterns of workplace ableism\n    And it should provide Alex tools to educate coworkers when Alex chooses\n    And it should support Alex in advocating for cultural change\n    And workplace should be prompted toward disability inclusion training\n    And Alex should be compensated if providing disability education\n    And the protocol should recognize that cultural change is ongoing work\n    And Alex should not bear sole responsibility for workplace education\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace culture education reduces ableism",
+    "ogDescription": "Workplace culture education reduces ableism",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace culture education reduces ableism",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace culture education reduces ableism - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-workplace culture education reduces ableism",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-workplace culture education reduces ableism",
+    "name": "Workplace culture education reduces ableism",
+    "description": "Workplace culture education reduces ableism",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

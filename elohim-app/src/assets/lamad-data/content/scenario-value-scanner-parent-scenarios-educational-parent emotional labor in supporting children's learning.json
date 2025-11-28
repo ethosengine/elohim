@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-educational-parent emotional labor in supporting children's learning",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent emotional labor in supporting children's learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent emotional labor in supporting children's learning",
   "description": "Parent emotional labor in supporting children's learning",
   "content": "Scenario: Parent emotional labor in supporting children's learning\n    Given Sarah manages Tommy's frustration with difficult tasks\n    And she builds Emma's confidence and motivation\n    When the educational_elohim tracks educational emotional labor\n    Then it should recognize emotional support as teaching work\n    And it should value Sarah's work maintaining children's love of learning\n    And emotional scaffolding should be recognized as pedagogical skill\n    And the full scope of educational work should be visible\n    And the system should value affective dimensions of teaching\n    And parent emotional labor should be recognized as essential to learning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent emotional labor in supporting children's learning",
+    "ogDescription": "Parent emotional labor in supporting children's learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent emotional labor in supporting children's learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent emotional labor in supporting children's learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent emotional labor in supporting children's learning",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent emotional labor in supporting children's learning",
+    "name": "Parent emotional labor in supporting children's learning",
+    "description": "Parent emotional labor in supporting children's learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

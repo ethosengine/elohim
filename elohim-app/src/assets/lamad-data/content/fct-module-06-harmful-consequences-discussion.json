@@ -25,6 +25,32 @@
     "sourceModule": "fct-module-06-harmful-consequences",
     "activityType": "discussion"
   },
-  "createdAt": "2025-11-28T02:53:21.866678",
-  "updatedAt": "2025-11-28T02:53:21.866680"
+  "createdAt": "2025-11-28T21:10:19.206992",
+  "updatedAt": "2025-11-28T21:10:19.206994",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Minimizing Harmful Consequences",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Minimizing Harmful Consequences - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-06-harmful-consequences-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "Discussion: Minimizing Harmful Consequences",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.206992",
+    "dateModified": "2025-11-28T21:10:19.206994",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

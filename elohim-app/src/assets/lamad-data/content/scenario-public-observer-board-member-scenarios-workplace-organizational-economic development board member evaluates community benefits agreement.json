@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member evaluates community benefits agreement",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:workplace-organizational-economic development board member evaluates community benefits agreement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Economic development board member evaluates community benefits agreement",
   "description": "Economic development board member evaluates community benefits agreement",
   "content": "Scenario: Economic development board member evaluates community benefits agreement\n    Given board considers approving development incentives with community benefits terms\n    And developer proposes hiring commitments, affordable housing, and public space\n    And board wants to understand if benefits are meaningful and enforceable\n    When the board member requests Observer community benefits analysis\n    Then they receive assessment of whether proposed benefits serve community needs\n    And see track record of similar agreements in other jurisdictions\n    And discover many community benefits agreements not enforced or delivered\n    And access specific enforcement mechanisms that make agreements effective\n    And independent analysis helps board negotiate stronger accountability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Economic development board member evaluates community benefits agreement",
+    "ogDescription": "Economic development board member evaluates community benefits agreement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member evaluates community benefits agreement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Economic development board member evaluates community benefits agreement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member evaluates community benefits agreement",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:workplace-organizational-economic development board member evaluates community benefits agreement",
+    "name": "Economic development board member evaluates community benefits agreement",
+    "description": "Economic development board member evaluates community benefits agreement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

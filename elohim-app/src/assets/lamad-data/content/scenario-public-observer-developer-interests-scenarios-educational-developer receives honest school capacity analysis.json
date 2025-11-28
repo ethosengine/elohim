@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-educational-developer receives honest school capacity analysis",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer receives honest school capacity analysis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer receives honest school capacity analysis",
   "description": "Developer receives honest school capacity analysis",
   "content": "Scenario: Developer receives honest school capacity analysis\n    Given a developer proposes 300-unit residential development\n    And claims it will bring tax revenue benefiting schools\n    When the Observer provides independent school impact analysis\n    Then the developer sees: project will generate 180 school-age children\n    And local elementary school is already at 95% capacity\n    And district needs $12M to expand capacity for projected enrollment\n    And property tax revenue is $800K/year but school costs are $1.5M/year\n    And honest analysis reveals net burden on school system\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer receives honest school capacity analysis",
+    "ogDescription": "Developer receives honest school capacity analysis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer receives honest school capacity analysis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer receives honest school capacity analysis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-educational-developer receives honest school capacity analysis",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:educational-developer receives honest school capacity analysis",
+    "name": "Developer receives honest school capacity analysis",
+    "description": "Developer receives honest school capacity analysis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

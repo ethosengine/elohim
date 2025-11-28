@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-community-preventing sarah's overcommitment through community coordination",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-preventing sarah's overcommitment through community coordination",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Preventing Sarah's overcommitment through community coordination",
   "description": "Preventing Sarah's overcommitment through community coordination",
   "content": "Scenario: Preventing Sarah's overcommitment through community coordination\n    Given Sarah is highly engaged in community\n    And she tends to say yes to too many requests\n    When community organizations ask Sarah to contribute\n    Then the community_elohim should track her total commitments\n    And it should warn Sarah when she's approaching overcommitment\n    And it should help her maintain sustainable participation\n    And community should benefit from Sarah's long-term engagement\n    And burnout should be prevented through coordination\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Preventing Sarah's overcommitment through community coordination",
+    "ogDescription": "Preventing Sarah's overcommitment through community coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-preventing sarah's overcommitment through community coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing Sarah's overcommitment through community coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-preventing sarah's overcommitment through community coordination",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-preventing sarah's overcommitment through community coordination",
+    "name": "Preventing Sarah's overcommitment through community coordination",
+    "description": "Preventing Sarah's overcommitment through community coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

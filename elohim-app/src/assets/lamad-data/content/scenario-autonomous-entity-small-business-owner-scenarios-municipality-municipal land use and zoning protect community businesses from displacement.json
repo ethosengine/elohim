@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal land use and zoning protect community businesses from displacement",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal land use and zoning protect community businesses from displacement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal land use and zoning protect community businesses from displacement",
   "description": "Municipal land use and zoning protect community businesses from displacement",
   "content": "Scenario: Municipal land use and zoning protect community businesses from displacement\n    Given commercial real estate speculation threatens community institutions\n    And Rosa's Auto could face displacement through rising rents or property sale\n    When democratic ownership is recognized as community benefit\n    Then zoning policies prioritize long-term community business tenancy\n    And city explores community land trusts for commercial space\n    And democratic businesses receive preference in publicly-owned commercial properties\n    And land use policy protects against speculation displacing community institutions\n    And municipality_elohim advocates for commercial anti-displacement policies\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-municipality",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal land use and zoning protect community businesses from displacement",
+    "ogDescription": "Municipal land use and zoning protect community businesses from displacement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal land use and zoning protect community businesses from displacement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal land use and zoning protect community businesses from displacement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-municipality-municipal land use and zoning protect community businesses from displacement",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:municipality-municipal land use and zoning protect community businesses from displacement",
+    "name": "Municipal land use and zoning protect community businesses from displacement",
+    "description": "Municipal land use and zoning protect community businesses from displacement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

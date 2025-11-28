@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-advising on global technical standards with cultural sensitivity",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-advising on global technical standards with cultural sensitivity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advising on global technical standards with cultural sensitivity",
   "description": "Advising on global technical standards with cultural sensitivity",
   "content": "Scenario: Advising on global technical standards with cultural sensitivity\n    Given global protocol needs technical standards\n    And different cultures have different technical capacities\n    When I help develop culturally-sensitive technical requirements\n    Then I ensure: standards work with varying infrastructure\n    And I avoid: assuming Global North technical context\n    And I support: diverse implementation approaches\n    And I enable: low-resource communities to participate\n    And I collaborate: with Global South technical experts\n    And I resist: digital colonialism in technical design\n    And I demonstrate: that technical standards can honor diversity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Advising on global technical standards with cultural sensitivity",
+    "ogDescription": "Advising on global technical standards with cultural sensitivity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-advising on global technical standards with cultural sensitivity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advising on global technical standards with cultural sensitivity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-advising on global technical standards with cultural sensitivity",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-advising on global technical standards with cultural sensitivity",
+    "name": "Advising on global technical standards with cultural sensitivity",
+    "description": "Advising on global technical standards with cultural sensitivity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

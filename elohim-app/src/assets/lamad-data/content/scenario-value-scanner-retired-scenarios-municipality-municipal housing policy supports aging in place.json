@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-municipality-municipal housing policy supports aging in place",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal housing policy supports aging in place",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal housing policy supports aging in place",
   "description": "Municipal housing policy supports aging in place",
   "content": "Scenario: Municipal housing policy supports aging in place\n    Given Frank wants to age in his community\n    And housing costs are significant on fixed income\n    When the municipal_elohim coordinates housing policy\n    Then it should support policies enabling aging in place\n    And affordable housing should serve retired residents on fixed income\n    And Frank should not be displaced by rising housing costs\n    And municipal policy should recognize his decades of community contribution\n    And housing should be treated as right, not commodity\n    And care economy contributions should inform housing access\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal housing policy supports aging in place",
+    "ogDescription": "Municipal housing policy supports aging in place",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal housing policy supports aging in place",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal housing policy supports aging in place - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal housing policy supports aging in place",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal housing policy supports aging in place",
+    "name": "Municipal housing policy supports aging in place",
+    "description": "Municipal housing policy supports aging in place",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

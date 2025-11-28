@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-individual-documenting personal needs for advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-documenting personal needs for advocacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Documenting personal needs for advocacy",
   "description": "Documenting personal needs for advocacy",
   "content": "Scenario: Documenting personal needs for advocacy\n    Given I experience specific challenges due to work conditions\n    When I want to advocate for changes\n    Then the protocol should help me document my needs\n    And provide evidence of how current conditions affect my well-being\n    And support me in articulating what I need to thrive\n    And empower me to advocate for care-economy-aligned workplace policies\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Documenting personal needs for advocacy",
+    "ogDescription": "Documenting personal needs for advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-documenting personal needs for advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Documenting personal needs for advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-documenting personal needs for advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-documenting personal needs for advocacy",
+    "name": "Documenting personal needs for advocacy",
+    "description": "Documenting personal needs for advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

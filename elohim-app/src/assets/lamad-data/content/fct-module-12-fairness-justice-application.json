@@ -22,6 +22,32 @@
     "category": "fct-practice",
     "sourceModule": "fct-module-12-fairness-justice"
   },
-  "createdAt": "2025-11-28T02:53:21.896253",
-  "updatedAt": "2025-11-28T02:53:21.896254"
+  "createdAt": "2025-11-28T21:10:19.223592",
+  "updatedAt": "2025-11-28T21:10:19.223592",
+  "did": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: Supporting Fairness and Justice",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: Supporting Fairness and Justice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-12-fairness-justice-application",
+    "identifier": "did:web:elohim.host:content:fct:module 12 - supporting fairness and justice",
+    "name": "Application: Supporting Fairness and Justice",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.223592",
+    "dateModified": "2025-11-28T21:10:19.223592",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

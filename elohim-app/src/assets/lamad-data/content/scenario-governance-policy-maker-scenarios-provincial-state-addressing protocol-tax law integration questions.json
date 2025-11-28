@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-provincial-state-addressing protocol-tax law integration questions",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-addressing protocol-tax law integration questions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Addressing protocol-tax law integration questions",
   "description": "Addressing protocol-tax law integration questions",
   "content": "Scenario: Addressing protocol-tax law integration questions\n    Given protocol creates novel economic relationships\n    And tax implications are unclear\n    When I work with revenue department on clarification\n    Then we determine: tax treatment of care tokens\n    And we address: property tax implications of resource sharing\n    And we clarify: whether mutual aid counts for social safety net\n    And we create: certainty enabling protocol to function\n    And we avoid: creating impossible tax burdens\n    And we ensure: tax policy doesn't undermine protocol benefits\n    And legal clarity: supports implementation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Addressing protocol-tax law integration questions",
+    "ogDescription": "Addressing protocol-tax law integration questions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-addressing protocol-tax law integration questions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Addressing protocol-tax law integration questions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-addressing protocol-tax law integration questions",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-addressing protocol-tax law integration questions",
+    "name": "Addressing protocol-tax law integration questions",
+    "description": "Addressing protocol-tax law integration questions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

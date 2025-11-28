@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-neighborhood-local knowledge preservation through elderly memory keeping",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-local knowledge preservation through elderly memory keeping",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Local knowledge preservation through elderly memory keeping",
   "description": "Local knowledge preservation through elderly memory keeping",
   "content": "Scenario: Local knowledge preservation through elderly memory keeping\n    Given Helen remembers 40 years of neighborhood changes\n    And this knowledge has cultural and practical value\n    When neighborhood planning and decisions occur\n    Then the neighborhood_elohim should surface Helen's historical knowledge\n    And her memory of neighborhood patterns should inform planning\n    And oral history should be captured for community archive\n    And Helen should be recognized as neighborhood historian\n    And her contribution to collective memory should be valued\n    And the protocol should preserve local knowledge through elder participation\n    And community memory should include longtime residents' perspectives\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Local knowledge preservation through elderly memory keeping",
+    "ogDescription": "Local knowledge preservation through elderly memory keeping",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-local knowledge preservation through elderly memory keeping",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Local knowledge preservation through elderly memory keeping - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-local knowledge preservation through elderly memory keeping",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-local knowledge preservation through elderly memory keeping",
+    "name": "Local knowledge preservation through elderly memory keeping",
+    "description": "Local knowledge preservation through elderly memory keeping",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

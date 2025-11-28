@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-household-coordinating three children's different developmental needs simultaneously",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-coordinating three children's different developmental needs simultaneously",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating three children's different developmental needs simultaneously",
   "description": "Coordinating three children's different developmental needs simultaneously",
   "content": "Scenario: Coordinating three children's different developmental needs simultaneously\n    Given Maria parents a 6-year-old, 9-year-old, and 14-year-old alone\n    And each child has completely different needs, schedules, and emotional requirements\n    When Maria manages children's needs\n    Then the household_elohim should help her track each child's developmental stage\n    And it should coordinate different school schedules and activities\n    And it should remind her of each child's unique needs\n    And it should prevent younger children from being neglected due to teen's demands\n    And Maria should have AI support for impossible multi-child coordination\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating three children's different developmental needs simultaneously",
+    "ogDescription": "Coordinating three children's different developmental needs simultaneously",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-coordinating three children's different developmental needs simultaneously",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating three children's different developmental needs simultaneously - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-coordinating three children's different developmental needs simultaneously",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-coordinating three children's different developmental needs simultaneously",
+    "name": "Coordinating three children's different developmental needs simultaneously",
+    "description": "Coordinating three children's different developmental needs simultaneously",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

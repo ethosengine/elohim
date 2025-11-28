@@ -1,6 +1,8 @@
 {
   "id": "feature-autonomous-entity-worker-scenarios-individual",
+  "did": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:individual",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Individual Dignity and Data Sovereignty for Worker",
   "description": "As a worker in the autonomous_entity system Operating at the individual governance layer I want my personal dignity protected and my data sovereign So that I am valued as a person, not exploited as a resource",
   "content": "@epic:autonomous_entity\n@user_type:worker\n@governance_layer:individual\n@related_users:[manager,customer,supplier,community_investor]\n@related_layers:[workplace_organizational,community]\n@elohim_agents:[workplace_elohim]\n\nFeature: Individual Dignity and Data Sovereignty for Worker\n  As a worker in the autonomous_entity system\n  Operating at the individual governance layer\n  I want my personal dignity protected and my data sovereign\n  So that I am valued as a person, not exploited as a resource\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the worker user is registered in the system\n    And the individual governance context is active\n    And surveillance infrastructure has been converted to witness infrastructure\n\n  Scenario: Worker controls their own REA (Resource-Event-Agent) profile data\n    Given Maria has worked at ChickenMax for 8 years\n    And her REA profile documents her contributions across multiple dimensions\n    When Maria requests to view her complete REA profile\n    Then she sees her documented expertise (847 perfect fryer batches, 47 hours training given)\n    And she sees her care work (comforting customers, mentoring colleagues)\n    And she sees her efficiency improvements ($3,400 waste eliminated)\n    And she controls what portions of her profile to share externally\n    And she can export her profile if she changes jobs\n    And no corporate entity can access her data without her consent\n\n  Scenario: Surveillance transforms from extraction to protection\n    Given workplace cameras previously monitored workers for corporate benefit\n    And cameras now operate as witness infrastructure under worker control\n    When a customer harasses Maria during her shift\n    And the incident is captured on camera\n    Then the footage is immediately available to Maria\n    And Maria can democratically propose banning the customer\n    And management cannot delete or modify the footage\n    And the footage cannot be used for speedup or discipline without worker consent\n    And Maria's dignity is architecturally protected\n\n  Scenario: Fair compensation based on witnessed value creation\n    Given Maria's 8 years of invisible contributions are now documented\n    And her REA profile shows training, conflict prevention, and optimization work\n    When the democratic workplace calculates compensation\n    Then Maria receives $28/hour instead of previous $11/hour\n    And her training contributions (47 hours) are compensated\n    And her conflict resolution (12 incidents prevented) generates recognized value\n    And her efficiency gains (2.3 hours daily saved) benefit her, not just corporate\n    And transparent algorithms show exactly how her compensation is calculated\n\n  Scenario: Worker receives immediate safety protection from harmful incidents\n    Given DeShawn witnesses a safety violation in the kitchen\n    When he uses his observer device to document the violation\n    Then the workplace_elohim agent is immediately notified\n    And appropriate safety protocols are activated\n    And the incident is logged in the immutable safety record\n    And DeShawn is protected from retaliation\n    And management must address the violation democratically with worker input\n\n  Scenario: Personal growth trajectory becomes visible and owned\n    Given Emma has demonstrated supply chain optimization genius over 6 months\n    And the REA system has documented her 23% waste reduction\n    When Emma views her growth trajectory dashboard\n    Then she sees her optimization pattern recognition abilities documented\n    And she sees skill tokens accumulating toward higher roles\n    And she discovers teaching opportunities based on her expertise\n    And she can pursue cross-training based on witnessed interests\n    And her development path is self-determined, not management-assigned\n\n  Scenario: Worker exits with portable documented expertise\n    Given Maria has accumulated 8 years of documented contributions\n    And she decides to leave ChickenMax for another opportunity\n    When she requests her portable REA profile\n    Then she receives cryptographically signed documentation of her expertise\n    And her profile includes training mastery, care work, and management skills\n    And she can present this profile to prospective employers\n    And her accumulated skill tokens remain valid across the EAE network\n    And her ownership tokens are converted to fair value upon exit\n\n  Scenario: Individual privacy is constitutionally protected while value is witnessed\n    Given the Observer network documents workplace contributions\n    And Emma prefers privacy about certain personal matters\n    When Emma sets her privacy preferences\n    Then work contributions are documented (with her consent)\n    And personal conversations are not recorded or analyzed\n    And bathroom breaks are not monitored for duration\n    And her personal data (health, family, beliefs) remains sovereign\n    And surveillance serves dignity protection, not corporate control\n\n  Scenario: Worker experiences liberation from constant surveillance anxiety\n    Given Maria previously worked under corporate cameras monitoring for \"time theft\"\n    And she developed stress from constant surveillance\n    When the workplace converts to democratic ownership\n    And cameras become worker-controlled witness infrastructure\n    Then Maria no longer fears being watched for compliance\n    And she experiences reduced workplace anxiety and stress\n    And her health indicators improve (lower blood pressure, better sleep)\n    And her sense of dignity and autonomy increases measurably\n",
@@ -32,6 +34,32 @@
     "epic": "autonomous_entity",
     "scenarioCount": 8
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Individual Dignity and Data Sovereignty for Worker",
+    "ogDescription": "As a worker in the autonomous_entity system Operating at the individual governance layer I want my personal dignity protected and my data sovereign So that I am valued as a person, not exploited as a ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-autonomous-entity-worker-scenarios-individual",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Individual Dignity and Data Sovereignty for Worker - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-autonomous-entity-worker-scenarios-individual",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:worker:scenarios:individual",
+    "name": "Individual Dignity and Data Sovereignty for Worker",
+    "description": "As a worker in the autonomous_entity system Operating at the individual governance layer I want my personal dignity protected and my data sovereign So that I am valued as a person, not exploited as a resource",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

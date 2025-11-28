@@ -25,6 +25,36 @@
     "author": "Mike Caulfield"
   },
   "_contributor": "Mike Caulfield",
-  "createdAt": "2025-11-28T02:53:21.848185",
-  "updatedAt": "2025-11-28T02:53:21.848186"
+  "createdAt": "2025-11-28T21:10:19.190516",
+  "updatedAt": "2025-11-28T21:10:19.190517",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Web Literacy for Student Fact-Checkers",
+    "ogDescription": "Book by Mike Caulfield",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-web-literacy-for-stu",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Web Literacy for Student Fact-Checkers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-web-literacy-for-stu",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Web Literacy for Student Fact-Checkers",
+    "description": "Book by Mike Caulfield",
+    "dateCreated": "2025-11-28T21:10:19.190516",
+    "dateModified": "2025-11-28T21:10:19.190517",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Mike Caulfield"
+    }
+  }
 }

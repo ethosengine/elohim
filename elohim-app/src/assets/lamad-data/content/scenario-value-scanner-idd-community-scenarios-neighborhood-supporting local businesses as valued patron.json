@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-neighborhood-supporting local businesses as valued patron",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-supporting local businesses as valued patron",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Supporting local businesses as valued patron",
   "description": "Supporting local businesses as valued patron",
   "content": "Scenario: Supporting local businesses as valued patron\n    Given Jordan visits the neighborhood coffee shop weekly\n    And the barista knows Jordan's regular order\n    When Jordan enters the coffee shop\n    Then the personal_agent might help with ordering if needed\n    And the barista greets Jordan by name and remembers their preference\n    And Jordan's weekly purchase contributes to business sustainability\n    And Jordan experiences being a valued, recognized customer\n    And the relationship is genuine, not charity or pity\n    And Jordan's economic participation in neighborhood is visible\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Supporting local businesses as valued patron",
+    "ogDescription": "Supporting local businesses as valued patron",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-supporting local businesses as valued patron",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting local businesses as valued patron - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-neighborhood-supporting local businesses as valued patron",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:neighborhood-supporting local businesses as valued patron",
+    "name": "Supporting local businesses as valued patron",
+    "description": "Supporting local businesses as valued patron",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

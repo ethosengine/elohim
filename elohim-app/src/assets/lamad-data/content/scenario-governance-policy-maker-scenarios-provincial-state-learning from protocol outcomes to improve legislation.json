@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-provincial-state-learning from protocol outcomes to improve legislation",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-learning from protocol outcomes to improve legislation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning from protocol outcomes to improve legislation",
   "description": "Learning from protocol outcomes to improve legislation",
   "content": "Scenario: Learning from protocol outcomes to improve legislation\n    Given Constitutional Convention passed adolescent autonomy amendment\n    And this reflects accumulated precedents and appeals\n    When I translate constitutional evolution into state law\n    Then I craft: legislation operationalizing the amendment\n    And I update: state family law to reflect constitutional principle\n    And I modify: education policy honoring developing autonomy\n    And constitutional evolution: informs statutory law\n    And I demonstrate: how different democratic forms work together\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning from protocol outcomes to improve legislation",
+    "ogDescription": "Learning from protocol outcomes to improve legislation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-learning from protocol outcomes to improve legislation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning from protocol outcomes to improve legislation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-learning from protocol outcomes to improve legislation",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-learning from protocol outcomes to improve legislation",
+    "name": "Learning from protocol outcomes to improve legislation",
+    "description": "Learning from protocol outcomes to improve legislation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

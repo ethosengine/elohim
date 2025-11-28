@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-elder-scenarios-affinity-network-elder joins quilting affinity network",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network-elder joins quilting affinity network",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder joins quilting affinity network",
   "description": "Elder joins quilting affinity network",
   "content": "Scenario: Elder joins quilting affinity network\n    Given Rose is a quilter interested in connecting with other quilters\n    When she discovers a regional quilting network on Elohim\n    And the network includes elders and younger crafters\n    Then she can join and share her quilting patterns\n    And she connects with others who appreciate traditional techniques\n    And she mentors younger quilters learning the craft\n    And her patterns are valued and spread through the network\n    And she finds meaningful community around her lifelong passion\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-elder-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder joins quilting affinity network",
+    "ogDescription": "Elder joins quilting affinity network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-affinity-network-elder joins quilting affinity network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder joins quilting affinity network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-affinity-network-elder joins quilting affinity network",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network-elder joins quilting affinity network",
+    "name": "Elder joins quilting affinity network",
+    "description": "Elder joins quilting affinity network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

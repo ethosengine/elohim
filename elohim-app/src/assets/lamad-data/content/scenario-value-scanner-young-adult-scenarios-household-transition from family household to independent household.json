@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-household-transition from family household to independent household",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-transition from family household to independent household",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transition from family household to independent household",
   "description": "Transition from family household to independent household",
   "content": "Scenario: Transition from family household to independent household\n    Given Aisha recently moved out of her family home\n    And she's adapting to independent household management\n    When Aisha establishes her household practices\n    Then the system should recognize this is a major transition\n    And it should help her adapt family practices to solo living\n    And it should provide continuity from family care economy patterns\n    And the personal_agent should acknowledge the learning curve\n    And support should smooth the jarring transition to full responsibility\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Transition from family household to independent household",
+    "ogDescription": "Transition from family household to independent household",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-transition from family household to independent household",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transition from family household to independent household - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-transition from family household to independent household",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-transition from family household to independent household",
+    "name": "Transition from family household to independent household",
+    "description": "Transition from family household to independent household",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -23,6 +23,32 @@
     "category": "fct-narrative",
     "sourceModule": "fct-module-03-problem-well-stated"
   },
-  "createdAt": "2025-11-28T02:53:21.854030",
-  "updatedAt": "2025-11-28T02:53:21.854031"
+  "createdAt": "2025-11-28T21:10:19.196185",
+  "updatedAt": "2025-11-28T21:10:19.196186",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Story: A Problem Well Stated",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Story: A Problem Well Stated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-story",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "Story: A Problem Well Stated",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.196185",
+    "dateModified": "2025-11-28T21:10:19.196186",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

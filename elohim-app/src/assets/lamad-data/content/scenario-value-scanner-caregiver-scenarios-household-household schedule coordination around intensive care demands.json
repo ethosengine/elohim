@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household schedule coordination around intensive care demands",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household schedule coordination around intensive care demands",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household schedule coordination around intensive care demands",
   "description": "Household schedule coordination around intensive care demands",
   "content": "Scenario: Household schedule coordination around intensive care demands\n    Given David requires constant supervision and care\n    And James must balance caregiving with part-time work\n    When household schedules are coordinated\n    Then the household_elohim should integrate care demands with work\n    And it should identify conflicts between care and employment\n    And it should help James negotiate sustainable scheduling\n    And household operations should be possible despite constraints\n    And schedule coordination should prevent impossible demands\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household schedule coordination around intensive care demands",
+    "ogDescription": "Household schedule coordination around intensive care demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household schedule coordination around intensive care demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household schedule coordination around intensive care demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household schedule coordination around intensive care demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household schedule coordination around intensive care demands",
+    "name": "Household schedule coordination around intensive care demands",
+    "description": "Household schedule coordination around intensive care demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

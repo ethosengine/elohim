@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-individual-decision fatigue support when every choice drains limited capacity",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-decision fatigue support when every choice drains limited capacity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Decision fatigue support when every choice drains limited capacity",
   "description": "Decision fatigue support when every choice drains limited capacity",
   "content": "Scenario: Decision fatigue support when every choice drains limited capacity\n    Given Maria makes hundreds of decisions daily with no co-parent\n    And decision fatigue is real and debilitating\n    When the personal_agent detects decision fatigue\n    Then it should simplify choices where possible\n    And it should provide clear recommendations based on her values and constraints\n    And it should reduce decision burden without removing her autonomy\n    And it should help her conserve decision-making capacity for critical choices\n    And Maria should experience reduced cognitive drain from constant choices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Decision fatigue support when every choice drains limited capacity",
+    "ogDescription": "Decision fatigue support when every choice drains limited capacity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-decision fatigue support when every choice drains limited capacity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Decision fatigue support when every choice drains limited capacity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-decision fatigue support when every choice drains limited capacity",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-decision fatigue support when every choice drains limited capacity",
+    "name": "Decision fatigue support when every choice drains limited capacity",
+    "description": "Decision fatigue support when every choice drains limited capacity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

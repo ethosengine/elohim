@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-accessing informal neighborhood support during acute crisis",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-accessing informal neighborhood support during acute crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing informal neighborhood support during acute crisis",
   "description": "Accessing informal neighborhood support during acute crisis",
   "content": "Scenario: Accessing informal neighborhood support during acute crisis\n    Given I am experiencing acute crisis (no food, utility shutoff, safety emergency)\n    And I need immediate neighborhood-level support\n    When crisis requires rapid local response\n    Then the Value Scanner connects me to immediate neighborhood resources\n    And identifies neighbors who've offered emergency support\n    And facilitates rapid requests for help through care economy network\n    And helps me access emergency assistance without shame\n    And validates that asking for crisis help is appropriate\n    And my personal_agent surfaces most appropriate immediate resources\n    And recognizes that everyone experiences crises requiring community support\n    And ensures rapid connection to neighborhood mutual aid\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing informal neighborhood support during acute crisis",
+    "ogDescription": "Accessing informal neighborhood support during acute crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-accessing informal neighborhood support during acute crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing informal neighborhood support during acute crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-accessing informal neighborhood support during acute crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-accessing informal neighborhood support during acute crisis",
+    "name": "Accessing informal neighborhood support during acute crisis",
+    "description": "Accessing informal neighborhood support during acute crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

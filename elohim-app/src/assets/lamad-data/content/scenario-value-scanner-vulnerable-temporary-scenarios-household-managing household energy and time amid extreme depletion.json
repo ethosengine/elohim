@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household energy and time amid extreme depletion",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:household-managing household energy and time amid extreme depletion",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing household energy and time amid extreme depletion",
   "description": "Managing household energy and time amid extreme depletion",
   "content": "Scenario: Managing household energy and time amid extreme depletion\n    Given I am traumatized, stressed, and exhausted\n    And household operations require consistent energy and attention\n    When I allocate my limited capacity across household demands\n    Then the Value Scanner helps me identify what's truly essential vs. what can wait\n    And provides realistic expectations for what's achievable in my state\n    And suggests efficiency strategies that reduce cognitive load\n    And validates that \"good enough\" is genuinely good enough right now\n    And helps me ask for and coordinate household help\n    And my personal_agent prevents me from over-committing my depleted resources\n    And recognizes that managing household while traumatized is extraordinary\n    And celebrates my household care work under extreme constraint\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Managing household energy and time amid extreme depletion",
+    "ogDescription": "Managing household energy and time amid extreme depletion",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household energy and time amid extreme depletion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing household energy and time amid extreme depletion - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household energy and time amid extreme depletion",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:household-managing household energy and time amid extreme depletion",
+    "name": "Managing household energy and time amid extreme depletion",
+    "description": "Managing household energy and time amid extreme depletion",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

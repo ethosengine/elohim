@@ -29,6 +29,32 @@
     "sourceModule": "fct-module-06-harmful-consequences",
     "thematicContext": "Minimizing Harmful Consequences"
   },
-  "createdAt": "2025-11-28T02:53:21.861011",
-  "updatedAt": "2025-11-28T02:53:21.861012"
+  "createdAt": "2025-11-28T21:10:19.201374",
+  "updatedAt": "2025-11-28T21:10:19.201375",
+  "did": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "1 Corinthians 3:6-9",
+    "ogDescription": "Scripture reference used in FCT Module 6",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-1-corinthians-3-6-9",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "1 Corinthians 3:6-9 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-1-corinthians-3-6-9",
+    "identifier": "did:web:elohim.host:content:fct:module 6 - minimizing harmful consequences - externalities, tragedy of the commons, and  arms races",
+    "name": "1 Corinthians 3:6-9",
+    "description": "Scripture reference used in FCT Module 6",
+    "dateCreated": "2025-11-28T21:10:19.201374",
+    "dateModified": "2025-11-28T21:10:19.201375",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
 }

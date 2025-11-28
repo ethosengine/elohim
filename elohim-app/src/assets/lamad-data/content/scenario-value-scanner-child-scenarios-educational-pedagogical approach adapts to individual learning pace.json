@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-educational-pedagogical approach adapts to individual learning pace",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-pedagogical approach adapts to individual learning pace",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Pedagogical approach adapts to individual learning pace",
   "description": "Pedagogical approach adapts to individual learning pace",
   "content": "Scenario: Pedagogical approach adapts to individual learning pace\n    Given Emma's development may vary from age averages\n    And learning readiness differs across children\n    When the personal_agent teaches value concepts\n    Then instruction should adapt to Emma's actual capabilities\n    And pacing should match her individual readiness\n    And the system should observe comprehension signals\n    And no child should be pushed beyond capacity\n    And no child should be held back from what they're ready to learn\n    And personalized learning should respect individual development\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Pedagogical approach adapts to individual learning pace",
+    "ogDescription": "Pedagogical approach adapts to individual learning pace",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-pedagogical approach adapts to individual learning pace",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Pedagogical approach adapts to individual learning pace - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-pedagogical approach adapts to individual learning pace",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-pedagogical approach adapts to individual learning pace",
+    "name": "Pedagogical approach adapts to individual learning pace",
+    "description": "Pedagogical approach adapts to individual learning pace",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

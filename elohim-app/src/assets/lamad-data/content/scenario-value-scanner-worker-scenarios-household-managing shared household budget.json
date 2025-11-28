@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-household-managing shared household budget",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-managing shared household budget",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing shared household budget",
   "description": "Managing shared household budget",
   "content": "Scenario: Managing shared household budget\n    Given household members share rent and utilities\n    And my income is limited and variable\n    When we manage shared expenses\n    Then the protocol should track contributions transparently\n    And accommodate my tight budget constraints\n    And facilitate fair cost distribution\n    And help us optimize shared household economics\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing shared household budget",
+    "ogDescription": "Managing shared household budget",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-managing shared household budget",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing shared household budget - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-managing shared household budget",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-managing shared household budget",
+    "name": "Managing shared household budget",
+    "description": "Managing shared household budget",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

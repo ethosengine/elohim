@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-neighborhood-building neighborhood resilience through worker solidarity",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-building neighborhood resilience through worker solidarity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building neighborhood resilience through worker solidarity",
   "description": "Building neighborhood resilience through worker solidarity",
   "content": "Scenario: Building neighborhood resilience through worker solidarity\n    Given many neighbors are also workers with similar constraints\n    When workers connect and support each other\n    Then the protocol should facilitate worker mutual aid networks\n    And coordinate support systems designed for workers' schedules\n    And build neighborhood culture of worker solidarity\n    And demonstrate that care economy serves workers' needs\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building neighborhood resilience through worker solidarity",
+    "ogDescription": "Building neighborhood resilience through worker solidarity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-building neighborhood resilience through worker solidarity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building neighborhood resilience through worker solidarity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-building neighborhood resilience through worker solidarity",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-building neighborhood resilience through worker solidarity",
+    "name": "Building neighborhood resilience through worker solidarity",
+    "description": "Building neighborhood resilience through worker solidarity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

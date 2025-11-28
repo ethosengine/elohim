@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-climate impact of dietary choices",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-climate impact of dietary choices",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Climate impact of dietary choices",
   "description": "Climate impact of dietary choices",
   "content": "Scenario: Climate impact of dietary choices\n    Given food production contributes to climate change\n    And individual choices aggregate to systemic impact\n    When Aisha evaluates food options\n    Then the bioregional_elohim should show carbon footprint\n    And it should explain climate impact of different choices\n    And it should help her make lower-impact selections\n    And climate literacy should inform dietary decisions\n    And she should understand individual contribution to climate crisis\n    And climate-conscious choices should be supported\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Climate impact of dietary choices",
+    "ogDescription": "Climate impact of dietary choices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-climate impact of dietary choices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Climate impact of dietary choices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-climate impact of dietary choices",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-climate impact of dietary choices",
+    "name": "Climate impact of dietary choices",
+    "description": "Climate impact of dietary choices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

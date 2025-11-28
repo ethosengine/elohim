@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-neighborhood-neighborhood cultural diversity in parenting approaches",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-neighborhood cultural diversity in parenting approaches",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood cultural diversity in parenting approaches",
   "description": "Neighborhood cultural diversity in parenting approaches",
   "content": "Scenario: Neighborhood cultural diversity in parenting approaches\n    Given the neighborhood includes families from diverse cultures\n    And different cultures have different parenting practices\n    When the neighborhood_elohim coordinates across cultural differences\n    Then it should respect diverse parenting approaches\n    And it should facilitate cross-cultural learning\n    And it should prevent cultural imperialism in parenting norms\n    And diverse practices should be valued, not homogenized\n    And neighborhood care economy should be culturally inclusive\n    And the system should support multicultural community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood cultural diversity in parenting approaches",
+    "ogDescription": "Neighborhood cultural diversity in parenting approaches",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-neighborhood cultural diversity in parenting approaches",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood cultural diversity in parenting approaches - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-neighborhood-neighborhood cultural diversity in parenting approaches",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:neighborhood-neighborhood cultural diversity in parenting approaches",
+    "name": "Neighborhood cultural diversity in parenting approaches",
+    "description": "Neighborhood cultural diversity in parenting approaches",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-care coordination with james's mother while caring for david",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-care coordination with james's mother while caring for david",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Care coordination with James's mother while caring for David",
   "description": "Care coordination with James's mother while caring for David",
   "content": "Scenario: Care coordination with James's mother while caring for David\n    Given James's mother (76) needs increasing support\n    And James is already overwhelmed caring for David\n    When James coordinates care for his mother\n    Then the family_elohim should help him manage both relationships\n    And it should recognize he cannot provide intensive care in both directions\n    And it should help coordinate additional support for his mother\n    And it should prevent James from collapsing under dual burden\n    And family care should be sustainable across multiple recipients\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Care coordination with James's mother while caring for David",
+    "ogDescription": "Care coordination with James's mother while caring for David",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-care coordination with james's mother while caring for david",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Care coordination with James's mother while caring for David - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-care coordination with james's mother while caring for david",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-care coordination with james's mother while caring for david",
+    "name": "Care coordination with James's mother while caring for David",
+    "description": "Care coordination with James's mother while caring for David",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

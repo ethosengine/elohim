@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-community-parenting recognized as community care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:community-parenting recognized as community care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parenting recognized as community care contribution",
   "description": "Parenting recognized as community care contribution",
   "content": "Scenario: Parenting recognized as community care contribution\n    Given Sarah is raising children who will become community members\n    And she is preparing them for civic participation and social responsibility\n    When the community_elohim tracks Sarah's contributions\n    Then it should recognize parenting as community-building work\n    And raising future citizens should be valued as civic labor\n    And Sarah's parenting should accumulate community care tokens\n    And her work should be recognized as essential to community continuity\n    And parenting should be understood as public good, not private consumption\n    And the community should value child-rearing as collective investment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.193597",
-  "updatedAt": "2025-11-21T18:54:29.193597"
+  "openGraphMetadata": {
+    "ogTitle": "Parenting recognized as community care contribution",
+    "ogDescription": "Parenting recognized as community care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-community-parenting recognized as community care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parenting recognized as community care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-community-parenting recognized as community care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:community-parenting recognized as community care contribution",
+    "name": "Parenting recognized as community care contribution",
+    "description": "Parenting recognized as community care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }
