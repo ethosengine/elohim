@@ -4,7 +4,7 @@ import { AgentService } from './agent.service';
 import { DataLoaderService } from './data-loader.service';
 import { SessionHumanService } from './session-human.service';
 import { Agent, AgentProgress, FrontierItem } from '../models/agent.model';
-import { SessionUser } from '../models/session-human.model';
+import { SessionHuman } from '../models/session-human.model';
 import { AccessLevel, ContentAccessMetadata } from '../models/content-access.model';
 
 describe('AgentService', () => {
@@ -14,7 +14,7 @@ describe('AgentService', () => {
   let localStorageMock: { [key: string]: string };
   let mockStorage: Storage;
 
-  const mockSessionUser: SessionUser = {
+  const mockSessionHuman: SessionHuman = {
     sessionId: 'session-123',
     displayName: 'Test User',
     isAnonymous: true,
@@ -99,7 +99,7 @@ describe('AgentService', () => {
     sessionHumanServiceSpy = TestBed.inject(SessionHumanService) as jasmine.SpyObj<SessionHumanService>;
 
     // Default spy return values
-    const sessionSubject = new BehaviorSubject<SessionUser | null>(mockSessionUser);
+    const sessionSubject = new BehaviorSubject<SessionHuman | null>(mockSessionHuman);
     Object.defineProperty(sessionHumanServiceSpy, 'session$', {
       get: () => sessionSubject.asObservable()
     });

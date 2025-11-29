@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { SessionHumanService } from './session-human.service';
 import {
-  SessionUser,
+  SessionHuman,
   SessionActivity,
   SessionPathProgress,
   HolochainUpgradePrompt,
@@ -53,7 +53,7 @@ describe('SessionHumanService', () => {
     });
 
     it('should restore existing session', () => {
-      const existingSession: SessionUser = {
+      const existingSession: SessionHuman = {
         sessionId: 'session-test-123',
         displayName: 'Test User',
         isAnonymous: true,
