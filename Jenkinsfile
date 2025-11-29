@@ -213,16 +213,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             
                             withBuildVars(props) {
                                 echo 'Building Angular application'
+                                echo "Using base version: ${BASE_VERSION}"
                                 echo "Using git hash: ${GIT_COMMIT_HASH}"
                                 echo "Using image tag: ${IMAGE_TAG}"
-                                
+
                                 // Replace placeholders
                                 sh """
+                                    sed -i "s/VERSION_PLACEHOLDER/${BASE_VERSION}/g" src/environments/environment.prod.ts
+                                    sed -i "s/VERSION_PLACEHOLDER/${BASE_VERSION}/g" src/environments/environment.staging.ts
+                                    sed -i "s/VERSION_PLACEHOLDER/${BASE_VERSION}/g" src/environments/environment.alpha.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.prod.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.staging.ts
                                     sed -i "s/GIT_HASH_PLACEHOLDER/${GIT_COMMIT_HASH}/g" src/environments/environment.alpha.ts
                                 """
-                                
+
                                 sh 'npm run build'
                                 sh 'ls -la dist/'
                             }
@@ -1022,6 +1026,69 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             sh 'kubectl rollout status deployment/elohim-site -n ethosengine --timeout=300s'
 
                             echo 'Production deployment completed!'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Create GitHub Release') {
+            when {
+                branch 'main'
+            }
+            steps {
+                container('builder'){
+                    script {
+                        def props = loadBuildVars()
+
+                        withBuildVars(props) {
+                            echo "Creating GitHub release for version: v${BASE_VERSION}"
+
+                            withCredentials([usernamePassword(credentialsId: 'github-pat', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')]) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+
+                                    # Configure git
+                                    git config --global --add safe.directory "*"
+
+                                    # Check if release already exists
+                                    RELEASE_EXISTS=\$(curl -s -o /dev/null -w "%{http_code}" \\
+                                        -H "Authorization: token \${GITHUB_TOKEN}" \\
+                                        "https://api.github.com/repos/ethosengine/elohim/releases/tags/v${BASE_VERSION}")
+
+                                    if [ "\$RELEASE_EXISTS" = "200" ]; then
+                                        echo "Release v${BASE_VERSION} already exists, skipping creation"
+                                        exit 0
+                                    fi
+
+                                    # Create annotated tag
+                                    git tag -a "v${BASE_VERSION}" -m "Release version ${BASE_VERSION}" ${GIT_COMMIT_HASH} || {
+                                        echo "Tag v${BASE_VERSION} may already exist locally, continuing..."
+                                    }
+
+                                    # Push tag to GitHub
+                                    git push https://\${GITHUB_TOKEN}@github.com/ethosengine/elohim.git "v${BASE_VERSION}" || {
+                                        echo "Tag push failed, may already exist remotely"
+                                    }
+
+                                    # Create release via GitHub API
+                                    RELEASE_NOTES="## Release v${BASE_VERSION}\\n\\nDeployed to production on \$(date -u +"%Y-%m-%d %H:%M:%S UTC")\\n\\n**Commit:** ${GIT_COMMIT_HASH}\\n**Image Tag:** ${IMAGE_TAG}"
+
+                                    curl -X POST \\
+                                        -H "Authorization: token \${GITHUB_TOKEN}" \\
+                                        -H "Accept: application/vnd.github.v3+json" \\
+                                        "https://api.github.com/repos/ethosengine/elohim/releases" \\
+                                        -d "{\\
+                                            \\"tag_name\\": \\"v${BASE_VERSION}\\",\\
+                                            \\"name\\": \\"Release v${BASE_VERSION}\\",\\
+                                            \\"body\\": \\"\${RELEASE_NOTES}\\",\\
+                                            \\"draft\\": false,\\
+                                            \\"prerelease\\": false\\
+                                        }"
+
+                                    echo "✅ GitHub release v${BASE_VERSION} created successfully"
+                                """
+                            }
                         }
                     }
                 }
