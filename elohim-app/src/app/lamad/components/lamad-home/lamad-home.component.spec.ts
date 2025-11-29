@@ -74,7 +74,8 @@ describe('LamadHomeComponent', () => {
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
 
     pathService.listPaths.and.returnValue(of(mockPathIndex));
-    agentService.getCurrentAgentId.and.returnValue('anonymous');
+    profileService.getCurrentFocus.and.returnValue(of([]));
+    agentService.getCurrentAgentId.and.returnValue('test-agent');
 
     fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
