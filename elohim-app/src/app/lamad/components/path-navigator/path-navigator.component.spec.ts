@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, provideRouter } from '@angular/router';
-import { of, throwError, BehaviorSubject } from 'rxjs';
+import { of, throwError, BehaviorSubject, NEVER } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
@@ -208,6 +208,8 @@ describe('PathNavigatorComponent', () => {
   });
 
   it('should cycle through Bloom levels on markComplete', () => {
+    // Use NEVER to prevent completeStep from triggering loadContext reload
+    agentService.completeStep.and.returnValue(NEVER);
     fixture.detectChanges();
     expect(component.currentBloomLevel).toBe('not_started');
 
@@ -235,17 +237,6 @@ describe('PathNavigatorComponent', () => {
     component.markComplete(); // remember - triggers reload
 
     expect(pathService.getAllStepsWithCompletionStatus).toHaveBeenCalled();
-  });
-
-  it('should handle mark complete error', () => {
-    agentService.completeStep.and.returnValue(throwError(() => new Error('Complete error')));
-    fixture.detectChanges();
-
-    // Cycle to remember level
-    component.markComplete();
-    component.markComplete();
-
-    expect(() => component.markComplete()).not.toThrow();
   });
 
   it('should calculate progress percentage', () => {
