@@ -84,8 +84,45 @@ describe('PathOverviewComponent', () => {
 
   const mockAccessibleSteps = [0, 1, 2];
 
+  const mockCompletion = {
+    totalSteps: 4,
+    completedSteps: 2,
+    totalUniqueContent: 4,
+    completedUniqueContent: 2,
+    contentCompletionPercentage: 50,
+    stepCompletionPercentage: 50,
+    sharedContentCompleted: 0
+  };
+
+  const mockContent: any = {
+    id: 'node-1',
+    contentType: 'concept',
+    title: 'Test Concept',
+    description: 'A test concept',
+    content: 'Test content',
+    contentFormat: 'markdown',
+    tags: [],
+    relatedNodeIds: [],
+    metadata: {}
+  };
+
+  const mockAllSteps: any[] = [
+    { step: mockPath.steps[0], content: { ...mockContent, id: 'node-1' }, isCompleted: true, completedInOtherPath: false, isCompletedGlobally: true, hasPrevious: false, hasNext: true },
+    { step: mockPath.steps[1], content: { ...mockContent, id: 'node-2' }, isCompleted: true, completedInOtherPath: false, isCompletedGlobally: true, hasPrevious: true, hasNext: true },
+    { step: mockPath.steps[2], content: { ...mockContent, id: 'node-3' }, isCompleted: false, completedInOtherPath: false, isCompletedGlobally: false, hasPrevious: true, hasNext: true },
+    { step: mockPath.steps[3], content: { ...mockContent, id: 'node-4' }, isCompleted: false, completedInOtherPath: false, isCompletedGlobally: false, hasPrevious: true, hasNext: false }
+  ];
+
   beforeEach(async () => {
-    const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath', 'getAccessibleSteps']);
+    const pathServiceSpy = jasmine.createSpyObj('PathService', [
+      'getPath',
+      'getAccessibleSteps',
+      'getPathCompletionByContent',
+      'getChapterSummariesWithContent',
+      'getAllStepsWithCompletionStatus',
+      'getConceptProgressForPath',
+      'getChapterFirstStep'
+    ]);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getProgressForPath']);
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
@@ -111,6 +148,10 @@ describe('PathOverviewComponent', () => {
     pathService.getPath.and.returnValue(of(mockPath));
     agentService.getProgressForPath.and.returnValue(of(mockProgress));
     pathService.getAccessibleSteps.and.returnValue(of(mockAccessibleSteps));
+    pathService.getPathCompletionByContent.and.returnValue(of(mockCompletion));
+    pathService.getChapterSummariesWithContent.and.returnValue(of([]));
+    pathService.getAllStepsWithCompletionStatus.and.returnValue(of(mockAllSteps));
+    pathService.getConceptProgressForPath.and.returnValue(of([]));
 
     fixture = TestBed.createComponent(PathOverviewComponent);
     component = fixture.componentInstance;
@@ -223,39 +264,15 @@ describe('PathOverviewComponent', () => {
     expect(component.isCompleted()).toBe(false); // Missing step 3 (required)
   });
 
-  it('should calculate completion percentage', () => {
+  it('should calculate completion percentage from pathCompletion', () => {
     fixture.detectChanges();
 
-    expect(component.getCompletionPercentage()).toBe(50); // 2/4 = 50%
+    expect(component.getCompletionPercentage()).toBe(50); // from mockCompletion
   });
 
-  it('should return 0 completion if no progress', () => {
-    component.progress = null;
+  it('should return 0 completion if no pathCompletion', () => {
+    component.pathCompletion = null;
     expect(component.getCompletionPercentage()).toBe(0);
-  });
-
-  it('should check if step is completed', () => {
-    fixture.detectChanges();
-
-    expect(component.isStepCompleted(0)).toBe(true);
-    expect(component.isStepCompleted(1)).toBe(true);
-    expect(component.isStepCompleted(2)).toBe(false);
-  });
-
-  it('should check if step is accessible', () => {
-    fixture.detectChanges();
-
-    expect(component.isStepAccessible(0)).toBe(true);
-    expect(component.isStepAccessible(1)).toBe(true);
-    expect(component.isStepAccessible(2)).toBe(true);
-    expect(component.isStepAccessible(3)).toBe(false);
-  });
-
-  it('should check if step is locked', () => {
-    fixture.detectChanges();
-
-    expect(component.isStepLocked(0)).toBe(false);
-    expect(component.isStepLocked(3)).toBe(true);
   });
 
   it('should begin journey at step 0', () => {
@@ -307,44 +324,6 @@ describe('PathOverviewComponent', () => {
     fixture.detectChanges();
 
     expect(component.getDifficultyDisplay()).toBe('Advanced');
-  });
-
-  it('should get step status class for completed step', () => {
-    fixture.detectChanges();
-
-    expect(component.getStepStatusClass(0)).toBe('completed');
-  });
-
-  it('should get step status class for locked step', () => {
-    fixture.detectChanges();
-
-    expect(component.getStepStatusClass(3)).toBe('locked');
-  });
-
-  it('should get step status class for current step', () => {
-    fixture.detectChanges();
-
-    expect(component.getStepStatusClass(2)).toBe('current');
-  });
-
-  it('should get step status class for accessible step', () => {
-    fixture.detectChanges();
-
-    // Step 2 is accessible (not current, not completed, but available)
-    component.progress = {
-      agentId: 'test-agent',
-      pathId: 'test-path',
-      currentStepIndex: 0,
-      completedStepIndices: [0],
-      startedAt: '2025-01-01T00:00:00.000Z',
-      lastActivityAt: '2025-01-01T00:00:00.000Z',
-      stepAffinity: {},
-      stepNotes: {},
-      reflectionResponses: {},
-      attestationsEarned: []
-    };
-
-    expect(component.getStepStatusClass(2)).toBe('accessible');
   });
 
   it('should cleanup on destroy', () => {

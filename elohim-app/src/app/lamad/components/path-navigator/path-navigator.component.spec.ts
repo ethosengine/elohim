@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
-import { of, throwError, BehaviorSubject } from 'rxjs';
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { of, throwError, BehaviorSubject, NEVER } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
@@ -11,7 +11,7 @@ describe('PathNavigatorComponent', () => {
   let fixture: ComponentFixture<PathNavigatorComponent>;
   let pathService: jasmine.SpyObj<PathService>;
   let agentService: jasmine.SpyObj<AgentService>;
-  let router: jasmine.SpyObj<Router>;
+  let router: Router;
   let paramsSubject: BehaviorSubject<any>;
 
   const mockPath: LearningPath = {
@@ -86,19 +86,24 @@ describe('PathNavigatorComponent', () => {
     previousStepIndex: 0
   };
 
+  const mockStepsWithStatus = [
+    { isCompleted: true, completedInOtherPath: false, content: { contentType: 'concept' } },
+    { isCompleted: false, completedInOtherPath: false, content: { contentType: 'concept' } },
+    { isCompleted: false, completedInOtherPath: false, content: { contentType: 'concept' } }
+  ];
+
   beforeEach(async () => {
-    const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath', 'getPathStep']);
+    const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath', 'getPathStep', 'getAllStepsWithCompletionStatus']);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['completeStep']);
-    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path', stepIndex: '1' });
 
     await TestBed.configureTestingModule({
       imports: [PathNavigatorComponent],
       providers: [
+        provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
-        { provide: Router, useValue: routerSpy },
         {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() }
@@ -108,8 +113,10 @@ describe('PathNavigatorComponent', () => {
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
-    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
 
+    pathService.getAllStepsWithCompletionStatus.and.returnValue(of(mockStepsWithStatus as any));
     pathService.getPath.and.returnValue(of(mockPath));
     pathService.getPathStep.and.returnValue(of(mockStepView));
     agentService.completeStep.and.returnValue(of(undefined));
@@ -125,6 +132,7 @@ describe('PathNavigatorComponent', () => {
   it('should load path and step on init', () => {
     fixture.detectChanges();
 
+    expect(pathService.getAllStepsWithCompletionStatus).toHaveBeenCalledWith('test-path');
     expect(pathService.getPath).toHaveBeenCalledWith('test-path');
     expect(pathService.getPathStep).toHaveBeenCalledWith('test-path', 1);
     expect(component.path).toEqual(mockPath);
@@ -155,13 +163,13 @@ describe('PathNavigatorComponent', () => {
     expect(component.error).toBe('Network error');
   });
 
-  it('should handle path load error gracefully', () => {
-    pathService.getPath.and.returnValue(throwError(() => new Error('Path error')));
+  it('should handle getAllStepsWithCompletionStatus error', () => {
+    pathService.getAllStepsWithCompletionStatus.and.returnValue(throwError(() => new Error('Steps error')));
 
     fixture.detectChanges();
 
-    // Path error is logged but doesn't stop step loading
-    expect(pathService.getPathStep).toHaveBeenCalled();
+    expect(component.isLoading).toBe(false);
+    expect(component.error).toBe('Steps error');
   });
 
   it('should navigate to previous step', () => {
@@ -199,27 +207,36 @@ describe('PathNavigatorComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path']);
   });
 
-  it('should mark step as complete', () => {
+  it('should cycle through Bloom levels on markComplete', () => {
+    // Use NEVER to prevent completeStep from triggering loadContext reload
+    agentService.completeStep.and.returnValue(NEVER);
     fixture.detectChanges();
+    expect(component.currentBloomLevel).toBe('not_started');
+
     component.markComplete();
+    expect(component.currentBloomLevel).toBe('seen');
+
+    component.markComplete();
+    expect(component.currentBloomLevel).toBe('remember');
+  });
+
+  it('should mark step as complete when reaching remember level', () => {
+    fixture.detectChanges();
+    // Cycle from not_started -> seen -> remember
+    component.markComplete(); // seen
+    component.markComplete(); // remember - triggers completeStep
 
     expect(agentService.completeStep).toHaveBeenCalledWith('test-path', 1);
   });
 
-  it('should reload step after marking complete', () => {
+  it('should reload context after marking complete at remember level', () => {
     fixture.detectChanges();
-    pathService.getPathStep.calls.reset();
+    pathService.getAllStepsWithCompletionStatus.calls.reset();
 
-    component.markComplete();
+    component.markComplete(); // seen
+    component.markComplete(); // remember - triggers reload
 
-    expect(pathService.getPathStep).toHaveBeenCalled();
-  });
-
-  it('should handle mark complete error', () => {
-    agentService.completeStep.and.returnValue(throwError(() => new Error('Complete error')));
-    fixture.detectChanges();
-
-    expect(() => component.markComplete()).not.toThrow();
+    expect(pathService.getAllStepsWithCompletionStatus).toHaveBeenCalled();
   });
 
   it('should calculate progress percentage', () => {
@@ -298,57 +315,20 @@ describe('PathNavigatorComponent', () => {
     expect(component.isGherkin()).toBe(true);
   });
 
-  it('should render markdown headers', () => {
+  it('should return content unchanged from renderMarkdown shim', () => {
     const markdown = '# Header 1\n## Header 2\n### Header 3';
-    const html = component.renderMarkdown(markdown);
+    const result = component.renderMarkdown(markdown);
 
-    expect(html).toContain('<h1>Header 1</h1>');
-    expect(html).toContain('<h2>Header 2</h2>');
-    expect(html).toContain('<h3>Header 3</h3>');
+    // renderMarkdown is now a shim that returns content unchanged
+    expect(result).toBe(markdown);
   });
 
-  it('should render markdown bold and italic', () => {
-    const markdown = '**bold** and *italic*';
-    const html = component.renderMarkdown(markdown);
+  it('should get Bloom display formatted', () => {
+    component.currentBloomLevel = 'not_started';
+    expect(component.getBloomDisplay()).toBe('NOT STARTED');
 
-    expect(html).toContain('<strong>bold</strong>');
-    expect(html).toContain('<em>italic</em>');
-  });
-
-  it('should render markdown links', () => {
-    const markdown = '[Link Text](https://example.com)';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<a href="https://example.com" target="_blank">Link Text</a>');
-  });
-
-  it('should render markdown code blocks', () => {
-    const markdown = '```code block```';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<pre><code>code block</code></pre>');
-  });
-
-  it('should render markdown inline code', () => {
-    const markdown = 'inline `code` here';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<code>code</code>');
-  });
-
-  it('should render markdown blockquotes', () => {
-    const markdown = '> Quote';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<blockquote>Quote</blockquote>');
-  });
-
-  it('should render markdown lists', () => {
-    const markdown = '- Item 1\n- Item 2';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<li>Item 1</li>');
-    expect(html).toContain('<li>Item 2</li>');
+    component.currentBloomLevel = 'remember';
+    expect(component.getBloomDisplay()).toBe('REMEMBER');
   });
 
   it('should cleanup on destroy', () => {
@@ -365,11 +345,52 @@ describe('PathNavigatorComponent', () => {
 
   it('should reload step when route params change', () => {
     fixture.detectChanges();
+    pathService.getAllStepsWithCompletionStatus.calls.reset();
     pathService.getPathStep.calls.reset();
 
     paramsSubject.next({ pathId: 'test-path', stepIndex: '2' });
 
     expect(component.stepIndex).toBe(2);
+    expect(pathService.getAllStepsWithCompletionStatus).toHaveBeenCalledWith('test-path');
     expect(pathService.getPathStep).toHaveBeenCalledWith('test-path', 2);
+  });
+
+  it('should toggle sidebar', () => {
+    expect(component.sidebarOpen).toBe(true);
+    component.toggleSidebar();
+    expect(component.sidebarOpen).toBe(false);
+    component.toggleSidebar();
+    expect(component.sidebarOpen).toBe(true);
+  });
+
+  it('should toggle chapter expansion', () => {
+    fixture.detectChanges();
+    // Add a chapter manually since mockPath doesn't have chapters
+    component.sidebarChapters = [
+      { id: 'ch1', title: 'Chapter 1', steps: [], isExpanded: true }
+    ];
+
+    component.toggleChapter('ch1');
+    expect(component.sidebarChapters[0].isExpanded).toBe(false);
+
+    component.toggleChapter('ch1');
+    expect(component.sidebarChapters[0].isExpanded).toBe(true);
+  });
+
+  it('should get current chapter title', () => {
+    fixture.detectChanges();
+    component.sidebarChapters = [
+      { id: 'ch1', title: 'Chapter 1', steps: [], isExpanded: true }
+    ];
+    component.currentChapterId = 'ch1';
+
+    expect(component.getCurrentChapterTitle()).toBe('Chapter 1');
+  });
+
+  it('should return undefined for current chapter title if not found', () => {
+    fixture.detectChanges();
+    component.currentChapterId = 'nonexistent';
+
+    expect(component.getCurrentChapterTitle()).toBeUndefined();
   });
 });

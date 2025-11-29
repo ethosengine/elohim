@@ -3,6 +3,8 @@ import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { PathService } from '../../services/path.service';
+import { ProfileService } from '../../services/profile.service';
+import { AgentService } from '../../services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 
 describe('LamadHomeComponent', () => {
@@ -10,6 +12,8 @@ describe('LamadHomeComponent', () => {
   let fixture: ComponentFixture<LamadHomeComponent>;
   let pathService: jasmine.SpyObj<PathService>;
   let router: jasmine.SpyObj<Router>;
+  let profileService: jasmine.SpyObj<ProfileService>;
+  let agentService: jasmine.SpyObj<AgentService>;
   let localStorageMock: { [key: string]: string };
 
   const mockPaths: PathIndexEntry[] = [
@@ -42,6 +46,8 @@ describe('LamadHomeComponent', () => {
   beforeEach(async () => {
     const pathServiceSpy = jasmine.createSpyObj('PathService', ['listPaths']);
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    const profileServiceSpy = jasmine.createSpyObj('ProfileService', ['getCurrentFocus']);
+    const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getCurrentAgentId']);
 
     // Mock localStorage
     localStorageMock = {};
@@ -56,14 +62,20 @@ describe('LamadHomeComponent', () => {
       imports: [LamadHomeComponent],
       providers: [
         { provide: PathService, useValue: pathServiceSpy },
-        { provide: Router, useValue: routerSpy }
+        { provide: Router, useValue: routerSpy },
+        { provide: ProfileService, useValue: profileServiceSpy },
+        { provide: AgentService, useValue: agentServiceSpy }
       ]
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    profileService = TestBed.inject(ProfileService) as jasmine.SpyObj<ProfileService>;
+    agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
 
     pathService.listPaths.and.returnValue(of(mockPathIndex));
+    profileService.getCurrentFocus.and.returnValue(of([]));
+    agentService.getCurrentAgentId.and.returnValue('test-agent');
 
     fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
@@ -190,12 +202,12 @@ describe('LamadHomeComponent', () => {
   it('should load saved view mode from localStorage', () => {
     localStorageMock['lamad-view-mode'] = 'explore';
 
-    const newComponent = new LamadHomeComponent(pathService, router);
+    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
     expect(newComponent.viewMode).toBe('explore');
   });
 
   it('should default to paths mode if no saved preference', () => {
-    const newComponent = new LamadHomeComponent(pathService, router);
+    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
     expect(newComponent.viewMode).toBe('paths');
   });
 

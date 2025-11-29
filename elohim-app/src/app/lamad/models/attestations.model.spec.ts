@@ -208,12 +208,12 @@ describe('Attestations Model', () => {
   describe('UserAttestations interface', () => {
     it('should create user attestations collection', () => {
       const userAttestations: UserAttestations = {
-        humanId: 'user-1',
+        userId: 'user-1',
         attestations: [],
         lastUpdated: '2025-01-01T00:00:00.000Z'
       };
 
-      expect(userAttestations.humanId).toBe('user-1');
+      expect(userAttestations.userId).toBe('user-1');
       expect(userAttestations.attestations.length).toBe(0);
     });
 
@@ -237,7 +237,7 @@ describe('Attestations Model', () => {
       };
 
       const userAttestations: UserAttestations = {
-        humanId: 'user-1',
+        userId: 'user-1',
         attestations: [attestation1, attestation2],
         lastUpdated: '2025-01-01T00:00:00.000Z'
       };
