@@ -20,6 +20,9 @@ import {
   RendererCompletionEvent
 } from '../../renderers/renderer-registry.service';
 
+import { TrustBadgeService } from '../../services/trust-badge.service';
+import { TrustBadge } from '../../models/trust-badge.model';
+
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
@@ -33,6 +36,13 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
   relatedNodes: ContentNode[] = [];
   isLoading = true;
   error: string | null = null;
+
+  // Tab state
+  activeTab: 'content' | 'trust' | 'governance' | 'network' = 'content';
+
+  // Trust data
+  trustBadge: TrustBadge | null = null;
+  isLoadingTrust = false;
 
   // "Appears in paths" back-links (Wikipedia-style)
   containingPaths: Array<{ pathId: string; pathTitle: string; stepIndex: number }> = [];
@@ -56,7 +66,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     private readonly affinityService: AffinityTrackingService,
     private readonly rendererRegistry: RendererRegistryService,
     private readonly contentService: ContentService,
-    private readonly dataLoader: DataLoaderService
+    private readonly dataLoader: DataLoaderService,
+    private readonly trustBadgeService: TrustBadgeService
   ) {}
 
   ngOnInit(): void {
@@ -183,6 +194,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
         // Load containing paths (Wikipedia-style "appears in" back-links)
         this.loadContainingPaths(nodeId);
 
+        // Load trust badge data for Attestations tab
+        this.loadTrustBadge(nodeId);
+
         this.isLoading = false;
 
         // Load the appropriate renderer for this content format
@@ -216,6 +230,45 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
           this.loadingPaths = false;
         }
       });
+  }
+
+  /**
+   * Load Trust Badge data for the Attestations tab
+   */
+  private loadTrustBadge(nodeId: string): void {
+    this.isLoadingTrust = true;
+    this.trustBadge = null;
+
+    this.trustBadgeService.getBadge(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (badge) => {
+          this.trustBadge = badge;
+          this.isLoadingTrust = false;
+        },
+        error: (err) => {
+          console.error('Error loading trust badge:', err);
+          this.isLoadingTrust = false;
+        }
+      });
+  }
+
+  /**
+   * Switch active tab
+   */
+  setActiveTab(tab: 'content' | 'trust' | 'governance' | 'network'): void {
+    this.activeTab = tab;
+  }
+
+  /**
+   * Handle badge action click
+   */
+  handleAction(action: any): void {
+    if (action.route) {
+      this.router.navigate([action.route]);
+    } else {
+      console.log('Action clicked:', action.label);
+    }
   }
 
   /**

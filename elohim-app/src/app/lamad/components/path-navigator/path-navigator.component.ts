@@ -5,20 +5,35 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
-import { PathStepView, LearningPath } from '../../models/learning-path.model';
+import { PathStepView, LearningPath, PathChapter } from '../../models/learning-path.model';
+import { AgentProgress } from '../../models/agent.model';
+import { BLOOM_LEVEL_VALUES, BloomMasteryLevel } from '../../models/content-mastery.model';
+
+interface SidebarStep {
+  index: number;
+  title: string;
+  isCompleted: boolean;
+  isLocked: boolean;
+  isCurrent: boolean;
+  isGlobalCompletion: boolean; // True if completed in another path
+  icon: string;
+}
+
+interface SidebarChapter {
+  id: string;
+  title: string;
+  steps: SidebarStep[];
+  isExpanded: boolean;
+}
 
 /**
  * PathNavigatorComponent - The main learning interface.
  *
- * Renders a single step within a learning path with:
- * - Step narrative and learning objectives
- * - Content node (rendered based on contentFormat)
- * - Previous/Next navigation
- * - Progress tracking
+ * Implements a split-view "Course Player" layout:
+ * - Left Sidebar: Contextual navigation (Chapters/Steps)
+ * - Main Area: Breadcrumbs, Content, Navigation Footer
  *
  * Route: /lamad/path/:pathId/step/:stepIndex
- *
- * Implements Section 1.1 of LAMAD_API_SPECIFICATION_v1.0.md
  */
 @Component({
   selector: 'app-path-navigator',
@@ -35,10 +50,29 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   // Data
   stepView: PathStepView | null = null;
   path: LearningPath | null = null;
+  
+  // Sidebar State
+  sidebarChapters: SidebarChapter[] = [];
+  flatSidebarSteps: SidebarStep[] = []; // Fallback for paths without chapters
+  currentChapterId: string | null = null;
+
+  // Bloom's Mastery State (Prototype)
+  currentBloomLevel: BloomMasteryLevel = 'not_started';
+  readonly BLOOM_LEVELS: BloomMasteryLevel[] = [
+    'not_started',
+    'seen',
+    'remember',
+    'understand',
+    'apply',
+    'analyze',
+    'evaluate',
+    'create'
+  ];
 
   // UI state
   isLoading = true;
   error: string | null = null;
+  sidebarOpen = true; // Mobile toggle
 
   private readonly destroy$ = new Subject<void>();
 
@@ -54,7 +88,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.pathId = params['pathId'];
       this.stepIndex = parseInt(params['stepIndex'], 10) || 0;
-      this.loadStep();
+      this.loadContext();
     });
   }
 
@@ -64,78 +98,188 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Load the current step using PathService.getPathStep()
+   * Load path context and current step
    */
-  private loadStep(): void {
+  private loadContext(): void {
     this.isLoading = true;
     this.error = null;
 
-    // Load path metadata for header/progress
-    this.pathService.getPath(this.pathId).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: path => {
-        this.path = path;
-      },
-      error: err => {
-        console.error('[PathNavigator] Failed to load path:', err);
-      }
-    });
+    // Load full path context for sidebar (using the efficient bulk method)
+    this.pathService.getAllStepsWithCompletionStatus(this.pathId).subscribe({
+      next: (stepsWithStatus) => {
+        // 1. Load the Path Metadata
+        this.pathService.getPath(this.pathId).pipe(takeUntil(this.destroy$)).subscribe(path => {
+          this.path = path;
+          
+          // 2. Build Sidebar Structure
+          this.buildSidebar(path, stepsWithStatus);
+          
+          // 3. Set Current Step Data
+          this.pathService.getPathStep(this.pathId, this.stepIndex).subscribe({
+            next: (stepView) => {
+              this.stepView = stepView;
+              
+              // Initialize Bloom level based on completion status (Prototype)
+              if (stepView.isCompleted) {
+                // If already completed, assume at least 'apply' for demo purposes
+                // Real impl would fetch actual ContentMastery
+                this.currentBloomLevel = 'apply';
+              } else {
+                this.currentBloomLevel = 'not_started';
+              }
 
-    // Load specific step with content (lazy loading)
-    this.pathService.getPathStep(this.pathId, this.stepIndex).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: stepView => {
-        this.stepView = stepView;
-        this.isLoading = false;
+              this.determineCurrentChapter();
+              this.isLoading = false;
+            },
+            error: (err) => this.handleError(err)
+          });
+        });
       },
-      error: err => {
-        this.error = err.message || 'Failed to load step';
-        this.isLoading = false;
-        console.error('[PathNavigator] Failed to load step:', err);
-      }
+      error: (err) => this.handleError(err)
     });
   }
 
+  private handleError(err: any): void {
+    this.error = err.message || 'Failed to load learning path';
+    this.isLoading = false;
+    console.error('[PathNavigator] Error:', err);
+  }
+
   /**
-   * Navigate to previous step
+   * Construct the sidebar data structure
    */
+  private buildSidebar(path: LearningPath, stepsWithStatus: any[]): void {
+    if (path.chapters && path.chapters.length > 0) {
+      // Structure by chapters
+      let globalStepIndex = 0;
+      this.sidebarChapters = path.chapters.map(chapter => {
+        const chapterSteps: SidebarStep[] = chapter.steps.map((step, idx) => {
+          const status = stepsWithStatus[globalStepIndex];
+          const sidebarStep: SidebarStep = {
+            index: globalStepIndex,
+            title: step.stepTitle,
+            isCompleted: status.isCompleted,
+            isLocked: false, // Todo: wire up exact locking logic if needed beyond basic completion
+            isCurrent: globalStepIndex === this.stepIndex,
+            isGlobalCompletion: status.completedInOtherPath,
+            icon: this.getContentIcon(status.content?.contentType)
+          };
+          globalStepIndex++;
+          return sidebarStep;
+        });
+
+        return {
+          id: chapter.id,
+          title: chapter.title,
+          steps: chapterSteps,
+          isExpanded: true // Logic to expand current chapter later
+        };
+      });
+    } else {
+      // Flat list
+      this.flatSidebarSteps = stepsWithStatus.map((status, index) => ({
+        index: index,
+        title: path.steps[index].stepTitle,
+        isCompleted: status.isCompleted,
+        isLocked: false,
+        isCurrent: index === this.stepIndex,
+        isGlobalCompletion: status.completedInOtherPath,
+        icon: this.getContentIcon(status.content?.contentType)
+      }));
+    }
+  }
+
+  private determineCurrentChapter(): void {
+    if (!this.sidebarChapters.length) return;
+
+    // Find which chapter contains the current step
+    for (const chapter of this.sidebarChapters) {
+      if (chapter.steps.some(s => s.index === this.stepIndex)) {
+        this.currentChapterId = chapter.id;
+        chapter.isExpanded = true;
+        break;
+      }
+    }
+  }
+
+  private getContentIcon(contentType: string): string {
+    const icons: Record<string, string> = {
+      'epic': '📖',
+      'feature': '⚡',
+      'scenario': '✓',
+      'concept': '💡',
+      'simulation': '🎮',
+      'video': '🎥',
+      'assessment': '📝',
+      'organization': '🏢',
+      'book-chapter': '📚',
+      'tool': '🛠️'
+    };
+    return icons[contentType] || '📄';
+  }
+
+  toggleSidebar(): void {
+    this.sidebarOpen = !this.sidebarOpen;
+  }
+
+  toggleChapter(chapterId: string): void {
+    const chapter = this.sidebarChapters.find(c => c.id === chapterId);
+    if (chapter) {
+      chapter.isExpanded = !chapter.isExpanded;
+    }
+  }
+
+  /**
+   * Navigation Methods
+   */
+  goToStep(index: number): void {
+    this.router.navigate(['/lamad/path', this.pathId, 'step', index]);
+  }
+
   goToPrevious(): void {
     if (this.stepView?.hasPrevious && this.stepView.previousStepIndex !== undefined) {
-      this.router.navigate(['/lamad/path', this.pathId, 'step', this.stepView.previousStepIndex]);
+      this.goToStep(this.stepView.previousStepIndex);
     }
   }
 
-  /**
-   * Navigate to next step
-   */
   goToNext(): void {
     if (this.stepView?.hasNext && this.stepView.nextStepIndex !== undefined) {
-      this.router.navigate(['/lamad/path', this.pathId, 'step', this.stepView.nextStepIndex]);
+      this.goToStep(this.stepView.nextStepIndex);
     }
   }
 
-  /**
-   * Navigate to path overview
-   */
   goToPathOverview(): void {
     this.router.navigate(['/lamad/path', this.pathId]);
   }
 
   /**
-   * Mark current step as complete
+   * Toggle through Bloom's Taxonomy levels (Prototype)
    */
   markComplete(): void {
-    this.agentService.completeStep(this.pathId, this.stepIndex).subscribe({
-      next: () => {
-        // Reload to get updated progress
-        this.loadStep();
-      },
-      error: (err: Error) => {
-        console.error('[PathNavigator] Failed to mark step complete:', err);
-      }
-    });
+    // Cycle to next level
+    const currentIndex = this.BLOOM_LEVELS.indexOf(this.currentBloomLevel);
+    const nextIndex = (currentIndex + 1) % this.BLOOM_LEVELS.length;
+    this.currentBloomLevel = this.BLOOM_LEVELS[nextIndex];
+
+    console.log(`[Prototype] Mastery Level: ${this.currentBloomLevel}`);
+
+    // Persist basic completion to backend if we reach a 'completed' state
+    // For prototype, let's say 'remember' is enough to mark the step complete navigation-wise
+    if (this.currentBloomLevel === 'remember' || this.currentBloomLevel === 'apply') {
+      this.agentService.completeStep(this.pathId, this.stepIndex).subscribe({
+        next: () => {
+          // Refresh sidebar
+          this.loadContext(); 
+        }
+      });
+    }
+  }
+
+  /**
+   * Helper: Get current chapter title for breadcrumbs
+   */
+  getCurrentChapterTitle(): string | undefined {
+    return this.sidebarChapters.find(c => c.id === this.currentChapterId)?.title;
   }
 
   /**
@@ -147,7 +291,14 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Get content as string for rendering
+   * Format Bloom level for display
+   */
+  getBloomDisplay(): string {
+    return this.currentBloomLevel.replace('_', ' ').toUpperCase();
+  }
+
+  /**
+   * Content Rendering Helpers
    */
   getContentString(): string {
     if (!this.stepView?.content?.content) return '';
@@ -155,66 +306,21 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     return typeof content === 'string' ? content : JSON.stringify(content, null, 2);
   }
 
-  /**
-   * Check if content is markdown
-   */
   isMarkdown(): boolean {
     return this.stepView?.content?.contentFormat === 'markdown';
   }
 
-  /**
-   * Check if content is a quiz
-   */
   isQuiz(): boolean {
     return this.stepView?.content?.contentFormat === 'quiz-json' ||
            this.stepView?.content?.contentType === 'assessment';
   }
 
-  /**
-   * Check if content is gherkin
-   */
   isGherkin(): boolean {
     return this.stepView?.content?.contentFormat === 'gherkin';
   }
 
-  /**
-   * Render markdown to HTML (basic implementation)
-   */
   renderMarkdown(content: string): string {
-    let html = content;
-
-    // Headers
-    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-    // Bold
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    // Italic
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-    // Links
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-
-    // Code blocks
-    html = html.replace(/```([^`]+)```/gs, '<pre><code>$1</code></pre>');
-
-    // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Blockquotes
-    html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
-
-    // Unordered lists
-    html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
-
-    // Paragraphs (double newline)
-    html = html.replace(/\n\n/g, '</p><p>');
-
-    // Single line breaks
-    html = html.replace(/\n/g, '<br>');
-
-    return `<p>${html}</p>`;
+    // Basic shim - in production this uses the RendererRegistry
+    return content; 
   }
 }

@@ -103,15 +103,20 @@
 /* Header */
 .content-header {
   margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--lamad-border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .header-main {
-  background: var(--lamad-surface);
+  background: var(--lamad-surface, #ffffff);
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--lamad-border, #e5e7eb);
   margin-bottom: 1.5rem;
-  border: 1px solid var(--lamad-border);
+  width: 100%;
 }
 
 .content-type-badge {
@@ -311,6 +316,51 @@
 
 .affinity-bar-fill.affinity-high {
   background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+/* Tabs Navigation */
+.viewer-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--lamad-border);
+  margin-bottom: 1.5rem;
+  padding: 0 1rem;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  padding: 1rem 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--lamad-text-primary);
+}
+
+.tab-btn.active {
+  color: var(--lamad-accent-primary);
+  border-bottom-color: var(--lamad-accent-primary);
+}
+
+/* Tab Content */
+.tab-content {
+  min-height: 300px;
+}
+
+.trust-tab-placeholder,
+.placeholder-tab {
+  padding: 3rem;
+  text-align: center;
+  background: var(--lamad-surface);
+  border: 1px solid var(--lamad-border);
+  border-radius: 8px;
+  color: var(--lamad-text-secondary);
 }
 
 /* Content body */
@@ -601,22 +651,491 @@
 }
 
 /* Responsive */
+
 @media (max-width: 768px) {
+
   .content-viewer-container {
+
     padding: 1rem;
+
   }
+
+
 
   .content-title {
+
     font-size: 1.8rem;
+
   }
+
+
 
   .content-meta {
+
     flex-direction: column;
+
     gap: 0.5rem;
+
   }
 
+
+
   .related-grid,
+
   .children-grid {
+
     grid-template-columns: 1fr;
+
   }
+
+}
+
+
+
+/* Trust Tab Styles */
+
+.trust-tab-content {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 2rem;
+
+}
+
+
+
+/* Trust Summary Card */
+
+.trust-summary-card {
+
+  background: var(--lamad-surface);
+
+  border: 1px solid var(--lamad-border);
+
+  border-radius: 12px;
+
+  padding: 2rem;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+  border-left: 4px solid transparent;
+
+}
+
+
+
+/* Trust Level Theming */
+
+.trust-summary-card.trust-verified { border-left-color: #fbbf24; /* Gold */ }
+
+.trust-summary-card.trust-trusted { border-left-color: #3b82f6; /* Blue */ }
+
+.trust-summary-card.trust-emerging { border-left-color: #10b981; /* Green */ }
+
+.trust-summary-card.trust-unverified { border-left-color: #9ca3af; /* Gray */ }
+
+.trust-summary-card.trust-flagged { border-left-color: #ef4444; /* Red */ }
+
+
+
+.trust-header {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 2rem;
+
+  margin-bottom: 1.5rem;
+
+}
+
+
+
+.trust-score {
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 80px;
+
+  height: 80px;
+
+  background: var(--lamad-bg-tertiary);
+
+  border-radius: 50%;
+
+  border: 4px solid var(--lamad-border);
+
+}
+
+
+
+.score-val {
+
+  font-size: 1.5rem;
+
+  font-weight: 700;
+
+  color: var(--lamad-text-primary);
+
+  line-height: 1;
+
+}
+
+
+
+.score-label {
+
+  font-size: 0.7rem;
+
+  color: var(--lamad-text-secondary);
+
+  text-transform: uppercase;
+
+}
+
+
+
+.trust-primary-badge {
+
+  flex: 1;
+
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 1rem;
+
+}
+
+
+
+.badge-icon.large {
+
+  font-size: 2.5rem;
+
+  line-height: 1;
+
+}
+
+
+
+.badge-details h3 {
+
+  margin: 0 0 0.25rem 0;
+
+  font-size: 1.25rem;
+
+  color: var(--lamad-text-primary);
+
+}
+
+
+
+.badge-details p {
+
+  margin: 0 0 0.5rem 0;
+
+  color: var(--lamad-text-secondary);
+
+  font-size: 0.95rem;
+
+}
+
+
+
+.grantor {
+
+  font-size: 0.85rem;
+
+  color: var(--lamad-text-muted);
+
+  font-style: italic;
+
+}
+
+
+
+.trust-reach {
+
+  border-top: 1px solid var(--lamad-border);
+
+  padding-top: 1rem;
+
+  font-size: 0.9rem;
+
+  color: var(--lamad-text-secondary);
+
+}
+
+
+
+.trust-reach strong {
+
+  color: var(--lamad-text-primary);
+
+}
+
+
+
+/* Warnings */
+
+.trust-warnings {
+
+  margin-bottom: 1rem;
+
+}
+
+
+
+.trust-warnings h3 {
+
+  color: #ef4444; /* Red */
+
+  font-size: 1.1rem;
+
+  margin-bottom: 1rem;
+
+}
+
+
+
+.warning-list {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 1rem;
+
+}
+
+
+
+.warning-card {
+
+  display: flex;
+
+  gap: 1rem;
+
+  background: rgba(239, 68, 68, 0.05);
+
+  border: 1px solid rgba(239, 68, 68, 0.2);
+
+  border-radius: 8px;
+
+  padding: 1rem;
+
+}
+
+
+
+.warning-icon {
+
+  font-size: 1.5rem;
+
+}
+
+
+
+.warning-content h4 {
+
+  margin: 0 0 0.25rem 0;
+
+  color: #ef4444;
+
+}
+
+
+
+.warning-content p {
+
+  margin: 0;
+
+  font-size: 0.9rem;
+
+  color: var(--lamad-text-primary);
+
+}
+
+
+
+/* Secondary Badges */
+
+.trust-badges-section h3,
+
+.trust-actions h3 {
+
+  font-size: 1.1rem;
+
+  color: var(--lamad-text-primary);
+
+  margin-bottom: 1rem;
+
+}
+
+
+
+.badges-grid {
+
+  display: grid;
+
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+
+  gap: 1rem;
+
+}
+
+
+
+.badge-card {
+
+  display: flex;
+
+  gap: 0.75rem;
+
+  background: var(--lamad-surface);
+
+  border: 1px solid var(--lamad-border);
+
+  border-radius: 8px;
+
+  padding: 1rem;
+
+  transition: transform 0.2s;
+
+}
+
+
+
+.badge-card:hover {
+
+  transform: translateY(-2px);
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+}
+
+
+
+/* Badge Colors */
+
+.badge-card.badge-gold { border-left: 3px solid #fbbf24; }
+
+.badge-card.badge-blue { border-left: 3px solid #3b82f6; }
+
+.badge-card.badge-green { border-left: 3px solid #10b981; }
+
+.badge-card.badge-gray { border-left: 3px solid #9ca3af; }
+
+.badge-card.badge-orange { border-left: 3px solid #f97316; }
+
+.badge-card.badge-red { border-left: 3px solid #ef4444; }
+
+
+
+.badge-info h4 {
+
+  margin: 0 0 0.25rem 0;
+
+  font-size: 1rem;
+
+  color: var(--lamad-text-primary);
+
+}
+
+
+
+.badge-info p {
+
+  margin: 0 0 0.5rem 0;
+
+  font-size: 0.85rem;
+
+  color: var(--lamad-text-secondary);
+
+}
+
+
+
+.badge-grantor {
+
+  display: block;
+
+  font-size: 0.75rem;
+
+  color: var(--lamad-text-muted);
+
+}
+
+
+
+/* Actions */
+
+.actions-list {
+
+  display: flex;
+
+  gap: 1rem;
+
+  flex-wrap: wrap;
+
+}
+
+
+
+.btn-secondary {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 0.5rem;
+
+  background: var(--lamad-surface);
+
+  border: 1px solid var(--lamad-border);
+
+  border-radius: 6px;
+
+  padding: 0.75rem 1.25rem;
+
+  color: var(--lamad-text-primary);
+
+  font-size: 0.9rem;
+
+  cursor: pointer;
+
+  transition: all 0.2s;
+
+}
+
+
+
+.btn-secondary:hover:not(:disabled) {
+
+  background: var(--lamad-bg-secondary);
+
+  border-color: var(--lamad-accent-primary);
+
+  color: var(--lamad-accent-primary);
+
+}
+
+
+
+.btn-secondary:disabled {
+
+  opacity: 0.5;
+
+  cursor: not-allowed;
+
 }

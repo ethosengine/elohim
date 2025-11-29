@@ -412,6 +412,86 @@ export class PathService {
     );
   }
 
+  /**
+   * Get concept mastery progress for a path.
+   *
+   * Aggregates progress by unique concepts found in the path steps.
+   * Concepts are identified by the `sharedConcepts` field on steps.
+   */
+  getConceptProgressForPath(pathId: string): Observable<Array<{
+    conceptId: string;
+    title: string;
+    totalSteps: number;
+    completedSteps: number;
+    completionPercentage: number;
+  }>> {
+    return forkJoin({
+      path: this.getPath(pathId),
+      progress: this.agentService.getProgressForPath(pathId)
+    }).pipe(
+      switchMap(({ path, progress }) => {
+        // Map to store concept ID -> IDs of steps that teach this concept
+        const conceptMap = new Map<string, number[]>();
+        
+        // 1. Collect all concepts and which steps they appear in
+        path.steps.forEach((step: any, stepIndex) => {
+          if (step.sharedConcepts && Array.isArray(step.sharedConcepts)) {
+            step.sharedConcepts.forEach((conceptId: string) => {
+              if (!conceptMap.has(conceptId)) {
+                conceptMap.set(conceptId, []);
+              }
+              conceptMap.get(conceptId)?.push(stepIndex);
+            });
+          }
+        });
+
+        const uniqueConceptIds = Array.from(conceptMap.keys());
+        
+        if (uniqueConceptIds.length === 0) {
+          return of([]);
+        }
+
+        // 2. Load content nodes for concepts to get titles
+        const contentObservables = uniqueConceptIds.map(id => 
+          this.dataLoader.getContent(id).pipe(
+            // Handle error gracefully if a concept node is missing
+            map(node => ({ id, title: node?.title || id }))
+          )
+        );
+
+        return forkJoin(contentObservables).pipe(
+          map(conceptNodes => {
+            // 3. Aggregate progress
+            return conceptNodes.map(node => {
+              const stepIndices = conceptMap.get(node.id) || [];
+              const totalSteps = stepIndices.length;
+              
+              // Calculate completed steps for this concept
+              let completedSteps = 0;
+              if (progress) {
+                completedSteps = stepIndices.filter(idx => 
+                  progress.completedStepIndices.includes(idx)
+                ).length;
+              }
+
+              const completionPercentage = totalSteps > 0 
+                ? Math.round((completedSteps / totalSteps) * 100) 
+                : 0;
+
+              return {
+                conceptId: node.id,
+                title: node.title,
+                totalSteps,
+                completedSteps,
+                completionPercentage
+              };
+            }).sort((a, b) => b.totalSteps - a.totalSteps); // Sort by prevalence (most common concepts first)
+          })
+        );
+      })
+    );
+  }
+
   // =========================================================================
   // BULK LOADING & CHAPTER NAVIGATION
   // =========================================================================

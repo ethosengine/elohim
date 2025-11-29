@@ -57,13 +57,16 @@ import { RouterModule } from '@angular/router';
     }
 
     .dashboard-header {
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-color, #e5e7eb);
       margin-bottom: 2rem;
     }
 
     .dashboard-header h1 {
       font-size: 2rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
+      font-weight: 800;
+      color: var(--text-primary, #111827);
+      margin: 0 0 0.5rem 0;
     }
 
     .subtitle {

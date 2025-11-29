@@ -9,6 +9,12 @@
  * - Economic: REA value flows and contributor recognition
  * - Governance: Constitutional moderation, deliberation, feedback profiles
  *
+ * Mastery System (Bloom's Taxonomy):
+ * - ContentMastery: Per-node mastery tracking (not_started → create)
+ * - Attestation Gate: "apply" level unlocks participation privileges
+ * - ContentLifecycle: Refresh policies, deprecation, "right to be forgotten"
+ * - ExpertiseDiscovery: Graph-emergent expertise without gamified scores
+ *
  * Trust Model (Bidirectional Attestations):
  * - Agent attestations: Earned credentials for accessing gated content
  * - Content attestations: Earned trust for reaching broader audiences
@@ -140,3 +146,19 @@ export * from './governance-deliberation.model';
 
 // Feedback Profile models (virality as privilege, emotional reaction constraints)
 export * from './feedback-profile.model';
+
+// Content Mastery models (Bloom's Taxonomy progression)
+// Tracks mastery level from passive (seen → apply) to active (analyze → create)
+// The "apply" level is the attestation gate for participation privileges
+export * from './content-mastery.model';
+
+// Content Lifecycle models (refresh policies, deprecation, archival)
+// Implements "the right to be forgotten" - content has natural lifecycles
+export * from './content-lifecycle.model';
+
+// Human Affinity models (engagement depth tracking)
+export * from './human-affinity.model';
+
+// BACKLOGGED: Expertise Discovery models (finding experts in domains)
+// See BACKLOG.md - expertise-discovery.model.ts exists but not yet integrated
+// export * from './expertise-discovery.model';

@@ -198,7 +198,6 @@
   max-width: 1400px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -614,7 +613,7 @@
   }
 
   .lamad-main {
-    padding: 1rem;
+    padding: 0;
   }
 
   /* Hide session human stats on mobile */

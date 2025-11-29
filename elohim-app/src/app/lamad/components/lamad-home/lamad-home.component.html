@@ -1,5 +1,5 @@
 <div class="lamad-home">
-  <!-- View Mode Toggle Bar -->
+  <!-- View Mode Toggle -->
   <nav class="view-mode-bar">
     <div class="view-tabs">
       <button
@@ -8,7 +8,7 @@
         (click)="setViewMode('paths')"
       >
         <span class="tab-icon">&#128218;</span>
-        Paths
+        Learning Paths
       </button>
       <button
         class="view-tab"
@@ -16,17 +16,7 @@
         (click)="setViewMode('explore')"
       >
         <span class="tab-icon">&#127758;</span>
-        Explore
-      </button>
-    </div>
-    <div class="view-actions">
-      <button class="action-link" (click)="goToSearch()">
-        <span class="tab-icon">&#128269;</span>
-        Search
-      </button>
-      <button class="action-link" (click)="goToDashboard()">
-        <span class="tab-icon">&#128100;</span>
-        Me
+        Knowledge Graph
       </button>
     </div>
   </nav>
@@ -49,18 +39,38 @@
 
   <!-- Main Content -->
   @if (!isLoading && !error) {
-    <!-- Hero Section -->
-    <header class="hero-section">
-      <div class="hero-content">
-        <h1 class="hero-title">Lamad</h1>
-        <p class="hero-subtitle">
-          Discover the vision for digital infrastructure that serves human flourishing
-        </p>
-      </div>
-    </header>
+    
+    <!-- Active Journey (Priority) -->
+    @if (activeFocus) {
+      <section class="featured-section">
+        <div class="featured-card active-journey">
+          <div class="featured-badge">Continue Learning</div>
 
-    <!-- Featured Path -->
-    @if (featuredPath) {
+          <h2 class="featured-title">{{ activeFocus.pathTitle }}</h2>
+          <p class="featured-description">
+            Next: {{ activeFocus.nextStepTitle || 'Continue your journey' }}
+          </p>
+
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-fill" [style.width.%]="activeFocus.progressPercent"></div>
+            </div>
+            <span class="progress-text">{{ activeFocus.progressPercent }}% Complete</span>
+          </div>
+
+          <div class="featured-actions">
+            <button class="btn btn-primary btn-large" (click)="continueActiveJourney()">
+              Resume Journey
+            </button>
+            <button class="btn btn-secondary" (click)="goToPath(activeFocus.pathId)">
+              View Path
+            </button>
+          </div>
+        </div>
+      </section>
+    }
+    <!-- Featured Path (Fallback) -->
+    @else if (featuredPath) {
       <section class="featured-section">
         <div class="featured-card">
           <div class="featured-badge">Featured Journey</div>
@@ -92,31 +102,10 @@
       </section>
     }
 
-    <!-- Quick Actions -->
-    <section class="quick-actions">
-      <button class="action-card" (click)="goToDashboard()">
-        <span class="action-icon">📚</span>
-        <span class="action-label">My Learning</span>
-        <span class="action-description">Track your progress</span>
-      </button>
-
-      <button class="action-card" (click)="goToSearch()">
-        <span class="action-icon">🔍</span>
-        <span class="action-label">Search</span>
-        <span class="action-description">Find specific content</span>
-      </button>
-
-      <button class="action-card" (click)="goToExplore()">
-        <span class="action-icon">🗺️</span>
-        <span class="action-label">Explore</span>
-        <span class="action-description">Browse the knowledge graph</span>
-      </button>
-    </section>
-
     <!-- All Paths -->
-    @if (paths.length > 1) {
+    @if (paths.length > 0) {
       <section class="paths-section">
-        <h2 class="section-title">All Learning Paths</h2>
+        <h2 class="section-title">Browse All Paths</h2>
 
         <div class="paths-grid">
           @for (path of paths; track path.id) {

@@ -1,10 +1,13 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Subject, forkJoin, of } from 'rxjs';
+import { takeUntil, catchError } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
+import { ProfileService } from '../../services/profile.service';
+import { AgentService } from '../../services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
+import { CurrentFocus } from '../../models/profile.model';
 
 /**
  * LamadHomeComponent - Dual-mode landing page.
@@ -30,6 +33,7 @@ import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 export class LamadHomeComponent implements OnInit, OnDestroy {
   paths: PathIndexEntry[] = [];
   featuredPath: PathIndexEntry | null = null;
+  activeFocus: CurrentFocus | null = null;
 
   isLoading = true;
   error: string | null = null;
@@ -41,7 +45,9 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly pathService: PathService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly profileService: ProfileService,
+    private readonly agentService: AgentService
   ) {
     // Load saved view mode preference
     const savedMode = localStorage.getItem('lamad-view-mode');
@@ -63,11 +69,29 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     this.isLoading = true;
     this.error = null;
 
-    this.pathService.listPaths().pipe(
+    const isAuth = this.agentService.getCurrentAgentId() !== 'anonymous';
+
+    const tasks = isAuth
+      ? [
+          this.pathService.listPaths(),
+          this.profileService.getCurrentFocus().pipe(catchError(() => of([])))
+        ]
+      : [this.pathService.listPaths()];
+
+    forkJoin(tasks).pipe(
       takeUntil(this.destroy$)
     ).subscribe({
-      next: (index: PathIndex) => {
+      next: (results) => {
+        const index = results[0] as PathIndex;
         this.paths = index.paths || [];
+
+        if (isAuth && results.length > 1 && results[1] && Array.isArray(results[1]) && results[1].length > 0) {
+            // Sort by most recent activity
+            const focus = (results[1] as CurrentFocus[]).sort((a, b) =>
+                new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
+            );
+            this.activeFocus = focus[0];
+        }
 
         // Feature the Elohim Protocol path
         this.featuredPath = this.paths.find(p => p.id === 'elohim-protocol') || this.paths[0] || null;
@@ -95,6 +119,15 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   startFeaturedPath(): void {
     if (this.featuredPath) {
       this.router.navigate(['/lamad/path', this.featuredPath.id, 'step', 0]);
+    }
+  }
+
+  /**
+   * Continue the active journey
+   */
+  continueActiveJourney(): void {
+    if (this.activeFocus) {
+      this.router.navigate(['/lamad/path', this.activeFocus.pathId, 'step', this.activeFocus.currentStepIndex]);
     }
   }
 
