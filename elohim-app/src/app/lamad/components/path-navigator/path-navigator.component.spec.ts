@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
 import { of, throwError, BehaviorSubject } from 'rxjs';
 import { PathNavigatorComponent } from './path-navigator.component';
 import { PathService } from '../../services/path.service';
@@ -89,16 +89,15 @@ describe('PathNavigatorComponent', () => {
   beforeEach(async () => {
     const pathServiceSpy = jasmine.createSpyObj('PathService', ['getPath', 'getPathStep']);
     const agentServiceSpy = jasmine.createSpyObj('AgentService', ['completeStep']);
-    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
 
     paramsSubject = new BehaviorSubject({ pathId: 'test-path', stepIndex: '1' });
 
     await TestBed.configureTestingModule({
       imports: [PathNavigatorComponent],
       providers: [
+        provideRouter([]),
         { provide: PathService, useValue: pathServiceSpy },
         { provide: AgentService, useValue: agentServiceSpy },
-        { provide: Router, useValue: routerSpy },
         {
           provide: ActivatedRoute,
           useValue: { params: paramsSubject.asObservable() }
@@ -109,6 +108,7 @@ describe('PathNavigatorComponent', () => {
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
     router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    spyOn(router, 'navigate');
 
     pathService.getPath.and.returnValue(of(mockPath));
     pathService.getPathStep.and.returnValue(of(mockStepView));
