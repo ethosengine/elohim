@@ -29,34 +29,37 @@
     </nav>
 
     <!-- Path Header -->
-    <header class="path-header">
-      <div class="path-meta">
-        <span class="difficulty-badge" [class]="path.difficulty">
-          {{ getDifficultyDisplay() }}
-        </span>
-        @if (path.estimatedDuration) {
-          <span class="duration">{{ path.estimatedDuration }}</span>
-        }
+    <div class="path-header">
+      <div class="path-header-content">
+        <div class="path-meta">
+          <span class="difficulty-badge" [class]="path?.difficulty || 'beginner'">
+            {{ getDifficultyDisplay() }}
+          </span>
+          <span class="duration" *ngIf="path?.estimatedDuration">
+            ⏱ {{ path?.estimatedDuration }}
+          </span>
+        </div>
+
+        <h1 class="path-title">{{ path?.title }}</h1>
+        <p class="path-description">{{ path?.description }}</p>
+
+        <div class="path-purpose" *ngIf="path?.purpose">
+          <strong>Goal:</strong> {{ path?.purpose }}
+        </div>
+
+        <div class="path-tags" *ngIf="path?.tags && path.tags.length > 0">
+          <span *ngFor="let tag of path.tags" class="tag">#{{ tag }}</span>
+        </div>
       </div>
 
-      <h1 class="path-title">{{ path.title }}</h1>
-      <p class="path-description">{{ path.description }}</p>
-
-      @if (path.purpose) {
-        <div class="path-purpose">
-          <strong>Purpose:</strong> {{ path.purpose }}
-        </div>
-      }
-
-      <!-- Tags -->
-      @if (path.tags && path.tags.length > 0) {
-        <div class="path-tags">
-          @for (tag of path.tags; track tag) {
-            <span class="tag">{{ tag }}</span>
-          }
-        </div>
-      }
-    </header>
+      <div class="path-thumbnail-container">
+        <img [src]="path?.thumbnailUrl || 'assets/lamad-data/images/path-placeholder.png'" 
+             [alt]="path?.thumbnailAlt || path?.title" 
+             class="path-thumbnail-image"
+             onerror="this.style.display='none'"> <!-- Hide if fails -->
+        <!-- Fallback visual if image hidden/missing? CSS can handle background color -->
+      </div>
+    </div>
 
     <!-- Main Grid Layout -->
     <div class="overview-main">

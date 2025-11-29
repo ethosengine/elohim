@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-11-28T21:09:48.298687",
+  "lastUpdated": "2025-11-29T12:00:00.000000",
   "totalCount": 2,
   "paths": [
     {
@@ -13,7 +13,9 @@
         "foundation",
         "protocol",
         "onboarding"
-      ]
+      ],
+      "thumbnailUrl": "/images/elohim_protocol_logo_light.png",
+      "thumbnailAlt": "Elohim Protocol logo"
     },
     {
       "id": "foundations-christian-technology",
@@ -32,7 +34,9 @@
         "discipleship",
         "church"
       ],
-      "category": "fct"
+      "category": "fct",
+      "thumbnailUrl": "/images/fct_cover.webp",
+      "thumbnailAlt": "Foundations for Christian Technology course cover"
     }
   ]
 }

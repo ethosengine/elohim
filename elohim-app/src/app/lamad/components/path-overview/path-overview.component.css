@@ -27,6 +27,18 @@
       "sidebar" /* Actions first on mobile usually better? Or main content? */
       "main";
   }
+
+  .path-header {
+    flex-direction: column-reverse;
+  }
+
+  .path-thumbnail-container {
+    width: 100%;
+    max-width: 100%;
+    height: 250px;
+    flex: none;
+    margin-bottom: 1.5rem;
+  }
 }
 
 /* Sidebar Styling */
@@ -120,13 +132,44 @@
 }
 
 /* Path Header */
-.path-header { margin-bottom: 2rem; }
+.path-header {
+  grid-area: header;
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.path-header-content {
+  flex: 1;
+  min-width: 0; /* Prevent flex overflow */
+}
+
+.path-thumbnail-container {
+  flex: 0 0 25%; /* 25% width column */
+  max-width: 300px;
+  min-width: 200px;
+  aspect-ratio: 1 / 1; /* Square */
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--lamad-bg-secondary, #f9fafb);
+  border: 1px solid var(--lamad-border, #e5e7eb);
+}
+
+.path-thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .path-meta {
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
 }
+
 .difficulty-badge {
   font-size: 0.75rem;
   text-transform: uppercase;

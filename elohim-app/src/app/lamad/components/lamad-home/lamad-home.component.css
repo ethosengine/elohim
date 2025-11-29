@@ -311,15 +311,42 @@
   background: var(--lamad-surface);
   border: 1px solid var(--lamad-border);
   border-radius: 12px;
-  padding: 1.5rem;
+  overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .path-card:hover {
   border-color: var(--lamad-accent-primary);
   background: var(--lamad-surface-hover);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.path-thumbnail {
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  background: var(--lamad-bg-tertiary, #e5e7eb);
+}
+
+.path-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.path-card:hover .path-thumbnail img {
+  transform: scale(1.05);
+}
+
+.path-content {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .path-title {
@@ -338,6 +365,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  flex: 1;
 }
 
 .path-meta {

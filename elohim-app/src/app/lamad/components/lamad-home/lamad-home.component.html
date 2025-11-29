@@ -110,25 +110,32 @@
         <div class="paths-grid">
           @for (path of paths; track path.id) {
             <article class="path-card" (click)="goToPath(path.id)">
-              <h3 class="path-title">{{ path.title }}</h3>
-              <p class="path-description">{{ path.description }}</p>
-
-              <div class="path-meta">
-                <span class="meta-item difficulty" [class]="getDifficultyClass(path.difficulty)">
-                  {{ formatDifficulty(path.difficulty) }}
-                </span>
-                @if (path.stepCount) {
-                  <span class="meta-item">{{ path.stepCount }} steps</span>
-                }
-              </div>
-
-              @if (path.tags && path.tags.length > 0) {
-                <div class="path-tags">
-                  @for (tag of path.tags.slice(0, 3); track tag) {
-                    <span class="tag">{{ tag }}</span>
-                  }
+              @if (path.thumbnailUrl) {
+                <div class="path-thumbnail">
+                  <img [src]="path.thumbnailUrl" [alt]="path.thumbnailAlt || path.title" loading="lazy">
                 </div>
               }
+              <div class="path-content">
+                <h3 class="path-title">{{ path.title }}</h3>
+                <p class="path-description">{{ path.description }}</p>
+
+                <div class="path-meta">
+                  <span class="meta-item difficulty" [class]="getDifficultyClass(path.difficulty)">
+                    {{ formatDifficulty(path.difficulty) }}
+                  </span>
+                  @if (path.stepCount) {
+                    <span class="meta-item">{{ path.stepCount }} steps</span>
+                  }
+                </div>
+
+                @if (path.tags && path.tags.length > 0) {
+                  <div class="path-tags">
+                    @for (tag of path.tags.slice(0, 3); track tag) {
+                      <span class="tag">{{ tag }}</span>
+                    }
+                  </div>
+                }
+              </div>
             </article>
           }
         </div>

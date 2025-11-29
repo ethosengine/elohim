@@ -112,6 +112,19 @@ export interface LearningPath {
    * Reference: https://www.w3.org/TR/did-core/
    */
   did?: string;
+
+  // =========================================================================
+  // Visual Assets
+  // =========================================================================
+
+  /**
+   * Thumbnail/cover image URL for path cards and landing pages.
+   * Falls back to socialMetadata.ogImage if not set.
+   */
+  thumbnailUrl?: string;
+
+  /** Alt text for thumbnail (accessibility) */
+  thumbnailAlt?: string;
 }
 
 /**
@@ -319,6 +332,12 @@ export interface PathIndexEntry {
 
   /** Category for grouping */
   category?: string;
+
+  /** Thumbnail image URL for path cards */
+  thumbnailUrl?: string;
+
+  /** Alt text for thumbnail (accessibility) */
+  thumbnailAlt?: string;
 }
 
 /**
