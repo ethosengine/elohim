@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, forkJoin } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 import { TrustBadgeService } from './trust-badge.service';
-import { ContentNode, ContentType, ContentReach } from '../models/content-node.model';
+import { ContentType, ContentReach } from '../models/content-node.model';
 import { TrustLevel, calculateTrustLevel } from '../models/trust-badge.model';
 import { ContentIndexEntry } from './content.service';
 import {
@@ -69,7 +69,7 @@ export class SearchService {
 
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
-        const nodes = index.nodes || [];
+        const nodes = index.nodes ?? [];
 
         // Score and filter all nodes
         const scoredResults = this.scoreAndFilter(nodes, query);
@@ -81,9 +81,9 @@ export class SearchService {
         const sortedResults = this.sortResults(scoredResults, query);
 
         // Paginate
-        const page = query.page || 1;
+        const page = query.page ?? 1;
         const pageSize = Math.min(
-          query.pageSize || DEFAULT_SEARCH_CONFIG.pageSize,
+          query.pageSize ?? DEFAULT_SEARCH_CONFIG.pageSize,
           DEFAULT_SEARCH_CONFIG.maxPageSize
         );
         const startIndex = (page - 1) * pageSize;
@@ -123,7 +123,7 @@ export class SearchService {
 
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
-        const nodes = index.nodes || [];
+        const nodes = index.nodes ?? [];
         const query = partialQuery.toLowerCase().trim();
         const suggestions: SearchSuggestion[] = [];
         const seen = new Set<string>();
@@ -146,9 +146,9 @@ export class SearchService {
         // Suggest matching tags
         const tagCounts = new Map<string, number>();
         for (const node of nodes) {
-          for (const tag of node.tags || []) {
+          for (const tag of node.tags ?? []) {
             if (tag.toLowerCase().includes(query)) {
-              tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
             }
           }
         }
@@ -184,9 +184,9 @@ export class SearchService {
       map(index => {
         const tagCounts = new Map<string, number>();
 
-        for (const node of index.nodes || []) {
-          for (const tag of node.tags || []) {
-            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        for (const node of index.nodes ?? []) {
+          for (const tag of node.tags ?? []) {
+            tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
           }
         }
 
@@ -206,7 +206,7 @@ export class SearchService {
    */
   private scoreAndFilter(nodes: ContentIndexEntry[], query: SearchQuery): SearchResult[] {
     const results: SearchResult[] = [];
-    const searchText = (query.text || '').toLowerCase().trim();
+    const searchText = (query.text ?? '').toLowerCase().trim();
     const searchWords = searchText.split(/\s+/).filter(w => w.length > 0);
 
     for (const node of nodes) {
@@ -231,11 +231,11 @@ export class SearchService {
         title: node.title,
         description: node.description,
         contentType: node.contentType,
-        tags: node.tags || [],
-        reach: (node as any).reach || 'commons',
+        tags: node.tags ?? [],
+        reach: (node as any).reach ?? 'commons',
         trustScore: (node as any).trustScore ?? 1.0,
         trustLevel,
-        hasFlags: ((node as any).flags || []).length > 0,
+        hasFlags: ((node as any).flags ?? []).length > 0,
         relevanceScore: score,
         matchedFields,
         highlights,
@@ -260,7 +260,7 @@ export class SearchService {
 
     // Reach level filter
     if (query.reachLevels && query.reachLevels.length > 0) {
-      const nodeReach = (node as any).reach || 'commons';
+      const nodeReach = (node as any).reach ?? 'commons';
       if (!query.reachLevels.includes(nodeReach)) {
         return false;
       }
@@ -276,7 +276,7 @@ export class SearchService {
 
     // Tag filter (OR logic)
     if (query.tags && query.tags.length > 0) {
-      const nodeTags = (node.tags || []).map(t => t.toLowerCase());
+      const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
       const hasAnyTag = query.tags.some(t => nodeTags.includes(t.toLowerCase()));
       if (!hasAnyTag) {
         return false;
@@ -285,7 +285,7 @@ export class SearchService {
 
     // Required tags filter (AND logic)
     if (query.requiredTags && query.requiredTags.length > 0) {
-      const nodeTags = (node.tags || []).map(t => t.toLowerCase());
+      const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
       const hasAllTags = query.requiredTags.every(t => nodeTags.includes(t.toLowerCase()));
       if (!hasAllTags) {
         return false;
@@ -302,7 +302,7 @@ export class SearchService {
 
     // Exclude flagged
     if (query.excludeFlagged) {
-      const flags = (node as any).flags || [];
+      const flags = (node as any).flags ?? [];
       if (flags.length > 0) {
         return false;
       }
@@ -328,8 +328,8 @@ export class SearchService {
     const highlights: SearchHighlight[] = [];
 
     const titleLower = node.title.toLowerCase();
-    const descLower = (node.description || '').toLowerCase();
-    const tagsLower = (node.tags || []).map(t => t.toLowerCase());
+    const descLower = (node.description ?? '').toLowerCase();
+    const tagsLower = (node.tags ?? []).map(t => t.toLowerCase());
 
     for (const word of searchWords) {
       // Title matching
@@ -398,7 +398,7 @@ export class SearchService {
     }
 
     if (matchedFields.some(f => f.field === 'tags')) {
-      const matchingTags = (node.tags || []).filter(tag =>
+      const matchingTags = (node.tags ?? []).filter(tag =>
         searchWords.some(w => tag.toLowerCase().includes(w))
       );
       if (matchingTags.length > 0) {
@@ -452,8 +452,8 @@ export class SearchService {
    * Sort results based on query sort options.
    */
   private sortResults(results: SearchResult[], query: SearchQuery): SearchResult[] {
-    const sortBy = query.sortBy || 'relevance';
-    const direction = query.sortDirection || 'desc';
+    const sortBy = query.sortBy ?? 'relevance';
+    const direction = query.sortDirection ?? 'desc';
     const multiplier = direction === 'asc' ? 1 : -1;
 
     return [...results].sort((a, b) => {
@@ -473,10 +473,10 @@ export class SearchService {
           comparison = this.reachToNumber(a.reach) - this.reachToNumber(b.reach);
           break;
         case 'newest':
-          comparison = (a.createdAt || '').localeCompare(b.createdAt || '');
+          comparison = (a.createdAt ?? '').localeCompare(b.createdAt ?? '');
           break;
         case 'updated':
-          comparison = (a.updatedAt || '').localeCompare(b.updatedAt || '');
+          comparison = (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '');
           break;
       }
 
@@ -511,21 +511,21 @@ export class SearchService {
       // Content type
       byContentType.set(
         result.contentType,
-        (byContentType.get(result.contentType) || 0) + 1
+        (byContentType.get(result.contentType) ?? 0) + 1
       );
 
       // Reach
-      byReach.set(result.reach, (byReach.get(result.reach) || 0) + 1);
+      byReach.set(result.reach, (byReach.get(result.reach) ?? 0) + 1);
 
       // Trust level
       byTrustLevel.set(
         result.trustLevel,
-        (byTrustLevel.get(result.trustLevel) || 0) + 1
+        (byTrustLevel.get(result.trustLevel) ?? 0) + 1
       );
 
       // Tags
       for (const tag of result.tags) {
-        byTag.set(tag, (byTag.get(tag) || 0) + 1);
+        byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
       }
 
       // Flag status
@@ -567,10 +567,10 @@ export class SearchService {
    * Compute trust level for a node.
    */
   private computeTrustLevel(node: ContentIndexEntry): TrustLevel {
-    const attestationTypes = (node as any).attestationTypes || [];
-    const hasFlags = ((node as any).flags || []).length > 0;
+    const attestationTypes = (node as any).attestationTypes ?? [];
+    const hasFlags = ((node as any).flags ?? []).length > 0;
     return calculateTrustLevel(
-      (node as any).reach || 'commons',
+      (node as any).reach ?? 'commons',
       attestationTypes,
       hasFlags
     );

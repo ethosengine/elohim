@@ -130,7 +130,7 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
     const stats = {
       wordCount: this.countWords(content),
       lineCount: content.split('\n').length,
-      sectionCount: (content.match(/^#{1,6}\s+/gm) || []).length
+      sectionCount: (content.match(/^#{1,6}\s+/gm) ?? []).length
     };
 
     return {
@@ -170,7 +170,7 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
     }
 
     // Check for markdown lists
-    if (/^[\-\*]\s+.+$/m.test(content)) {
+    if (/^[-*]\s+.+$/m.test(content)) {
       confidence += 0.1;
     }
 
@@ -210,7 +210,7 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
+      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read file'));
       reader.readAsText(file);
     });
   }
@@ -337,7 +337,7 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
 
   private validateHeadings(content: string): { warnings: ValidationWarning[] } {
     const warnings: ValidationWarning[] = [];
-    const headings = content.match(/^(#{1,6})\s+.+$/gm) || [];
+    const headings = content.match(/^(#{1,6})\s+.+$/gm) ?? [];
 
     // Check for H1
     const h1Count = headings.filter(h => h.startsWith('# ')).length;

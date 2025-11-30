@@ -43,7 +43,7 @@ export class ContentIORegistryService {
     // Index by file extensions
     for (const ext of plugin.fileExtensions) {
       const normalizedExt = ext.toLowerCase().startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
-      const existing = this.extensionMap.get(normalizedExt) || [];
+      const existing = this.extensionMap.get(normalizedExt) ?? [];
       if (!existing.includes(formatId)) {
         this.extensionMap.set(normalizedExt, [...existing, formatId]);
       }
@@ -52,7 +52,7 @@ export class ContentIORegistryService {
     // Index by MIME types
     for (const mime of plugin.mimeTypes) {
       const normalizedMime = mime.toLowerCase();
-      const existing = this.mimeTypeMap.get(normalizedMime) || [];
+      const existing = this.mimeTypeMap.get(normalizedMime) ?? [];
       if (!existing.includes(formatId)) {
         this.mimeTypeMap.set(normalizedMime, [...existing, formatId]);
       }
@@ -73,14 +73,14 @@ export class ContentIORegistryService {
     // Remove from extension map
     for (const ext of plugin.fileExtensions) {
       const normalizedExt = ext.toLowerCase().startsWith('.') ? ext.toLowerCase() : `.${ext.toLowerCase()}`;
-      const existing = this.extensionMap.get(normalizedExt) || [];
+      const existing = this.extensionMap.get(normalizedExt) ?? [];
       this.extensionMap.set(normalizedExt, existing.filter(id => id !== formatId));
     }
 
     // Remove from MIME type map
     for (const mime of plugin.mimeTypes) {
       const normalizedMime = mime.toLowerCase();
-      const existing = this.mimeTypeMap.get(normalizedMime) || [];
+      const existing = this.mimeTypeMap.get(normalizedMime) ?? [];
       this.mimeTypeMap.set(normalizedMime, existing.filter(id => id !== formatId));
     }
 
@@ -121,7 +121,7 @@ export class ContentIORegistryService {
       ? extension.toLowerCase()
       : `.${extension.toLowerCase()}`;
 
-    const formatIds = this.extensionMap.get(normalizedExt) || [];
+    const formatIds = this.extensionMap.get(normalizedExt) ?? [];
     return formatIds
       .map(id => this.plugins.get(id))
       .filter((p): p is ContentIOPlugin => p !== undefined);
@@ -132,7 +132,7 @@ export class ContentIORegistryService {
    */
   getPluginsForMimeType(mimeType: string): ContentIOPlugin[] {
     const normalizedMime = mimeType.toLowerCase();
-    const formatIds = this.mimeTypeMap.get(normalizedMime) || [];
+    const formatIds = this.mimeTypeMap.get(normalizedMime) ?? [];
     return formatIds
       .map(id => this.plugins.get(id))
       .filter((p): p is ContentIOPlugin => p !== undefined);

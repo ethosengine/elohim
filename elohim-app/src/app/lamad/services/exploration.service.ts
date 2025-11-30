@@ -555,7 +555,7 @@ export class ExplorationService {
       edges.push({
         source: path[i],
         target: path[i + 1],
-        relationshipType: rel?.relationshipType || 'unknown'
+        relationshipType: rel?.relationshipType ?? 'unknown'
       });
     }
 
@@ -668,7 +668,7 @@ export class ExplorationService {
       edges.push({
         source: path[i],
         target: path[i + 1],
-        relationshipType: rel?.relationshipType || 'unknown'
+        relationshipType: rel?.relationshipType ?? 'unknown'
       });
     }
 
@@ -718,7 +718,7 @@ export class ExplorationService {
           };
         }
 
-        const attestations = agent.attestations || [];
+        const attestations = agent.attestations ?? [];
 
         // Check for attestation tiers
         let tier: RateLimitTier = 'authenticated';

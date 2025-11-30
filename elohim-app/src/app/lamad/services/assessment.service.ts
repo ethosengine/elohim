@@ -78,7 +78,7 @@ export class AssessmentService {
   private readonly STORAGE_PREFIX = 'lamad-assessment-';
 
   // Active session (one at a time)
-  private activeSession$ = new BehaviorSubject<AssessmentSession | null>(null);
+  private readonly activeSession$ = new BehaviorSubject<AssessmentSession | null>(null);
 
   constructor(
     private readonly dataLoader: DataLoaderService,

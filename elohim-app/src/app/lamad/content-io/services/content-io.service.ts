@@ -17,7 +17,7 @@ import { FormatMetadata } from '../interfaces/format-metadata.interface';
   providedIn: 'root'
 })
 export class ContentIOService {
-  constructor(private registry: ContentIORegistryService) {}
+  constructor(private readonly registry: ContentIORegistryService) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Import Operations
@@ -108,7 +108,7 @@ export class ContentIOService {
 
     // Convert string result to Blob
     if (typeof result === 'string') {
-      const mimeType = plugin.mimeTypes[0] || 'text/plain';
+      const mimeType = plugin.mimeTypes[0] ?? 'text/plain';
       return new Blob([result], { type: mimeType });
     }
 
@@ -225,10 +225,10 @@ export class ContentIOService {
   ): Promise<void> {
     const blob = await this.exportToFormat(node, formatId);
     const plugin = this.registry.getPlugin(formatId);
-    const extension = plugin?.fileExtensions[0] || '';
+    const extension = plugin?.fileExtensions[0] ?? '';
 
-    const downloadFilename = filename ||
-      this.sanitizeFilename(node.title || node.id || 'content') + extension;
+    const downloadFilename = filename ??
+      this.sanitizeFilename(node.title ?? node.id ?? 'content') + extension;
 
     this.downloadBlob(blob, downloadFilename);
   }
@@ -323,9 +323,9 @@ export class ContentIOService {
     }
 
     const content = await this.exportToString(node, targetFormat);
-    const extension = plugin.fileExtensions[0] || '';
-    const filename = this.sanitizeFilename(node.title || node.id || 'content') + extension;
-    const mimeType = plugin.mimeTypes[0] || 'text/plain';
+    const extension = plugin.fileExtensions[0] ?? '';
+    const filename = this.sanitizeFilename(node.title ?? node.id ?? 'content') + extension;
+    const mimeType = plugin.mimeTypes[0] ?? 'text/plain';
 
     return { content, filename, mimeType };
   }

@@ -799,7 +799,7 @@ export class PathExtensionService {
       visibility: ext.visibility,
       insertionCount: ext.insertions.length,
       annotationCount: ext.annotations.length,
-      forkCount: ext.forks?.length || 0,
+      forkCount: ext.forks?.length ?? 0,
       rating: ext.stats?.averageRating,
       updatedAt: ext.updatedAt
     };

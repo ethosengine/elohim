@@ -117,8 +117,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
    */
   private initializeSvg(): void {
     const container = this.graphContainer.nativeElement;
-    this.width = container.clientWidth || 800;
-    this.height = container.clientHeight || 600;
+    this.width = container.clientWidth ?? 800;
+    this.height = container.clientHeight ?? 600;
 
     // Clear existing
     d3.select(container).selectAll('*').remove();
@@ -168,7 +168,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .subscribe({
         next: (data) => {
           const nodes = data.nodes.map((n: any) => this.enrichNode(n));
-          const edges = data.edges || [];
+          const edges = data.edges ?? [];
 
           this.currentLevel = {
             nodes,
@@ -204,7 +204,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .subscribe({
         next: (data) => {
           const nodes = data.nodes.map((n: any) => this.enrichNode(n));
-          const edges = data.edges || [];
+          const edges = data.edges ?? [];
 
           this.currentLevel = {
             nodes,
@@ -287,7 +287,7 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       .data(edges)
       .enter()
       .append('line')
-      .attr('class', d => `link link-${(d as any).type?.toLowerCase() || 'default'}`)
+      .attr('class', d => `link link-${(d as any).type?.toLowerCase() ?? 'default'}`)
       .attr('stroke', '#475569')
       .attr('stroke-opacity', 0.6)
       .attr('stroke-width', 2)
@@ -493,6 +493,6 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       'review': 'Needs Review',
       'locked': 'Locked'
     };
-    return labels[state] || state;
+    return labels[state] ?? state;
   }
 }

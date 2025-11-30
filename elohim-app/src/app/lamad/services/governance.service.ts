@@ -154,7 +154,7 @@ export class GovernanceService {
    */
   getEffectiveStatus(entityType: string, entityId: string): Observable<string> {
     return this.getGovernanceState(entityType, entityId).pipe(
-      map(state => state?.status || 'unreviewed')
+      map(state => state?.status ?? 'unreviewed')
     );
   }
 
@@ -177,7 +177,7 @@ export class GovernanceService {
     severity: string;
   }>> {
     return this.getGovernanceState(entityType, entityId).pipe(
-      map(state => state?.labels || [])
+      map(state => state?.labels ?? [])
     );
   }
 
@@ -217,7 +217,7 @@ export class GovernanceService {
    * Get challenges filed by current user.
    */
   getMyChallenges(): Observable<ChallengeRecord[]> {
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     return this.getChallenges().pipe(
       map(challenges => challenges.filter(c => c.challenger.agentId === agentId))
     );
@@ -227,9 +227,9 @@ export class GovernanceService {
    * Submit a new challenge (MVP: saves to localStorage).
    */
   submitChallenge(submission: ChallengeSubmission): Observable<ChallengeRecord> {
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     const session = this.sessionUser.getSession();
-    const userName = session?.displayName || 'Anonymous';
+    const userName = session?.displayName ?? 'Anonymous';
 
     const challenge: ChallengeRecord = {
       id: `challenge-local-${Date.now()}`,
@@ -290,7 +290,7 @@ export class GovernanceService {
    * Get proposals I've created.
    */
   getMyProposals(): Observable<ProposalRecord[]> {
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     return this.getProposals().pipe(
       map(proposals => proposals.filter(p => p.proposer.agentId === agentId))
     );
@@ -300,9 +300,9 @@ export class GovernanceService {
    * Submit a new proposal (MVP: saves to localStorage).
    */
   submitProposal(submission: ProposalSubmission): Observable<ProposalRecord> {
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     const session = this.sessionUser.getSession();
-    const userName = session?.displayName || 'Anonymous';
+    const userName = session?.displayName ?? 'Anonymous';
 
     const proposal: ProposalRecord = {
       id: `proposal-local-${Date.now()}`,
@@ -332,7 +332,7 @@ export class GovernanceService {
    */
   voteOnProposal(vote: Vote): Observable<boolean> {
     // In MVP, we just record the vote locally
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     const key = `${this.STORAGE_PREFIX}vote-${agentId}-${vote.proposalId}`;
 
     try {
@@ -351,7 +351,7 @@ export class GovernanceService {
    * Get my vote on a proposal.
    */
   getMyVote(proposalId: string): Observable<Vote | null> {
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     const key = `${this.STORAGE_PREFIX}vote-${agentId}-${proposalId}`;
     const data = localStorage.getItem(key);
     return of(data ? JSON.parse(data) : null);
@@ -422,9 +422,9 @@ export class GovernanceService {
    * Post a message to a discussion (MVP: saves to localStorage).
    */
   postMessage(message: DiscussionMessage): Observable<boolean> {
-    const agentId = this.sessionUser.getSessionId() || 'anonymous';
+    const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
     const session = this.sessionUser.getSession();
-    const userName = session?.displayName || 'Anonymous';
+    const userName = session?.displayName ?? 'Anonymous';
 
     const newMessage = {
       id: `msg-local-${Date.now()}`,

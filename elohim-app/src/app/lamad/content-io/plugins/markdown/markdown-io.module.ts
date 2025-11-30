@@ -13,8 +13,8 @@ import { ContentIORegistryService } from '../../services/content-io-registry.ser
 })
 export class MarkdownIOModule {
   constructor(
-    private registry: ContentIORegistryService,
-    private plugin: MarkdownIOPlugin
+    private readonly registry: ContentIORegistryService,
+    private readonly plugin: MarkdownIOPlugin
   ) {
     this.registry.register(this.plugin);
   }

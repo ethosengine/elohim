@@ -219,7 +219,7 @@ export class ContentService {
   getContentWithAccessCheck(resourceId: string): Observable<ContentAccessResult> {
     return this.dataLoader.getContent(resourceId).pipe(
       map(content => {
-        const contentReach = content.reach || 'commons'; // Default to commons for legacy content
+        const contentReach = content.reach ?? 'commons'; // Default to commons for legacy content
         const agentReach = this.getAgentReachLevel();
 
         // Check if agent can access this content

@@ -191,7 +191,7 @@ export class AffinityTrackingService {
       }
 
       // By category
-      const category = (node.metadata?.['category'] as string) || 'uncategorized';
+      const category = (node.metadata?.['category'] as string) ?? 'uncategorized';
       if (!categoryMap.has(category)) {
         categoryMap.set(category, []);
       }

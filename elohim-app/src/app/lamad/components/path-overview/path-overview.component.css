@@ -47,26 +47,11 @@
   gap: 1.5rem;
 }
 
-.action-section {
-  order: -1; /* Ensure actions are at top of sidebar */
-  position: sticky;
-  top: 1rem; /* Sticky sidebar */
-  margin-bottom: 0; /* Override previous margin */
-}
-
-.concepts-section {
-  margin-bottom: 0; /* Override previous margin */
-}
-
 /* Main Content Styling */
 .overview-main {
   display: flex;
   flex-direction: column;
   gap: 2rem;
-}
-
-.progress-section {
-  margin-bottom: 0; /* Handled by gap */
 }
 
 /* Adjustments for layout */
@@ -217,8 +202,8 @@
   background: var(--lamad-bg-secondary, #f9fafb);
   padding: 1.5rem;
   border-radius: 0.5rem;
-  margin-bottom: 2rem;
   border: 1px solid var(--lamad-border, #e5e7eb);
+  margin-bottom: 0; /* Handled by gap in grid layout */
 }
 .progress-header {
   display: flex;
@@ -259,7 +244,7 @@
 
 /* Concept Mastery */
 .concepts-section {
-  margin-bottom: 2rem;
+  margin-bottom: 0; /* Handled by gap in grid layout */
 }
 
 .concepts-section h3 {
@@ -346,11 +331,14 @@
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 2.5rem;
   padding: 1.5rem;
   background: var(--lamad-surface, #ffffff);
   border: 1px solid var(--lamad-border, #e5e7eb);
   border-radius: 0.75rem;
+  order: -1; /* Ensure actions are at top of sidebar */
+  position: sticky;
+  top: 1rem; /* Sticky sidebar */
+  margin-bottom: 0; /* Handled by gap in grid layout */
 }
 .completed-message {
   display: flex;

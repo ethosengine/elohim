@@ -240,10 +240,7 @@ export type OpenGraphType =
   | 'music.song'        // Individual song
   | 'music.album'       // Music album
   | 'music.playlist'    // Playlist
-  | 'music.radio_station' // Radio station
-
-  // Custom (for domain-specific types)
-  | string;
+  | 'music.radio_station'; // Radio station
 
 /**
  * OpenGraphImage - Detailed image metadata
@@ -317,9 +314,9 @@ export function createOpenGraphMetadata(params: {
     ogImage: params.imageUrl,
     ogImageAlt: params.imageAlt,
     ogUrl: params.url,
-    ogType: params.type || 'website',
+    ogType: params.type ?? 'website',
     ogLocale: params.locale,
-    ogSiteName: params.siteName || 'Elohim Protocol',
+    ogSiteName: params.siteName ?? 'Elohim Protocol',
     articlePublishedTime: params.publishedTime,
     articleModifiedTime: params.modifiedTime,
     articleSection: params.section,

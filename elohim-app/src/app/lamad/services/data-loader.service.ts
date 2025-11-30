@@ -155,13 +155,13 @@ export class DataLoaderService {
   private readonly basePath = '/assets/lamad-data';
 
   // Caches to prevent redundant HTTP calls (shareReplay pattern)
-  private pathCache = new Map<string, Observable<LearningPath>>();
-  private contentCache = new Map<string, Observable<ContentNode>>();
+  private readonly pathCache = new Map<string, Observable<LearningPath>>();
+  private readonly contentCache = new Map<string, Observable<ContentNode>>();
   private attestationCache$: Observable<ContentAttestation[]> | null = null;
-  private attestationsByContentCache = new Map<string, ContentAttestation[]>();
+  private readonly attestationsByContentCache = new Map<string, ContentAttestation[]>();
   private graphCache$: Observable<ContentGraph> | null = null;
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   /**
    * Load a LearningPath by ID.
