@@ -304,7 +304,8 @@ export class ProfileService {
 
       case 'affinity':
         // Only create event for meaningful affinity (> 0.5)
-        if ((activity.metadata?.['value']) > 0.5) {
+        const affinityValue = activity.metadata?.['value'];
+        if (typeof affinityValue === 'number' && affinityValue > 0.5) {
           return {
             id: `${activity.type}-${resourceId}-${timestamp}`,
             type: 'meaningful_encounter' as TimelineEventType,
