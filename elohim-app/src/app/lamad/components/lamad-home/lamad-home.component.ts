@@ -35,6 +35,9 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
   featuredPath: PathIndexEntry | null = null;
   activeFocus: CurrentFocus | null = null;
 
+  /** Map of pathId to progress percentage (0-100) */
+  pathProgressMap: Map<string, number> = new Map();
+
   isLoading = true;
   error: string | null = null;
 
@@ -74,7 +77,8 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
     const tasks = isAuth
       ? [
           this.pathService.listPaths(),
-          this.profileService.getCurrentFocus().pipe(catchError(() => of([])))
+          this.profileService.getCurrentFocus().pipe(catchError(() => of([]))),
+          this.agentService.getAgentProgress().pipe(catchError(() => of([])))
         ]
       : [this.pathService.listPaths()];
 
@@ -91,6 +95,26 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
                 new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
             );
             this.activeFocus = focus[0];
+        }
+
+        // Build progress map from agent progress records
+        if (isAuth && results.length > 2 && results[2]) {
+          const progressRecords = results[2] as Array<{ pathId: string; completedStepIndices: number[]; completedAt?: string }>;
+          this.pathProgressMap.clear();
+
+          // Calculate progress for each path
+          progressRecords
+            .filter(p => p.pathId !== '__global__') // Skip global progress record
+            .forEach(progress => {
+              // Find the path to get total step count
+              const path = this.paths.find(p => p.id === progress.pathId);
+              if (path && path.stepCount > 0) {
+                const percent = progress.completedAt
+                  ? 100
+                  : Math.round((progress.completedStepIndices.length / path.stepCount) * 100);
+                this.pathProgressMap.set(progress.pathId, percent);
+              }
+            });
         }
 
         // Feature the Elohim Protocol path
@@ -169,6 +193,13 @@ export class LamadHomeComponent implements OnInit, OnDestroy {
       'advanced': 'Advanced'
     };
     return displays[difficulty] || difficulty;
+  }
+
+  /**
+   * Get progress percentage for a path (0-100, or null if no progress)
+   */
+  getPathProgress(pathId: string): number | null {
+    return this.pathProgressMap.has(pathId) ? this.pathProgressMap.get(pathId)! : null;
   }
 
   /**

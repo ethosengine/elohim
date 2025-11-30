@@ -91,7 +91,7 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: var(--lamad-text-secondary, #656d76);
+  color: var(--lamad-text-secondary, #4b5563);
   padding: 0;
   line-height: 1;
 }
@@ -113,7 +113,7 @@
 .toc-list a {
   display: block;
   padding: 0.375rem 0.5rem;
-  color: var(--lamad-text-secondary, #656d76);
+  color: var(--lamad-text-secondary, #4b5563);
   text-decoration: none;
   font-size: 0.875rem;
   border-radius: 0.25rem;
@@ -205,6 +205,8 @@
   max-width: 100%;
   padding: 0;
   margin: 0;
+  /* Ensure text color is explicitly set for embedded mode */
+  color: var(--lamad-text-primary, #1f2328);
 }
 
 /* Explicitly force TOC toggle and sidebar as overlay in embedded mode */
@@ -235,15 +237,15 @@
 }
 
 /* =============================================================================
-   Typography - GitHub Style
+   Typography - GitHub Style (::ng-deep for innerHTML content)
    ============================================================================= */
 
-.markdown-content h1,
-.markdown-content h2,
-.markdown-content h3,
-.markdown-content h4,
-.markdown-content h5,
-.markdown-content h6 {
+:host ::ng-deep .markdown-content h1,
+:host ::ng-deep .markdown-content h2,
+:host ::ng-deep .markdown-content h3,
+:host ::ng-deep .markdown-content h4,
+:host ::ng-deep .markdown-content h5,
+:host ::ng-deep .markdown-content h6 {
   margin-top: 1.5em; /* 24px */
   margin-bottom: 16px;
   font-weight: 600;
@@ -251,48 +253,53 @@
   color: var(--lamad-text-primary, #1f2328);
 }
 
-.markdown-content h1 {
+:host ::ng-deep .markdown-content .heading-anchor {
+  color: var(--lamad-text-primary, #1f2328);
+}
+
+:host ::ng-deep .markdown-content h1 {
   font-size: 2em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--lamad-border, #d0d7de);
   margin-top: 0; /* No top margin for first header */
 }
 
-.markdown-content h2 {
+:host ::ng-deep .markdown-content h2 {
   font-size: 1.5em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--lamad-border, #d0d7de);
 }
 
-.markdown-content h3 {
+:host ::ng-deep .markdown-content h3 {
   font-size: 1.25em;
 }
 
-.markdown-content h4 {
+:host ::ng-deep .markdown-content h4 {
   font-size: 1em;
 }
 
-.markdown-content h5 {
+:host ::ng-deep .markdown-content h5 {
   font-size: 0.875em;
 }
 
-.markdown-content h6 {
+:host ::ng-deep .markdown-content h6 {
   font-size: 0.85em;
-  color: var(--lamad-text-secondary, #656d76);
+  color: var(--lamad-text-secondary, #4b5563);
 }
 
-.markdown-content p {
+:host ::ng-deep .markdown-content p {
   margin-top: 0;
   margin-bottom: 16px;
+  color: var(--lamad-text-primary, #1f2328);
 }
 
-.markdown-content a {
+:host ::ng-deep .markdown-content a {
   color: var(--lamad-accent-primary, #0969da);
   text-decoration: none;
   background-color: transparent;
 }
 
-.markdown-content a:hover {
+:host ::ng-deep .markdown-content a:hover {
   text-decoration: underline;
 }
 
@@ -300,12 +307,12 @@
    Heading Anchors
    ============================================================================= */
 
-.heading-anchor {
+:host ::ng-deep .markdown-content .heading-anchor {
   position: relative;
   scroll-margin-top: 2rem;
 }
 
-.heading-anchor .anchor-link {
+:host ::ng-deep .markdown-content .heading-anchor .anchor-link {
   position: absolute;
   left: -1.25em;
   opacity: 0;
@@ -317,11 +324,11 @@
   transition: opacity 0.15s ease;
 }
 
-.heading-anchor:hover .anchor-link {
+:host ::ng-deep .markdown-content .heading-anchor:hover .anchor-link {
   opacity: 1;
 }
 
-.heading-anchor .anchor-link:hover {
+:host ::ng-deep .markdown-content .heading-anchor .anchor-link:hover {
   color: var(--lamad-accent-primary, #0969da);
   text-decoration: none;
 }
@@ -330,28 +337,30 @@
    Lists
    ============================================================================= */
 
-.markdown-content ul,
-.markdown-content ol {
+:host ::ng-deep .markdown-content ul,
+:host ::ng-deep .markdown-content ol {
   margin-top: 0;
   margin-bottom: 16px;
   padding-left: 2em;
+  color: var(--lamad-text-primary, #1f2328);
 }
 
-.markdown-content li {
+:host ::ng-deep .markdown-content li {
   word-wrap: break-word;
+  color: var(--lamad-text-primary, #1f2328);
 }
 
 /* Spacing between list items if they contain blocks */
-.markdown-content li + li {
+:host ::ng-deep .markdown-content li + li {
   margin-top: 0.25em;
 }
 
-.markdown-content li > p {
+:host ::ng-deep .markdown-content li > p {
   margin-top: 0.5em;
 }
 
-.markdown-content li > ul,
-.markdown-content li > ol {
+:host ::ng-deep .markdown-content li > ul,
+:host ::ng-deep .markdown-content li > ol {
   margin-top: 0.25em;
   margin-bottom: 0;
 }
@@ -360,18 +369,18 @@
    Blockquotes
    ============================================================================= */
 
-.markdown-content blockquote {
+:host ::ng-deep .markdown-content blockquote {
   padding: 0 1em;
-  color: var(--lamad-text-secondary, #656d76);
+  color: var(--lamad-text-secondary, #4b5563);
   border-left: 0.25em solid var(--lamad-border, #d0d7de);
   margin: 0 0 16px 0;
 }
 
-.markdown-content blockquote > :first-child {
+:host ::ng-deep .markdown-content blockquote > :first-child {
   margin-top: 0;
 }
 
-.markdown-content blockquote > :last-child {
+:host ::ng-deep .markdown-content blockquote > :last-child {
   margin-bottom: 0;
 }
 
@@ -380,14 +389,14 @@
    ============================================================================= */
 
 /* Inline code */
-.markdown-content code,
-.markdown-content kbd,
-.markdown-content samp {
+:host ::ng-deep .markdown-content code,
+:host ::ng-deep .markdown-content kbd,
+:host ::ng-deep .markdown-content samp {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 85%;
 }
 
-.markdown-content :not(pre) > code {
+:host ::ng-deep .markdown-content :not(pre) > code {
   padding: 0.2em 0.4em;
   margin: 0;
   font-size: 85%;
@@ -398,18 +407,18 @@
 }
 
 /* Code blocks */
-.markdown-content pre {
+:host ::ng-deep .markdown-content pre {
   padding: 16px;
   overflow: auto;
   font-size: 85%;
   line-height: 1.45;
-  background-color: #f6f8fa;
+  background-color: #1e293b; /* Dark slate for contrast */
   border-radius: 6px;
   margin-top: 0;
   margin-bottom: 16px;
 }
 
-.markdown-content pre code {
+:host ::ng-deep .markdown-content pre code {
   display: inline;
   max-width: auto;
   padding: 0;
@@ -419,50 +428,41 @@
   word-wrap: normal;
   background-color: transparent;
   border: 0;
-  color: inherit;
+  color: #e2e8f0;
   font-size: 100%;
   white-space: pre;
-}
-
-/* Dark mode code blocks (since we use highlight.js normally) */
-.markdown-content pre {
-    background-color: #1e293b; /* Dark slate for contrast */
-}
-
-.markdown-content pre code {
-    color: #e2e8f0;
 }
 
 /* =============================================================================
    Tables
    ============================================================================= */
 
-.markdown-content table {
+:host ::ng-deep .markdown-content table {
   border-spacing: 0;
   border-collapse: collapse;
   margin-top: 0;
   margin-bottom: 16px;
   width: 100%;
-  overflow: block; /* For responsive scrolling wrapper */
+  overflow: auto;
 }
 
-.markdown-content th,
-.markdown-content td {
+:host ::ng-deep .markdown-content th,
+:host ::ng-deep .markdown-content td {
   padding: 6px 13px;
   border: 1px solid var(--lamad-border, #d0d7de);
 }
 
-.markdown-content th {
+:host ::ng-deep .markdown-content th {
   font-weight: 600;
   background-color: var(--lamad-bg-secondary, #f6f8fa);
 }
 
-.markdown-content tr {
+:host ::ng-deep .markdown-content tr {
   background-color: var(--lamad-bg-primary, #ffffff);
   border-top: 1px solid var(--lamad-border, #d0d7de);
 }
 
-.markdown-content tr:nth-child(2n) {
+:host ::ng-deep .markdown-content tr:nth-child(2n) {
   background-color: var(--lamad-bg-secondary, #f6f8fa);
 }
 
@@ -470,7 +470,7 @@
    Horizontal Rules
    ============================================================================= */
 
-.markdown-content hr {
+:host ::ng-deep .markdown-content hr {
   height: 0.25em;
   padding: 0;
   margin: 24px 0;
@@ -482,7 +482,7 @@
    Images
    ============================================================================= */
 
-.markdown-content img {
+:host ::ng-deep .markdown-content img {
   max-width: 100%;
   box-sizing: content-box;
   background-color: var(--lamad-bg-primary, #ffffff);
@@ -527,21 +527,21 @@
     background: var(--lamad-bg-primary, #0d1117);
     border-color: #30363d;
   }
-  
+
   .toc-header {
     color: #e6edf3;
     border-bottom-color: #30363d;
   }
-  
+
   .toc-list a {
     color: #e6edf3;
   }
-  
+
   .toc-list a:hover {
     color: #58a6ff;
     background: #161b22;
   }
-  
+
   .toc-active a {
     color: #58a6ff;
     background: rgba(56, 139, 253, 0.15);
@@ -551,55 +551,58 @@
   .markdown-content {
     color: #e6edf3;
   }
-  
-  .markdown-content h1,
-  .markdown-content h2,
-  .markdown-content h3,
-  .markdown-content h4,
-  .markdown-content h5,
-  .markdown-content h6 {
-    color: #e6edf3;
-    border-bottom-color: #21262d;
-  }
-  
-  .markdown-content a {
-    color: #4493f8;
-  }
-
-  .markdown-content blockquote {
-    color: #8b949e;
-    border-left-color: #30363d;
-  }
-  
-  .markdown-content :not(pre) > code {
-    background-color: rgba(110, 118, 129, 0.4);
-    color: #e6edf3;
-  }
-  
-  .markdown-content table th,
-  .markdown-content table td {
-    border-color: #30363d;
-  }
-  
-  .markdown-content table th {
-    background-color: #161b22;
-  }
-  
-  .markdown-content table tr {
-    background-color: #0d1117;
-  }
-  
-  .markdown-content table tr:nth-child(2n) {
-    background-color: #161b22;
-  }
-  
-  .markdown-content hr {
-    background-color: #30363d;
-  }
 
   .back-to-top {
     background: #21262d;
     border-color: #30363d;
     color: #c9d1d9;
+  }
+}
+
+/* Dark mode for innerHTML content (::ng-deep) */
+@media (prefers-color-scheme: dark) {
+  :host ::ng-deep .markdown-content h1,
+  :host ::ng-deep .markdown-content h2,
+  :host ::ng-deep .markdown-content h3,
+  :host ::ng-deep .markdown-content h4,
+  :host ::ng-deep .markdown-content h5,
+  :host ::ng-deep .markdown-content h6,
+  :host ::ng-deep .markdown-content .heading-anchor {
+    border-bottom-color: #21262d;
+  }
+
+  :host ::ng-deep .markdown-content a {
+    color: #4493f8;
+  }
+
+  :host ::ng-deep .markdown-content blockquote {
+    color: #8b949e;
+    border-left-color: #30363d;
+  }
+
+  :host ::ng-deep .markdown-content :not(pre) > code {
+    background-color: rgba(110, 118, 129, 0.4);
+    color: #e6edf3;
+  }
+
+  :host ::ng-deep .markdown-content table th,
+  :host ::ng-deep .markdown-content table td {
+    border-color: #30363d;
+  }
+
+  :host ::ng-deep .markdown-content table th {
+    background-color: #161b22;
+  }
+
+  :host ::ng-deep .markdown-content table tr {
+    background-color: #0d1117;
+  }
+
+  :host ::ng-deep .markdown-content table tr:nth-child(2n) {
+    background-color: #161b22;
+  }
+
+  :host ::ng-deep .markdown-content hr {
+    background-color: #30363d;
   }
 }

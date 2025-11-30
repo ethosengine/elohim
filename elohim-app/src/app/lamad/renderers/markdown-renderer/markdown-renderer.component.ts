@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild, OnDestroy, ViewEncapsulation } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, AfterViewInit, ElementRef, ViewChild, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Marked } from 'marked';
@@ -77,8 +77,7 @@ export interface TocEntry {
       </button>
     </div>
   `,
-  styleUrls: ['./markdown-renderer.component.css'],
-  encapsulation: ViewEncapsulation.None
+  styleUrls: ['./markdown-renderer.component.css']
 })
 export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input() node!: ContentNode;

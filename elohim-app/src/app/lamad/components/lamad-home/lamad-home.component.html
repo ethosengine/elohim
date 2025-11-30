@@ -116,7 +116,12 @@
                 </div>
               }
               <div class="path-content">
-                <h3 class="path-title">{{ path.title }}</h3>
+                <div class="path-header">
+                  <h3 class="path-title">{{ path.title }}</h3>
+                  @if (getPathProgress(path.id) !== null) {
+                    <span class="path-progress-text">{{ getPathProgress(path.id) }}%</span>
+                  }
+                </div>
                 <p class="path-description">{{ path.description }}</p>
 
                 <div class="path-meta">

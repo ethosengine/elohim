@@ -315,14 +315,6 @@ describe('PathNavigatorComponent', () => {
     expect(component.isGherkin()).toBe(true);
   });
 
-  it('should return content unchanged from renderMarkdown shim', () => {
-    const markdown = '# Header 1\n## Header 2\n### Header 3';
-    const result = component.renderMarkdown(markdown);
-
-    // renderMarkdown is now a shim that returns content unchanged
-    expect(result).toBe(markdown);
-  });
-
   it('should get Bloom display formatted', () => {
     component.currentBloomLevel = 'not_started';
     expect(component.getBloomDisplay()).toBe('NOT STARTED');
