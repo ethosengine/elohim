@@ -520,69 +520,34 @@
 
 /* =============================================================================
    Dark Mode Support
+
+   NOTE: Avoid hard-coding colors in prefers-color-scheme media queries.
+   Let CSS variables handle theming so manual theme toggle works correctly.
+   Only use media queries for non-variable properties like border-color.
+   See claude.md "Lessons Learned" for details.
    ============================================================================= */
 
 @media (prefers-color-scheme: dark) {
   .toc-sidebar {
-    background: var(--lamad-bg-primary, #0d1117);
     border-color: #30363d;
   }
 
   .toc-header {
-    color: #e6edf3;
     border-bottom-color: #30363d;
   }
 
-  .toc-list a {
-    color: #e6edf3;
-  }
-
-  .toc-list a:hover {
-    color: #58a6ff;
-    background: #161b22;
-  }
-
-  .toc-active a {
-    color: #58a6ff;
-    background: rgba(56, 139, 253, 0.15);
-  }
-
-  /* Content */
-  .markdown-content {
-    color: #e6edf3;
-  }
-
-  .back-to-top {
-    background: #21262d;
-    border-color: #30363d;
-    color: #c9d1d9;
-  }
+  /* Non-color properties only - let CSS variables handle colors */
 }
 
-/* Dark mode for innerHTML content (::ng-deep) */
+/* Dark mode for innerHTML content (::ng-deep) - border colors only */
 @media (prefers-color-scheme: dark) {
   :host ::ng-deep .markdown-content h1,
-  :host ::ng-deep .markdown-content h2,
-  :host ::ng-deep .markdown-content h3,
-  :host ::ng-deep .markdown-content h4,
-  :host ::ng-deep .markdown-content h5,
-  :host ::ng-deep .markdown-content h6,
-  :host ::ng-deep .markdown-content .heading-anchor {
+  :host ::ng-deep .markdown-content h2 {
     border-bottom-color: #21262d;
   }
 
-  :host ::ng-deep .markdown-content a {
-    color: #4493f8;
-  }
-
   :host ::ng-deep .markdown-content blockquote {
-    color: #8b949e;
     border-left-color: #30363d;
-  }
-
-  :host ::ng-deep .markdown-content :not(pre) > code {
-    background-color: rgba(110, 118, 129, 0.4);
-    color: #e6edf3;
   }
 
   :host ::ng-deep .markdown-content table th,
@@ -590,19 +555,9 @@
     border-color: #30363d;
   }
 
-  :host ::ng-deep .markdown-content table th {
-    background-color: #161b22;
-  }
-
-  :host ::ng-deep .markdown-content table tr {
-    background-color: #0d1117;
-  }
-
-  :host ::ng-deep .markdown-content table tr:nth-child(2n) {
-    background-color: #161b22;
-  }
-
   :host ::ng-deep .markdown-content hr {
     background-color: #30363d;
   }
+
+  /* Note: Colors handled by CSS variables, only border/separator colors here */
 }
