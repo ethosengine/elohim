@@ -5,6 +5,11 @@
     <span class="icon">{{ sidebarOpen ? '✕' : '☰' }}</span>
   </button>
 
+  <!-- Mobile Sidebar Backdrop - click to dismiss -->
+  @if (sidebarOpen) {
+    <div class="sidebar-backdrop" (click)="toggleSidebar()"></div>
+  }
+
   <!-- PATH TOOLING: Sidebar -->
   <aside class="path-sidebar">
     <div class="sidebar-header">

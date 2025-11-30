@@ -609,6 +609,19 @@
   color: var(--lamad-text-primary, #374151);
 }
 
+/* Mobile sidebar backdrop - click to dismiss */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 15;
+  cursor: pointer;
+}
+
 /* Desktop collapse button (inside sidebar) */
 .sidebar-collapse-btn {
   display: flex;
@@ -691,6 +704,11 @@
   /* Use mobile toggle instead */
   .sidebar-toggle {
     display: flex;
+  }
+
+  /* Show backdrop when sidebar is open on mobile/tablet */
+  .sidebar-backdrop {
+    display: block;
   }
 
   .path-player-container.sidebar-collapsed .path-sidebar {
