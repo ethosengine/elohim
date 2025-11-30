@@ -74,7 +74,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   // UI state
   isLoading = true;
   error: string | null = null;
-  sidebarOpen = false; // Default closed on mobile, toggled by user
+  sidebarOpen = true; // Default open, click backdrop to dismiss on mobile
 
   // Dynamic renderer hosting
   @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
