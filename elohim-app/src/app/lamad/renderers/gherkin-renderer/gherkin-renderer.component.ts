@@ -342,7 +342,8 @@ export class GherkinRendererComponent implements OnChanges {
         }
 
         // Steps
-        const stepMatch = trimmed.match(/^(Given|When|Then|And|But|\*)\s+(.+)$/);
+        const stepRegex = /^(Given|When|Then|And|But|\*)\s+(.+)$/;
+        const stepMatch = stepRegex.exec(trimmed);
         if (stepMatch && currentScenario) {
           currentScenario.steps.push({
             keyword: stepMatch[1] + ' ',
@@ -367,7 +368,6 @@ export class GherkinRendererComponent implements OnChanges {
             }
             lastStep.dataTable.push(cells);
           }
-          continue;
         }
       }
 

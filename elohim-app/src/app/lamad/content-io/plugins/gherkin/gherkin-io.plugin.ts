@@ -101,7 +101,7 @@ export class GherkinIOPlugin implements ContentIOPlugin {
     }
 
     // Check for at least one scenario
-    const scenarioCount = (content.match(/^\s*(Scenario|Scenario Outline):/gm) || []).length;
+    const scenarioCount = (content.match(/^\s*(Scenario|Scenario Outline):/gm) ?? []).length;
     if (scenarioCount === 0) {
       warnings.push({
         code: 'NO_SCENARIOS',
@@ -138,9 +138,9 @@ export class GherkinIOPlugin implements ContentIOPlugin {
     // Calculate stats
     const stats = {
       scenarioCount,
-      stepCount: (content.match(/^\s*(Given|When|Then|And|But)\s+/gm) || []).length,
+      stepCount: (content.match(/^\s*(Given|When|Then|And|But)\s+/gm) ?? []).length,
       lineCount: content.split('\n').length,
-      tagCount: (content.match(/@[\w-]+/g) || []).length
+      tagCount: (content.match(/@[\w-]+/g) ?? []).length
     };
 
     return {
@@ -215,7 +215,7 @@ export class GherkinIOPlugin implements ContentIOPlugin {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
+      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read file'));
       reader.readAsText(file);
     });
   }

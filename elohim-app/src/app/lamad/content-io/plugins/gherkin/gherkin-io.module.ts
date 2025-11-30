@@ -13,8 +13,8 @@ import { ContentIORegistryService } from '../../services/content-io-registry.ser
 })
 export class GherkinIOModule {
   constructor(
-    private registry: ContentIORegistryService,
-    private plugin: GherkinIOPlugin
+    private readonly registry: ContentIORegistryService,
+    private readonly plugin: GherkinIOPlugin
   ) {
     this.registry.register(this.plugin);
   }

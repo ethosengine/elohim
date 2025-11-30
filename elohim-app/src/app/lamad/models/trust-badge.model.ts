@@ -256,7 +256,7 @@ export interface TrustIndicatorSet {
  */
 export function badgeToIndicator(badge: BadgeDisplay, priority: number): TrustIndicator {
   return {
-    id: `badge-${badge.attestationType || badge.type}`,
+    id: `badge-${badge.attestationType ?? badge.type}`,
     polarity: 'positive',
     priority,
     icon: badge.icon,
@@ -266,11 +266,11 @@ export function badgeToIndicator(badge: BadgeDisplay, priority: number): TrustIn
     verified: badge.verified,
     source: {
       type: 'attestation',
-      id: badge.attestationType || badge.type,
+      id: badge.attestationType ?? badge.type,
       name: badge.grantedBy
     },
-    timestamp: badge.grantedAt || new Date().toISOString(),
-    sourceType: badge.attestationType || 'author-verified'
+    timestamp: badge.grantedAt ?? new Date().toISOString(),
+    sourceType: badge.attestationType ?? 'author-verified'
   };
 }
 
@@ -290,7 +290,7 @@ export function warningToIndicator(warning: BadgeWarning): TrustIndicator {
   return {
     id: `flag-${warning.type}`,
     polarity: 'negative',
-    priority: priorityMap[warning.type] || 50,
+    priority: priorityMap[warning.type] ?? 50,
     icon: warning.icon,
     label: warning.label,
     description: warning.description,

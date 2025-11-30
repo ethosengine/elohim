@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, forkJoin } from 'rxjs';
-import { map, switchMap, catchError } from 'rxjs/operators';
+import { map, catchError } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 import { ContentService } from './content.service';
 import { AgentService } from './agent.service';
@@ -195,7 +195,7 @@ export class TrustBadgeService {
       const badge: BadgeDisplay = {
         ...config,
         attestationType: att.attestationType,
-        grantedBy: att.grantedBy.grantorName || att.grantedBy.grantorId,
+        grantedBy: att.grantedBy.grantorName ?? att.grantedBy.grantorId,
         grantedAt: att.grantedAt
       };
       return badgeToIndicator(badge, ATTESTATION_PRIORITY[att.attestationType]);
@@ -332,7 +332,7 @@ export class TrustBadgeService {
         return {
           ...config,
           attestationType: type,
-          grantedBy: attestation.grantedBy.grantorName || attestation.grantedBy.grantorId,
+          grantedBy: attestation.grantedBy.grantorName ?? attestation.grantedBy.grantorId,
           grantedAt: attestation.grantedAt
         };
       }
@@ -383,7 +383,7 @@ export class TrustBadgeService {
       secondary.push({
         ...config,
         attestationType: attestation.attestationType,
-        grantedBy: attestation.grantedBy.grantorName || attestation.grantedBy.grantorId,
+        grantedBy: attestation.grantedBy.grantorName ?? attestation.grantedBy.grantorId,
         grantedAt: attestation.grantedAt
       });
     }
@@ -430,7 +430,7 @@ export class TrustBadgeService {
     let earnedWeight = 0;
 
     for (const attestation of attestations) {
-      earnedWeight += weights[attestation.attestationType] || 0;
+      earnedWeight += weights[attestation.attestationType] ?? 0;
     }
 
     // Cap at 1.0

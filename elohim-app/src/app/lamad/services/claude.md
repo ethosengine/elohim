@@ -280,3 +280,70 @@ Services need unit tests. Priority order:
 4. TrustBadgeService (indicator computation)
 5. ContentService (access control)
 6. ExplorationService (rate limiting)
+
+---
+
+## Code Quality & SonarQube Compliance
+
+Services were audited for SonarQube compliance (368 issues fixed). Follow these patterns:
+
+### Nullish Coalescing (`??` vs `||`)
+```typescript
+// WRONG: || treats empty string/0/false as falsy
+const agentId = this.sessionUser.getSessionId() || 'anonymous';
+
+// CORRECT: ?? only checks null/undefined
+const agentId = this.sessionUser.getSessionId() ?? 'anonymous';
+```
+
+### Readonly Constructor Dependencies
+```typescript
+// WRONG: Missing readonly
+constructor(
+  private dataLoader: DataLoaderService,
+  private sessionUser: SessionUserService
+) {}
+
+// CORRECT: All injected dependencies should be readonly
+constructor(
+  private readonly dataLoader: DataLoaderService,
+  private readonly sessionUser: SessionUserService
+) {}
+```
+
+### Clean Imports
+```typescript
+// WRONG: Unused imports
+import { Observable, of, forkJoin } from 'rxjs';  // forkJoin unused
+
+// CORRECT: Only import what's used
+import { Observable, of } from 'rxjs';
+```
+
+### Avoid Deprecated Methods
+```typescript
+// WRONG: .substr() is deprecated
+const ext = filename.substr(filename.lastIndexOf('.'));
+
+// CORRECT: Use .substring()
+const ext = filename.substring(filename.lastIndexOf('.'));
+```
+
+### Empty Catch Blocks
+```typescript
+// WRONG: Silent failure
+try {
+  localStorage.setItem(key, data);
+} catch {
+  // Empty catch
+}
+
+// CORRECT: Log errors in MVP, handle properly in production
+try {
+  localStorage.setItem(key, data);
+} catch (err) {
+  console.error('[ServiceName] Failed to save data', err);
+}
+```
+
+**Full documentation**: See `common_mistakes.md` Section 10 for comprehensive SonarQube patterns and rule reference.

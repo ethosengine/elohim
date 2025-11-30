@@ -41,7 +41,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
     // Verify data is loadable by fetching the content index
     this.dataLoader.getContentIndex().pipe(takeUntil(this.destroy$)).subscribe({
       next: (index) => {
-        console.log('Lamad data ready:', index.nodes?.length || 0, 'content nodes');
+        console.log('Lamad data ready:', index.nodes?.length ?? 0, 'content nodes');
         this.isReady = true;
       },
       error: (err: Error) => {
@@ -97,7 +97,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
    * Get display name for session human.
    */
   getDisplayName(): string {
-    return this.session?.displayName || 'Traveler';
+    return this.session?.displayName ?? 'Traveler';
   }
 
   /**

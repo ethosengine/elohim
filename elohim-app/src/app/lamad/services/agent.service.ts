@@ -26,7 +26,7 @@ import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../models
 @Injectable({ providedIn: 'root' })
 export class AgentService {
   private agentSubject = new BehaviorSubject<Agent | null>(null);
-  agent$ = this.agentSubject.asObservable();
+  readonly agent$ = this.agentSubject.asObservable();
 
   // Progress cache (keyed by pathId)
   private progressCache = new Map<string, AgentProgress>();
@@ -125,7 +125,7 @@ export class AgentService {
     if (this.sessionHumanService) {
       return this.sessionHumanService.getSessionId();
     }
-    return this.agentSubject.value?.id || 'anonymous';
+    return this.agentSubject.value?.id ?? 'anonymous';
   }
 
   /**
@@ -264,7 +264,7 @@ export class AgentService {
           return of(undefined);
         }
 
-        const current = existingProgress.stepAffinity[stepIndex] || 0;
+        const current = existingProgress.stepAffinity[stepIndex] ?? 0;
         existingProgress.stepAffinity[stepIndex] = Math.max(0, Math.min(1, current + delta));
         existingProgress.lastActivityAt = new Date().toISOString();
 
@@ -539,7 +539,7 @@ export class AgentService {
         // Basic counts
         const totalPathsStarted = pathProgress.length;
         const totalPathsCompleted = pathProgress.filter(p => p.completedAt).length;
-        const totalContentNodesCompleted = globalProgress?.completedContentIds?.length || 0;
+        const totalContentNodesCompleted = globalProgress?.completedContentIds?.length ?? 0;
         const totalStepsCompleted = pathProgress.reduce(
           (sum, p) => sum + p.completedStepIndices.length,
           0

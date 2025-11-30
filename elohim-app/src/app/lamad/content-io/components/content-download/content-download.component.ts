@@ -68,8 +68,8 @@ export class ContentDownloadComponent {
   downloading = false;
 
   constructor(
-    private contentIO: ContentIOService,
-    private registry: ContentIORegistryService
+    private readonly contentIO: ContentIOService,
+    private readonly registry: ContentIORegistryService
   ) {}
 
   /**

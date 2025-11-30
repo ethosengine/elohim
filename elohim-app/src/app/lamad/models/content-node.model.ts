@@ -522,5 +522,4 @@ export interface ContentGraphMetadata {
   version: string;
 }
 
-// Alias for backward compatibility
 export type { ContentGraphMetadata as GraphMetadata };

@@ -49,7 +49,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     combineLatest([
       this.dataLoader.getContentIndex().pipe(
-        map(index => index.nodes || [])
+        map(index => index.nodes ?? [])
       ),
       this.affinityService.affinity$,
     ])
@@ -152,7 +152,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       deployment: 'Deployment & CI/CD',
       uncategorized: 'Other',
     };
-    return displayNames[category] || category;
+    return displayNames[category] ?? category;
   }
 
   /**
@@ -165,7 +165,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       deployment: '🚀',
       uncategorized: '📄',
     };
-    return icons[category] || '📦';
+    return icons[category] ?? '📦';
   }
 
   /**
@@ -211,7 +211,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       feature: 'Feature',
       scenario: 'Scenario',
     };
-    return displays[contentType] || contentType;
+    return displays[contentType] ?? contentType;
   }
 
   /**
@@ -223,6 +223,6 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       feature: '⚙️',
       scenario: '✓',
     };
-    return icons[contentType] || '•';
+    return icons[contentType] ?? '•';
   }
 }

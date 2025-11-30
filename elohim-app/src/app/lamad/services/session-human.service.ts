@@ -134,7 +134,7 @@ export class SessionHumanService {
    * Get the current session ID.
    */
   getSessionId(): string {
-    return this.sessionSubject.value?.sessionId || '';
+    return this.sessionSubject.value?.sessionId ?? '';
   }
 
   /**
@@ -150,7 +150,7 @@ export class SessionHumanService {
   setDisplayName(name: string): void {
     const session = this.sessionSubject.value;
     if (session) {
-      session.displayName = name.trim() || 'Traveler';
+      session.displayName = name.trim() ?? 'Traveler';
       session.lastActiveAt = new Date().toISOString();
       this.saveSession(session);
       this.sessionSubject.next({ ...session });
@@ -598,7 +598,7 @@ export class SessionHumanService {
       const stored = localStorage.getItem(affinityKey);
       if (stored) {
         const parsed = JSON.parse(stored);
-        affinity = parsed.affinity || {};
+        affinity = parsed.affinity ?? {};
       }
     } catch {
       // Ignore

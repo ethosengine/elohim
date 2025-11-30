@@ -72,7 +72,7 @@ export class GherkinParser {
 
     const feature: FeatureNode = {
       id: featureId,
-      contentType: 'feature' as ContentType,
+      contentType: 'feature',
       title: featureTitle,
       description: descriptionLines.join(' '),
       tags,
@@ -189,7 +189,7 @@ export class GherkinParser {
 
     return {
       id: scenarioId,
-      contentType: 'scenario' as ContentType,
+      contentType: 'scenario',
       title: scenarioTitle,
       description: scenarioTitle,
       tags: scenarioTags.concat(featureTags),

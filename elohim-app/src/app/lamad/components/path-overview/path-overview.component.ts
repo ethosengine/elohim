@@ -191,7 +191,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       return 0;
     }
     const maxCompleted = Math.max(...this.progress.completedStepIndices);
-    return Math.min(maxCompleted + 1, (this.path?.steps.length || 1) - 1);
+    return Math.min(maxCompleted + 1, (this.path?.steps.length ?? 1) - 1);
   }
 
   /**
@@ -279,6 +279,6 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       'intermediate': 'Intermediate',
       'advanced': 'Advanced'
     };
-    return displays[this.path?.difficulty || ''] || this.path?.difficulty || '';
+    return displays[this.path?.difficulty ?? ''] ?? this.path?.difficulty ?? '';
   }
 }
