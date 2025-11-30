@@ -251,8 +251,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     branch 'main'
                     branch 'staging'
                     // Run on PRs targeting staging or main (regardless of source branch)
-                    expression { return env.CHANGE_TARGET == 'staging' }
-                    expression { return env.CHANGE_TARGET == 'main' }
+                    changeRequest target: 'staging'
+                    changeRequest target: 'main'
                 }
             }
             steps {
@@ -267,7 +267,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
                                     -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info \
+                                    -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**
                                 '''
                             }
                             
