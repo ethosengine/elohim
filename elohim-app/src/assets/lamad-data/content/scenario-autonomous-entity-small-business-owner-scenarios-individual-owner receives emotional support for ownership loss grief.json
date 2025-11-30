@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-individual-owner receives emotional support for ownership loss grief",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:individual-owner receives emotional support for ownership loss grief",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Owner receives emotional support for ownership loss grief",
   "description": "Owner receives emotional support for ownership loss grief",
   "content": "Scenario: Owner receives emotional support for ownership loss grief\n    Given letting go of business is genuine grief and identity crisis\n    And capitalist culture offers no support for this transition\n    When EAE provides transition support\n    Then Rosa accesses peer support groups with other converted owners\n    And Rosa receives therapy for processing ownership loss\n    And Rosa's emotional reality is validated and supported\n    And transition support recognizes this as major life change requiring care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Owner receives emotional support for ownership loss grief",
+    "ogDescription": "Owner receives emotional support for ownership loss grief",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-individual-owner receives emotional support for ownership loss grief",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Owner receives emotional support for ownership loss grief - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-individual-owner receives emotional support for ownership loss grief",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:individual-owner receives emotional support for ownership loss grief",
+    "name": "Owner receives emotional support for ownership loss grief",
+    "description": "Owner receives emotional support for ownership loss grief",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

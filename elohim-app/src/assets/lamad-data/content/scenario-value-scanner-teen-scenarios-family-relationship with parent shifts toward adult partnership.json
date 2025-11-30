@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-family-relationship with parent shifts toward adult partnership",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:family-relationship with parent shifts toward adult partnership",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Relationship with parent shifts toward adult partnership",
   "description": "Relationship with parent shifts toward adult partnership",
   "content": "Scenario: Relationship with parent shifts toward adult partnership\n    Given Jasmine has demonstrated substantial capability\n    And she contributes meaningfully to household functioning\n    When parent Maya interacts with Jasmine through the care economy\n    Then the family_elohim should reflect their evolving relationship\n    And Maya should receive prompts that honor Jasmine's growing autonomy\n    And support Maya in trusting Jasmine's judgment\n    And recognize when Jasmine needs support versus when she's capable\n    And facilitate the gradual transition from parent-child to adult-adult relationship\n    And help Maya learn to be available for support without controlling\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Relationship with parent shifts toward adult partnership",
+    "ogDescription": "Relationship with parent shifts toward adult partnership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-family-relationship with parent shifts toward adult partnership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Relationship with parent shifts toward adult partnership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-family-relationship with parent shifts toward adult partnership",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:family-relationship with parent shifts toward adult partnership",
+    "name": "Relationship with parent shifts toward adult partnership",
+    "description": "Relationship with parent shifts toward adult partnership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

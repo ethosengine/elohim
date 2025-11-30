@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-coordinating family participation in children's lives during instability",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-coordinating family participation in children's lives during instability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating family participation in children's lives during instability",
   "description": "Coordinating family participation in children's lives during instability",
   "content": "Scenario: Coordinating family participation in children's lives during instability\n    Given my children's lives are disrupted by housing changes and crisis\n    And extended family wants to support children's stability\n    When I organize family involvement in children's education, activities, care\n    Then the family_elohim coordinates family practical support\n    And helps family members contribute according to their capacity\n    And maintains my oversight of all family involvement with children\n    And ensures family help is consistent with my parenting values\n    And tracks family contributions with care token recognition\n    And my personal_agent facilitates communication without overwhelming me\n    And recognizes coordination of family help as substantial organizational labor\n    And validates that family participation strengthens children's support network\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating family participation in children's lives during instability",
+    "ogDescription": "Coordinating family participation in children's lives during instability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-coordinating family participation in children's lives during instability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating family participation in children's lives during instability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-coordinating family participation in children's lives during instability",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-coordinating family participation in children's lives during instability",
+    "name": "Coordinating family participation in children's lives during instability",
+    "description": "Coordinating family participation in children's lives during instability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

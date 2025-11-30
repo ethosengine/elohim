@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-individual-personal financial management integrated with care economy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-personal financial management integrated with care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal financial management integrated with care economy",
   "description": "Personal financial management integrated with care economy",
   "content": "Scenario: Personal financial management integrated with care economy\n    Given Sarah manages household finances on $65k/year combined income\n    And budgeting is complex across multiple care contexts\n    When Sarah makes purchasing decisions\n    Then her personal_agent should track budget in real-time\n    And it should integrate financial constraints with nutritional needs, developmental appropriateness, family values\n    And it should help Sarah make informed trade-offs\n    And financial tools should serve care economy goals, not just spending tracking\n    And budget management should feel supportive, not restrictive\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal financial management integrated with care economy",
+    "ogDescription": "Personal financial management integrated with care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-personal financial management integrated with care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal financial management integrated with care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-personal financial management integrated with care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-personal financial management integrated with care economy",
+    "name": "Personal financial management integrated with care economy",
+    "description": "Personal financial management integrated with care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

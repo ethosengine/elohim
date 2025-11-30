@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-municipality-council member surfaces constituent intelligence at scale",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member surfaces constituent intelligence at scale",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Council member surfaces constituent intelligence at scale",
   "description": "Council member surfaces constituent intelligence at scale",
   "content": "Scenario: Council member surfaces constituent intelligence at scale\n    Given the politician represents 50,000 residents\n    And only 20 constituents typically attend council meetings\n    When the Observer aggregates constituent patterns from civic engagement\n    Then the politician sees 230 families losing 90 minutes daily to bus delays\n    And identifies senior centers underutilized due to access barriers\n    And learns small businesses struggle with permit complexity\n    And hears from working parents and shift workers who can't attend meetings\n    And understands actual constituent needs beyond loudest voices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Council member surfaces constituent intelligence at scale",
+    "ogDescription": "Council member surfaces constituent intelligence at scale",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member surfaces constituent intelligence at scale",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Council member surfaces constituent intelligence at scale - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member surfaces constituent intelligence at scale",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member surfaces constituent intelligence at scale",
+    "name": "Council member surfaces constituent intelligence at scale",
+    "description": "Council member surfaces constituent intelligence at scale",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

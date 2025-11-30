@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-household-household care tokens reflect combined retirement contributions",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:household-household care tokens reflect combined retirement contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household care tokens reflect combined retirement contributions",
   "description": "Household care tokens reflect combined retirement contributions",
   "content": "Scenario: Household care tokens reflect combined retirement contributions\n    Given household participates in care token economy\n    And both partners contribute substantial volunteer and family care\n    When household care tokens are calculated\n    Then tokens should accumulate from both partners' contributions\n    And Frank's Habitat work should be valued appropriately\n    And his wife's care contributions should be recognized\n    And household should receive care token supplements for low fixed income\n    And the scanner should be accessible regardless of economic status\n    And combined contributions should create household care economy resources\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Household care tokens reflect combined retirement contributions",
+    "ogDescription": "Household care tokens reflect combined retirement contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-household-household care tokens reflect combined retirement contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household care tokens reflect combined retirement contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-household-household care tokens reflect combined retirement contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:household-household care tokens reflect combined retirement contributions",
+    "name": "Household care tokens reflect combined retirement contributions",
+    "description": "Household care tokens reflect combined retirement contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

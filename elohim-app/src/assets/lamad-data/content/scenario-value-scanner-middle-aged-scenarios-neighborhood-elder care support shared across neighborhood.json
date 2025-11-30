@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-elder care support shared across neighborhood",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-elder care support shared across neighborhood",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder care support shared across neighborhood",
   "description": "Elder care support shared across neighborhood",
   "content": "Scenario: Elder care support shared across neighborhood\n    Given Robert's parents visit regularly and will eventually need local care\n    And several neighbors are also managing elder care\n    When neighborhood_elohim coordinates elder care support\n    Then it should connect neighbors managing similar challenges\n    And facilitate sharing of resources, knowledge, and respite\n    And surface: \"Three neighbors use the same home health agency\u2014could coordinate for better rates\"\n    And build neighborhood capacity to support aging residents\n    And prevent isolation for those managing elder care\n    And create mutual support network for common challenges\n    And strengthen neighborhood through shared caregiving\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder care support shared across neighborhood",
+    "ogDescription": "Elder care support shared across neighborhood",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-elder care support shared across neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder care support shared across neighborhood - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-elder care support shared across neighborhood",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-elder care support shared across neighborhood",
+    "name": "Elder care support shared across neighborhood",
+    "description": "Elder care support shared across neighborhood",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-household-solo household management learning",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-solo household management learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Solo household management learning",
   "description": "Solo household management learning",
   "content": "Scenario: Solo household management learning\n    Given Aisha lives alone in her first apartment\n    And household and individual layers largely overlap\n    When Aisha manages household resources\n    Then the personal_agent should help her establish routines\n    And it should track household maintenance tasks\n    And it should help her build sustainable practices\n    And household management should feel achievable, not overwhelming\n    And the system should scaffold her household competence development\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Solo household management learning",
+    "ogDescription": "Solo household management learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-solo household management learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Solo household management learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-household-solo household management learning",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:household-solo household management learning",
+    "name": "Solo household management learning",
+    "description": "Solo household management learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

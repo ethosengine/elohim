@@ -1,6 +1,8 @@
 {
   "id": "governance-organizations-leverage-points-places-to-intervene-in-a-system-readme",
+  "did": "did:web:elohim.host:content:governance:organizations:leverage-points-places-to-intervene-in-a-system:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
   "content": "---\nnode_type: organization\norg_id: leverage_points_places_to_intervene_in_a_system\nname: \"Leverage Points: Places to Intervene in a System\"\nurl: \"https://donellameadows.org/archives/leverage-points-places-to-intervene-in-a-system/\"\ngem_id: \"2eaeXy76dLvEHSj5a3rA\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Leverage Points: Places to Intervene in a System inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Leverage Points: Places to Intervene in a System\n\n## Description\n\n[Description to be added]\n\n**Publisher:** The Academy for Systems Change\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Leverage Points: Places to Intervene in a System relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://donellameadows.org/archives/leverage-points-places-to-intervene-in-a-system/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -14,8 +16,47 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://donellameadows.org/archives/leverage-points-places-to-intervene-in-a-system/",
+    "name": "Leverage Points: Places to Intervene in a System",
+    "org_id": "leverage_points_places_to_intervene_in_a_system",
+    "gem_id": "2eaeXy76dLvEHSj5a3rA",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "The Academy for Systems Change",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Leverage Points: Places to Intervene in a System inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.172597",
-  "updatedAt": "2025-11-21T18:54:29.172597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "[Description to be added]",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-organizations-leverage-points-places-to-intervene-in-a-system-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/governance-organizations-leverage-points-places-to-intervene-in-a-system-readme",
+    "identifier": "did:web:elohim.host:content:governance:organizations:leverage-points-places-to-intervene-in-a-system:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "[Description to be added]",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

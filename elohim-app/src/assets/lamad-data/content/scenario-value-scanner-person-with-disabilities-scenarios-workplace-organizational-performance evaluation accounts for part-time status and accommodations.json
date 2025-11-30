@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-performance evaluation accounts for part-time status and accommodations",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-performance evaluation accounts for part-time status and accommodations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Performance evaluation accounts for part-time status and accommodations",
   "description": "Performance evaluation accounts for part-time status and accommodations",
   "content": "Scenario: Performance evaluation accounts for part-time status and accommodations\n    Given Alex works part-time with accommodations\n    And performance should be measured appropriately for Alex's situation\n    When Alex receives performance evaluations\n    Then the workplace_elohim should help Alex ensure fair evaluation\n    And expectations should be adjusted for part-time hours worked\n    And accommodations should not be held against Alex\n    And productivity should be measured per hours worked, not full-time standard\n    And disability-related absences should not negatively impact evaluation\n    And the protocol should support Alex in advocating for fair treatment\n    And evaluation should recognize Alex's actual contributions accurately\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Performance evaluation accounts for part-time status and accommodations",
+    "ogDescription": "Performance evaluation accounts for part-time status and accommodations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-performance evaluation accounts for part-time status and accommodations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Performance evaluation accounts for part-time status and accommodations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-performance evaluation accounts for part-time status and accommodations",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-performance evaluation accounts for part-time status and accommodations",
+    "name": "Performance evaluation accounts for part-time status and accommodations",
+    "description": "Performance evaluation accounts for part-time status and accommodations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

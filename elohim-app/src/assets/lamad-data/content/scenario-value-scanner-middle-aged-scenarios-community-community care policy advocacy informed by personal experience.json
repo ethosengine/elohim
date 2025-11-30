@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-community-community care policy advocacy informed by personal experience",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community care policy advocacy informed by personal experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community care policy advocacy informed by personal experience",
   "description": "Community care policy advocacy informed by personal experience",
   "content": "Scenario: Community care policy advocacy informed by personal experience\n    Given Robert manages multigenerational care and work-life balance\n    And he's learned what community systems help and what fails\n    And policy could be improved based on his experience\n    When community_elohim connects him to policy advocacy\n    Then it should surface opportunities to influence care economy policy\n    And help him translate personal experience into policy recommendations\n    And connect him to boards, councils, and advocacy organizations\n    And recognize that his voice matters because he's lived the complexity\n    And support him in advocating for elder care resources, work-family policies, and care infrastructure\n    And channel his accumulated wisdom toward system improvement\n    And demonstrate that care economy includes policy transformation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Community care policy advocacy informed by personal experience",
+    "ogDescription": "Community care policy advocacy informed by personal experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community care policy advocacy informed by personal experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care policy advocacy informed by personal experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community care policy advocacy informed by personal experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community care policy advocacy informed by personal experience",
+    "name": "Community care policy advocacy informed by personal experience",
+    "description": "Community care policy advocacy informed by personal experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

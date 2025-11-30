@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-professional networks include care economy perspective",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-professional networks include care economy perspective",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Professional networks include care economy perspective",
   "description": "Professional networks include care economy perspective",
   "content": "Scenario: Professional networks include care economy perspective\n    Given Robert participates in professional networks and associations\n    And professional networks often ignore care economy\n    And his networks could advance care economy professionally\n    When workplace_elohim supports professional network engagement\n    Then it should help Robert bring care economy perspective to professional networks\n    And support him in advocating within professional associations\n    And help him connect with other care economy professionals\n    And build professional networks that normalize care economy principles\n    And advance care economy through professional channels\n    And demonstrate that all professions can adopt care economy lens\n    And spread care economy principles through professional influence\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Professional networks include care economy perspective",
+    "ogDescription": "Professional networks include care economy perspective",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-professional networks include care economy perspective",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional networks include care economy perspective - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-professional networks include care economy perspective",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-professional networks include care economy perspective",
+    "name": "Professional networks include care economy perspective",
+    "description": "Professional networks include care economy perspective",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

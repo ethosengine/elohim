@@ -1,0 +1,79 @@
+{
+  "lastUpdated": "2025-11-28T00:09:03.481624",
+  "totalCount": 3,
+  "challenges": [
+    {
+      "id": "challenge-001",
+      "entityType": "content",
+      "entityId": "governance-epic",
+      "challenger": {
+        "agentId": "demo-learner",
+        "displayName": "Demo Learner",
+        "standing": "community-member"
+      },
+      "grounds": "factual-error",
+      "description": "The governance epic states that appeals are limited to 3 levels, but the manifesto mentions 5 levels of Elohim hierarchy.",
+      "evidence": [
+        {
+          "type": "document-reference",
+          "reference": "manifesto",
+          "quote": "Five levels of constitutional hierarchy..."
+        }
+      ],
+      "status": "acknowledged",
+      "filedAt": "2025-11-21T00:09:03.481567",
+      "acknowledgedAt": "2025-11-22T00:09:03.481572",
+      "slaDeadline": "2025-12-05T00:09:03.481574",
+      "assignedElohim": "elohim-community-learning",
+      "priority": "normal"
+    },
+    {
+      "id": "challenge-002",
+      "entityType": "content",
+      "entityId": "disputed-economic-model",
+      "challenger": {
+        "agentId": "steward-economics",
+        "displayName": "Economics Steward",
+        "standing": "domain-steward"
+      },
+      "grounds": "new-evidence",
+      "description": "Recent research contradicts some economic assumptions in this content.",
+      "evidence": [
+        {
+          "type": "external-reference",
+          "reference": "Economic Journal 2025",
+          "description": "New findings on care economy metrics"
+        }
+      ],
+      "status": "under-review",
+      "filedAt": "2025-11-14T00:09:03.481577",
+      "acknowledgedAt": "2025-11-15T00:09:03.481578",
+      "slaDeadline": "2025-11-28T00:09:03.481580",
+      "assignedElohim": "elohim-community-learning",
+      "priority": "high"
+    },
+    {
+      "id": "challenge-003",
+      "entityType": "content",
+      "entityId": "outdated-protocol-spec",
+      "challenger": {
+        "agentId": "steward-technology",
+        "displayName": "Technology Steward",
+        "standing": "domain-steward"
+      },
+      "grounds": "superseded",
+      "description": "This specification has been replaced by v2.0",
+      "status": "resolved",
+      "resolution": {
+        "outcome": "upheld",
+        "reasoning": "Content confirmed superseded. Updated redirect to new version.",
+        "decidedBy": "elohim-community-learning",
+        "decidedAt": "2025-10-29T00:09:03.481582"
+      },
+      "filedAt": "2025-10-14T00:09:03.481583",
+      "acknowledgedAt": "2025-10-15T00:09:03.481585",
+      "assignedElohim": "elohim-community-learning",
+      "priority": "normal"
+    }
+  ]
+}

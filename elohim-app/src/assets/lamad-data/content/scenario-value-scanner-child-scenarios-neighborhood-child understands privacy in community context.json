@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-neighborhood-child understands privacy in community context",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-child understands privacy in community context",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child understands privacy in community context",
   "description": "Child understands privacy in community context",
   "content": "Scenario: Child understands privacy in community context\n    Given Emma's data contributes to neighborhood patterns\n    And she is learning about privacy concepts\n    When Emma's anonymized data is aggregated\n    Then she should understand her information is protected\n    And her personal_agent should explain community data carefully\n    And the agent should say \"Your choices help the neighborhood, but your privacy is protected\"\n    And she should learn about balance between community good and privacy\n    And data ethics education should be age-appropriate\n    And she should understand collective benefit need not compromise privacy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Child understands privacy in community context",
+    "ogDescription": "Child understands privacy in community context",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-child understands privacy in community context",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child understands privacy in community context - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-child understands privacy in community context",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-child understands privacy in community context",
+    "name": "Child understands privacy in community context",
+    "description": "Child understands privacy in community context",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-integrating municipal services with protocol coordination",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-integrating municipal services with protocol coordination",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Integrating municipal services with protocol coordination",
   "description": "Integrating municipal services with protocol coordination",
   "content": "Scenario: Integrating municipal services with protocol coordination\n    Given city provides services (water, waste, transit, parks)\n    And these need coordination with protocol resource flows\n    When I integrate municipal services with Elohim coordination\n    Then city departments: share data with agents appropriately\n    And Municipal Elohim: helps optimize service delivery\n    And environmental services: coordinate with Ecosystem Elohim\n    And social services: work with Community Elohim for crisis response\n    And integration respects: department professional judgment\n    And agents augment: not replace city workers\n    And public services improve: through better coordination\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Integrating municipal services with protocol coordination",
+    "ogDescription": "Integrating municipal services with protocol coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-integrating municipal services with protocol coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Integrating municipal services with protocol coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-integrating municipal services with protocol coordination",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-integrating municipal services with protocol coordination",
+    "name": "Integrating municipal services with protocol coordination",
+    "description": "Integrating municipal services with protocol coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

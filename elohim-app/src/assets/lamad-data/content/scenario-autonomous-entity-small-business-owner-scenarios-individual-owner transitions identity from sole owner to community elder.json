@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-individual-owner transitions identity from sole owner to community elder",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:individual-owner transitions identity from sole owner to community elder",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Owner transitions identity from sole owner to community elder",
   "description": "Owner transitions identity from sole owner to community elder",
   "content": "Scenario: Owner transitions identity from sole owner to community elder\n    Given Rosa's identity was tied to business ownership\n    And exit could mean loss of meaning and social isolation\n    When EAE offers transition support\n    Then Rosa receives counseling for identity transition\n    And Rosa explores new roles: advisor, retiree, community elder\n    And Rosa's expertise is valued through consulting compensation\n    And transition is honored as life stage, not failure\n    And Rosa discovers purpose beyond ownership burden\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Owner transitions identity from sole owner to community elder",
+    "ogDescription": "Owner transitions identity from sole owner to community elder",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-individual-owner transitions identity from sole owner to community elder",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Owner transitions identity from sole owner to community elder - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-individual-owner transitions identity from sole owner to community elder",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:individual-owner transitions identity from sole owner to community elder",
+    "name": "Owner transitions identity from sole owner to community elder",
+    "description": "Owner transitions identity from sole owner to community elder",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

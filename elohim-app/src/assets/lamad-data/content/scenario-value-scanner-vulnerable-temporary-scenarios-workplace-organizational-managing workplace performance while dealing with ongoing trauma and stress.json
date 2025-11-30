@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace performance while dealing with ongoing trauma and stress",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-managing workplace performance while dealing with ongoing trauma and stress",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing workplace performance while dealing with ongoing trauma and stress",
   "description": "Managing workplace performance while dealing with ongoing trauma and stress",
   "content": "Scenario: Managing workplace performance while dealing with ongoing trauma and stress\n    Given I am working while still recovering from trauma\n    And trauma symptoms may affect my workplace performance\n    When trauma impacts my work capability\n    Then the workplace_elohim helps me manage performance expectations realistically\n    And provides strategies for trauma management in workplace\n    And helps me access workplace mental health resources if available\n    And validates that trauma affects work capacity and that's normal\n    And identifies when workplace environment is retraumatizing\n    And my personal_agent reminds me of coping strategies during work stress\n    And recognizes that working while traumatized is extraordinarily difficult\n    And supports appropriate accommodations or job changes if needed\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Managing workplace performance while dealing with ongoing trauma and stress",
+    "ogDescription": "Managing workplace performance while dealing with ongoing trauma and stress",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace performance while dealing with ongoing trauma and stress",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing workplace performance while dealing with ongoing trauma and stress - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace performance while dealing with ongoing trauma and stress",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-managing workplace performance while dealing with ongoing trauma and stress",
+    "name": "Managing workplace performance while dealing with ongoing trauma and stress",
+    "description": "Managing workplace performance while dealing with ongoing trauma and stress",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

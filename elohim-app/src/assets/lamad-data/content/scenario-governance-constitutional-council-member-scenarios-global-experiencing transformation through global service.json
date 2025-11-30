@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-global-experiencing transformation through global service",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-experiencing transformation through global service",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Experiencing transformation through global service",
   "description": "Experiencing transformation through global service",
   "content": "Scenario: Experiencing transformation through global service\n    Given I began as nurse who never imagined governance role\n    And I served community, regional, national, now global councils\n    When I reflect on my journey through sortition democracy\n    Then I have developed: constitutional literacy and deliberative wisdom\n    And I have learned: to judge under uncertainty with humility\n    And I have experienced: democratic participation as transformation\n    And I have contributed: to governance at every scale\n    And I have become: more fully human through invitation to govern\n    And I have proven: ordinary people can address extraordinary questions\n    And I embody: hope that democracy can govern with AI toward flourishing\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Experiencing transformation through global service",
+    "ogDescription": "Experiencing transformation through global service",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-experiencing transformation through global service",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Experiencing transformation through global service - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-experiencing transformation through global service",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-experiencing transformation through global service",
+    "name": "Experiencing transformation through global service",
+    "description": "Experiencing transformation through global service",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

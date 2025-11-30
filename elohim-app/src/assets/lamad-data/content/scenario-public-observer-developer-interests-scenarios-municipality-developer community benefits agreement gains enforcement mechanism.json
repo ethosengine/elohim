@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer community benefits agreement gains enforcement mechanism",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-developer community benefits agreement gains enforcement mechanism",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer community benefits agreement gains enforcement mechanism",
   "description": "Developer community benefits agreement gains enforcement mechanism",
   "content": "Scenario: Developer community benefits agreement gains enforcement mechanism\n    Given a developer negotiated affordable housing units as approval condition\n    And promised childcare facility and public greenspace\n    When the Observer tracks commitment delivery\n    Then community members monitor construction and occupancy\n    And see whether affordable units are actually rented to qualifying residents\n    And track whether childcare facility opens as promised\n    And developer reputation depends on honoring commitments\n    And binding accountability replaces unenforceable promises\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer community benefits agreement gains enforcement mechanism",
+    "ogDescription": "Developer community benefits agreement gains enforcement mechanism",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-developer community benefits agreement gains enforcement mechanism",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer community benefits agreement gains enforcement mechanism - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-developer community benefits agreement gains enforcement mechanism",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-developer community benefits agreement gains enforcement mechanism",
+    "name": "Developer community benefits agreement gains enforcement mechanism",
+    "description": "Developer community benefits agreement gains enforcement mechanism",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

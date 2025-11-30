@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-community-responding to community emergency with supported capability",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-responding to community emergency with supported capability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Responding to community emergency with supported capability",
   "description": "Responding to community emergency with supported capability",
   "content": "Scenario: Responding to community emergency with supported capability\n    Given there's a community crisis (natural disaster, emergency)\n    And everyone is mobilizing to help\n    When Jordan wants to contribute to emergency response\n    Then the personal_agent helps Jordan identify safe ways to help\n    And Jordan contributes at their capability (preparing supplies, making calls)\n    And Jordan's crisis contribution is recognized and valued\n    And the community includes Jordan in collective response\n    And Jordan accumulates care tokens for emergency care work\n    And Jordan experiences being part of community resilience\n    And Jordan's citizenship includes both receiving and providing care\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Responding to community emergency with supported capability",
+    "ogDescription": "Responding to community emergency with supported capability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-responding to community emergency with supported capability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responding to community emergency with supported capability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-responding to community emergency with supported capability",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-responding to community emergency with supported capability",
+    "name": "Responding to community emergency with supported capability",
+    "description": "Responding to community emergency with supported capability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-family-transitioning from child to adult in family system",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-transitioning from child to adult in family system",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transitioning from child to adult in family system",
   "description": "Transitioning from child to adult in family system",
   "content": "Scenario: Transitioning from child to adult in family system\n    Given Jordan turned 26 and family dynamics are shifting\n    And parents are learning to see Jordan as an adult\n    When family interactions reveal old patterns (treating Jordan as child)\n    Then the family_elohim surfaces the pattern respectfully\n    And the system provides education about adult autonomy for IDD people\n    And Jordan can express feelings about wanting adult treatment\n    And the family receives support for the transition\n    And Jordan's growth toward greater autonomy is celebrated\n    And the family system evolves to honor Jordan's adult status\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Transitioning from child to adult in family system",
+    "ogDescription": "Transitioning from child to adult in family system",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-transitioning from child to adult in family system",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transitioning from child to adult in family system - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-transitioning from child to adult in family system",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-transitioning from child to adult in family system",
+    "name": "Transitioning from child to adult in family system",
+    "description": "Transitioning from child to adult in family system",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child prevented from exposure to inappropriate content",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child prevented from exposure to inappropriate content",
   "description": "Child prevented from exposure to inappropriate content",
   "content": "Scenario: Child prevented from exposure to inappropriate content\n    Given Emma participates in the manga community\n    When an older teen posts art with mature themes\n    And the content is not appropriate for younger members\n    Then the guardian agent prevents Emma from seeing the mature content\n    And the moderator is notified to evaluate the post\n    And age-appropriate content guidelines are reinforced\n    And Emma's experience remains safe and appropriate to her development\n    And the older teen receives guidance about age-appropriate spaces\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child prevented from exposure to inappropriate content",
+    "ogDescription": "Child prevented from exposure to inappropriate content",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child prevented from exposure to inappropriate content - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child prevented from exposure to inappropriate content",
+    "name": "Child prevented from exposure to inappropriate content",
+    "description": "Child prevented from exposure to inappropriate content",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

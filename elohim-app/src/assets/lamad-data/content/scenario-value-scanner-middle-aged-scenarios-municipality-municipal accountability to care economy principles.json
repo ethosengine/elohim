@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-municipality-municipal accountability to care economy principles",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal accountability to care economy principles",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal accountability to care economy principles",
   "description": "Municipal accountability to care economy principles",
   "content": "Scenario: Municipal accountability to care economy principles\n    Given Robert and others participate in municipal care economy\n    And municipalities should be accountable to care principles\n    And municipal decisions affect care economy functioning\n    When municipal_elohim monitors municipal accountability\n    Then it should track whether municipal policy supports care economy\n    And surface when municipal decisions harm caregivers\n    And help Robert hold municipality accountable to care principles\n    And provide tools for monitoring municipal care economy performance\n    And support resident advocacy for accountability\n    And build municipal governance that serves care economy\n    And demonstrate that municipalities should be accountable to residents' care needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal accountability to care economy principles",
+    "ogDescription": "Municipal accountability to care economy principles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal accountability to care economy principles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal accountability to care economy principles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-municipality-municipal accountability to care economy principles",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:municipality-municipal accountability to care economy principles",
+    "name": "Municipal accountability to care economy principles",
+    "description": "Municipal accountability to care economy principles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-contributing to community care economy even while in crisis",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-contributing to community care economy even while in crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Contributing to community care economy even while in crisis",
   "description": "Contributing to community care economy even while in crisis",
   "content": "Scenario: Contributing to community care economy even while in crisis\n    Given I am receiving support and have limited capacity\n    And I still have skills, knowledge, and care to offer\n    When opportunities arise to contribute to community\n    Then the Value Scanner surfaces contribution opportunities matching my capacity\n    And recognizes even small contributions as valuable\n    And facilitates contributions that don't overwhelm my limited resources\n    And tracks my care economy participation comprehensively\n    And validates that I am contributor as well as recipient\n    And my personal_agent suggests contributions I can manage\n    And ensures my contributions are recognized with care tokens\n    And supports reciprocity without exploiting vulnerable people\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Contributing to community care economy even while in crisis",
+    "ogDescription": "Contributing to community care economy even while in crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-contributing to community care economy even while in crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing to community care economy even while in crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-contributing to community care economy even while in crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-contributing to community care economy even while in crisis",
+    "name": "Contributing to community care economy even while in crisis",
+    "description": "Contributing to community care economy even while in crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

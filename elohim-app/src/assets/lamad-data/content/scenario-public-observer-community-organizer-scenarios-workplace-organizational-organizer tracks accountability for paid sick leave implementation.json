@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer tracks accountability for paid sick leave implementation",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer tracks accountability for paid sick leave implementation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer tracks accountability for paid sick leave implementation",
   "description": "Organizer tracks accountability for paid sick leave implementation",
   "content": "Scenario: Organizer tracks accountability for paid sick leave implementation\n    Given city passed paid sick leave ordinance\n    And the organizer's worker-community coalition won the policy\n    When the Observer tracks implementation and enforcement\n    Then the organizer monitors employer compliance rates\n    And sees enforcement actions and penalties for violations\n    And identifies industries with systematic non-compliance\n    And documents workers actually receiving sick leave\n    And policy victory leads to implementation accountability ensuring real impact\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer tracks accountability for paid sick leave implementation",
+    "ogDescription": "Organizer tracks accountability for paid sick leave implementation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer tracks accountability for paid sick leave implementation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer tracks accountability for paid sick leave implementation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer tracks accountability for paid sick leave implementation",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer tracks accountability for paid sick leave implementation",
+    "name": "Organizer tracks accountability for paid sick leave implementation",
+    "description": "Organizer tracks accountability for paid sick leave implementation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

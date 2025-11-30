@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-family-grandparent care contributions visible to entire family",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-grandparent care contributions visible to entire family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Grandparent care contributions visible to entire family",
   "description": "Grandparent care contributions visible to entire family",
   "content": "Scenario: Grandparent care contributions visible to entire family\n    Given Margaret provides substantial childcare for Sarah's family\n    And her care work saves Sarah ~$1,500/month in childcare costs\n    When the family_elohim tracks Margaret's care contributions\n    Then Sarah should see quantified value of Margaret's labor\n    And the grandchildren should learn that grandma provides valuable work\n    And the full family should recognize Margaret's contributions\n    And visibility should enable family-wide appreciation\n    And Margaret's labor should be valued, not taken for granted\n    And care tokens should accumulate for her substantial work\n    And family should understand her economic and developmental contribution\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Grandparent care contributions visible to entire family",
+    "ogDescription": "Grandparent care contributions visible to entire family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-grandparent care contributions visible to entire family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grandparent care contributions visible to entire family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-grandparent care contributions visible to entire family",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-grandparent care contributions visible to entire family",
+    "name": "Grandparent care contributions visible to entire family",
+    "description": "Grandparent care contributions visible to entire family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

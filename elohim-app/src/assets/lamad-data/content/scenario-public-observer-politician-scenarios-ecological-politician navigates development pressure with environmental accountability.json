@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-ecological-politician navigates development pressure with environmental accountability",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician navigates development pressure with environmental accountability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician navigates development pressure with environmental accountability",
   "description": "Politician navigates development pressure with environmental accountability",
   "content": "Scenario: Politician navigates development pressure with environmental accountability\n    Given developer proposes project with environmental impacts\n    And campaign contributions create perception of conflict\n    When the Observer documents environmental impacts and relationships\n    Then they see project's environmental footprint objectively analyzed\n    And identify developer's environmental track record\n    And understand campaign finance relationships made publicly visible\n    And review community environmental concerns systematically\n    And make transparent decision accountable to environmental and community interests\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician navigates development pressure with environmental accountability",
+    "ogDescription": "Politician navigates development pressure with environmental accountability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician navigates development pressure with environmental accountability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician navigates development pressure with environmental accountability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician navigates development pressure with environmental accountability",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician navigates development pressure with environmental accountability",
+    "name": "Politician navigates development pressure with environmental accountability",
+    "description": "Politician navigates development pressure with environmental accountability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

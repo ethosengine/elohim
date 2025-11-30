@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-state development policy outcomes versus promises",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-state development policy outcomes versus promises",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "State development policy outcomes versus promises",
   "description": "State development policy outcomes versus promises",
   "content": "Scenario: State development policy outcomes versus promises\n    Given state legislature passed developer-backed \"affordable housing\" law\n    And promised it would increase affordable housing supply\n    When the Observer tracks actual outcomes three years later\n    Then analysis shows: luxury housing increased 40%\n    And affordable housing decreased 8%\n    And displacement accelerated in gentrifying neighborhoods\n    And policy delivered opposite of promised outcomes\n    And evidence supports policy reform not developer rhetoric\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "State development policy outcomes versus promises",
+    "ogDescription": "State development policy outcomes versus promises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-state development policy outcomes versus promises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "State development policy outcomes versus promises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-state development policy outcomes versus promises",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-state development policy outcomes versus promises",
+    "name": "State development policy outcomes versus promises",
+    "description": "State development policy outcomes versus promises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

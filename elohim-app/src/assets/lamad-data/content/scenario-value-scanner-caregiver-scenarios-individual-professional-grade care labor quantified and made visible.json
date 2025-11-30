@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-individual-professional-grade care labor quantified and made visible",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-professional-grade care labor quantified and made visible",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Professional-grade care labor quantified and made visible",
   "description": "Professional-grade care labor quantified and made visible",
   "content": "Scenario: Professional-grade care labor quantified and made visible\n    Given James provides skilled care equivalent to professional nursing\n    And he manages medications with precision\n    And he provides cognitive support and emotional care\n    And this work would be valued at $50k+/year for a stranger\n    When the personal_agent tracks James's care contributions\n    Then his care labor should be quantified as professional-grade work\n    And care tokens should reflect the true value of his skills\n    And his contributions should be valued at professional nursing rates\n    And invisible care work should become economically visible\n    And society should see he's performing skilled professional care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Professional-grade care labor quantified and made visible",
+    "ogDescription": "Professional-grade care labor quantified and made visible",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-professional-grade care labor quantified and made visible",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional-grade care labor quantified and made visible - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-professional-grade care labor quantified and made visible",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-professional-grade care labor quantified and made visible",
+    "name": "Professional-grade care labor quantified and made visible",
+    "description": "Professional-grade care labor quantified and made visible",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

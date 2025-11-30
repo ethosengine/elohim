@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-household-household decision-making about grandparenting commitments",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-household decision-making about grandparenting commitments",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household decision-making about grandparenting commitments",
   "description": "Household decision-making about grandparenting commitments",
   "content": "Scenario: Household decision-making about grandparenting commitments\n    Given grandparenting commitments affect both household members\n    And decisions should be made jointly\n    When the family requests additional care or changes\n    Then the household_elohim should facilitate joint decision-making\n    And both Margaret and Robert should agree on care commitments\n    And household should speak with one voice to family\n    And care arrangements should serve household needs and capacity\n    And neither partner should unilaterally commit to care\n    And household governance should be respected by extended family\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Household decision-making about grandparenting commitments",
+    "ogDescription": "Household decision-making about grandparenting commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-household decision-making about grandparenting commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household decision-making about grandparenting commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-household decision-making about grandparenting commitments",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-household decision-making about grandparenting commitments",
+    "name": "Household decision-making about grandparenting commitments",
+    "description": "Household decision-making about grandparenting commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

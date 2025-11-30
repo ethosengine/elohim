@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns healthy work-life boundaries",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-teen learns healthy work-life boundaries",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teen learns healthy work-life boundaries",
   "description": "Teen learns healthy work-life boundaries",
   "content": "Scenario: Teen learns healthy work-life boundaries\n    Given Jasmine's employer frequently requests last-minute schedule changes\n    And this disrupts her school and family commitments\n    When workplace_elohim tracks scheduling patterns\n    Then it should recognize the boundary violation\n    And help her understand that she has right to reasonable scheduling\n    And support her in negotiating better scheduling practices\n    And teach her that workers can and should set boundaries\n    And build her expectation that work should respect whole life\n    And prepare her for adult advocacy for work-life balance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Teen learns healthy work-life boundaries",
+    "ogDescription": "Teen learns healthy work-life boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns healthy work-life boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen learns healthy work-life boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns healthy work-life boundaries",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-teen learns healthy work-life boundaries",
+    "name": "Teen learns healthy work-life boundaries",
+    "description": "Teen learns healthy work-life boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

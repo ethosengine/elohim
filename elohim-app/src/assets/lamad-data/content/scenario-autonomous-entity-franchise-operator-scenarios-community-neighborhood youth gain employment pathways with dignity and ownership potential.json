@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-neighborhood youth gain employment pathways with dignity and ownership potential",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-neighborhood youth gain employment pathways with dignity and ownership potential",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood youth gain employment pathways with dignity and ownership potential",
   "description": "Neighborhood youth gain employment pathways with dignity and ownership potential",
   "content": "Scenario: Neighborhood youth gain employment pathways with dignity and ownership potential\n    Given franchise locations offered poverty-wage jobs with no advancement or ownership\n    And youth employment was exploitative, not developmental\n    When democratic governance creates dignified youth employment programs\n    Then neighborhood youth earn living wages ($18/hour) with training and support\n    And employment includes path to worker ownership for committed participants\n    And youth experience democratic governance, not hierarchical exploitation\n    And community youth economic opportunity improves dramatically through local democratic businesses\n    And community_elohim documents youth employment outcomes and advancement pathways\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood youth gain employment pathways with dignity and ownership potential",
+    "ogDescription": "Neighborhood youth gain employment pathways with dignity and ownership potential",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-neighborhood youth gain employment pathways with dignity and ownership potential",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood youth gain employment pathways with dignity and ownership potential - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-neighborhood youth gain employment pathways with dignity and ownership potential",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-neighborhood youth gain employment pathways with dignity and ownership potential",
+    "name": "Neighborhood youth gain employment pathways with dignity and ownership potential",
+    "description": "Neighborhood youth gain employment pathways with dignity and ownership potential",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

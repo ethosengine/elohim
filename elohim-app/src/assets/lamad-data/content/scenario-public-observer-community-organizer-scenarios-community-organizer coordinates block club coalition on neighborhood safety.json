@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-community-organizer coordinates block club coalition on neighborhood safety",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer coordinates block club coalition on neighborhood safety",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer coordinates block club coalition on neighborhood safety",
   "description": "Organizer coordinates block club coalition on neighborhood safety",
   "content": "Scenario: Organizer coordinates block club coalition on neighborhood safety\n    Given five block clubs care about pedestrian safety improvements\n    And members work different shifts and speak different languages\n    When the organizer uses Observer for coalition coordination\n    Then all members see shared information base in their languages\n    And can engage asynchronously on their schedules\n    And track who's committed to testify at traffic commission\n    And coordinate meeting attendance across 35 residents\n    And coalition functions at scale without exhausting organizer\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer coordinates block club coalition on neighborhood safety",
+    "ogDescription": "Organizer coordinates block club coalition on neighborhood safety",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer coordinates block club coalition on neighborhood safety",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer coordinates block club coalition on neighborhood safety - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer coordinates block club coalition on neighborhood safety",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer coordinates block club coalition on neighborhood safety",
+    "name": "Organizer coordinates block club coalition on neighborhood safety",
+    "description": "Organizer coordinates block club coalition on neighborhood safety",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

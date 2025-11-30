@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-being recognized for work contributions publicly",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-being recognized for work contributions publicly",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Being recognized for work contributions publicly",
   "description": "Being recognized for work contributions publicly",
   "content": "Scenario: Being recognized for work contributions publicly\n    Given the library celebrates Employee Appreciation Week\n    And all staff members are recognized for their contributions\n    When Jordan is recognized for their work\n    Then the recognition celebrates Jordan's genuine contributions\n    And Jordan is honored as a valued employee, not a charity case\n    And specific accomplishments are named (not just \"trying hard\")\n    And Jordan's work helping organize library is highlighted\n    And Jordan experiences authentic professional recognition\n    And colleagues see Jordan as contributing peer\n    And Jordan's worker identity is affirmed and celebrated\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Being recognized for work contributions publicly",
+    "ogDescription": "Being recognized for work contributions publicly",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-being recognized for work contributions publicly",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Being recognized for work contributions publicly - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-being recognized for work contributions publicly",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-being recognized for work contributions publicly",
+    "name": "Being recognized for work contributions publicly",
+    "description": "Being recognized for work contributions publicly",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

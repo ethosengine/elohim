@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-community investment demonstrates alternative to corporate subsidy model",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-community investment demonstrates alternative to corporate subsidy model",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community investment demonstrates alternative to corporate subsidy model",
   "description": "Community investment demonstrates alternative to corporate subsidy model",
   "content": "Scenario: Community investment demonstrates alternative to corporate subsidy model\n    Given municipal economic development typically subsidizes corporate expansion\n    And Patricia's taxes funded corporate subsidies with minimal community benefit\n    When community investment proves superior economic development strategy\n    Then her $10K investment creates more jobs and better wages than equivalent corporate subsidy\n    And no public money is required\u2014private capital supports democratic conversions\n    And municipal officials observe community investment effectiveness\n    And economic development strategy shifts toward supporting democratic ownership\n    And municipality_elohim documents community investment outcomes for policy advocacy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Community investment demonstrates alternative to corporate subsidy model",
+    "ogDescription": "Community investment demonstrates alternative to corporate subsidy model",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-community investment demonstrates alternative to corporate subsidy model",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community investment demonstrates alternative to corporate subsidy model - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-community investment demonstrates alternative to corporate subsidy model",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-community investment demonstrates alternative to corporate subsidy model",
+    "name": "Community investment demonstrates alternative to corporate subsidy model",
+    "description": "Community investment demonstrates alternative to corporate subsidy model",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

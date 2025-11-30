@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-family-family care tokens reflect frank's contributions across family",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-family care tokens reflect frank's contributions across family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care tokens reflect Frank's contributions across family",
   "description": "Family care tokens reflect Frank's contributions across family",
   "content": "Scenario: Family care tokens reflect Frank's contributions across family\n    Given care flows in multiple directions across the family\n    And Frank provides grandchild care, elder support, and adult child guidance\n    When family_elohim calculates family care tokens\n    Then it should track care across all three generations\n    And recognize Frank's care for grandchildren and mother-in-law\n    And value his support for adult children\n    And accumulate tokens representing Frank's family contributions\n    And these tokens should create claims on future family support\n    And the complex web of family care reciprocity should be visible\n    And Frank should see his place in lifecycle care flows\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care tokens reflect Frank's contributions across family",
+    "ogDescription": "Family care tokens reflect Frank's contributions across family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-family care tokens reflect frank's contributions across family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care tokens reflect Frank's contributions across family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-family care tokens reflect frank's contributions across family",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-family care tokens reflect frank's contributions across family",
+    "name": "Family care tokens reflect Frank's contributions across family",
+    "description": "Family care tokens reflect Frank's contributions across family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

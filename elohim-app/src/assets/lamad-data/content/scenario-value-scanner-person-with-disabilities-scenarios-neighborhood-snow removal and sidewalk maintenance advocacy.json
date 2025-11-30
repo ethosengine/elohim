@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-snow removal and sidewalk maintenance advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-snow removal and sidewalk maintenance advocacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Snow removal and sidewalk maintenance advocacy",
   "description": "Snow removal and sidewalk maintenance advocacy",
   "content": "Scenario: Snow removal and sidewalk maintenance advocacy\n    Given Alex uses a wheelchair and inaccessible sidewalks trap Alex at home\n    And snow removal is often inadequate\n    When winter weather creates accessibility barriers\n    Then Alex should be able to document sidewalk problems systematically\n    And the neighborhood_elohim should coordinate snow removal advocacy\n    And Alex's mobility needs should be recognized as legitimate priority\n    And neighbors should understand that sidewalk access is essential infrastructure\n    And collective action should demand better municipal services\n    And Alex's advocacy should improve conditions for all residents\n    And the neighborhood should support Alex's right to mobility\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Snow removal and sidewalk maintenance advocacy",
+    "ogDescription": "Snow removal and sidewalk maintenance advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-snow removal and sidewalk maintenance advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Snow removal and sidewalk maintenance advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-snow removal and sidewalk maintenance advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-snow removal and sidewalk maintenance advocacy",
+    "name": "Snow removal and sidewalk maintenance advocacy",
+    "description": "Snow removal and sidewalk maintenance advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

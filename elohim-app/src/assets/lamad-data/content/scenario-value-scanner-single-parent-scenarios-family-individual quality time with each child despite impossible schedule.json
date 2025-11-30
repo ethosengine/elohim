@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-individual quality time with each child despite impossible schedule",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-individual quality time with each child despite impossible schedule",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Individual quality time with each child despite impossible schedule",
   "description": "Individual quality time with each child despite impossible schedule",
   "content": "Scenario: Individual quality time with each child despite impossible schedule\n    Given each child needs one-on-one parent time\n    And Maria must provide all individual attention alone across three children\n    When Maria allocates time with children\n    Then the family_elohim should help her protect individual connection time\n    And it should remind her that each child needs her undivided attention sometimes\n    And it should coordinate schedules to create brief one-on-one moments\n    And it should prevent any child from being consistently neglected\n    And Maria should maintain individual relationships with each child despite constraints\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Individual quality time with each child despite impossible schedule",
+    "ogDescription": "Individual quality time with each child despite impossible schedule",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-individual quality time with each child despite impossible schedule",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Individual quality time with each child despite impossible schedule - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-individual quality time with each child despite impossible schedule",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-individual quality time with each child despite impossible schedule",
+    "name": "Individual quality time with each child despite impossible schedule",
+    "description": "Individual quality time with each child despite impossible schedule",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-global-studying global inequality in protocol access and benefits",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:global-studying global inequality in protocol access and benefits",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Studying global inequality in protocol access and benefits",
   "description": "Studying global inequality in protocol access and benefits",
   "content": "Scenario: Studying global inequality in protocol access and benefits\n    Given I hypothesize protocol might exacerbate global inequality\n    And wealthy nations can afford infrastructure poor nations cannot\n    When I analyze distributional effects at global scale\n    Then I examine: adoption rates by national income and infrastructure\n    And I assess: whether benefits flow primarily to Global North\n    And I measure: whether protocol reduces or increases global inequality\n    And I explore: mechanisms of digital colonialism or democratic leveling\n    And I identify: barriers preventing equitable global adoption\n    And I advocate: for international funding and technology transfer\n    And My research serves: global justice by revealing inequities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Studying global inequality in protocol access and benefits",
+    "ogDescription": "Studying global inequality in protocol access and benefits",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-studying global inequality in protocol access and benefits",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Studying global inequality in protocol access and benefits - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-studying global inequality in protocol access and benefits",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:global-studying global inequality in protocol access and benefits",
+    "name": "Studying global inequality in protocol access and benefits",
+    "description": "Studying global inequality in protocol access and benefits",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

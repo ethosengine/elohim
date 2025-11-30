@@ -1,0 +1,31 @@
+{
+  "id": "concept-scandinavian-insight",
+  "contentType": "concept",
+  "title": "The Scandinavian Insight",
+  "description": "Nordic countries demonstrate that high-trust societies are possible through transparency that makes manipulation visible, safety nets that reduce zero-sum competition, cultural antibodies against antisocial behavior, and economic structures that don't reward exploitation.",
+  "content": "Nordic countries demonstrate that high-trust societies are possible through transparency that makes manipulation visible, safety nets that reduce zero-sum competition, cultural antibodies against antisocial behavior, and economic structures that don't reward exploitation.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/learning-success/concept-scandinavian-insight.json",
+  "tags": [
+    "models",
+    "scandinavia",
+    "trust",
+    "society",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "value-scanner-epic",
+    "economic-coordination-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "learning-success",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.002142",
+  "updatedAt": "2025-11-28T17:11:57.002142"
+}

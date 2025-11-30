@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-municipal constitutional council handles city-level appeals",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal constitutional council handles city-level appeals",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal Constitutional Council handles city-level appeals",
   "description": "Municipal Constitutional Council handles city-level appeals",
   "content": "Scenario: Municipal Constitutional Council handles city-level appeals\n    Given some appeals affect multiple neighborhoods or city as whole\n    And community-layer councils referred case to municipal level\n    When Municipal Constitutional Council reviews the appeal\n    Then I provide: city-wide context for their deliberation\n    And they evaluate: if decision aligns with city's constitutional interpretation\n    And they consider: effects across all Riverside neighborhoods\n    And they create: municipal-level precedent\n    And they may recommend: city council policy action\n    And I implement: their recommendations respecting their authority\n    And municipal governance: maintains democratic accountability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal Constitutional Council handles city-level appeals",
+    "ogDescription": "Municipal Constitutional Council handles city-level appeals",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal constitutional council handles city-level appeals",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal Constitutional Council handles city-level appeals - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal constitutional council handles city-level appeals",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal constitutional council handles city-level appeals",
+    "name": "Municipal Constitutional Council handles city-level appeals",
+    "description": "Municipal Constitutional Council handles city-level appeals",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for professional development that actually helps",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher advocates for professional development that actually helps",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher advocates for professional development that actually helps",
   "description": "Teacher advocates for professional development that actually helps",
   "content": "Scenario: Teacher advocates for professional development that actually helps\n    Given district mandates professional development hours\n    But most PD is generic and doesn't improve teaching\n    When teachers evaluate professional development through Observer\n    Then teachers rate 75% of required PD as not useful for their teaching\n    And identify what actually helps (job-embedded coaching, subject-specific content)\n    And document time wasted on compliance PD vs productive professional learning\n    And negotiate for teacher voice in PD planning and evaluation\n    And professional development becomes professional not bureaucratic\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher advocates for professional development that actually helps",
+    "ogDescription": "Teacher advocates for professional development that actually helps",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for professional development that actually helps",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher advocates for professional development that actually helps - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher advocates for professional development that actually helps",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher advocates for professional development that actually helps",
+    "name": "Teacher advocates for professional development that actually helps",
+    "description": "Teacher advocates for professional development that actually helps",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

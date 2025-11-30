@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-household-distributing grandparenting labor equitably between partners",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-distributing grandparenting labor equitably between partners",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Distributing grandparenting labor equitably between partners",
   "description": "Distributing grandparenting labor equitably between partners",
   "content": "Scenario: Distributing grandparenting labor equitably between partners\n    Given both Margaret and Robert are retired and available\n    And Margaret currently does most of the grandchild care\n    When the household_elohim tracks care contributions\n    Then it should show Margaret's 25 hours/week of grandchild care\n    And it should show Robert's care contributions (if any)\n    And it should identify if care labor is unequally distributed\n    And it should facilitate discussion about equitable distribution\n    And both partners should contribute to grandparenting\n    And Margaret should not bear sole burden of care work\n    And household care economy should be equitable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Distributing grandparenting labor equitably between partners",
+    "ogDescription": "Distributing grandparenting labor equitably between partners",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-distributing grandparenting labor equitably between partners",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Distributing grandparenting labor equitably between partners - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-distributing grandparenting labor equitably between partners",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-distributing grandparenting labor equitably between partners",
+    "name": "Distributing grandparenting labor equitably between partners",
+    "description": "Distributing grandparenting labor equitably between partners",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-community-community recognition of family caregiving as professional-grade work",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community recognition of family caregiving as professional-grade work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community recognition of family caregiving as professional-grade work",
   "description": "Community recognition of family caregiving as professional-grade work",
   "content": "Scenario: Community recognition of family caregiving as professional-grade work\n    Given James provides skilled care equivalent to professional nursing\n    And his work is invisible because he cares for family\n    When the community_elohim evaluates caregiving contributions\n    Then James's care should be valued at professional rates\n    And community should recognize family caregiving as essential infrastructure\n    And care token accumulation should reflect professional-grade value\n    And invisibility of family care should be systematically addressed\n    And community care economy should make family caregiving visible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Community recognition of family caregiving as professional-grade work",
+    "ogDescription": "Community recognition of family caregiving as professional-grade work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community recognition of family caregiving as professional-grade work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community recognition of family caregiving as professional-grade work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community recognition of family caregiving as professional-grade work",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community recognition of family caregiving as professional-grade work",
+    "name": "Community recognition of family caregiving as professional-grade work",
+    "description": "Community recognition of family caregiving as professional-grade work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

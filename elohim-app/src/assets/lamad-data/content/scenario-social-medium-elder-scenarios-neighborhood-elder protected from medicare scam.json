@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-elder-scenarios-neighborhood-elder protected from medicare scam",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder protected from medicare scam",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder protected from Medicare scam",
   "description": "Elder protected from Medicare scam",
   "content": "Scenario: Elder protected from Medicare scam\n    Given scammers are running fake Medicare enrollment campaigns\n    When a scammer tries to contact Rose about \"urgent\" Medicare changes\n    And the message requests personal information and payment\n    Then the guardian agent identifies the scam pattern\n    And the fraudulent message never reaches Rose\n    And Rose is protected without awareness of the threat\n    And legitimate Medicare communications work normally\n    And her real healthcare connections remain intact\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder protected from Medicare scam",
+    "ogDescription": "Elder protected from Medicare scam",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder protected from medicare scam",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder protected from Medicare scam - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder protected from medicare scam",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder protected from medicare scam",
+    "name": "Elder protected from Medicare scam",
+    "description": "Elder protected from Medicare scam",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

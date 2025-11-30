@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-explaining attack vectors from authoritarian and corporate actors",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-explaining attack vectors from authoritarian and corporate actors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Explaining attack vectors from authoritarian and corporate actors",
   "description": "Explaining attack vectors from authoritarian and corporate actors",
   "content": "Scenario: Explaining attack vectors from authoritarian and corporate actors\n    Given global protocol faces threats from powerful adversaries\n    And delegates need to understand vulnerabilities\n    When I present threat assessment to convention\n    Then I explain: how authoritarian regimes might compromise agents\n    And I describe: corporate strategies for regulatory capture\n    And I assess: resilience of distributed architecture\n    And I present: defense mechanisms and their limitations\n    And I avoid: either creating panic or false confidence\n    And I enable: informed deliberation about governance security\n    And I demonstrate: that technical design serves democratic protection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Explaining attack vectors from authoritarian and corporate actors",
+    "ogDescription": "Explaining attack vectors from authoritarian and corporate actors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-explaining attack vectors from authoritarian and corporate actors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Explaining attack vectors from authoritarian and corporate actors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-explaining attack vectors from authoritarian and corporate actors",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-explaining attack vectors from authoritarian and corporate actors",
+    "name": "Explaining attack vectors from authoritarian and corporate actors",
+    "description": "Explaining attack vectors from authoritarian and corporate actors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

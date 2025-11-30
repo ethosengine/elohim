@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-community-community leadership balanced with existing care demands",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community leadership balanced with existing care demands",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community leadership balanced with existing care demands",
   "description": "Community leadership balanced with existing care demands",
   "content": "Scenario: Community leadership balanced with existing care demands\n    Given Robert has capacity for community contribution\n    And community leadership opportunities are abundant\n    And he also carries substantial family and work responsibilities\n    When community_elohim coordinates his community participation\n    Then it should help him balance community leadership with other demands\n    And prevent over-commitment that would overwhelm him\n    And surface when community demands exceed healthy boundaries\n    And support him in choosing leadership roles that match his capacity\n    And recognize that sustainable participation requires limits\n    And prevent community from exploiting his sense of responsibility\n    And support meaningful contribution without burnout\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Community leadership balanced with existing care demands",
+    "ogDescription": "Community leadership balanced with existing care demands",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community leadership balanced with existing care demands",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community leadership balanced with existing care demands - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community leadership balanced with existing care demands",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community leadership balanced with existing care demands",
+    "name": "Community leadership balanced with existing care demands",
+    "description": "Community leadership balanced with existing care demands",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

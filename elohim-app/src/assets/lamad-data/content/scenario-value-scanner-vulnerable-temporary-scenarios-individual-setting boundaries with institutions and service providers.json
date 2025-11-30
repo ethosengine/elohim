@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-setting boundaries with institutions and service providers",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-setting boundaries with institutions and service providers",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Setting boundaries with institutions and service providers",
   "description": "Setting boundaries with institutions and service providers",
   "content": "Scenario: Setting boundaries with institutions and service providers\n    Given I am navigating multiple social service systems\n    And some institutional demands feel invasive or harmful\n    When I identify a boundary I need to maintain\n    Then the Value Scanner helps me understand my rights\n    And provides language for asserting my boundaries\n    And tracks instances where institutions violate my boundaries\n    And connects me to advocacy support when needed\n    And validates that boundary-setting is healthy and appropriate\n    And my personal_agent coaches me through difficult conversations\n    And recognizes that protecting my wellbeing is my right\n    And supports me in saying \"no\" when necessary\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Setting boundaries with institutions and service providers",
+    "ogDescription": "Setting boundaries with institutions and service providers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-setting boundaries with institutions and service providers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Setting boundaries with institutions and service providers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-setting boundaries with institutions and service providers",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-setting boundaries with institutions and service providers",
+    "name": "Setting boundaries with institutions and service providers",
+    "description": "Setting boundaries with institutions and service providers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

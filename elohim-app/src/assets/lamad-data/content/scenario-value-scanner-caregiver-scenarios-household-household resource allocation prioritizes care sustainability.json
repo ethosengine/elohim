@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household resource allocation prioritizes care sustainability",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household resource allocation prioritizes care sustainability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household resource allocation prioritizes care sustainability",
   "description": "Household resource allocation prioritizes care sustainability",
   "content": "Scenario: Household resource allocation prioritizes care sustainability\n    Given household resources are severely limited\n    And care needs are high and increasing\n    When household resources are allocated\n    Then the household_elohim should prioritize care sustainability\n    And it should ensure James has resources for respite\n    And it should allocate funds for both David's and James's needs\n    And resource decisions should prevent caregiver burnout\n    And household economics should serve sustainable caregiving\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household resource allocation prioritizes care sustainability",
+    "ogDescription": "Household resource allocation prioritizes care sustainability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household resource allocation prioritizes care sustainability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household resource allocation prioritizes care sustainability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household resource allocation prioritizes care sustainability",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household resource allocation prioritizes care sustainability",
+    "name": "Household resource allocation prioritizes care sustainability",
+    "description": "Household resource allocation prioritizes care sustainability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

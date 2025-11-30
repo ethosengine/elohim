@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-workplace-organizational-understanding labor rights as student worker",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-understanding labor rights as student worker",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Understanding labor rights as student worker",
   "description": "Understanding labor rights as student worker",
   "content": "Scenario: Understanding labor rights as student worker\n    Given Kenji has same labor rights as any employee\n    And many students don't know their workplace rights\n    When the workplace_elohim educates Kenji about labor law\n    Then it should teach him about breaks, overtime, workplace safety\n    And it should inform him of right to organize and unionize\n    And it should help him recognize illegal employer practices\n    And it should empower him to advocate for fair treatment\n    And the system should build Kenji's labor rights literacy\n    And student workers should know and exercise their rights\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Understanding labor rights as student worker",
+    "ogDescription": "Understanding labor rights as student worker",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-understanding labor rights as student worker",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding labor rights as student worker - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-understanding labor rights as student worker",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-understanding labor rights as student worker",
+    "name": "Understanding labor rights as student worker",
+    "description": "Understanding labor rights as student worker",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

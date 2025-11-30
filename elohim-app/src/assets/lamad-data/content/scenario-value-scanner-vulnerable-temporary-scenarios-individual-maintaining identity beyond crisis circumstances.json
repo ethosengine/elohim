@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-maintaining identity beyond crisis circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-maintaining identity beyond crisis circumstances",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Maintaining identity beyond crisis circumstances",
   "description": "Maintaining identity beyond crisis circumstances",
   "content": "Scenario: Maintaining identity beyond crisis circumstances\n    Given I am defined by institutions as \"domestic violence survivor\" or \"homeless person\"\n    And I am much more than my current circumstances\n    When I interact with the Value Scanner\n    Then the system recognizes my full humanity and complexity\n    And documents my interests, skills, values, and dreams\n    And reflects back my identity beyond crisis labels\n    And helps me pursue aspects of life that matter to me\n    And validates that crisis is something I'm experiencing, not who I am\n    And my personal_agent knows and responds to my whole self\n    And the care economy values me as complete person\n    And my identity is not reduced to my vulnerability\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Maintaining identity beyond crisis circumstances",
+    "ogDescription": "Maintaining identity beyond crisis circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-maintaining identity beyond crisis circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Maintaining identity beyond crisis circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-maintaining identity beyond crisis circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-maintaining identity beyond crisis circumstances",
+    "name": "Maintaining identity beyond crisis circumstances",
+    "description": "Maintaining identity beyond crisis circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

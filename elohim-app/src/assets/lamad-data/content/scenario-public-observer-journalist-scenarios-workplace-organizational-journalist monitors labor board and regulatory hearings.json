@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist monitors labor board and regulatory hearings",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist monitors labor board and regulatory hearings",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist monitors labor board and regulatory hearings",
   "description": "Journalist monitors labor board and regulatory hearings",
   "content": "Scenario: Journalist monitors labor board and regulatory hearings\n    Given the journalist covers labor and employment\n    And must track labor board, wage enforcement, OSHA, and related agencies\n    When the Observer monitors all labor regulatory agencies\n    Then the journalist reviews all violation cases and enforcement actions\n    And receives alerts for significant labor violations\n    And tracks patterns in enforcement and employer violations\n    And comprehensive labor accountability coverage becomes sustainable\n    And worker exploitation cannot hide in regulatory obscurity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist monitors labor board and regulatory hearings",
+    "ogDescription": "Journalist monitors labor board and regulatory hearings",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist monitors labor board and regulatory hearings",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist monitors labor board and regulatory hearings - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist monitors labor board and regulatory hearings",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist monitors labor board and regulatory hearings",
+    "name": "Journalist monitors labor board and regulatory hearings",
+    "description": "Journalist monitors labor board and regulatory hearings",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

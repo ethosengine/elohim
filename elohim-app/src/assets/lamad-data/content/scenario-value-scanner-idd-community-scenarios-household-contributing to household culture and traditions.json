@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-contributing to household culture and traditions",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-contributing to household culture and traditions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Contributing to household culture and traditions",
   "description": "Contributing to household culture and traditions",
   "content": "Scenario: Contributing to household culture and traditions\n    Given the household is building shared traditions\n    And Jordan loves music and dancing\n    When Jordan suggests Friday night dance parties\n    Then the household considers Jordan's idea democratically\n    And Jordan's cultural contribution is valued\n    And the household adopts Friday dance as a tradition\n    And Jordan accumulates care tokens for culture-building contribution\n    And Jordan experiences shaping their household community\n    And Jordan's joy and creativity enrich household life\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Contributing to household culture and traditions",
+    "ogDescription": "Contributing to household culture and traditions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-contributing to household culture and traditions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing to household culture and traditions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-contributing to household culture and traditions",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-contributing to household culture and traditions",
+    "name": "Contributing to household culture and traditions",
+    "description": "Contributing to household culture and traditions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

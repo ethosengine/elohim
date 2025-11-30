@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-community-community supports teen's transition to adult independence",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-community supports teen's transition to adult independence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community supports teen's transition to adult independence",
   "description": "Community supports teen's transition to adult independence",
   "content": "Scenario: Community supports teen's transition to adult independence\n    Given Jasmine is preparing for college and adult life\n    And she has accumulated care contributions and care tokens\n    When she needs support for transition to adulthood\n    Then the community_elohim should surface relevant resources\n    And her care tokens should be convertible to educational resources\n    And community institutions should support her based on demonstrated contribution\n    And mentorship, skill-building, and educational opportunities should be accessible\n    And the community should invest in her success as she invested in community wellbeing\n    And care economy should support intergenerational care and lifecycle transitions\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Community supports teen's transition to adult independence",
+    "ogDescription": "Community supports teen's transition to adult independence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-community supports teen's transition to adult independence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community supports teen's transition to adult independence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-community supports teen's transition to adult independence",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-community supports teen's transition to adult independence",
+    "name": "Community supports teen's transition to adult independence",
+    "description": "Community supports teen's transition to adult independence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

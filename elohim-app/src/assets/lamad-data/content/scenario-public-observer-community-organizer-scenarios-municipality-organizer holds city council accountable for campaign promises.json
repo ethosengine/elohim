@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-municipality-organizer holds city council accountable for campaign promises",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer holds city council accountable for campaign promises",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer holds city council accountable for campaign promises",
   "description": "Organizer holds city council accountable for campaign promises",
   "content": "Scenario: Organizer holds city council accountable for campaign promises\n    Given council member promised affordable housing support during campaign\n    And the organizer's coalition delivered volunteer support and votes\n    When the council member votes on housing policy\n    Then the Observer tracks their votes against commitments\n    And shows the organizer their complete voting record\n    And provides evidence for accountability conversations\n    And makes politician's record visible to organized constituents\n    And electoral support creates ongoing accountability relationship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer holds city council accountable for campaign promises",
+    "ogDescription": "Organizer holds city council accountable for campaign promises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer holds city council accountable for campaign promises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer holds city council accountable for campaign promises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-municipality-organizer holds city council accountable for campaign promises",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:municipality-organizer holds city council accountable for campaign promises",
+    "name": "Organizer holds city council accountable for campaign promises",
+    "description": "Organizer holds city council accountable for campaign promises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

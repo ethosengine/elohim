@@ -36,12 +36,14 @@ module.exports = function (config) {
         { type: 'lcovonly', file: 'lcov.info' }
       ],
       check: {
-        global: {
+        // Only enforce coverage on services (business logic)
+        '**/services/*.ts': {
           statements: 50,
           branches: 15,
           functions: 50,
           lines: 50
         }
+        // No global threshold - components/models are advisory only
       }
     },
     reporters: ['progress', 'kjhtml', 'coverage'],

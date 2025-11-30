@@ -1,0 +1,58 @@
+{
+  "id": "fct-media-07-documentary-poverty-inc",
+  "contentType": "documentary",
+  "title": "Poverty, Inc.",
+  "description": "Poverty, Inc. (2014)",
+  "content": {
+    "title": "Poverty, Inc.",
+    "year": 2014,
+    "platform": null,
+    "duration": null,
+    "format": "documentary"
+  },
+  "contentFormat": "documentary",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "documentary",
+    "fct",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-08-centering-love",
+    "mediaType": "documentary",
+    "year": "2014"
+  },
+  "_organization": null,
+  "createdAt": "2025-11-28T21:10:19.209138",
+  "updatedAt": "2025-11-28T21:10:19.209139",
+  "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Poverty, Inc.",
+    "ogDescription": "Poverty, Inc. (2014)",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-07-documentary-poverty-inc",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/documentary.jpg",
+    "ogImageAlt": "Poverty, Inc. - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-media-07-documentary-poverty-inc",
+    "identifier": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+    "name": "Poverty, Inc.",
+    "description": "Poverty, Inc. (2014)",
+    "dateCreated": "2025-11-28T21:10:19.209138",
+    "dateModified": "2025-11-28T21:10:19.209139",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

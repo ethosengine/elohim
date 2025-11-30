@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-family-receiving family financial support with dignity",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-receiving family financial support with dignity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Receiving family financial support with dignity",
   "description": "Receiving family financial support with dignity",
   "content": "Scenario: Receiving family financial support with dignity\n    Given Kenji receives some financial support from family\n    And traditional economics treats this as dependency or charity\n    When the family_elohim tracks family resource flows\n    Then it should frame financial support as family care investment\n    And it should recognize that families invest in young members' development\n    And it should help Kenji receive support without shame\n    And it should track this as reciprocal care economy, not dependency\n    And the system should value family investment in student development\n    And receiving family support should be dignified participation in family economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Receiving family financial support with dignity",
+    "ogDescription": "Receiving family financial support with dignity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-receiving family financial support with dignity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Receiving family financial support with dignity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-receiving family financial support with dignity",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-receiving family financial support with dignity",
+    "name": "Receiving family financial support with dignity",
+    "description": "Receiving family financial support with dignity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

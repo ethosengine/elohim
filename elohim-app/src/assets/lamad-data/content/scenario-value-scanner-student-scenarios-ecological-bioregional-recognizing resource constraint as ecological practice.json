@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-recognizing resource constraint as ecological practice",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-recognizing resource constraint as ecological practice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognizing resource constraint as ecological practice",
   "description": "Recognizing resource constraint as ecological practice",
   "content": "Scenario: Recognizing resource constraint as ecological practice\n    Given Kenji's $180/week budget forces minimal consumption\n    And ecological sustainability requires reduced consumption\n    When the bioregional_elohim reframes Kenji's scarcity\n    Then it should recognize that living on limited resources is low ecological impact\n    And it should validate \"Your minimal consumption is ecological stewardship\"\n    And it should show how his constrained lifestyle aligns with sustainability\n    And resource constraint should be recognized as ecological care\n    And the system should honor scarcity as ecological practice\n    And Kenji should understand his poverty as inadvertently sustainable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing resource constraint as ecological practice",
+    "ogDescription": "Recognizing resource constraint as ecological practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-recognizing resource constraint as ecological practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing resource constraint as ecological practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-recognizing resource constraint as ecological practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-recognizing resource constraint as ecological practice",
+    "name": "Recognizing resource constraint as ecological practice",
+    "description": "Recognizing resource constraint as ecological practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-educational-parent exposes school resource inequities",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent exposes school resource inequities",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent exposes school resource inequities",
   "description": "Parent exposes school resource inequities",
   "content": "Scenario: Parent exposes school resource inequities\n    Given the parent suspects their child's school gets fewer resources\n    And neighboring school seems to have more programs and facilities\n    When the parent reviews Observer's district equity analysis\n    Then they see per-student spending varies by thousands of dollars\n    And westside schools have gifted programs and experienced teachers\n    And their child's school lacks arts, music, and advanced courses\n    And systematic inequity pattern becomes documented evidence\n    And parent advocacy shifts to structural equity demands\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent exposes school resource inequities",
+    "ogDescription": "Parent exposes school resource inequities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent exposes school resource inequities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent exposes school resource inequities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent exposes school resource inequities",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent exposes school resource inequities",
+    "name": "Parent exposes school resource inequities",
+    "description": "Parent exposes school resource inequities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

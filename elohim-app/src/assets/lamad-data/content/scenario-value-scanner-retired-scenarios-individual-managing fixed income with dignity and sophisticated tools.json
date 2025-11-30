@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-individual-managing fixed income with dignity and sophisticated tools",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-managing fixed income with dignity and sophisticated tools",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing fixed income with dignity and sophisticated tools",
   "description": "Managing fixed income with dignity and sophisticated tools",
   "content": "Scenario: Managing fixed income with dignity and sophisticated tools\n    Given Frank has $140/week grocery budget for two people\n    And his income is fixed at ~$28k/year and cannot be increased through employment\n    And he needs to maintain nutrition as dietary needs change with age\n    When Frank plans his household shopping\n    Then his personal_agent should provide sophisticated budgeting tools\n    And it should identify sales and optimize value per dollar\n    And it should track spending patterns across weeks and months\n    And it should suggest resource optimization without stigma or shame\n    And it should help maintain quality of life within real constraints\n    And the framing should be dignity-preserving, not scarcity-shaming\n    And Frank should experience agency and resourcefulness, not deprivation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing fixed income with dignity and sophisticated tools",
+    "ogDescription": "Managing fixed income with dignity and sophisticated tools",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-managing fixed income with dignity and sophisticated tools",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing fixed income with dignity and sophisticated tools - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-individual-managing fixed income with dignity and sophisticated tools",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:individual-managing fixed income with dignity and sophisticated tools",
+    "name": "Managing fixed income with dignity and sophisticated tools",
+    "description": "Managing fixed income with dignity and sophisticated tools",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-cross-municipal coordination with neighboring cities",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-cross-municipal coordination with neighboring cities",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Cross-municipal coordination with neighboring cities",
   "description": "Cross-municipal coordination with neighboring cities",
   "content": "Scenario: Cross-municipal coordination with neighboring cities\n    Given some challenges extend beyond Riverside boundaries\n    And watershed management affects multiple municipalities\n    When I coordinate with neighboring community leaders\n    Then we convene: inter-municipal deliberative assemblies\n    And agents from: different municipalities share analysis\n    And we negotiate: agreements serving all communities\n    And we respect: each municipality's sovereignty\n    And we find: synthesis through democratic deliberation\n    And lateral coordination: addresses problems that don't respect boundaries\n    And we demonstrate: governance working across jurisdictions\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Cross-municipal coordination with neighboring cities",
+    "ogDescription": "Cross-municipal coordination with neighboring cities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-cross-municipal coordination with neighboring cities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Cross-municipal coordination with neighboring cities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-cross-municipal coordination with neighboring cities",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-cross-municipal coordination with neighboring cities",
+    "name": "Cross-municipal coordination with neighboring cities",
+    "description": "Cross-municipal coordination with neighboring cities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

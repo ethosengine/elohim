@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-provincial-state-mandating transparency while protecting privacy",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-mandating transparency while protecting privacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Mandating transparency while protecting privacy",
   "description": "Mandating transparency while protecting privacy",
   "content": "Scenario: Mandating transparency while protecting privacy\n    Given public needs visibility into protocol governance\n    And individuals need privacy protection\n    When I craft transparency requirements\n    Then I require: appeal outcomes and patterns be public\n    And I mandate: constitutional council precedents accessible\n    And I ensure: individual data privacy through anonymization\n    And I specify: security audit results must be disclosed\n    And I balance: transparency serving accountability with privacy protection\n    And requirements: enable democratic oversight without surveillance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Mandating transparency while protecting privacy",
+    "ogDescription": "Mandating transparency while protecting privacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-mandating transparency while protecting privacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mandating transparency while protecting privacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-mandating transparency while protecting privacy",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-mandating transparency while protecting privacy",
+    "name": "Mandating transparency while protecting privacy",
+    "description": "Mandating transparency while protecting privacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

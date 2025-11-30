@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-community-organizer detects organizing opportunity from community complaint patterns",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer detects organizing opportunity from community complaint patterns",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer detects organizing opportunity from community complaint patterns",
   "description": "Organizer detects organizing opportunity from community complaint patterns",
   "content": "Scenario: Organizer detects organizing opportunity from community complaint patterns\n    Given 47 residents across three blocks have reported the same landlord issues\n    And most residents don't know others are affected\n    When the Observer detects the shared grievance pattern\n    Then the organizer sees the organizing opportunity alert\n    And receives contact information for residents who opted in\n    And views specific issues by building and timeline\n    And gets recommended organizing approach for tenant association\n    And isolated frustration becomes basis for collective action\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer detects organizing opportunity from community complaint patterns",
+    "ogDescription": "Organizer detects organizing opportunity from community complaint patterns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer detects organizing opportunity from community complaint patterns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer detects organizing opportunity from community complaint patterns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer detects organizing opportunity from community complaint patterns",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer detects organizing opportunity from community complaint patterns",
+    "name": "Organizer detects organizing opportunity from community complaint patterns",
+    "description": "Organizer detects organizing opportunity from community complaint patterns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

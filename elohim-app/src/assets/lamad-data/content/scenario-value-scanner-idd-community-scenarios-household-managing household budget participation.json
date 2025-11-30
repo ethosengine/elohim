@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-managing household budget participation",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-managing household budget participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing household budget participation",
   "description": "Managing household budget participation",
   "content": "Scenario: Managing household budget participation\n    Given the group home has a shared household budget\n    And housemates collectively decide on discretionary spending\n    When the household discusses buying a new game system\n    Then Jordan participates in the budget discussion with support\n    And the interface shows budget information with visual aids\n    And Jordan can express their opinion on the purchase\n    And Jordan's vote counts equally with other housemates\n    And supported decision-making helps Jordan understand options\n    And Jordan experiences democratic household governance\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing household budget participation",
+    "ogDescription": "Managing household budget participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-managing household budget participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing household budget participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-managing household budget participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-managing household budget participation",
+    "name": "Managing household budget participation",
+    "description": "Managing household budget participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

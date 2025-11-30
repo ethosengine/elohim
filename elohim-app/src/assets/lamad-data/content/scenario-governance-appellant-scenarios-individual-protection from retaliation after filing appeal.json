@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-individual-protection from retaliation after filing appeal",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-protection from retaliation after filing appeal",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Protection from retaliation after filing appeal",
   "description": "Protection from retaliation after filing appeal",
   "content": "Scenario: Protection from retaliation after filing appeal\n    Given I filed an appeal that challenged an agent's authority\n    And I was concerned about potential retaliation in future decisions\n    When I continue interacting with Elohim agents after my appeal\n    Then the appeal cannot be used against me in future decisions\n    And Agents do not punish me for exercising my right to appeal\n    And The system monitors for retaliatory patterns\n    And I have recourse if I detect bias based on my appeal history\n    And My right to dissent is protected as fundamental to the protocol\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-individual",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Protection from retaliation after filing appeal",
+    "ogDescription": "Protection from retaliation after filing appeal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-protection from retaliation after filing appeal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protection from retaliation after filing appeal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-protection from retaliation after filing appeal",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-protection from retaliation after filing appeal",
+    "name": "Protection from retaliation after filing appeal",
+    "description": "Protection from retaliation after filing appeal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

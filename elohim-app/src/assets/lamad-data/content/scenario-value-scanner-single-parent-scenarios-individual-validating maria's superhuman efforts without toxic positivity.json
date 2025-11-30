@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-individual-validating maria's superhuman efforts without toxic positivity",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-validating maria's superhuman efforts without toxic positivity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Validating Maria's superhuman efforts without toxic positivity",
   "description": "Validating Maria's superhuman efforts without toxic positivity",
   "content": "Scenario: Validating Maria's superhuman efforts without toxic positivity\n    Given Maria performs extraordinary care labor daily\n    And society often dismisses or pities single parents\n    When the personal_agent provides feedback to Maria\n    Then it should genuinely recognize her superhuman work\n    And it should validate the weight of solo parenting\n    And it should avoid toxic positivity that dismisses her struggles\n    And it should acknowledge both her strength and her legitimate exhaustion\n    And Maria should feel truly seen, not patronized\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Validating Maria's superhuman efforts without toxic positivity",
+    "ogDescription": "Validating Maria's superhuman efforts without toxic positivity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-validating maria's superhuman efforts without toxic positivity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Validating Maria's superhuman efforts without toxic positivity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-validating maria's superhuman efforts without toxic positivity",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-validating maria's superhuman efforts without toxic positivity",
+    "name": "Validating Maria's superhuman efforts without toxic positivity",
+    "description": "Validating Maria's superhuman efforts without toxic positivity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

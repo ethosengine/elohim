@@ -165,3 +165,52 @@ this.registry.register(['vr-scene', 'aframe'], VrSceneRendererComponent, 15);
 - IframeRenderer uses sandboxing
 - External URLs sanitized via DomSanitizer
 - Quiz inputs validated before submission
+
+---
+
+## Lessons Learned
+
+### CSS Variables vs Media Queries (2025-11-30)
+
+**Problem:** Headers displayed wrong color in light mode when OS was set to dark mode.
+
+**Root Cause:** The `@media (prefers-color-scheme: dark)` block hard-coded `color: #e6edf3` for headers, overriding the CSS variable `var(--lamad-text-primary)`. When the app has a manual theme toggle that updates CSS variables, the media query fought against it.
+
+**Solution:** Remove hard-coded colors from `prefers-color-scheme` media queries. Let CSS variables control colors in both modes.
+
+```css
+/* WRONG - hard-coded color overrides CSS variable */
+@media (prefers-color-scheme: dark) {
+  :host ::ng-deep .markdown-content h1 {
+    color: #e6edf3;  /* This ignores manual theme toggle */
+  }
+}
+
+/* CORRECT - let CSS variable handle theming */
+:host ::ng-deep .markdown-content h1 {
+  color: var(--lamad-text-primary, #1f2328);
+}
+
+@media (prefers-color-scheme: dark) {
+  :host ::ng-deep .markdown-content h1 {
+    border-bottom-color: #21262d;  /* Only non-variable properties */
+  }
+}
+```
+
+**Rule:** When an app has manual theme control via CSS variables, avoid hard-coding colors in `prefers-color-scheme` media queries - let the variables do the work.
+
+### Styling innerHTML with Angular View Encapsulation (2025-11-30)
+
+**Problem:** Styles don't apply to dynamically injected `[innerHTML]` content.
+
+**Solution:** Use `:host ::ng-deep` selector pattern to penetrate view encapsulation while keeping styles scoped to the component:
+
+```css
+/* Styles for innerHTML content */
+:host ::ng-deep .markdown-content p {
+  color: var(--lamad-text-primary, #1f2328);
+}
+```
+
+**Note:** `ViewEncapsulation.None` is an alternative but leaks styles globally - avoid it.

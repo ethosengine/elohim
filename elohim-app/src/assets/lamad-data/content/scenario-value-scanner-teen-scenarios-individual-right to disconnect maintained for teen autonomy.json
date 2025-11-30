@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-individual-right to disconnect maintained for teen autonomy",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-right to disconnect maintained for teen autonomy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Right to disconnect maintained for teen autonomy",
   "description": "Right to disconnect maintained for teen autonomy",
   "content": "Scenario: Right to disconnect maintained for teen autonomy\n    Given Jasmine has been using the Value Scanner extensively\n    And constitutional constraints protect her agency\n    When Jasmine chooses to disconnect from the system\n    Then the disconnection must be honored immediately\n    And no data retention beyond legal requirements should occur\n    And no manipulative patterns to retain usage should be employed\n    And her right to not participate must be respected\n    And her care contributions should be exportable in standard format\n    And she should maintain full control over her participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Right to disconnect maintained for teen autonomy",
+    "ogDescription": "Right to disconnect maintained for teen autonomy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-right to disconnect maintained for teen autonomy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Right to disconnect maintained for teen autonomy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-right to disconnect maintained for teen autonomy",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-right to disconnect maintained for teen autonomy",
+    "name": "Right to disconnect maintained for teen autonomy",
+    "description": "Right to disconnect maintained for teen autonomy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

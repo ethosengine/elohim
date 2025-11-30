@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-learning about regenerative food systems",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-learning about regenerative food systems",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning about regenerative food systems",
   "description": "Learning about regenerative food systems",
   "content": "Scenario: Learning about regenerative food systems\n    Given current industrial food systems are extractive\n    And regenerative agriculture can restore ecological health\n    When I want to understand alternatives to industrial food\n    Then the protocol should provide education about regenerative food systems\n    And connect me to regenerative food initiatives in bioregion\n    And help me envision food work that contributes to ecological restoration\n    And support transformation toward care-economy-aligned food systems\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning about regenerative food systems",
+    "ogDescription": "Learning about regenerative food systems",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-learning about regenerative food systems",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning about regenerative food systems - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-learning about regenerative food systems",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-learning about regenerative food systems",
+    "name": "Learning about regenerative food systems",
+    "description": "Learning about regenerative food systems",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

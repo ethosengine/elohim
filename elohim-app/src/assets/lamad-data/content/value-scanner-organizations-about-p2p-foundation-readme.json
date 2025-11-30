@@ -1,6 +1,8 @@
 {
   "id": "value-scanner-organizations-about-p2p-foundation-readme",
+  "did": "did:web:elohim.host:content:value-scanner:organizations:about-p2p-foundation:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Read about our Story, Mission, and Strategic Priorities",
   "content": "---\nnode_type: organization\norg_id: about_p2p_foundation\nname: \"About - P2P Foundation\"\nurl: \"https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation\"\ngem_id: \"LYwUXMNJCbRt6EvMc1uk\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [governance]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How About - P2P Foundation inspires the value_scanner epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How About - P2P Foundation inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# About - P2P Foundation\n\n## Description\n\nRead about our Story, Mission, and Strategic Priorities\n\n**Publisher:** P2P Foundation\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how About - P2P Foundation relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: governance\n\n[How About - P2P Foundation also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `governance` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -18,8 +20,51 @@
     "related_epics": [
       "governance"
     ],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation",
+    "name": "About - P2P Foundation",
+    "org_id": "about_p2p_foundation",
+    "gem_id": "LYwUXMNJCbRt6EvMc1uk",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "P2P Foundation",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How About - P2P Foundation inspires the value_scanner epic]",
+        "parallel_work": []
+      },
+      "governance": {
+        "inspiration": "[How About - P2P Foundation inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Read about our Story, Mission, and Strategic Priorities",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/value-scanner-organizations-about-p2p-foundation-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/value-scanner-organizations-about-p2p-foundation-readme",
+    "identifier": "did:web:elohim.host:content:value-scanner:organizations:about-p2p-foundation:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Read about our Story, Mission, and Strategic Priorities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

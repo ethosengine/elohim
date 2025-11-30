@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-displaced-person-scenarios-community-displaced person receives support from domestic violence network",
+  "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community-displaced person receives support from domestic violence network",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Displaced person receives support from domestic violence network",
   "description": "Displaced person receives support from domestic violence network",
   "content": "Scenario: Displaced person receives support from domestic violence network\n    Given Maria is recovering from domestic violence trauma\n    When she joins a domestic violence survivor support affinity network\n    And the network provides peer support and resources\n    Then she connects with others who understand her experience\n    And she receives practical support for rebuilding her life\n    And the network helps her access legal aid and counseling\n    And she finds strength and healing through community support\n    And her safety is maintained through privacy protections\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-displaced-person-scenarios-community",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Displaced person receives support from domestic violence network",
+    "ogDescription": "Displaced person receives support from domestic violence network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-community-displaced person receives support from domestic violence network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Displaced person receives support from domestic violence network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-community-displaced person receives support from domestic violence network",
+    "identifier": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community-displaced person receives support from domestic violence network",
+    "name": "Displaced person receives support from domestic violence network",
+    "description": "Displaced person receives support from domestic violence network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

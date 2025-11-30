@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-strategic shopping reduces transportation emissions",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-strategic shopping reduces transportation emissions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Strategic shopping reduces transportation emissions",
   "description": "Strategic shopping reduces transportation emissions",
   "content": "Scenario: Strategic shopping reduces transportation emissions\n    Given Maria carefully plans shopping trips to maximize efficiency\n    And she coordinates purchases to minimize separate trips\n    When transportation patterns are analyzed\n    Then the bioregional_elohim should recognize her efficient transportation\n    And it should value her trip consolidation as emissions reduction\n    And her careful planning should be seen as environmental stewardship\n    And economic efficiency should be recognized as climate contribution\n    And Maria should see her behavior as environmentally valuable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Strategic shopping reduces transportation emissions",
+    "ogDescription": "Strategic shopping reduces transportation emissions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-strategic shopping reduces transportation emissions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Strategic shopping reduces transportation emissions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-strategic shopping reduces transportation emissions",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-strategic shopping reduces transportation emissions",
+    "name": "Strategic shopping reduces transportation emissions",
+    "description": "Strategic shopping reduces transportation emissions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

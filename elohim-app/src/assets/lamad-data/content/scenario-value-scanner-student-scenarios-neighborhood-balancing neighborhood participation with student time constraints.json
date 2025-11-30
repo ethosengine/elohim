@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-neighborhood-balancing neighborhood participation with student time constraints",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-balancing neighborhood participation with student time constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Balancing neighborhood participation with student time constraints",
   "description": "Balancing neighborhood participation with student time constraints",
   "content": "Scenario: Balancing neighborhood participation with student time constraints\n    Given Kenji has limited time between school and work\n    And neighborhood participation requires time investment\n    When the neighborhood_elohim helps Kenji manage participation\n    Then it should help him identify high-impact, low-time contributions\n    And it should validate that he can't participate in everything\n    And it should show: \"30 minutes at neighborhood meeting = valuable contribution\"\n    And participation should be realistic for student schedules\n    And the system should enable partial participation as valid\n    And students should participate at sustainable levels\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Balancing neighborhood participation with student time constraints",
+    "ogDescription": "Balancing neighborhood participation with student time constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-balancing neighborhood participation with student time constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Balancing neighborhood participation with student time constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-balancing neighborhood participation with student time constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-balancing neighborhood participation with student time constraints",
+    "name": "Balancing neighborhood participation with student time constraints",
+    "description": "Balancing neighborhood participation with student time constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

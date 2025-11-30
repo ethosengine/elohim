@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-hosting guests and social events at home",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-hosting guests and social events at home",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Hosting guests and social events at home",
   "description": "Hosting guests and social events at home",
   "content": "Scenario: Hosting guests and social events at home\n    Given Jordan wants to invite friends to the group home\n    And the household has policies about guests\n    When Jordan plans a small gathering\n    Then the personal_agent helps Jordan coordinate with housemates\n    And the interface shows the guest policy in simple language\n    And Jordan can request guest approval using the household system\n    And housemates discuss and approve Jordan's gathering\n    And Jordan experiences autonomy in their home social life\n    And the household supports Jordan's social connections\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Hosting guests and social events at home",
+    "ogDescription": "Hosting guests and social events at home",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-hosting guests and social events at home",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Hosting guests and social events at home - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-hosting guests and social events at home",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-hosting guests and social events at home",
+    "name": "Hosting guests and social events at home",
+    "description": "Hosting guests and social events at home",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

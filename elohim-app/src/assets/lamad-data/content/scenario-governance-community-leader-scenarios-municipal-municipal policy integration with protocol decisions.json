@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipal-municipal policy integration with protocol decisions",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-municipal policy integration with protocol decisions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal policy integration with protocol decisions",
   "description": "Municipal policy integration with protocol decisions",
   "content": "Scenario: Municipal policy integration with protocol decisions\n    Given city council passes new housing affordability ordinance\n    And Municipal Elohim flags potential conflict with property protocols\n    When conflict is identified\n    Then Constitutional Council reviews constitutional alignment\n    And council determines whether ordinance or protocol needs adjustment\n    And Jamal facilitates resolution through democratic deliberation\n    And city retains policy sovereignty within constitutional bounds\n    And agents and elected government work as partners\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipal",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal policy integration with protocol decisions",
+    "ogDescription": "Municipal policy integration with protocol decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-municipal policy integration with protocol decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal policy integration with protocol decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-municipal policy integration with protocol decisions",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-municipal policy integration with protocol decisions",
+    "name": "Municipal policy integration with protocol decisions",
+    "description": "Municipal policy integration with protocol decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

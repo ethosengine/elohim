@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-11-collaboration-sensemaking-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Creating Shared Understanding: Collaboration",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "Trustville and Skeptica, and considering our module's focus on creating shared understanding and fostering trust, an engaging class discussion activity could be:  \n\"Building Trustville\"  \nInstructions:\n\nDivide the class into small groups of 4-5 students.  \nAsk each group to imagine they are Kingdom Developers tasked with transforming a digital \"Skeptica\" into a \"Trustville\" within a specific context (e.g., a church's online community, a Christian social media platform, or a faith-based educational forum).  \nHave groups discuss and develop answers to the following questions:  \na. What are the key features of your digital \"Skeptica\" that need to be addressed?  \nb. How would you apply the principles of Trustville to this digital space?  \nc. What specific tools, practices, or policies would you implement to foster trust and shared understanding?  \nd. How might you balance openness and trust with necessary safeguards against genuine threats or misuse?  \ne. In what ways can you encourage users to transfer the trust built in the digital space to their physical communities?  \nf. How would you measure the success of your efforts in building a high-trust digital community?  \nAfter group discussions, have each team present their \"Digital Trustville\" plan to the class.  \nConclude with a full-class reflection on common themes, challenges, and innovative ideas that emerged from the exercise.\n\nThis activity encourages students to apply the concepts of trust-building and shared understanding to practical, digital contexts. It also allows them to engage creatively with the challenges of fostering high-trust environments online while considering the unique perspective of Kingdom Developers.",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 11 - Create Shared Understanding - Collaboration and Sensemaking.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "understanding"
+  ],
+  "relatedNodeIds": [
+    "fct-module-11-collaboration-sensemaking"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-11-collaboration-sensemaking",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T21:10:19.218298",
+  "updatedAt": "2025-11-28T21:10:19.218299",
+  "did": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Creating Shared Understanding: Collaboration",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Creating Shared Understanding: Collaboration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-11-collaboration-sensemaking-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 11 - create shared understanding - collaboration and sensemaking",
+    "name": "Discussion: Creating Shared Understanding: Collaboration",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.218298",
+    "dateModified": "2025-11-28T21:10:19.218299",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

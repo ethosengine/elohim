@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-contributing to neighborhood care economy as newcomer",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-contributing to neighborhood care economy as newcomer",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Contributing to neighborhood care economy as newcomer",
   "description": "Contributing to neighborhood care economy as newcomer",
   "content": "Scenario: Contributing to neighborhood care economy as newcomer\n    Given Aisha is new and has few connections\n    And she wants to establish herself in the community\n    When Aisha contributes to neighborhood initiatives\n    Then the neighborhood_elohim should track her contributions\n    And it should make her care work visible to neighbors\n    And it should help her build social capital through care\n    And early contributions should establish her as community participant\n    And the system should help newcomers integrate through care economy\n    And belonging should be earned through reciprocal care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Contributing to neighborhood care economy as newcomer",
+    "ogDescription": "Contributing to neighborhood care economy as newcomer",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-contributing to neighborhood care economy as newcomer",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing to neighborhood care economy as newcomer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-contributing to neighborhood care economy as newcomer",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-contributing to neighborhood care economy as newcomer",
+    "name": "Contributing to neighborhood care economy as newcomer",
+    "description": "Contributing to neighborhood care economy as newcomer",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

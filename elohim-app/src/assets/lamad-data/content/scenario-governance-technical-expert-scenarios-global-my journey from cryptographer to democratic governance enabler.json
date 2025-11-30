@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-my journey from cryptographer to democratic governance enabler",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-my journey from cryptographer to democratic governance enabler",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "My journey from cryptographer to democratic governance enabler",
   "description": "My journey from cryptographer to democratic governance enabler",
   "content": "Scenario: My journey from cryptographer to democratic governance enabler\n    Given I began studying cryptographic AI alignment\n    And I now serve humanity's constitutional governance\n    When I reflect on my role in global democracy\n    Then I understand: expertise serves democratic flourishing\n    And I accept: that citizens must judge despite my greater knowledge\n    And I respect: human wisdom complementing technical knowledge\n    And I practice: humility about what I know and don't know\n    And I demonstrate: how technical experts serve rather than dominate\n    And I participate: in humanity's attempt to govern with superintelligent AI\n    And I know: my expertise matters most when it empowers others' judgment\n    And I embody: technical excellence serving democratic hope\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "My journey from cryptographer to democratic governance enabler",
+    "ogDescription": "My journey from cryptographer to democratic governance enabler",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-my journey from cryptographer to democratic governance enabler",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "My journey from cryptographer to democratic governance enabler - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-my journey from cryptographer to democratic governance enabler",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-my journey from cryptographer to democratic governance enabler",
+    "name": "My journey from cryptographer to democratic governance enabler",
+    "description": "My journey from cryptographer to democratic governance enabler",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-educational-learning value literacy through concrete experiences",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-learning value literacy through concrete experiences",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning value literacy through concrete experiences",
   "description": "Learning value literacy through concrete experiences",
   "content": "Scenario: Learning value literacy through concrete experiences\n    Given Tommy is at the concrete operational stage of development\n    And abstract economic thinking has not yet developed\n    When Tommy uses the Value Scanner to make care decisions\n    Then learning should occur through direct, concrete experiences\n    And the personal_agent should present choices in tangible terms\n    And abstract concepts like \"opportunity cost\" should not be introduced\n    And Tommy should learn by doing: \"Strawberries for Emma\"\n    And value literacy should be built through action, not explanation\n    And neural pathways around care-based decision making should form\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning value literacy through concrete experiences",
+    "ogDescription": "Learning value literacy through concrete experiences",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-learning value literacy through concrete experiences",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning value literacy through concrete experiences - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-educational-learning value literacy through concrete experiences",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:educational-learning value literacy through concrete experiences",
+    "name": "Learning value literacy through concrete experiences",
+    "description": "Learning value literacy through concrete experiences",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

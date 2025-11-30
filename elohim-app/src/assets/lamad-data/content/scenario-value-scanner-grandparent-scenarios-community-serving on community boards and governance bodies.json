@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-community-serving on community boards and governance bodies",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-serving on community boards and governance bodies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Serving on community boards and governance bodies",
   "description": "Serving on community boards and governance bodies",
   "content": "Scenario: Serving on community boards and governance bodies\n    Given Margaret has time, experience, and judgment to contribute\n    And community boards need skilled, committed members\n    When Margaret serves on nonprofit boards or advisory committees\n    Then the community_elohim should recognize governance work\n    And it should value her time and expertise in decision-making\n    And it should track her board service as care contribution\n    And governance participation should accumulate care tokens\n    And community should benefit from her wisdom and service\n    And retired elders should be valued in community leadership\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Serving on community boards and governance bodies",
+    "ogDescription": "Serving on community boards and governance bodies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-serving on community boards and governance bodies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Serving on community boards and governance bodies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-serving on community boards and governance bodies",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-serving on community boards and governance bodies",
+    "name": "Serving on community boards and governance bodies",
+    "description": "Serving on community boards and governance bodies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

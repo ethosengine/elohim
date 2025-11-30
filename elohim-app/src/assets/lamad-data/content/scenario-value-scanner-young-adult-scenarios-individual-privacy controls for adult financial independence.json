@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-individual-privacy controls for adult financial independence",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-privacy controls for adult financial independence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Privacy controls for adult financial independence",
   "description": "Privacy controls for adult financial independence",
   "content": "Scenario: Privacy controls for adult financial independence\n    Given Aisha has full adult autonomy\n    And she wants to keep financial details private\n    When Aisha configures her privacy settings\n    Then she should have complete control over data sharing\n    And her financial information should remain private by default\n    And she should explicitly consent to any family visibility\n    And workplace should have no access to personal data\n    And privacy controls should be granular and transparent\n    And the system should respect her adult independence\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Privacy controls for adult financial independence",
+    "ogDescription": "Privacy controls for adult financial independence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-privacy controls for adult financial independence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy controls for adult financial independence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-privacy controls for adult financial independence",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-privacy controls for adult financial independence",
+    "name": "Privacy controls for adult financial independence",
+    "description": "Privacy controls for adult financial independence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

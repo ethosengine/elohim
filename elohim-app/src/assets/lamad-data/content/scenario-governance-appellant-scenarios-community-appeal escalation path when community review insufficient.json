@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-community-appeal escalation path when community review insufficient",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:community-appeal escalation path when community review insufficient",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal escalation path when community review insufficient",
   "description": "Appeal escalation path when community review insufficient",
   "content": "Scenario: Appeal escalation path when community review insufficient\n    Given Community Elohim review upheld the original decision\n    And I remain convinced my constitutional rights were violated\n    When I choose to escalate beyond community layer\n    Then I can request peer agent review (three Family Elohim from other families)\n    And If still unsatisfied, I can escalate to Regional Constitutional Council\n    And Each layer brings fresh perspective and greater scrutiny\n    And The escalation path is accessible without legal expertise\n    And Timelines are maintained (peer review within 1 week, regional within 1 month)\n    And Higher layers don't just rubber-stamp lower decisions\n    And Genuine independent review happens at each escalation level\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal escalation path when community review insufficient",
+    "ogDescription": "Appeal escalation path when community review insufficient",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-appeal escalation path when community review insufficient",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal escalation path when community review insufficient - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-community-appeal escalation path when community review insufficient",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:community-appeal escalation path when community review insufficient",
+    "name": "Appeal escalation path when community review insufficient",
+    "description": "Appeal escalation path when community review insufficient",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

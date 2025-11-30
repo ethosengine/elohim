@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-collaborating with dr. chen on global sortition research",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-collaborating with dr. chen on global sortition research",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Collaborating with Dr. Chen on global sortition research",
   "description": "Collaborating with Dr. Chen on global sortition research",
   "content": "Scenario: Collaborating with Dr. Chen on global sortition research\n    Given Dr. Chen presents research on constitutional council effectiveness\n    And my technical expertise complements his social science\n    When I help explain technical aspects of his findings\n    Then I clarify: how technical design enables or constrains democratic oversight\n    And I interpret: patterns in agent-council interactions\n    And I assess: whether technical systems adequately support citizen governance\n    And I respect: his authority on democratic theory and outcomes\n    And we integrate: technical and social understanding\n    And we serve: evidence-based global constitutional deliberation\n    And we demonstrate: interdisciplinary collaboration\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Collaborating with Dr. Chen on global sortition research",
+    "ogDescription": "Collaborating with Dr. Chen on global sortition research",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-collaborating with dr. chen on global sortition research",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Collaborating with Dr. Chen on global sortition research - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-collaborating with dr. chen on global sortition research",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-collaborating with dr. chen on global sortition research",
+    "name": "Collaborating with Dr. Chen on global sortition research",
+    "description": "Collaborating with Dr. Chen on global sortition research",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

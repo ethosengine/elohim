@@ -1,12 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject } from 'rxjs';
 import { AffinityTrackingService } from './affinity-tracking.service';
-import { SessionUserService } from './session-user.service';
+import { SessionHumanService } from './session-human.service';
 import { ContentNode } from '../models/content-node.model';
 
 describe('AffinityTrackingService', () => {
   let service: AffinityTrackingService;
-  let sessionUserServiceSpy: jasmine.SpyObj<SessionUserService>;
+  let sessionHumanServiceSpy: jasmine.SpyObj<SessionHumanService>;
   let localStorageMock: { [key: string]: string };
   let mockStorage: Storage;
   let sessionSubject: BehaviorSubject<any>;
@@ -25,7 +25,7 @@ describe('AffinityTrackingService', () => {
 
     spyOnProperty(window, 'localStorage', 'get').and.returnValue(mockStorage);
 
-    sessionUserServiceSpy = jasmine.createSpyObj('SessionUserService', [
+    sessionHumanServiceSpy = jasmine.createSpyObj('SessionHumanService', [
       'getSessionId',
       'getAffinityStorageKey',
       'recordContentView',
@@ -33,17 +33,17 @@ describe('AffinityTrackingService', () => {
     ]);
 
     sessionSubject = new BehaviorSubject<any>(null);
-    Object.defineProperty(sessionUserServiceSpy, 'session$', {
+    Object.defineProperty(sessionHumanServiceSpy, 'session$', {
       get: () => sessionSubject.asObservable()
     });
 
-    sessionUserServiceSpy.getSessionId.and.returnValue('test-session');
-    sessionUserServiceSpy.getAffinityStorageKey.and.returnValue('affinity-test-session');
+    sessionHumanServiceSpy.getSessionId.and.returnValue('test-session');
+    sessionHumanServiceSpy.getAffinityStorageKey.and.returnValue('affinity-test-session');
 
     TestBed.configureTestingModule({
       providers: [
         AffinityTrackingService,
-        { provide: SessionUserService, useValue: sessionUserServiceSpy }
+        { provide: SessionHumanService, useValue: sessionHumanServiceSpy }
       ]
     });
 
@@ -112,7 +112,7 @@ describe('AffinityTrackingService', () => {
 
     it('should record affinity change in session service', () => {
       service.setAffinity('node-1', 0.6);
-      expect(sessionUserServiceSpy.recordAffinityChange).toHaveBeenCalledWith('node-1', 0.6);
+      expect(sessionHumanServiceSpy.recordAffinityChange).toHaveBeenCalledWith('node-1', 0.6);
     });
   });
 
@@ -150,7 +150,7 @@ describe('AffinityTrackingService', () => {
 
     it('should record view in session service', () => {
       service.trackView('node-1');
-      expect(sessionUserServiceSpy.recordContentView).toHaveBeenCalledWith('node-1');
+      expect(sessionHumanServiceSpy.recordContentView).toHaveBeenCalledWith('node-1');
     });
   });
 
@@ -267,7 +267,7 @@ describe('AffinityTrackingService', () => {
     it('should emit current affinity state', (done) => {
       service.affinity$.subscribe(affinity => {
         expect(affinity).toBeTruthy();
-        expect(affinity.userId).toBeDefined();
+        expect(affinity.humanId).toBeDefined();
         done();
       });
     });
@@ -284,7 +284,7 @@ describe('AffinityTrackingService', () => {
 
     it('should load existing affinity from localStorage on session change', () => {
       const existingData = {
-        userId: 'test-user',
+        humanId: 'test-user',
         affinity: { 'existing-node': 0.9 },
         lastUpdated: new Date().toISOString()
       };

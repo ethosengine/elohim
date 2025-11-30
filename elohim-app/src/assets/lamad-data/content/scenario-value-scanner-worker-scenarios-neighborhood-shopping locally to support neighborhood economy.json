@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-neighborhood-shopping locally to support neighborhood economy",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-shopping locally to support neighborhood economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Shopping locally to support neighborhood economy",
   "description": "Shopping locally to support neighborhood economy",
   "content": "Scenario: Shopping locally to support neighborhood economy\n    Given I need to buy groceries and household items\n    And local businesses are part of neighborhood care economy\n    When I shop for necessities\n    Then the protocol should identify accessible local businesses\n    And recognize that shopping locally is care economy participation\n    And show me how my purchases support neighborhood resilience\n    And accumulate care tokens for supporting local commerce\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Shopping locally to support neighborhood economy",
+    "ogDescription": "Shopping locally to support neighborhood economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-shopping locally to support neighborhood economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Shopping locally to support neighborhood economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-shopping locally to support neighborhood economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-shopping locally to support neighborhood economy",
+    "name": "Shopping locally to support neighborhood economy",
+    "description": "Shopping locally to support neighborhood economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

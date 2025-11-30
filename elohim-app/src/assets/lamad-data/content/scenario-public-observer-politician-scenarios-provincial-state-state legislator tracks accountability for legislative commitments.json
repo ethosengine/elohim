@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-state legislator tracks accountability for legislative commitments",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator tracks accountability for legislative commitments",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "State legislator tracks accountability for legislative commitments",
   "description": "State legislator tracks accountability for legislative commitments",
   "content": "Scenario: State legislator tracks accountability for legislative commitments\n    Given the politician co-sponsored criminal justice reform bill\n    And committed to reducing incarceration rates\n    When the Observer monitors policy implementation\n    Then they see whether state agencies implement legislative intent\n    And track incarceration trends after legislation passage\n    And identify bureaucratic resistance to reform\n    And receive alerts when outcomes diverge from expectations\n    And intervene to ensure legislation achieves intended impact\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "State legislator tracks accountability for legislative commitments",
+    "ogDescription": "State legislator tracks accountability for legislative commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator tracks accountability for legislative commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "State legislator tracks accountability for legislative commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator tracks accountability for legislative commitments",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator tracks accountability for legislative commitments",
+    "name": "State legislator tracks accountability for legislative commitments",
+    "description": "State legislator tracks accountability for legislative commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

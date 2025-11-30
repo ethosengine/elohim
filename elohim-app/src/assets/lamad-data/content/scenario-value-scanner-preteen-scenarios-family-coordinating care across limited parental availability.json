@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-coordinating care across limited parental availability",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-coordinating care across limited parental availability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating care across limited parental availability",
   "description": "Coordinating care across limited parental availability",
   "content": "Scenario: Coordinating care across limited parental availability\n    Given Sarah's work schedule limits her availability\n    And Marcus manages daily household operations\n    When coordination is needed between them\n    Then the family_elohim should facilitate asynchronous communication\n    And Sarah should be able to provide guidance during her available hours\n    And Marcus should be able to request help when needed\n    And the system should ensure Sarah stays informed despite time constraints\n    And coordination should happen efficiently without constant interruption\n    And their partnership should function despite scheduling challenges\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating care across limited parental availability",
+    "ogDescription": "Coordinating care across limited parental availability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-coordinating care across limited parental availability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating care across limited parental availability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-coordinating care across limited parental availability",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-coordinating care across limited parental availability",
+    "name": "Coordinating care across limited parental availability",
+    "description": "Coordinating care across limited parental availability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-identifying unsafe or harmful workplace conditions",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-identifying unsafe or harmful workplace conditions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Identifying unsafe or harmful workplace conditions",
   "description": "Identifying unsafe or harmful workplace conditions",
   "content": "Scenario: Identifying unsafe or harmful workplace conditions\n    Given restaurant work involves physical demands and potential hazards\n    When I experience unsafe conditions or health risks\n    Then the workplace_elohim should help me identify hazards\n    And provide information about workplace safety rights\n    And support me in reporting unsafe conditions\n    And advocate for conditions that protect workers' health\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Identifying unsafe or harmful workplace conditions",
+    "ogDescription": "Identifying unsafe or harmful workplace conditions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-identifying unsafe or harmful workplace conditions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Identifying unsafe or harmful workplace conditions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-identifying unsafe or harmful workplace conditions",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-identifying unsafe or harmful workplace conditions",
+    "name": "Identifying unsafe or harmful workplace conditions",
+    "description": "Identifying unsafe or harmful workplace conditions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

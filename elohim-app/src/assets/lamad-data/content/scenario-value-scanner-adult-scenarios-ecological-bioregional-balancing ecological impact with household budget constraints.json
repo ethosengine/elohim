@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-balancing ecological impact with household budget constraints",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-balancing ecological impact with household budget constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Balancing ecological impact with household budget constraints",
   "description": "Balancing ecological impact with household budget constraints",
   "content": "Scenario: Balancing ecological impact with household budget constraints\n    Given Sarah wants to make environmentally responsible choices\n    And household budget is $65k/year with tight food budget\n    When Sarah makes purchasing decisions\n    Then the bioregional_elohim should present ecological impact information\n    And it should integrate cost, nutrition, and environmental factors\n    And it should help Sarah make best choices within budget constraints\n    And ecological care should not be only available to wealthy\n    And affordable options should be environmentally informed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Balancing ecological impact with household budget constraints",
+    "ogDescription": "Balancing ecological impact with household budget constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-balancing ecological impact with household budget constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Balancing ecological impact with household budget constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-balancing ecological impact with household budget constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-balancing ecological impact with household budget constraints",
+    "name": "Balancing ecological impact with household budget constraints",
+    "description": "Balancing ecological impact with household budget constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

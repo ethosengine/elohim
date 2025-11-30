@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-community-parent receives child-focused community updates",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:community-parent receives child-focused community updates",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent receives child-focused community updates",
   "description": "Parent receives child-focused community updates",
   "content": "Scenario: Parent receives child-focused community updates\n    Given the parent works shifts and has 15 minutes during lunch\n    And community decisions were made last night about parks and safety\n    When the parent checks their morning brief\n    Then they see only decisions affecting their children's bus stops, parks, and routes\n    And the summary takes 3 minutes to read\n    And jargon is translated to real impacts (\"longer walk,\" \"no crossing guard\")\n    And the parent can submit feedback during their break\n    And civic engagement fits into a working parent's schedule\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent receives child-focused community updates",
+    "ogDescription": "Parent receives child-focused community updates",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-community-parent receives child-focused community updates",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent receives child-focused community updates - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-community-parent receives child-focused community updates",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:community-parent receives child-focused community updates",
+    "name": "Parent receives child-focused community updates",
+    "description": "Parent receives child-focused community updates",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

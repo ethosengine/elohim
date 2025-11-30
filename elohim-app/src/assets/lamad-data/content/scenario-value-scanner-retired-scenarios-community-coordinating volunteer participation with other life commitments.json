@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-community-coordinating volunteer participation with other life commitments",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-coordinating volunteer participation with other life commitments",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating volunteer participation with other life commitments",
   "description": "Coordinating volunteer participation with other life commitments",
   "content": "Scenario: Coordinating volunteer participation with other life commitments\n    Given Frank volunteers 20 hours/week\n    And he also provides family care and participates in neighborhood governance\n    When the community_elohim coordinates his participation\n    Then it should integrate volunteer work with other commitments\n    And help Frank maintain sustainable participation level\n    And prevent volunteer burnout through overcommitment\n    And coordinate scheduling across community, family, and neighborhood\n    And support Frank in balancing diverse care contributions\n    And enable long-term sustainable volunteer engagement\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating volunteer participation with other life commitments",
+    "ogDescription": "Coordinating volunteer participation with other life commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-coordinating volunteer participation with other life commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating volunteer participation with other life commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-coordinating volunteer participation with other life commitments",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-coordinating volunteer participation with other life commitments",
+    "name": "Coordinating volunteer participation with other life commitments",
+    "description": "Coordinating volunteer participation with other life commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

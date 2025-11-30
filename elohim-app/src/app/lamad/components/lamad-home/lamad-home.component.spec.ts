@@ -3,6 +3,8 @@ import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
 import { PathService } from '../../services/path.service';
+import { ProfileService } from '../../services/profile.service';
+import { AgentService } from '../../services/agent.service';
 import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 
 describe('LamadHomeComponent', () => {
@@ -10,6 +12,8 @@ describe('LamadHomeComponent', () => {
   let fixture: ComponentFixture<LamadHomeComponent>;
   let pathService: jasmine.SpyObj<PathService>;
   let router: jasmine.SpyObj<Router>;
+  let profileService: jasmine.SpyObj<ProfileService>;
+  let agentService: jasmine.SpyObj<AgentService>;
   let localStorageMock: { [key: string]: string };
 
   const mockPaths: PathIndexEntry[] = [
@@ -42,6 +46,8 @@ describe('LamadHomeComponent', () => {
   beforeEach(async () => {
     const pathServiceSpy = jasmine.createSpyObj('PathService', ['listPaths']);
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    const profileServiceSpy = jasmine.createSpyObj('ProfileService', ['getCurrentFocus']);
+    const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getCurrentAgentId', 'getAgentProgress']);
 
     // Mock localStorage
     localStorageMock = {};
@@ -56,14 +62,21 @@ describe('LamadHomeComponent', () => {
       imports: [LamadHomeComponent],
       providers: [
         { provide: PathService, useValue: pathServiceSpy },
-        { provide: Router, useValue: routerSpy }
+        { provide: Router, useValue: routerSpy },
+        { provide: ProfileService, useValue: profileServiceSpy },
+        { provide: AgentService, useValue: agentServiceSpy }
       ]
     }).compileComponents();
 
     pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
     router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    profileService = TestBed.inject(ProfileService) as jasmine.SpyObj<ProfileService>;
+    agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
 
     pathService.listPaths.and.returnValue(of(mockPathIndex));
+    profileService.getCurrentFocus.and.returnValue(of([]));
+    agentService.getCurrentAgentId.and.returnValue('test-agent');
+    agentService.getAgentProgress.and.returnValue(of([]));
 
     fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
@@ -190,12 +203,12 @@ describe('LamadHomeComponent', () => {
   it('should load saved view mode from localStorage', () => {
     localStorageMock['lamad-view-mode'] = 'explore';
 
-    const newComponent = new LamadHomeComponent(pathService, router);
+    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
     expect(newComponent.viewMode).toBe('explore');
   });
 
   it('should default to paths mode if no saved preference', () => {
-    const newComponent = new LamadHomeComponent(pathService, router);
+    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
     expect(newComponent.viewMode).toBe('paths');
   });
 
@@ -209,5 +222,52 @@ describe('LamadHomeComponent', () => {
 
     expect(component['destroy$'].next).toHaveBeenCalled();
     expect(component['destroy$'].complete).toHaveBeenCalled();
+  });
+
+  it('should return null for getPathProgress when no progress exists', () => {
+    expect(component.getPathProgress('non-existent-path')).toBeNull();
+  });
+
+  it('should return progress percentage from pathProgressMap', () => {
+    component.pathProgressMap.set('test-path', 50);
+    expect(component.getPathProgress('test-path')).toBe(50);
+  });
+
+  it('should populate pathProgressMap from agent progress', () => {
+    const mockAgentProgress = [
+      {
+        agentId: 'test-agent',
+        pathId: 'elohim-protocol',
+        currentStepIndex: 2,
+        completedStepIndices: [0, 1],
+        startedAt: '2025-01-01T00:00:00.000Z',
+        lastActivityAt: '2025-01-02T00:00:00.000Z',
+        stepAffinity: {},
+        stepNotes: {},
+        reflectionResponses: {},
+        attestationsEarned: []
+      },
+      {
+        agentId: 'test-agent',
+        pathId: 'learning-platform',
+        currentStepIndex: 3,
+        completedStepIndices: [0, 1, 2],
+        startedAt: '2025-01-01T00:00:00.000Z',
+        lastActivityAt: '2025-01-03T00:00:00.000Z',
+        completedAt: '2025-01-03T00:00:00.000Z',
+        stepAffinity: {},
+        stepNotes: {},
+        reflectionResponses: {},
+        attestationsEarned: []
+      }
+    ];
+    agentService.getAgentProgress.and.returnValue(of(mockAgentProgress));
+
+    fixture.detectChanges();
+
+    // elohim-protocol has 5 steps, 2 completed = 40%
+    expect(component.pathProgressMap.get('elohim-protocol')).toBe(40);
+    // learning-platform is completed = 100%
+    expect(component.pathProgressMap.get('learning-platform')).toBe(100);
   });
 });

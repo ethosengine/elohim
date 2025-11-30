@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-neighborhood-contributing skills to neighborhood when available",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-contributing skills to neighborhood when available",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Contributing skills to neighborhood when available",
   "description": "Contributing skills to neighborhood when available",
   "content": "Scenario: Contributing skills to neighborhood when available\n    Given I have food preparation skills from my restaurant work\n    And neighbors might benefit from these skills\n    When I have rare free time\n    Then the protocol should help me share skills with neighborhood\n    And coordinate skill-sharing or teaching opportunities\n    And accumulate care tokens for skill contribution\n    And build neighborhood capacity through skill distribution\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Contributing skills to neighborhood when available",
+    "ogDescription": "Contributing skills to neighborhood when available",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-contributing skills to neighborhood when available",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing skills to neighborhood when available - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-contributing skills to neighborhood when available",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-contributing skills to neighborhood when available",
+    "name": "Contributing skills to neighborhood when available",
+    "description": "Contributing skills to neighborhood when available",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

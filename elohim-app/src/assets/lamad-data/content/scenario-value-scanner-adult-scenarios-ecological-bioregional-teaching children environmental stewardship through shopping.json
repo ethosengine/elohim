@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-teaching children environmental stewardship through shopping",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-teaching children environmental stewardship through shopping",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching children environmental stewardship through shopping",
   "description": "Teaching children environmental stewardship through shopping",
   "content": "Scenario: Teaching children environmental stewardship through shopping\n    Given Sarah is raising Tommy (5) and Emma (8)\n    And she wants them to learn ecological care\n    When Sarah uses the Value Scanner with children\n    Then the bioregional_elohim should provide age-appropriate environmental education\n    And Tommy should learn concrete care for food (not abstract sustainability)\n    And Emma should learn connections between care for people and planet\n    And shopping should be teaching moment for ecological stewardship\n    And children should internalize environmental care as care work\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching children environmental stewardship through shopping",
+    "ogDescription": "Teaching children environmental stewardship through shopping",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-teaching children environmental stewardship through shopping",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching children environmental stewardship through shopping - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-teaching children environmental stewardship through shopping",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-teaching children environmental stewardship through shopping",
+    "name": "Teaching children environmental stewardship through shopping",
+    "description": "Teaching children environmental stewardship through shopping",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

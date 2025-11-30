@@ -1,6 +1,8 @@
 {
   "id": "feature-social-medium-community-moderator-scenarios-community",
+  "did": "did:web:elohim.host:content:social-medium:community-moderator:scenarios:community",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Community Space Moderation with Restorative Approach",
   "description": "As a community_moderator in the social_medium system Operating at the community governance layer I want to maintain healthy spaces where human flourishing is possible So that communities can coordinate and communicate without harm",
   "content": "@epic:social_medium\n@user_type:community_moderator\n@governance_layer:community\n@related_users:activist,content_creator,child,elder\n@related_layers:neighborhood,district,affinity_network\n@elohim_agents:moderation_agent,pattern_detection_agent,restorative_justice_agent\n\nFeature: Community Space Moderation with Restorative Approach\n  As a community_moderator in the social_medium system\n  Operating at the community governance layer\n  I want to maintain healthy spaces where human flourishing is possible\n  So that communities can coordinate and communicate without harm\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_moderator user is registered in the system\n    And the community governance context is active\n    And the moderator is Alex, serving the Riverside community\n\n  Scenario: Moderator resolves conflict with restorative approach\n    Given two community members have an escalating disagreement\n    And the moderation agent alerts Alex to rising tension\n    When Alex reviews the full context and conversation history\n    And sees both parties have history of positive contributions\n    Then Alex initiates restorative dialogue process\n    And both parties can express their concerns privately\n    And Alex helps them find common ground and mutual understanding\n    And the conflict is resolved without punitive action\n    And both parties remain active, valued community members\n\n  Scenario: Moderator detects and prevents infiltration attempt\n    Given the housing justice organizing space has active membership\n    When the pattern detection agent identifies suspicious new member\n    And the new member exhibits patterns of infiltrator behavior\n    Then Alex receives alert with evidence of concerning patterns\n    And Alex can see the member lacks community trust connections\n    And Alex reviews their contribution patterns and tactics\n    And Alex prevents the infiltrator from disrupting organizing\n    And the space remains safe for genuine organizing work\n\n  Scenario: Moderator protects child while educating peer\n    Given a teenage member posts content inappropriate for younger children\n    And the guardian agent prevents younger children from seeing it\n    When Alex is notified of the age-appropriateness issue\n    Then Alex reaches out to the teenager with education, not punishment\n    And explains how to gauge age-appropriateness\n    And the teenager learns and adjusts future contributions\n    And younger children were protected without the teenager being shamed\n    And restorative education prevented future issues\n\n  Scenario: Moderator coordinates with other moderators on cross-community issue\n    Given a coordinated harassment campaign targets multiple communities\n    And the pattern detection agent identifies the coordinated nature\n    When Alex and moderators from affected communities are alerted\n    Then they can coordinate response while respecting local autonomy\n    And each community handles the issue according to their standards\n    And patterns are shared to protect other communities\n    And the coordinated attack is neutralized through cooperation\n",
@@ -28,6 +30,32 @@
     "epic": "social_medium",
     "scenarioCount": 4
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Community Space Moderation with Restorative Approach",
+    "ogDescription": "As a community_moderator in the social_medium system Operating at the community governance layer I want to maintain healthy spaces where human flourishing is possible So that communities can coordinat",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-community-moderator-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Space Moderation with Restorative Approach - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-community-moderator-scenarios-community",
+    "identifier": "did:web:elohim.host:content:social-medium:community-moderator:scenarios:community",
+    "name": "Community Space Moderation with Restorative Approach",
+    "description": "As a community_moderator in the social_medium system Operating at the community governance layer I want to maintain healthy spaces where human flourishing is possible So that communities can coordinate and communicate without harm",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

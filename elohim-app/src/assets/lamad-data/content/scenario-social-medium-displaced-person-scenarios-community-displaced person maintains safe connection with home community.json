@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+  "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community-displaced person maintains safe connection with home community",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Displaced person maintains safe connection with home community",
   "description": "Displaced person maintains safe connection with home community",
   "content": "Scenario: Displaced person maintains safe connection with home community\n    Given Maria left her hometown to escape an abusive partner\n    And she wants to stay connected with friends and family back home\n    When Maria configures her privacy settings for selective visibility\n    And she marks her abuser and his associates as blocked\n    Then she can communicate with trusted home community members\n    And her new location is never revealed to blocked individuals\n    And her abuser cannot find or contact her through the system\n    And she maintains important relationships while staying safe\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-displaced-person-scenarios-community",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Displaced person maintains safe connection with home community",
+    "ogDescription": "Displaced person maintains safe connection with home community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Displaced person maintains safe connection with home community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+    "identifier": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community-displaced person maintains safe connection with home community",
+    "name": "Displaced person maintains safe connection with home community",
+    "description": "Displaced person maintains safe connection with home community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

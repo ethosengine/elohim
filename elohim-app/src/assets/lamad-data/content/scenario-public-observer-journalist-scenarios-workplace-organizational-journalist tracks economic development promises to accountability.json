@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist tracks economic development promises to accountability",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist tracks economic development promises to accountability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist tracks economic development promises to accountability",
   "description": "Journalist tracks economic development promises to accountability",
   "content": "Scenario: Journalist tracks economic development promises to accountability\n    Given company received tax incentives for job creation\n    And the journalist covered initial economic development announcement\n    When the Observer monitors job creation and wage outcomes\n    Then the journalist finds company created 40% of promised jobs\n    And sees wages are lower than promised in tax incentive agreement\n    And documents tax breaks cost more than economic benefit\n    And identifies lack of enforcement from economic development agency\n    And publishes accountability story on corporate welfare waste\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist tracks economic development promises to accountability",
+    "ogDescription": "Journalist tracks economic development promises to accountability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist tracks economic development promises to accountability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist tracks economic development promises to accountability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist tracks economic development promises to accountability",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist tracks economic development promises to accountability",
+    "name": "Journalist tracks economic development promises to accountability",
+    "description": "Journalist tracks economic development promises to accountability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

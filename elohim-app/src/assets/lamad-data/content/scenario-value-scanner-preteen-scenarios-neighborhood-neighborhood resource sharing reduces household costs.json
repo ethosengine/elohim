@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood resource sharing reduces household costs",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-neighborhood resource sharing reduces household costs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood resource sharing reduces household costs",
   "description": "Neighborhood resource sharing reduces household costs",
   "content": "Scenario: Neighborhood resource sharing reduces household costs\n    Given many families have similar needs\n    And resource sharing could reduce individual costs\n    When the neighborhood_elohim identifies sharing opportunities\n    Then Marcus's family should be connected to sharing networks\n    And bulk buying cooperatives should be suggested\n    And tool libraries and resource sharing should be facilitated\n    And neighborhood coordination should stretch Marcus's budget further\n    And collective consumption should reduce individual scarcity\n    And care economy should operate at neighborhood scale\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood resource sharing reduces household costs",
+    "ogDescription": "Neighborhood resource sharing reduces household costs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood resource sharing reduces household costs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood resource sharing reduces household costs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-neighborhood resource sharing reduces household costs",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-neighborhood resource sharing reduces household costs",
+    "name": "Neighborhood resource sharing reduces household costs",
+    "description": "Neighborhood resource sharing reduces household costs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

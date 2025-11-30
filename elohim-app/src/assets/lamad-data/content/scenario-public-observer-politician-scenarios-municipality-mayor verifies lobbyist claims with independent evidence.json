@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-municipality-mayor verifies lobbyist claims with independent evidence",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-mayor verifies lobbyist claims with independent evidence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Mayor verifies lobbyist claims with independent evidence",
   "description": "Mayor verifies lobbyist claims with independent evidence",
   "content": "Scenario: Mayor verifies lobbyist claims with independent evidence\n    Given business lobbyists claim regulations will kill jobs\n    And present alarming economic projections\n    When the Observer fact-checks lobbying claims\n    Then they see similar regulations in comparable cities\n    And review actual economic impacts versus predicted disasters\n    And identify which lobbyist projections proved accurate historically\n    And evaluate claims against track record\n    And resist manipulation through evidence-based analysis\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Mayor verifies lobbyist claims with independent evidence",
+    "ogDescription": "Mayor verifies lobbyist claims with independent evidence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-mayor verifies lobbyist claims with independent evidence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mayor verifies lobbyist claims with independent evidence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-mayor verifies lobbyist claims with independent evidence",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-mayor verifies lobbyist claims with independent evidence",
+    "name": "Mayor verifies lobbyist claims with independent evidence",
+    "description": "Mayor verifies lobbyist claims with independent evidence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

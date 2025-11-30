@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-county-regional-developer negotiates regional community benefits agreement",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-developer negotiates regional community benefits agreement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer negotiates regional community benefits agreement",
   "description": "Developer negotiates regional community benefits agreement",
   "content": "Scenario: Developer negotiates regional community benefits agreement\n    Given a developer's project has significant regional impacts\n    And multiple communities demand input and benefits\n    When the Observer facilitates regional benefit negotiations\n    Then the developer engages stakeholders from all affected jurisdictions\n    And negotiates benefits addressing regional not just local impacts\n    And commits to workforce development benefiting regional residents\n    And Observer tracks delivery across jurisdictional boundaries\n    And regional accountability prevents divide-and-conquer tactics\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer negotiates regional community benefits agreement",
+    "ogDescription": "Developer negotiates regional community benefits agreement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-developer negotiates regional community benefits agreement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer negotiates regional community benefits agreement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-developer negotiates regional community benefits agreement",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-developer negotiates regional community benefits agreement",
+    "name": "Developer negotiates regional community benefits agreement",
+    "description": "Developer negotiates regional community benefits agreement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

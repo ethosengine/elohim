@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional economic localization supports care and ecological resilience",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-bioregional economic localization supports care and ecological resilience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional economic localization supports care and ecological resilience",
   "description": "Bioregional economic localization supports care and ecological resilience",
   "content": "Scenario: Bioregional economic localization supports care and ecological resilience\n    Given globalized economy increases ecological impact\n    And bioregional economic localization can reduce impact while building care economy\n    And Robert's economic choices affect regional resilience\n    When bioregional_elohim supports economic localization\n    Then it should help Robert source goods and services bioregionally\n    And connect him to regional producers, workers, and care economy networks\n    And recognize that local economic participation reduces transportation impact\n    And demonstrate that care economy and ecological sustainability align through localization\n    And build bioregional economic resilience through local exchange\n    And reduce ecological impact through regional economic relationships\n    And advance care economy through bioregional economic networks\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional economic localization supports care and ecological resilience",
+    "ogDescription": "Bioregional economic localization supports care and ecological resilience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional economic localization supports care and ecological resilience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional economic localization supports care and ecological resilience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional economic localization supports care and ecological resilience",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-bioregional economic localization supports care and ecological resilience",
+    "name": "Bioregional economic localization supports care and ecological resilience",
+    "description": "Bioregional economic localization supports care and ecological resilience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

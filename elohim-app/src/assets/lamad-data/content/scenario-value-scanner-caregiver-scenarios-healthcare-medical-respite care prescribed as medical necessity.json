@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-respite care prescribed as medical necessity",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-respite care prescribed as medical necessity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Respite care prescribed as medical necessity",
   "description": "Respite care prescribed as medical necessity",
   "content": "Scenario: Respite care prescribed as medical necessity\n    Given caregiver burnout threatens James's ability to provide care\n    And respite is essential for sustainable caregiving\n    When the healthcare_elohim advocates for respite\n    Then respite care should be prescribed as medical necessity\n    And insurance should cover respite like other medical care\n    And providers should understand caregiver burnout is medical concern\n    And James's health should be recognized as essential care infrastructure\n    And healthcare system should support caregiver sustainability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Respite care prescribed as medical necessity",
+    "ogDescription": "Respite care prescribed as medical necessity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-respite care prescribed as medical necessity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Respite care prescribed as medical necessity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-respite care prescribed as medical necessity",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-respite care prescribed as medical necessity",
+    "name": "Respite care prescribed as medical necessity",
+    "description": "Respite care prescribed as medical necessity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

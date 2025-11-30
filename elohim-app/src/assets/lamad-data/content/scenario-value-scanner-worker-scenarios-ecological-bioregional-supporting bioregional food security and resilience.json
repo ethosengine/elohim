@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-supporting bioregional food security and resilience",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-supporting bioregional food security and resilience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Supporting bioregional food security and resilience",
   "description": "Supporting bioregional food security and resilience",
   "content": "Scenario: Supporting bioregional food security and resilience\n    Given bioregions need resilient local food systems\n    And my food preparation skills contribute to food security\n    When I want to support bioregional food resilience\n    Then the protocol should connect me to community food security initiatives\n    And help me contribute skills to mutual aid food programs\n    And recognize that local food systems support community and ecological resilience\n    And build bioregional capacity for food sovereignty\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Supporting bioregional food security and resilience",
+    "ogDescription": "Supporting bioregional food security and resilience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-supporting bioregional food security and resilience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting bioregional food security and resilience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-supporting bioregional food security and resilience",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-supporting bioregional food security and resilience",
+    "name": "Supporting bioregional food security and resilience",
+    "description": "Supporting bioregional food security and resilience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

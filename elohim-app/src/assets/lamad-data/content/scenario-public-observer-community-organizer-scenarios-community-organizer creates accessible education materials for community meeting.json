@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-community-organizer creates accessible education materials for community meeting",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer creates accessible education materials for community meeting",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer creates accessible education materials for community meeting",
   "description": "Organizer creates accessible education materials for community meeting",
   "content": "Scenario: Organizer creates accessible education materials for community meeting\n    Given the organizer is holding meeting about proposed zoning changes\n    And community members have limited policy literacy and speak multiple languages\n    When the organizer requests education materials from Observer\n    Then they receive one-page summary in plain language\n    And get versions in Spanish, Mandarin, and Vietnamese\n    And see visual infographics showing community impact\n    And access deeper detail for residents who want more information\n    And 47-page staff report becomes accessible to whole community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer creates accessible education materials for community meeting",
+    "ogDescription": "Organizer creates accessible education materials for community meeting",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer creates accessible education materials for community meeting",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer creates accessible education materials for community meeting - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-community-organizer creates accessible education materials for community meeting",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:community-organizer creates accessible education materials for community meeting",
+    "name": "Organizer creates accessible education materials for community meeting",
+    "description": "Organizer creates accessible education materials for community meeting",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

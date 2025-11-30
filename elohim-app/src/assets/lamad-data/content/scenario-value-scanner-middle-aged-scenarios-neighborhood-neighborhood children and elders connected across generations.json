@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood children and elders connected across generations",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood children and elders connected across generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood children and elders connected across generations",
   "description": "Neighborhood children and elders connected across generations",
   "content": "Scenario: Neighborhood children and elders connected across generations\n    Given Robert's grandchild occasionally visits\n    And neighborhood has elderly residents and young families\n    And intergenerational connection benefits everyone\n    When neighborhood_elohim facilitates intergenerational connection\n    Then it should coordinate intergenerational activities\n    And connect Robert's visiting grandchild with neighborhood children\n    And facilitate connections between neighborhood elders and families\n    And build multigenerational neighborhood care networks\n    And reduce isolation for elderly residents\n    And provide care and enrichment for children\n    And demonstrate that neighborhoods thrive through age diversity\n    And strengthen community through intergenerational care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood children and elders connected across generations",
+    "ogDescription": "Neighborhood children and elders connected across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood children and elders connected across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood children and elders connected across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood children and elders connected across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood children and elders connected across generations",
+    "name": "Neighborhood children and elders connected across generations",
+    "description": "Neighborhood children and elders connected across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

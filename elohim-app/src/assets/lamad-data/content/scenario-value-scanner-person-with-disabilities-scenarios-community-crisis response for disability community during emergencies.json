@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-crisis response for disability community during emergencies",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-crisis response for disability community during emergencies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Crisis response for disability community during emergencies",
   "description": "Crisis response for disability community during emergencies",
   "content": "Scenario: Crisis response for disability community during emergencies\n    Given emergencies disproportionately harm disabled people\n    And Alex coordinates disability community emergency response\n    When community faces crisis (pandemic, disaster, etc.)\n    Then Alex's crisis organizing should be recognized as essential care work\n    And the community_elohim should support disability-led emergency response\n    And Alex's work protecting vulnerable community members should be highly valued\n    And care tokens should reflect the lifesaving nature of crisis work\n    And the protocol should enable rapid mutual aid coordination\n    And disability community expertise should guide emergency systems\n    And Alex's leadership should be supported with resources\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Crisis response for disability community during emergencies",
+    "ogDescription": "Crisis response for disability community during emergencies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-crisis response for disability community during emergencies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crisis response for disability community during emergencies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-crisis response for disability community during emergencies",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-crisis response for disability community during emergencies",
+    "name": "Crisis response for disability community during emergencies",
+    "description": "Crisis response for disability community during emergencies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

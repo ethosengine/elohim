@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm financial transparency builds trust and informed decision-making",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farm financial transparency builds trust and informed decision-making",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Farm financial transparency builds trust and informed decision-making",
   "description": "Farm financial transparency builds trust and informed decision-making",
   "content": "Scenario: Farm financial transparency builds trust and informed decision-making\n    Given farmworkers previously had no visibility into farm finances\n    And lack of transparency created distrust and uninformed compensation discussions\n    When democratic governance requires financial transparency\n    Then farmworkers see complete financial picture: revenue, costs, margins, investments\n    And compensation decisions are informed by transparent profit distribution\n    And financial education is provided helping workers understand farm economics\n    And trust builds through transparency replacing suspicion from opacity\n    And workplace_elohim provides financial transparency dashboards for democratic governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Farm financial transparency builds trust and informed decision-making",
+    "ogDescription": "Farm financial transparency builds trust and informed decision-making",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm financial transparency builds trust and informed decision-making",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Farm financial transparency builds trust and informed decision-making - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm financial transparency builds trust and informed decision-making",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farm financial transparency builds trust and informed decision-making",
+    "name": "Farm financial transparency builds trust and informed decision-making",
+    "description": "Farm financial transparency builds trust and informed decision-making",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

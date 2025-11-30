@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-community-organizing and coordinating community care initiatives",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-organizing and coordinating community care initiatives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizing and coordinating community care initiatives",
   "description": "Organizing and coordinating community care initiatives",
   "content": "Scenario: Organizing and coordinating community care initiatives\n    Given Margaret has organizational skills and community connections\n    And community care initiatives need coordination\n    When Margaret helps organize mutual aid, care networks, or community programs\n    Then the community_elohim should recognize organizational labor\n    And it should value coordination work as essential care\n    And it should support Margaret in community organizing\n    And organizational leadership should accumulate care tokens\n    And community should benefit from her coordination skills\n    And care infrastructure should be built and maintained\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizing and coordinating community care initiatives",
+    "ogDescription": "Organizing and coordinating community care initiatives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-organizing and coordinating community care initiatives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizing and coordinating community care initiatives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-organizing and coordinating community care initiatives",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-organizing and coordinating community care initiatives",
+    "name": "Organizing and coordinating community care initiatives",
+    "description": "Organizing and coordinating community care initiatives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

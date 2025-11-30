@@ -320,6 +320,20 @@ export type REAAgentType =
  * ExternalIdentifier - Links to external identity systems.
  *
  * Used for contributor presences to enable claiming.
+ *
+ * W3C DECENTRALIZED IDENTIFIERS (DID) ALIGNMENT:
+ * This structure is compatible with DID verification methods.
+ * External identifiers can be transformed to DID Documents with service endpoints.
+ *
+ * Examples of DID mappings:
+ * - ORCID → did:web:orcid.org:{orcid-id}
+ * - GitHub → did:web:github.com:{username}
+ * - Email → did:web:domain.com:users:{email-hash}
+ *
+ * The verification system here already implements the core DID principle:
+ * cryptographically verifiable claims about identity on external systems.
+ *
+ * Future: Can serialize to DID Documents for interoperability.
  */
 export interface ExternalIdentifier {
   /** Type of identifier */

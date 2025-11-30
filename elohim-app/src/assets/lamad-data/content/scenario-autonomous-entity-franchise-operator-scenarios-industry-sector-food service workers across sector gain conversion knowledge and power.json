@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-food service workers across sector gain conversion knowledge and power",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-food service workers across sector gain conversion knowledge and power",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Food service workers across sector gain conversion knowledge and power",
   "description": "Food service workers across sector gain conversion knowledge and power",
   "content": "Scenario: Food service workers across sector gain conversion knowledge and power\n    Given workers at non-converted franchises observe democratic locations thriving\n    And word spreads about $18/hour wages, ownership, and democratic voice\n    When worker organizing across food service sector references democratic conversions\n    Then workers demand democratic conversion or equivalent improvements at their locations\n    And franchise operators face worker pressure to convert or match democratic conditions\n    And worker power increases sector-wide through demonstration effect\n    And sector-wide organizing becomes possible through democratic model inspiration\n    And industry_sector_elohim supports cross-location worker organizing and education\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Food service workers across sector gain conversion knowledge and power",
+    "ogDescription": "Food service workers across sector gain conversion knowledge and power",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-food service workers across sector gain conversion knowledge and power",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Food service workers across sector gain conversion knowledge and power - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-food service workers across sector gain conversion knowledge and power",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-food service workers across sector gain conversion knowledge and power",
+    "name": "Food service workers across sector gain conversion knowledge and power",
+    "description": "Food service workers across sector gain conversion knowledge and power",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

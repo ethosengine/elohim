@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-household-coordinating complex household schedules across family members",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-coordinating complex household schedules across family members",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating complex household schedules across family members",
   "description": "Coordinating complex household schedules across family members",
   "content": "Scenario: Coordinating complex household schedules across family members\n    Given Sarah manages her work schedule, children's schools, household tasks, appointments\n    And partner has separate work schedule and obligations\n    When household activities need coordination\n    Then the household_elohim should integrate all family calendars\n    And it should identify conflicts across household members\n    And it should suggest solutions that work for everyone\n    And schedule coordination should reduce stress, not increase it\n    And household operations should run smoothly through effective coordination\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating complex household schedules across family members",
+    "ogDescription": "Coordinating complex household schedules across family members",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-coordinating complex household schedules across family members",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating complex household schedules across family members - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-coordinating complex household schedules across family members",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-coordinating complex household schedules across family members",
+    "name": "Coordinating complex household schedules across family members",
+    "description": "Coordinating complex household schedules across family members",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry research and data collection includes care economy metrics",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry research and data collection includes care economy metrics",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Industry research and data collection includes care economy metrics",
   "description": "Industry research and data collection includes care economy metrics",
   "content": "Scenario: Industry research and data collection includes care economy metrics\n    Given industry research shapes understanding of workforce needs\n    And care economy metrics are often missing from industry data\n    And better data would support care-friendly policy advocacy\n    When industry_elohim advocates for data collection\n    Then it should help Robert advocate for industry research on care economy\n    And support inclusion of caregiving metrics in workforce studies\n    And help industry understand impact of care responsibilities on productivity and retention\n    And provide data that supports care-friendly policy business case\n    And build industry knowledge base that includes care economy\n    And demonstrate that industry advancement requires care economy understanding\n    And create evidence base for sector transformation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Industry research and data collection includes care economy metrics",
+    "ogDescription": "Industry research and data collection includes care economy metrics",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry research and data collection includes care economy metrics",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Industry research and data collection includes care economy metrics - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry research and data collection includes care economy metrics",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry research and data collection includes care economy metrics",
+    "name": "Industry research and data collection includes care economy metrics",
+    "description": "Industry research and data collection includes care economy metrics",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-income from employment integrated with disability benefits",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-income from employment integrated with disability benefits",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Income from employment integrated with disability benefits",
   "description": "Income from employment integrated with disability benefits",
   "content": "Scenario: Income from employment integrated with disability benefits\n    Given Alex receives both part-time employment income and disability benefits\n    And benefits coordination is complex\n    When the workplace_elohim tracks Alex's income\n    Then it should help Alex understand how employment income affects benefits\n    And it should alert Alex to earnings thresholds that impact benefits\n    And it should integrate with household economics management\n    And Alex should be able to make informed decisions about work hours\n    And the protocol should support Alex in maximizing total income\n    And benefits cliffs should be navigated carefully\n    And Alex's economic stability should be optimized across income sources\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Income from employment integrated with disability benefits",
+    "ogDescription": "Income from employment integrated with disability benefits",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-income from employment integrated with disability benefits",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Income from employment integrated with disability benefits - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-income from employment integrated with disability benefits",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-income from employment integrated with disability benefits",
+    "name": "Income from employment integrated with disability benefits",
+    "description": "Income from employment integrated with disability benefits",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

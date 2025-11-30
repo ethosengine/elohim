@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-municipality-developer relationship transparency creates ethical incentives",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-developer relationship transparency creates ethical incentives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer relationship transparency creates ethical incentives",
   "description": "Developer relationship transparency creates ethical incentives",
   "content": "Scenario: Developer relationship transparency creates ethical incentives\n    Given a developer has made campaign donations to three council members\n    And those members must vote on the developer's project\n    When the Observer makes relationships visible\n    Then constituents see donation patterns and voting correlations\n    And the developer faces scrutiny about influence versus merit\n    And council members face accountability for conflicts of interest\n    And transparency creates pressure for decisions based on community benefit\n    And legitimate projects must stand on merits not political relationships\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer relationship transparency creates ethical incentives",
+    "ogDescription": "Developer relationship transparency creates ethical incentives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-developer relationship transparency creates ethical incentives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer relationship transparency creates ethical incentives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-municipality-developer relationship transparency creates ethical incentives",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:municipality-developer relationship transparency creates ethical incentives",
+    "name": "Developer relationship transparency creates ethical incentives",
+    "description": "Developer relationship transparency creates ethical incentives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

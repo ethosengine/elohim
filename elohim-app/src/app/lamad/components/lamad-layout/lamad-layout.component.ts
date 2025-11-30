@@ -1,19 +1,19 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { RouterOutlet, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { DataLoaderService } from '../../services/data-loader.service';
-import { SessionUserService } from '../../services/session-user.service';
+import { SessionHumanService } from '../../services/session-human.service';
 import { RendererInitializerService } from '../../renderers/renderer-initializer.service';
 import { ThemeToggleComponent } from '../../../components/theme-toggle/theme-toggle.component';
-import { SessionUser, HolochainUpgradePrompt } from '../../models/session-user.model';
+import { SessionHuman, HolochainUpgradePrompt } from '../../models/session-human.model';
 
 @Component({
   selector: 'app-lamad-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule, ThemeToggleComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, FormsModule, ThemeToggleComponent],
   templateUrl: './lamad-layout.component.html',
   styleUrls: ['./lamad-layout.component.css']
 })
@@ -23,7 +23,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
   isHomePage = false;
 
   // Session human state
-  session: SessionUser | null = null;
+  session: SessionHuman | null = null;
   activeUpgradePrompt: HolochainUpgradePrompt | null = null;
   showUpgradeModal = false;
 
@@ -31,7 +31,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly dataLoader: DataLoaderService,
-    private readonly sessionUserService: SessionUserService,
+    private readonly sessionHumanService: SessionHumanService,
     private readonly router: Router,
     // Injecting RendererInitializerService triggers renderer registration
     private readonly _rendererInit: RendererInitializerService
@@ -51,12 +51,12 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
     });
 
     // Subscribe to session human state
-    this.sessionUserService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
+    this.sessionHumanService.session$.pipe(takeUntil(this.destroy$)).subscribe(session => {
       this.session = session;
     });
 
     // Subscribe to upgrade prompts
-    this.sessionUserService.upgradePrompts$.pipe(takeUntil(this.destroy$)).subscribe(prompts => {
+    this.sessionHumanService.upgradePrompts$.pipe(takeUntil(this.destroy$)).subscribe(prompts => {
       // Show the most recent non-dismissed prompt
       this.activeUpgradePrompt = prompts.find(p => !p.dismissed) || null;
     });
@@ -131,7 +131,7 @@ export class LamadLayoutComponent implements OnInit, OnDestroy {
    */
   dismissUpgradePrompt(): void {
     if (this.activeUpgradePrompt) {
-      this.sessionUserService.dismissUpgradePrompt(this.activeUpgradePrompt.id);
+      this.sessionHumanService.dismissUpgradePrompt(this.activeUpgradePrompt.id);
     }
   }
 

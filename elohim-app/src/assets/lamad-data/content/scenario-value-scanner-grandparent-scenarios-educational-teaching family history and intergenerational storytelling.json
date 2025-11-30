@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-educational-teaching family history and intergenerational storytelling",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:educational-teaching family history and intergenerational storytelling",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teaching family history and intergenerational storytelling",
   "description": "Teaching family history and intergenerational storytelling",
   "content": "Scenario: Teaching family history and intergenerational storytelling\n    Given Margaret carries family stories, history, and identity\n    And grandchildren learn who they are through family narrative\n    When Margaret shares family stories and history\n    Then the educational_elohim should recognize this as cultural education\n    And it should value storytelling as teaching and identity formation\n    And it should track intergenerational knowledge transmission\n    And family history education should accumulate care tokens\n    And Margaret's role as family historian should be recognized\n    And narrative education should be valued as developmental care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Teaching family history and intergenerational storytelling",
+    "ogDescription": "Teaching family history and intergenerational storytelling",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-educational-teaching family history and intergenerational storytelling",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching family history and intergenerational storytelling - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-educational-teaching family history and intergenerational storytelling",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:educational-teaching family history and intergenerational storytelling",
+    "name": "Teaching family history and intergenerational storytelling",
+    "description": "Teaching family history and intergenerational storytelling",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

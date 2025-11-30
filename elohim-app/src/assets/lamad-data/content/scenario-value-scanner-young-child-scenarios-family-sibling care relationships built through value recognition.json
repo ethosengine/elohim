@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-family-sibling care relationships built through value recognition",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family-sibling care relationships built through value recognition",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Sibling care relationships built through value recognition",
   "description": "Sibling care relationships built through value recognition",
   "content": "Scenario: Sibling care relationships built through value recognition\n    Given Tommy regularly selects items for his sister Emma\n    And Emma is 7 years old\n    When Tommy makes care contributions targeting Emma\n    Then the family_elohim should track sibling care patterns\n    And positive feedback loops should be created\n    And Tommy's personal_agent should reference past successes: \"Emma loved the strawberries you picked last time\"\n    And Emma should be prompted to recognize Tommy's care\n    And sibling relationships should be based on mutual care, not competition\n    And the protocol should build family bonds through care visibility\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Sibling care relationships built through value recognition",
+    "ogDescription": "Sibling care relationships built through value recognition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-family-sibling care relationships built through value recognition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sibling care relationships built through value recognition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-family-sibling care relationships built through value recognition",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family-sibling care relationships built through value recognition",
+    "name": "Sibling care relationships built through value recognition",
+    "description": "Sibling care relationships built through value recognition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

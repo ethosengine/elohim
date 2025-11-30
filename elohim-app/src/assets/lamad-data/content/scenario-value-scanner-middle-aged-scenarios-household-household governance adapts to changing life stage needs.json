@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-household-household governance adapts to changing life stage needs",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-household governance adapts to changing life stage needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household governance adapts to changing life stage needs",
   "description": "Household governance adapts to changing life stage needs",
   "content": "Scenario: Household governance adapts to changing life stage needs\n    Given Robert and Jennifer's care responsibilities are evolving\n    And children are moving toward independence\n    And parents are requiring increasing care\n    And they approach their own pre-retirement years\n    When household_elohim supports governance evolution\n    Then it should help them adapt to changing circumstances\n    And recognize shifts: \"Child support demands are decreasing while parent care is increasing\"\n    And support planning for next life stage transitions\n    And help them reimagine household as children leave\n    And prepare for increased elder care coordination\n    And support them in navigating lifecycle transitions together\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Household governance adapts to changing life stage needs",
+    "ogDescription": "Household governance adapts to changing life stage needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-household governance adapts to changing life stage needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household governance adapts to changing life stage needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-household governance adapts to changing life stage needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-household governance adapts to changing life stage needs",
+    "name": "Household governance adapts to changing life stage needs",
+    "description": "Household governance adapts to changing life stage needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

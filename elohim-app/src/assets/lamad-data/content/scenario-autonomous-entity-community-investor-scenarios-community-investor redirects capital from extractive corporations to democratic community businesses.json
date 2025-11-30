@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor redirects capital from extractive corporations to democratic community businesses",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor redirects capital from extractive corporations to democratic community businesses",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor redirects capital from extractive corporations to democratic community businesses",
   "description": "Investor redirects capital from extractive corporations to democratic community businesses",
   "content": "Scenario: Investor redirects capital from extractive corporations to democratic community businesses\n    Given Patricia has $60K in index funds funding corporate extraction\n    And she morally opposes enterprises her capital funds but lacked alternatives\n    When community investment pool offers values-aligned local alternative\n    Then she moves $10K from stock market to community investment in Maria's Kitchen conversion\n    And capital directly funds worker ownership, not corporate extraction\n    And investment aligns with values: worker dignity, community wealth, environmental stewardship\n    And financial returns are fair (5% annually) while social returns are massive\n    And community_elohim facilitates investment pool management and transparent reporting\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor redirects capital from extractive corporations to democratic community businesses",
+    "ogDescription": "Investor redirects capital from extractive corporations to democratic community businesses",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor redirects capital from extractive corporations to democratic community businesses",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor redirects capital from extractive corporations to democratic community businesses - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor redirects capital from extractive corporations to democratic community businesses",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor redirects capital from extractive corporations to democratic community businesses",
+    "name": "Investor redirects capital from extractive corporations to democratic community businesses",
+    "description": "Investor redirects capital from extractive corporations to democratic community businesses",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

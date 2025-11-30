@@ -45,6 +45,7 @@ import {
   Measure,
   LAMAD_UNITS,
 } from './rea-bridge.model';
+import { OpenGraphMetadata } from './open-graph.model';
 
 // ============================================================================
 // Presence State
@@ -106,6 +107,17 @@ export interface ContributorPresence extends REAAgent {
 
   /** Nested stewardship (other presences this one may steward after claiming) */
   nestedStewardship?: string[]; // Other ContributorPresence IDs
+
+  // =========================================================================
+  // Social Graph Metadata (for sharing contributor profiles)
+  // =========================================================================
+
+  /**
+   * Open Graph metadata for social sharing.
+   * When a contributor profile is shared, this provides rich preview cards.
+   * Typically populated when presence is claimed or stewarded.
+   */
+  socialMetadata?: OpenGraphMetadata;
 }
 
 // ============================================================================

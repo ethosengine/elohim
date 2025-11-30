@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
   "description": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
   "content": "Scenario: Organizer mobilizes parents against school closure targeting low-income neighborhoods\n    Given district proposes closing three schools in working-class areas\n    And claims it's necessary for \"efficiency\"\n    When the organizer uses Observer to analyze closure impacts\n    Then they show closures increase commute times for low-income families\n    And demonstrate stable enrollment contradicting district claims\n    And calculate cost of closure to affected communities\n    And organize parents to demand community-based solutions\n    And education organizing prevents harm to vulnerable students\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "ogDescription": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer mobilizes parents against school closure targeting low-income neighborhoods - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "name": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "description": "Organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

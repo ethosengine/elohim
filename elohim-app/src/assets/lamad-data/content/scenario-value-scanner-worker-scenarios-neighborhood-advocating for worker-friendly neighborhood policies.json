@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-neighborhood-advocating for worker-friendly neighborhood policies",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-advocating for worker-friendly neighborhood policies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advocating for worker-friendly neighborhood policies",
   "description": "Advocating for worker-friendly neighborhood policies",
   "content": "Scenario: Advocating for worker-friendly neighborhood policies\n    Given neighborhood governance makes decisions affecting workers\n    When policies could support workers' care needs and participation\n    Then the protocol should help me participate in neighborhood advocacy\n    And connect me with other workers for collective voice\n    And support advocacy for worker-supportive policies\n    And build neighborhood culture that values workers' care needs\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for worker-friendly neighborhood policies",
+    "ogDescription": "Advocating for worker-friendly neighborhood policies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-advocating for worker-friendly neighborhood policies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for worker-friendly neighborhood policies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-advocating for worker-friendly neighborhood policies",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-advocating for worker-friendly neighborhood policies",
+    "name": "Advocating for worker-friendly neighborhood policies",
+    "description": "Advocating for worker-friendly neighborhood policies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

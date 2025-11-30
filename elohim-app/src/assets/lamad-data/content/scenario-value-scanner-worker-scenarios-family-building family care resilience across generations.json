@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-family-building family care resilience across generations",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-building family care resilience across generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building family care resilience across generations",
   "description": "Building family care resilience across generations",
   "content": "Scenario: Building family care resilience across generations\n    Given family care needs span generations\n    When family members support each other across life stages\n    Then the protocol should coordinate intergenerational care\n    And recognize contributions from all generations\n    And facilitate sustainable care distribution\n    And support family care economy across time\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Building family care resilience across generations",
+    "ogDescription": "Building family care resilience across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-building family care resilience across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building family care resilience across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-building family care resilience across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-building family care resilience across generations",
+    "name": "Building family care resilience across generations",
+    "description": "Building family care resilience across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-community-community resource allocation recognizes volunteer contributions",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-community resource allocation recognizes volunteer contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community resource allocation recognizes volunteer contributions",
   "description": "Community resource allocation recognizes volunteer contributions",
   "content": "Scenario: Community resource allocation recognizes volunteer contributions\n    Given Frank provides substantial volunteer labor\n    And community resources are limited\n    When the community_elohim influences resource allocation\n    Then Frank's contributions should be visible in allocation decisions\n    And his care tokens should provide access to community resources\n    And volunteers should not face additional burden from low income\n    And community resources should flow to contributors equitably\n    And Frank's volunteer work should be recognized through material support\n    And care economy should function as mutual aid, not charity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Community resource allocation recognizes volunteer contributions",
+    "ogDescription": "Community resource allocation recognizes volunteer contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-community resource allocation recognizes volunteer contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community resource allocation recognizes volunteer contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-community resource allocation recognizes volunteer contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-community resource allocation recognizes volunteer contributions",
+    "name": "Community resource allocation recognizes volunteer contributions",
+    "description": "Community resource allocation recognizes volunteer contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

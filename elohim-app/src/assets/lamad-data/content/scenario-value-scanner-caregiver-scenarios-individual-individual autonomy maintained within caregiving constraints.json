@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-individual-individual autonomy maintained within caregiving constraints",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-individual autonomy maintained within caregiving constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Individual autonomy maintained within caregiving constraints",
   "description": "Individual autonomy maintained within caregiving constraints",
   "content": "Scenario: Individual autonomy maintained within caregiving constraints\n    Given caregiving severely limits James's choices\n    And he cannot leave David for extended periods\n    And his schedule revolves entirely around care needs\n    When James makes personal decisions\n    Then the personal_agent should protect his autonomy\n    And it should identify opportunities for individual agency\n    And it should help James maintain some life beyond caregiving\n    And constraints should be acknowledged but not completely controlling\n    And James should retain some sphere of personal freedom\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Individual autonomy maintained within caregiving constraints",
+    "ogDescription": "Individual autonomy maintained within caregiving constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-individual autonomy maintained within caregiving constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Individual autonomy maintained within caregiving constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-individual autonomy maintained within caregiving constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-individual autonomy maintained within caregiving constraints",
+    "name": "Individual autonomy maintained within caregiving constraints",
+    "description": "Individual autonomy maintained within caregiving constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

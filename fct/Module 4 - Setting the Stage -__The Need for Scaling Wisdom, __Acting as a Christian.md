@@ -1,0 +1,265 @@
+
+
+## Setting the Stage \- The Need for Scaling Wisdom, Living Like Christ
+
+### Day
+
+2.0
+
+### Objective
+
+1.0
+
+### Foundations of Humane Tech Concepts Review
+
+Setting the Stage
+
+1, The Importance of Humane Technology  
+\- Recognizing the need for technology that strengthens rather than undermines human capacity  
+\- Understanding the "Wisdom Gap" caused by runaway technology
+
+2\. Complex Systems and Global Challenges  
+\- Distinguishing between complicated and complex problems  
+\- Recognizing technology's role in addressing global challenges  
+\- Understanding the interconnectedness of technological, social, and environmental issues
+
+3\. Paradigm Shift in Technology Development  
+\- The need for a new paradigm for humane technology  
+\- Challenging existing assumptions in tech design and development
+
+Personal Reflection and Alignment  
+\- "Mind the Gap" exercise: Exploring personal values and priorities  
+\- Identifying the gap between current reality and ideal alignment with values  
+\- Reflecting on causes of misalignment and potential for change
+
+4\. Systemic Approach to Technology  
+\- Considering the whole system that technology exists within and affects  
+\- Understanding leverage points for systemic change
+
+5\. Balancing Progress and Responsibility  
+\- Recognizing both the benefits and risks of technological advancement  
+\- The need for responsible innovation that respects human nature and societal well-being
+
+6\. Building a Community of Humane Technologists  
+\- Importance of collaboration and shared learning in the field  
+\- Encouraging engagement with the course community and resources
+
+### Size
+
+33.0
+
+### Foundations of Christians and Technology Learning Objectives
+
+1\. Institutional Standards and Compliance
+
+Understand and articulate the importance of exceeding legal standards in key institutional areas such as sexual misconduct, tax law, and equity and inclusion.  
+Develop strategies to proactively improve institutional practices beyond minimal requirements, with a focus on transparency and ethical leadership.  
+Evaluate and apply methods to foster institutional trust and integrity through bold and consistent actions.
+
+2\. Communication in Ministry
+
+Learn to facilitate highly accurate, authentic, and meaningful communication within church communities, emphasizing that it is a shared responsibility and not solely the task of a single minister.  
+Utilize technology to support complex face-to-face encounters and enhance collaborative opportunities.  
+Create and streamline processes for storytelling within the community, including creation, review, and publication, ensuring clarity and strong participation incentives.
+
+3\. Facilitation of Complex Interactions in Church Settings
+
+Develop and support accessible, dynamic small group networks with robust technological platforms to enhance discoverability, scheduling, and invitations.  
+Recognize and utilize transitional times between services and classes as crucial opportunities for invitation and community building.  
+Implement strategies to extend key communal times, such as extending pick-up times for children’s ministry and creating inviting spaces for deeper conversations.  
+Plan and prioritize high-quality communal meals to encourage longer stays, facilitate deeper connections among members, and provide flexible childcare solutions.
+
+### Introduction
+
+Review, evolution of Trust  \- https://ncase.me/trust/ 
+
+Game theory has shown us the three things we need for the evolution of trust:  
+1\. REPEAT INTERACTIONS Trust keeps a relationship going, but you need the knowledge of possible future repeat interactions before trust can evolve.  
+2\. POSSIBLE WIN-WINS You must be playing a non-zero-sum game, a game where it's at least possible that both players can be better off \-- a win-win.  
+3\. LOW MISCOMMUNICATION  If the level of miscommunication is too high, trust breaks down. But when there's a little bit of miscommunication, it pays to be more forgiving.Of course, real-world trust is affected by much more than this. There's reputation, shared values, contracts, cultural markers, blah blah blah. And let's not forget the biggest lesson: 
+
+If there's one big takeaway  
+from all of game theory, it's this:
+
+What the game is, defines what the players do.  
+Our problem today isn't just that people are losing trust,  
+it's that our environment acts against the evolution of trust.
+
+That may seem cynical or naive \-- that we're "merely" products of our environment \-- but as game theory reminds us, we are each others' environment. In the short run, the game defines the players. But in the long run, it's us players who define the game.
+
+So, do what you can do, to create the conditions necessary to evolve trust. Build relationships. Find win-wins. Communicate clearly. Maybe then, we can stop firing at each other, get out of our own trenches, cross No Man's Land to come together... ...to live and let live."A Christmas Truce between Opposing Trenches" Illustrated by AC Michael. Published in The Illustrated London News, January 9, 1915\.
+
+### Bible Reference(s)
+
+Matthew 10:16 “I am sending you out like sheep among wolves. Therefore be as shrewd as snakes and as innocent as doves. 17 Be on your guard; you will be handed over to the local councils and be flogged in the synagogues.
+
+Peace-Making is Coupled to Wisdom  
+Matthew 5:9 (CSB)  
+Blessed are the **peacemakers**, for they will be called sons of God.
+
+James 3:18 (CSB)  
+And **the fruit of righteousness is sown in peace** by those who **cultivate peace.**
+
+James 3:17 (CSB)  
+But the **wisdom from above is first pure, then peace-loving,** gentle, compliant, full of mercy and good fruits, unwavering, without pretense.
+
+Stewardship and Ethical Development  
+Parable of the Talents (Matthew 25:14-30) \- This parable emphasizes the importance of using our gifts and resources (talents) responsibly and ethically, aligning with the idea of developing technology that serves and uplifts humanity.
+
+Creation Care (Genesis 2:15) \- "The Lord God took the man and put him in the Garden of Eden to work it and take care of it." This verse underscores the responsibility of stewardship over creation, extending to how we create and use technology within God's creation.
+
+Community Support and Unity  
+The Body of Christ (1 Corinthians 12:12-27) \- Paul's description of the church as a body with many parts working together illustrates the importance of collaborative and supportive efforts, including the development of technology that fosters community and unity.
+
+The Good Samaritan (Luke 10:25-37) \- This story teaches the value of helping others regardless of their background, encouraging Christian technologists to develop technologies that bridge gaps and provide aid across communities.
+
+Promotion of Justice and Well-being  
+Micah 6:8 \- "He has shown you, O mortal, what is good. And what does the Lord require of you? To act justly and to love mercy and to walk humbly with your God." This verse calls for justice, mercy, and humility, principles that should underpin technology development.
+
+The Beatitudes (Matthew 5:3-12) \- The Beatitudes present values such as meekness, righteousness, mercy, and peacemaking, guiding principles for creating technology that promotes fairness and helps humans thrive.
+
+Fostering Mutual Understanding and Cooperation  
+Pentecost (Acts 2:1-12) \- The story of Pentecost, where the Holy Spirit enables the apostles to speak in different tongues, symbolizes breaking down communication barriers, analogous to the goal of technology in enhancing understanding and cooperation among diverse groups.
+
+The Wisdom of Solomon (1 Kings 3:16-28) \- Solomon's wise judgment demonstrates the value of discernment and understanding, qualities that are essential in developing and implementing technology for the greater good.
+
+Elevating Moral and Ethical Values  
+Daniel's Integrity (Daniel 1:8-20; 6:1-28) \- Daniel's refusal to compromise his values, even in a foreign land, highlights the importance of adhering to ethical standards, a message relevant for Christian technologists facing moral dilemmas.
+
+The Sermon on the Mount (Matthew 5-7) \- This sermon by Jesus covers a wide range of teachings on righteousness, ethical behavior, and the importance of internal motives over external appearances, applicable in guiding the motives behind technological innovation.
+
+### Story 
+
+Scaling Wisdom: Lessons from Righteous Old Testament Leaders  
+Throughout the Old Testament, several leaders were considered righteous. Despite facing challenges, they demonstrated key traits that allowed them to scale wisdom and lead God's people effectively:
+
+Sought God's Wisdom  
+Solomon asked for wisdom above all else (1 Kings 3:5-14)  
+Daniel prayed for understanding (Daniel 2:17-19)
+
+Acted with Humility  
+Moses was described as the most humble man on earth (Numbers 12:3)  
+David acknowledged his sins and sought forgiveness (2 Samuel 12:13)
+
+Prioritized Obedience to God  
+Abraham was willing to sacrifice Isaac (Genesis 22:1-18)  
+Joshua followed God's unusual battle plan at Jericho (Joshua 6:1-27)
+
+Led by Example  
+Nehemiah worked alongside the people to rebuild Jerusalem's walls (Nehemiah 4:21-23)  
+Josiah personally led religious reforms (2 Kings 23:1-25)
+
+Promoted Justice and Righteousness  
+Samuel judged Israel fairly (1 Samuel 12:3-5)  
+Jehoshaphat established a just legal system (2 Chronicles 19:4-11)
+
+Relied on Prayer and Consultation with God  
+Hezekiah prayed for deliverance from Assyria (2 Kings 19:14-19)  
+Gideon sought confirmation through signs (Judges 6:36-40)
+
+Encouraged Spiritual Renewal  
+Ezra led the people in studying and following God's law (Ezra 7:10, Nehemiah 8:1-8)  
+Josiah rediscovered and implemented God's law (2 Kings 22-23)
+
+These leaders demonstrate that while obedience to God is challenging, it is possible through humility, seeking God's wisdom, and prioritizing righteousness. Their examples provide a blueprint for scaling wisdom in leadership and society.
+
+### Discussion Question or Activity
+
+Jesus' Wisdom in Kingdom Theology: Examples and Discussion
+
+ Key Examples:
+
+1\. \*\*The Sermon on the Mount\*\* (Matthew 5-7)  
+   \- Jesus reinterprets and deepens Old Testament laws, emphasizing the spirit of the law over literal observance.  
+   \- He presents a new understanding of righteousness based on inner transformation rather than outward compliance.
+
+2\. \*\*Parable of the Good Samaritan\*\* (Luke 10:25-37)  
+   \- Jesus expands the concept of "neighbor" beyond cultural and ethnic boundaries.  
+   \- He demonstrates that wisdom and righteousness are found in compassionate action, not just knowledge of the law.
+
+3\. \*\*Teachings on Servant Leadership\*\* (Mark 10:42-45)  
+   \- Jesus inverts worldly power structures, teaching that true greatness in His Kingdom comes through serving others.  
+   \- This wisdom challenges conventional understanding of power and responsibility.
+
+4\. \*\*Parable of the Talents\*\* (Matthew 25:14-30)  
+   \- Jesus teaches about the responsibility that comes with gifts and resources.  
+   \- This parable illustrates how expanding responsibility in God's Kingdom involves faithful stewardship and productive use of what we're given.
+
+5\. \*\*Jesus' Response to Pharisees about Taxes\*\* (Matthew 22:15-22)  
+   \- Jesus wisely navigates a political trap, providing insight into the relationship between earthly and divine authority.  
+   \- His response, "Give to Caesar what is Caesar's, and to God what is God's," demonstrates wisdom in balancing worldly and spiritual responsibilities.
+
+\#\# Discussion Question:
+
+Consider Jesus' teachings on wisdom and responsibility in His Kingdom theology, alongside what we've learned about righteous leadership in the Old Testament and our modern challenges with technology and information systems. How might Jesus' approach to expanding responsibility and scaling wisdom inform our work as Christian technologists? 
+
+Specifically:  
+\- How can we design digital systems that embody the spirit of Jesus' teachings, emphasizing inner transformation and compassionate action over mere compliance or engagement metrics?  
+\- In what ways can we apply Jesus' model of servant leadership to our roles in developing and managing technology platforms?  
+\- How might Jesus' parable of the talents guide our approach to stewarding the powerful technological tools at our disposal?  
+\- Given Jesus' ability to wisely navigate complex social and political situations, how can we create technologies that help users do the same in our increasingly complex digital landscape?
+
+Reflect on how these principles could reshape our approach to scaling wisdom through technology while remaining true to our calling as followers of Christ.
+
+Activity: Mind the Gap \- What does the World Need? Who are you, at your core? Imagine a life that matches those Priorities. How big is the Gap?  Reflect for a moment on the cause of the gap.
+
+### Conclusion
+
+Conclusion: Scaling Wisdom through Christian-Informed System Design  
+As we conclude this module on setting the stage for scaling wisdom, let's focus on how Christian technologists can leverage system design principles to amplify and distribute godly wisdom in our digital age:
+
+Scaling Godly Wisdom: A Meta-Statement
+
+Reflecting deeply on the righteous leaders of the Old Testament, the teachings of Jesus, and the modern context of exponential technology and information systems, we can distill a meta-statement that might encapsulate God's perspective on righteous leadership and scaling wisdom:
+
+Christians "Design systems of heart and mind that cultivate humble seekers of truth, who grow in wisdom through obedient action, and who shoulder expanding responsibility with increasing grace and discernment. These systems should foster communities where knowledge and understanding flow freely, where power serves rather than dominates, and where each member is equipped and inspired to steward their influence for the flourishing of all."
+
+Key elements of this meta-statement:
+
+1\. \*\*Humble Truth-Seeking\*\*: Echoes the Old Testament leaders' reliance on God's wisdom and Jesus' teachings on humility.  
+2\. \*\*Wisdom Through Obedience\*\*: Reflects the consistent theme of leaders acting on God's guidance.  
+3\. \*\*Expanding Responsibility\*\*: Respects of increasing responsibilities with increased rights and power.  
+4\. \*\*Free Flow of Knowledge\*\*: Addresses the need for informed participants in complex systems.  
+5\. \*\*Servant Leadership\*\*: Embodies Jesus' model of leadership and power used for others' benefit.  
+6\. \*\*Stewardship of Influence\*\*: Encompasses the Old Testament leaders' role in guiding society and the modern need for responsible use of technology and information.
+
+This meta-statement aims to bridge ancient wisdom with modern challenges, providing a framework for designing systems \- technological, social, and spiritual \- that scale godly wisdom in our complex world.
+
+### Application 
+
+\* We need to hold ourselves as an institution to a higher standard than is minimally required by law, especially in areas where we are found to be lacking, sexual misconduct, tax-law, equity and inclusion (both racial and class) .. (any others?)  Doing more than what's minimially required with boldness gives institutions opportunities to build trust. 
+
+\* Churches need to prioritize highly accurate, authentic, and meaningful communication as a discipline (not one minister's job), that everyone is a participant. What technology we use to do to facilitate that should help us have complex face-to-face encounters, and increase collaborative opporutinties.   
+ If you are a ministry leader, there needs to be obvious ways to create a story, have it reviewed, and get it published. There needs to be a clarity in the process and a strong incentive for people to participate and be heard. 
+
+\*  Churches needs to priritize complex interactions:    
+    \-  Accessible and dynamic in-person small group networks need robust platform support for Discoverability, Scheduling, and Invitation.  
+    \- Transition times between Service and Class aren't just dead space, these are KEY invatational moments to build REAL community, Extend     these times, inviting SPACES for people to enter into deeper conversation.  Extend the pick-up times for Childrens misintry, release kids to the playground.   
+    \-  Prioritize high-quality meals at the building that would incentivize people to stay for lunch and provide flexibility for childcare.    
+
+Wisdom Amplification Systems: Design platforms that don't just inform, but help users develop discernment. This could involve AI-assisted analysis tools that guide users through critical thinking processes, echoing Proverbs 4:7: "The beginning of wisdom is this: Get wisdom."  
+Collaborative Discernment Mechanisms: Create systems that facilitate group decision-making processes based on biblical principles. This could include digital spaces for communal prayer, reflection, and discussion, embodying James 1:5: "If any of you lacks wisdom, you should ask God."  
+Ethical Impact Visualization: Develop tools that help users see the long-term consequences of their digital actions, fostering a sense of ethical responsibility. This aligns with Galatians 6:7: "A man reaps what he sows."  
+Wisdom Distribution Networks: Design algorithms that prioritize the spread of wise counsel and thoughtful reflection over mere viral content, inspired by Proverbs 15:31: "Whoever heeds life-giving correction will be at home among the wise."  
+Stewardship-Centered UX: Create user experiences that encourage mindful use of time and attention, helping users grow in digital stewardship. This embodies 1 Peter 4:10: "Each of you should use whatever gift you have received to serve others."
+
+Actionable Steps for Scaling Wisdom
+
+Implement Reflection Prompts: Integrate moments of pause and reflection into user flows, encouraging thoughtful engagement rather than mindless scrolling.  
+Develop Wisdom Metrics: Create new metrics that measure growth in discernment and wise decision-making, not just engagement or time spent.  
+Design for Diverse Insights: Build systems that intentionally expose users to diverse perspectives, fostering a more comprehensive understanding of complex issues.  
+Create Ethical Sandboxes: Develop safe spaces within platforms where users can explore the consequences of their digital actions without real-world repercussions.  
+Implement Wisdom-Sharing Features: Design tools that make it easy for users to share insights and life lessons, creating a crowd-sourced wisdom repository.  
+Build Digital Discipleship Tools: Create features that support mentorship and discipleship relationships, scaling personal growth through technology.  
+Integrate Scripture-Based Guidance: Develop AI systems that can offer relevant biblical wisdom in response to user queries or situations.
+
+As we apply these principles, let us be guided by Colossians 3:16-17: "Let the message of Christ dwell among you richly as you teach and admonish one another with all wisdom... And whatever you do, whether in word or deed, do it all in the name of the Lord Jesus, giving thanks to God the Father through him."  
+Our calling as Christian technologists is not just to create efficient systems, but to design digital ecosystems that cultivate and scale godly wisdom. By integrating these principles into our work, we can leverage technology to amplify biblical insights, foster discernment, and guide users towards Christ-like decision making. In doing so, we participate in God's redemptive work, transforming our digital landscapes into spaces where wisdom flourishes and communities are built up in faith and understanding.
+
+### Class Homework
+
+CHT Module 2 Respecting Human Nature
+
+### Other Media / Go Deeper / Class Maps
+
+\* Know Thy Enemy: Coordination \- ( banklesshq.com )  

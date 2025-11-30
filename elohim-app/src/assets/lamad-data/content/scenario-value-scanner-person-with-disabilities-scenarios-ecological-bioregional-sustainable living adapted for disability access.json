@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-sustainable living adapted for disability access",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-sustainable living adapted for disability access",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Sustainable living adapted for disability access",
   "description": "Sustainable living adapted for disability access",
   "content": "Scenario: Sustainable living adapted for disability access\n    Given sustainable practices are often designed without disability consideration\n    And inaccessible sustainability excludes disabled people\n    When sustainable living practices are promoted\n    Then the bioregional_elohim should ensure practices are disability-accessible\n    And composting, gardening, conservation should be adaptable for various capabilities\n    And Alex should be able to participate in ecological practices\n    And sustainable living should work for diverse bodies and minds\n    And the protocol should advocate for inclusive environmental practices\n    And disability expertise should improve sustainability design\n    And Alex's participation should be welcomed and supported\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Sustainable living adapted for disability access",
+    "ogDescription": "Sustainable living adapted for disability access",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-sustainable living adapted for disability access",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sustainable living adapted for disability access - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-sustainable living adapted for disability access",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-sustainable living adapted for disability access",
+    "name": "Sustainable living adapted for disability access",
+    "description": "Sustainable living adapted for disability access",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

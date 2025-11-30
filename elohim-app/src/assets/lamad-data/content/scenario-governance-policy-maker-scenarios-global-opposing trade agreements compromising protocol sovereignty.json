@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-global-opposing trade agreements compromising protocol sovereignty",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-opposing trade agreements compromising protocol sovereignty",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Opposing trade agreements compromising protocol sovereignty",
   "description": "Opposing trade agreements compromising protocol sovereignty",
   "content": "Scenario: Opposing trade agreements compromising protocol sovereignty\n    Given trade negotiations may include digital governance provisions\n    And some proposals would restrict community autonomy\n    When I evaluate trade agreement implications\n    Then I identify: provisions threatening protocol sovereignty\n    And I oppose: requirements mandating centralization or backdoors\n    And I insist: on preserving community choice\n    And I coalition: with other nations defending autonomy\n    And I use: evidence showing protocol benefits economic wellbeing\n    And I resist: regulatory arbitrage through trade agreements\n    And I protect: democratic governance from corporate capture via trade\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Opposing trade agreements compromising protocol sovereignty",
+    "ogDescription": "Opposing trade agreements compromising protocol sovereignty",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-opposing trade agreements compromising protocol sovereignty",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Opposing trade agreements compromising protocol sovereignty - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-opposing trade agreements compromising protocol sovereignty",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-opposing trade agreements compromising protocol sovereignty",
+    "name": "Opposing trade agreements compromising protocol sovereignty",
+    "description": "Opposing trade agreements compromising protocol sovereignty",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

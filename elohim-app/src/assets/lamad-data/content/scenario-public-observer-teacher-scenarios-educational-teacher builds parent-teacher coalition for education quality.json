@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-educational-teacher builds parent-teacher coalition for education quality",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational-teacher builds parent-teacher coalition for education quality",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher builds parent-teacher coalition for education quality",
   "description": "Teacher builds parent-teacher coalition for education quality",
   "content": "Scenario: Teacher builds parent-teacher coalition for education quality\n    Given parents and teachers share commitment to student learning\n    But often lack coordination around education policy\n    When the Observer facilitates parent-teacher alignment\n    Then teachers share professional insights on education policy impacts\n    And parents provide family perspective on student experiences\n    And shared analysis reveals common interests (smaller classes, arts, counselors)\n    And parent-teacher coalition advocates together to decision-makers\n    And cross-stakeholder solidarity transforms education advocacy power\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher builds parent-teacher coalition for education quality",
+    "ogDescription": "Teacher builds parent-teacher coalition for education quality",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-educational-teacher builds parent-teacher coalition for education quality",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher builds parent-teacher coalition for education quality - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-educational-teacher builds parent-teacher coalition for education quality",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational-teacher builds parent-teacher coalition for education quality",
+    "name": "Teacher builds parent-teacher coalition for education quality",
+    "description": "Teacher builds parent-teacher coalition for education quality",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

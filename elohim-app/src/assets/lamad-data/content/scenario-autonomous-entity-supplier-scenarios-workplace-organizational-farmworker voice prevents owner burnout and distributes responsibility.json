@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker voice prevents owner burnout and distributes responsibility",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farmworker voice prevents owner burnout and distributes responsibility",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Farmworker voice prevents owner burnout and distributes responsibility",
   "description": "Farmworker voice prevents owner burnout and distributes responsibility",
   "content": "Scenario: Farmworker voice prevents owner burnout and distributes responsibility\n    Given Tom carried full farm responsibility alone causing stress and burnout\n    And sole proprietorship meant he couldn't take breaks without farm crisis\n    When democratic governance distributes responsibility across worker-owners\n    Then Tom (if staying as cooperative member) is freed from sole responsibility burden\n    And farmworkers collectively manage farm reducing individual stress\n    And vacation and health breaks become possible for all including Tom\n    And democratic distribution of responsibility enables sustainable work-life balance\n    And workplace_elohim ensures responsibility distribution is equitable and sustainable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Farmworker voice prevents owner burnout and distributes responsibility",
+    "ogDescription": "Farmworker voice prevents owner burnout and distributes responsibility",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker voice prevents owner burnout and distributes responsibility",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Farmworker voice prevents owner burnout and distributes responsibility - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farmworker voice prevents owner burnout and distributes responsibility",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farmworker voice prevents owner burnout and distributes responsibility",
+    "name": "Farmworker voice prevents owner burnout and distributes responsibility",
+    "description": "Farmworker voice prevents owner burnout and distributes responsibility",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

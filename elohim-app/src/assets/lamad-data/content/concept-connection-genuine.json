@@ -1,0 +1,29 @@
+{
+  "id": "concept-connection-genuine",
+  "contentType": "concept",
+  "title": "Connection is genuine",
+  "description": "rather than performative, fostering real relationships and mutual aid",
+  "content": "rather than performative, fostering real relationships and mutual aid",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/vision/concept-connection-genuine.json",
+  "tags": [
+    "vision",
+    "connection",
+    "authenticity",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "social-medium-epic",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "vision",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001752",
+  "updatedAt": "2025-11-28T17:11:57.001752"
+}

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-district-teacher provides evidence on class size policy",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher provides evidence on class size policy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher provides evidence on class size policy",
   "description": "Teacher provides evidence on class size policy",
   "content": "Scenario: Teacher provides evidence on class size policy\n    Given the board is considering budget cuts increasing class sizes\n    And board claims research shows class size doesn't matter\n    When teachers coordinate evidence-based advocacy through Observer\n    Then they present district's own data showing outcomes decline as sizes increase\n    And cite research on class size effects by grade level\n    And show neighboring district has lower ratios and better results\n    And provide teacher professional judgment grounded in evidence\n    And board decision becomes informed by multiple evidence sources\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-district",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher provides evidence on class size policy",
+    "ogDescription": "Teacher provides evidence on class size policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher provides evidence on class size policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher provides evidence on class size policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher provides evidence on class size policy",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher provides evidence on class size policy",
+    "name": "Teacher provides evidence on class size policy",
+    "description": "Teacher provides evidence on class size policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-family privacy protects alex from unwanted disclosure",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-family privacy protects alex from unwanted disclosure",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family privacy protects Alex from unwanted disclosure",
   "description": "Family privacy protects Alex from unwanted disclosure",
   "content": "Scenario: Family privacy protects Alex from unwanted disclosure\n    Given Alex's disability status is sensitive information\n    And some family members might share Alex's private information\n    When family members access shared family systems\n    Then Alex should control what information family can access\n    And the family_elohim should prevent unauthorized disclosure\n    And Alex's medical information should never be shared without consent\n    And family should not be able to discuss Alex's private matters in shared spaces\n    And privacy violations should be prevented systematically\n    And Alex should be protected from family gossip or oversharing\n    And confidentiality should be enforced even within family\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Family privacy protects Alex from unwanted disclosure",
+    "ogDescription": "Family privacy protects Alex from unwanted disclosure",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-family privacy protects alex from unwanted disclosure",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family privacy protects Alex from unwanted disclosure - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-family privacy protects alex from unwanted disclosure",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-family privacy protects alex from unwanted disclosure",
+    "name": "Family privacy protects Alex from unwanted disclosure",
+    "description": "Family privacy protects Alex from unwanted disclosure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

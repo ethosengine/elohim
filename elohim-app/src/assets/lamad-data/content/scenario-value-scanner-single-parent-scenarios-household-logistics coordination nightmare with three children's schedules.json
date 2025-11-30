@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-household-logistics coordination nightmare with three children's schedules",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-logistics coordination nightmare with three children's schedules",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Logistics coordination nightmare with three children's schedules",
   "description": "Logistics coordination nightmare with three children's schedules",
   "content": "Scenario: Logistics coordination nightmare with three children's schedules\n    Given Maria coordinates school, after-school care, activities, appointments for three children\n    And she manages this alone while working full-time\n    When daily logistics need coordination\n    Then the household_elohim should integrate all schedules\n    And it should identify conflicts before they become crises\n    And it should suggest solutions for impossible timing situations\n    And it should coordinate with other parents for pickup/dropoff sharing\n    And Maria should have AI co-parent for logistical complexity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Logistics coordination nightmare with three children's schedules",
+    "ogDescription": "Logistics coordination nightmare with three children's schedules",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-logistics coordination nightmare with three children's schedules",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Logistics coordination nightmare with three children's schedules - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-logistics coordination nightmare with three children's schedules",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-logistics coordination nightmare with three children's schedules",
+    "name": "Logistics coordination nightmare with three children's schedules",
+    "description": "Logistics coordination nightmare with three children's schedules",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

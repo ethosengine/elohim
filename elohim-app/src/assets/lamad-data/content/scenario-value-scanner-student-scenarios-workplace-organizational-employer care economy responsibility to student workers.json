@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-workplace-organizational-employer care economy responsibility to student workers",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-employer care economy responsibility to student workers",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Employer care economy responsibility to student workers",
   "description": "Employer care economy responsibility to student workers",
   "content": "Scenario: Employer care economy responsibility to student workers\n    Given Kenji is vulnerable worker with limited experience and options\n    And employers have care economy responsibility to workers\n    When the workplace_elohim evaluates Kenji's workplace\n    Then it should assess whether employer provides fair wages, safe conditions, and flexibility\n    And it should recognize good employers who support student success\n    And it should flag exploitative practices or toxic culture\n    And it should help Kenji identify better employment if current job is harmful\n    And the system should hold employers accountable to care economy standards\n    And workplaces should support student worker flourishing\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Employer care economy responsibility to student workers",
+    "ogDescription": "Employer care economy responsibility to student workers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-employer care economy responsibility to student workers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Employer care economy responsibility to student workers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-employer care economy responsibility to student workers",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-employer care economy responsibility to student workers",
+    "name": "Employer care economy responsibility to student workers",
+    "description": "Employer care economy responsibility to student workers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

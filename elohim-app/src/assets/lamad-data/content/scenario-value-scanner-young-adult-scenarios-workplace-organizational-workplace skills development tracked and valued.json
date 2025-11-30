@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-workplace skills development tracked and valued",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-workplace skills development tracked and valued",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace skills development tracked and valued",
   "description": "Workplace skills development tracked and valued",
   "content": "Scenario: Workplace skills development tracked and valued\n    Given Aisha is building professional capabilities\n    And skill development benefits both her and employer\n    When the workplace_elohim tracks her skill growth\n    Then it should recognize learning as valuable labor\n    And it should help her advocate for development opportunities\n    And it should track skills acquired for her career benefit\n    And professional growth should be visible and valued\n    And the system should ensure development serves her long-term interests\n    And skill building should be recognized as mutual investment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace skills development tracked and valued",
+    "ogDescription": "Workplace skills development tracked and valued",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-workplace skills development tracked and valued",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace skills development tracked and valued - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-workplace skills development tracked and valued",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-workplace skills development tracked and valued",
+    "name": "Workplace skills development tracked and valued",
+    "description": "Workplace skills development tracked and valued",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

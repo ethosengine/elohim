@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-family care tokens reflect preteen's substantial contributions",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-family care tokens reflect preteen's substantial contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care tokens reflect preteen's substantial contributions",
   "description": "Family care tokens reflect preteen's substantial contributions",
   "content": "Scenario: Family care tokens reflect preteen's substantial contributions\n    Given the family participates in care token economy\n    And Marcus performs significant household labor\n    When family care tokens are calculated\n    Then Marcus's contributions should be valued at realistic rates\n    And tokens should reflect that his work would be compensated if adult performed it\n    And family care token total should include his contributions\n    And tokens should qualify family for community resource access\n    And Marcus's demonstrated stewardship should be evidence of family capability\n    And care economy should channel support to families like Marcus's\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care tokens reflect preteen's substantial contributions",
+    "ogDescription": "Family care tokens reflect preteen's substantial contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-family care tokens reflect preteen's substantial contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care tokens reflect preteen's substantial contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-family care tokens reflect preteen's substantial contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-family care tokens reflect preteen's substantial contributions",
+    "name": "Family care tokens reflect preteen's substantial contributions",
+    "description": "Family care tokens reflect preteen's substantial contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-care economy data supports worker advocacy for policy changes",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-care economy data supports worker advocacy for policy changes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Care economy data supports worker advocacy for policy changes",
   "description": "Care economy data supports worker advocacy for policy changes",
   "content": "Scenario: Care economy data supports worker advocacy for policy changes\n    Given Sarah and colleagues want better workplace care policies\n    And employers may not understand workers' care burdens\n    When Sarah advocates for workplace policy changes\n    Then the workplace_elohim should provide aggregated care economy data\n    And advocacy should be strengthened by quantified evidence\n    And Sarah should show that care responsibilities are substantial\n    And policy discussions should be informed by actual care patterns\n    And workers should use care economy data to win policy improvements\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Care economy data supports worker advocacy for policy changes",
+    "ogDescription": "Care economy data supports worker advocacy for policy changes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-care economy data supports worker advocacy for policy changes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Care economy data supports worker advocacy for policy changes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-care economy data supports worker advocacy for policy changes",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-care economy data supports worker advocacy for policy changes",
+    "name": "Care economy data supports worker advocacy for policy changes",
+    "description": "Care economy data supports worker advocacy for policy changes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

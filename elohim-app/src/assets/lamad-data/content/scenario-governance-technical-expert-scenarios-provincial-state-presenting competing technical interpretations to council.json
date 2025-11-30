@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-provincial-state-presenting competing technical interpretations to council",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-presenting competing technical interpretations to council",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Presenting competing technical interpretations to council",
   "description": "Presenting competing technical interpretations to council",
   "content": "Scenario: Presenting competing technical interpretations to council\n    Given technical experts disagree about transparency method adequacy\n    And council needs to understand the disagreement\n    When I present both my view and Dr. Chen's alternative\n    Then I explain: his argument fairly and completely\n    And I articulate: where we agree and where we differ\n    And I present: his evidence alongside mine\n    And I avoid: dismissing his perspective unfairly\n    And I let: council judge which interpretation is more constitutionally aligned\n    And I demonstrate: intellectual humility and respect for disagreement\n    And council sees: that expertise involves uncertainty\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Presenting competing technical interpretations to council",
+    "ogDescription": "Presenting competing technical interpretations to council",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-presenting competing technical interpretations to council",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Presenting competing technical interpretations to council - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-presenting competing technical interpretations to council",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-presenting competing technical interpretations to council",
+    "name": "Presenting competing technical interpretations to council",
+    "description": "Presenting competing technical interpretations to council",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

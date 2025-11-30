@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-municipality-council member tracks accountability commitments systematically",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member tracks accountability commitments systematically",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Council member tracks accountability commitments systematically",
   "description": "Council member tracks accountability commitments systematically",
   "content": "Scenario: Council member tracks accountability commitments systematically\n    Given the politician made campaign promises to constituents\n    And committed to specific actions in community meetings\n    When the Observer monitors commitment tracking\n    Then they receive alerts when deadlines approach\n    And see status of all promises made across forums\n    And get nudges to follow through on community pledges\n    And build constituent trust through documented delivery\n    And maintain integrity against overwhelming office demands\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Council member tracks accountability commitments systematically",
+    "ogDescription": "Council member tracks accountability commitments systematically",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member tracks accountability commitments systematically",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Council member tracks accountability commitments systematically - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-municipality-council member tracks accountability commitments systematically",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:municipality-council member tracks accountability commitments systematically",
+    "name": "Council member tracks accountability commitments systematically",
+    "description": "Council member tracks accountability commitments systematically",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

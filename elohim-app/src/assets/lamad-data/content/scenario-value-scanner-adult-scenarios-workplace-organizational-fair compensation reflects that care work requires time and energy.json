@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-fair compensation reflects that care work requires time and energy",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-fair compensation reflects that care work requires time and energy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Fair compensation reflects that care work requires time and energy",
   "description": "Fair compensation reflects that care work requires time and energy",
   "content": "Scenario: Fair compensation reflects that care work requires time and energy\n    Given Sarah's care responsibilities are substantial\n    And she needs sufficient income to support household\n    When Sarah's compensation is determined\n    Then the workplace_elohim should advocate for living wages\n    And compensation should enable household flourishing, not just survival\n    And Sarah should earn enough to afford care work time\n    And wages should reflect that workers have care responsibilities\n    And fair compensation should support care economy participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Fair compensation reflects that care work requires time and energy",
+    "ogDescription": "Fair compensation reflects that care work requires time and energy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-fair compensation reflects that care work requires time and energy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Fair compensation reflects that care work requires time and energy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-fair compensation reflects that care work requires time and energy",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-fair compensation reflects that care work requires time and energy",
+    "name": "Fair compensation reflects that care work requires time and energy",
+    "description": "Fair compensation reflects that care work requires time and energy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

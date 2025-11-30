@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-activist-scenarios-community-activist shares evidence-based call to action",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:community-activist shares evidence-based call to action",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist shares evidence-based call to action",
   "description": "Activist shares evidence-based call to action",
   "content": "Scenario: Activist shares evidence-based call to action\n    Given the activist has researched city council voting records on housing\n    And they have compiled data showing repeated votes against affordability\n    When they create a contribution calling for community action\n    And they attach verified sources and documentation\n    And they propose attending the next city council meeting\n    Then the system evaluates the evidence quality\n    And the contribution reaches all organizing space members immediately\n    And it reaches wider community with evidence-based reach boost\n    And community members can endorse the call to action\n    And coordination tools help organize attendance and testimony\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-activist-scenarios-community",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist shares evidence-based call to action",
+    "ogDescription": "Activist shares evidence-based call to action",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-community-activist shares evidence-based call to action",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist shares evidence-based call to action - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-community-activist shares evidence-based call to action",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:community-activist shares evidence-based call to action",
+    "name": "Activist shares evidence-based call to action",
+    "description": "Activist shares evidence-based call to action",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

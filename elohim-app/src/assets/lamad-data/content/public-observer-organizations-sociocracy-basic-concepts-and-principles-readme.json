@@ -1,6 +1,8 @@
 {
   "id": "public-observer-organizations-sociocracy-basic-concepts-and-principles-readme",
+  "did": "did:web:elohim.host:content:public-observer:organizations:sociocracy-basic-concepts-and-principles:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.",
   "content": "---\nnode_type: organization\norg_id: sociocracy_basic_concepts_and_principles\nname: \"Sociocracy - basic concepts and principles\"\nurl: \"https://www.sociocracyforall.org/sociocracy/\"\ngem_id: \"4i41kojFTidiePwLjwtV\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: public_observer\nrelated_epics: [value_scanner, governance]\n\nepic_relationships:\n  public_observer:\n    inspiration: \"[How Sociocracy - basic concepts and principles inspires the public_observer epic]\"\n    parallel_work: []\n  value_scanner:\n    inspiration: \"[How Sociocracy - basic concepts and principles inspires the value_scanner epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How Sociocracy - basic concepts and principles inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Sociocracy - basic concepts and principles\n\n## Description\n\nBrief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.\n\n**Publisher:** Sociocracy For All\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: public_observer\n\n[Detailed explanation of how Sociocracy - basic concepts and principles relates to and inspires the public_observer epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: value_scanner\n\n[How Sociocracy - basic concepts and principles also inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: governance\n\n[How Sociocracy - basic concepts and principles also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.sociocracyforall.org/sociocracy/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `public_observer` - Primary focus and location\n- `value_scanner` - [Connection description]\n- `governance` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -20,8 +22,55 @@
       "value_scanner",
       "governance"
     ],
-    "primary_epic": "public_observer"
+    "primary_epic": "public_observer",
+    "url": "https://www.sociocracyforall.org/sociocracy/",
+    "name": "Sociocracy - basic concepts and principles",
+    "org_id": "sociocracy_basic_concepts_and_principles",
+    "gem_id": "4i41kojFTidiePwLjwtV",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Sociocracy For All",
+    "epic_relationships": {
+      "public_observer": {
+        "inspiration": "[How Sociocracy - basic concepts and principles inspires the public_observer epic]",
+        "parallel_work": []
+      },
+      "value_scanner": {
+        "inspiration": "[How Sociocracy - basic concepts and principles inspires the value_scanner epic]",
+        "parallel_work": []
+      },
+      "governance": {
+        "inspiration": "[How Sociocracy - basic concepts and principles inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/public-observer-organizations-sociocracy-basic-concepts-and-principles-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/public-observer-organizations-sociocracy-basic-concepts-and-principles-readme",
+    "identifier": "did:web:elohim.host:content:public-observer:organizations:sociocracy-basic-concepts-and-principles:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-individual-recognition of substantial care labor as economically valuable",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-recognition of substantial care labor as economically valuable",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognition of substantial care labor as economically valuable",
   "description": "Recognition of substantial care labor as economically valuable",
   "content": "Scenario: Recognition of substantial care labor as economically valuable\n    Given Marcus performs household management work\n    And similar work by adults would be compensated\n    When Marcus completes weekly shopping and meal planning\n    Then his care contributions should be valued at realistic economic rates\n    And care tokens should reflect genuine value of his work\n    And the system should make explicit that his labor is valuable\n    And recognition should communicate that he's doing skilled work\n    And his contributions should qualify family for community resources\n    And his stewardship should be evidence of capability, not exploitation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognition of substantial care labor as economically valuable",
+    "ogDescription": "Recognition of substantial care labor as economically valuable",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-recognition of substantial care labor as economically valuable",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition of substantial care labor as economically valuable - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-recognition of substantial care labor as economically valuable",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-recognition of substantial care labor as economically valuable",
+    "name": "Recognition of substantial care labor as economically valuable",
+    "description": "Recognition of substantial care labor as economically valuable",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

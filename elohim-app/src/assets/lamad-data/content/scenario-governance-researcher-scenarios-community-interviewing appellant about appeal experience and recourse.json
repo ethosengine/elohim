@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-community-interviewing appellant about appeal experience and recourse",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:community-interviewing appellant about appeal experience and recourse",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Interviewing appellant about appeal experience and recourse",
   "description": "Interviewing appellant about appeal experience and recourse",
   "content": "Scenario: Interviewing appellant about appeal experience and recourse\n    Given Marcus appealed his Family Elohim's mental health intervention\n    And he has consented to research interview\n    When I ask about his experience of the appeal process\n    Then he shares: emotional impact of feeling violated then heard\n    And he describes: accessibility of appeal interface, dignity of process\n    And he explains: how explanation changed his understanding\n    And he reflects: reconciliation with agent through meaningful recourse\n    And I learn: what made the process feel legitimate despite initial anger\n    And I understand: lived experience that statistics cannot capture\n    And His story humanizes governance mechanisms for research audience\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Interviewing appellant about appeal experience and recourse",
+    "ogDescription": "Interviewing appellant about appeal experience and recourse",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-interviewing appellant about appeal experience and recourse",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Interviewing appellant about appeal experience and recourse - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-community-interviewing appellant about appeal experience and recourse",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:community-interviewing appellant about appeal experience and recourse",
+    "name": "Interviewing appellant about appeal experience and recourse",
+    "description": "Interviewing appellant about appeal experience and recourse",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

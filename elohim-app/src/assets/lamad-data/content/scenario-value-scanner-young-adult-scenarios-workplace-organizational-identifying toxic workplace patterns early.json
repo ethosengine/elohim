@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-workplace-organizational-identifying toxic workplace patterns early",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-identifying toxic workplace patterns early",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Identifying toxic workplace patterns early",
   "description": "Identifying toxic workplace patterns early",
   "content": "Scenario: Identifying toxic workplace patterns early\n    Given Aisha is inexperienced with workplace dynamics\n    And toxic workplaces can be normalizing\n    When the workplace_elohim monitors organizational patterns\n    Then it should flag exploitative practices\n    And it should identify when workplace violates care principles\n    And it should help her recognize red flags\n    And the system should protect her from normalizing abuse\n    And she should learn what healthy workplace care looks like\n    And early warning should enable protective action\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Identifying toxic workplace patterns early",
+    "ogDescription": "Identifying toxic workplace patterns early",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-identifying toxic workplace patterns early",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Identifying toxic workplace patterns early - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-workplace-organizational-identifying toxic workplace patterns early",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:workplace-organizational-identifying toxic workplace patterns early",
+    "name": "Identifying toxic workplace patterns early",
+    "description": "Identifying toxic workplace patterns early",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

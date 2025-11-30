@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-individual-personal agent provides collegial support for complex adult work",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-personal agent provides collegial support for complex adult work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent provides collegial support for complex adult work",
   "description": "Personal agent provides collegial support for complex adult work",
   "content": "Scenario: Personal agent provides collegial support for complex adult work\n    Given Marcus is performing work that adults get paid to do\n    And he needs sophisticated planning and analysis tools\n    When Marcus's personal_agent interacts with him\n    Then the relationship should be almost collegial\n    And the agent should provide information, analysis, and planning support\n    And the agent should say \"You've kept nutrition above 90% for three weeks\u2014excellent stewardship\"\n    And emotional encouragement should acknowledge real difficulty of his work\n    And the agent should serve as genuine tool for real work\n    And the tone should respect his capability while supporting his needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent provides collegial support for complex adult work",
+    "ogDescription": "Personal agent provides collegial support for complex adult work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-personal agent provides collegial support for complex adult work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent provides collegial support for complex adult work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-personal agent provides collegial support for complex adult work",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-personal agent provides collegial support for complex adult work",
+    "name": "Personal agent provides collegial support for complex adult work",
+    "description": "Personal agent provides collegial support for complex adult work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

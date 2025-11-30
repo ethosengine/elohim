@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-ecological care tokens recognize environmental contribution despite poverty",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-ecological care tokens recognize environmental contribution despite poverty",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Ecological care tokens recognize environmental contribution despite poverty",
   "description": "Ecological care tokens recognize environmental contribution despite poverty",
   "content": "Scenario: Ecological care tokens recognize environmental contribution despite poverty\n    Given Maria's household practices are environmentally exemplary\n    And she achieves low impact through necessity, not affluent environmentalism\n    When ecological care tokens are calculated\n    Then her resource efficiency should be valued as environmental contribution\n    And she should accumulate ecological care tokens for sustainable practices\n    And low-impact living should be recognized regardless of economic motivation\n    And environmental stewardship should be valued whether chosen or necessary\n    And Maria should receive ecological recognition for her sustainable household\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Ecological care tokens recognize environmental contribution despite poverty",
+    "ogDescription": "Ecological care tokens recognize environmental contribution despite poverty",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-ecological care tokens recognize environmental contribution despite poverty",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Ecological care tokens recognize environmental contribution despite poverty - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-ecological care tokens recognize environmental contribution despite poverty",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-ecological care tokens recognize environmental contribution despite poverty",
+    "name": "Ecological care tokens recognize environmental contribution despite poverty",
+    "description": "Ecological care tokens recognize environmental contribution despite poverty",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

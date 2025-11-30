@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-neighborhood-coordinating with neighbors for transportation",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-coordinating with neighbors for transportation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating with neighbors for transportation",
   "description": "Coordinating with neighbors for transportation",
   "content": "Scenario: Coordinating with neighbors for transportation\n    Given I may not have reliable transportation\n    And neighbors might share rides or have vehicles available\n    When I need transportation for work, shopping, or other needs\n    Then the protocol should help coordinate neighborhood ride-sharing\n    And track reciprocal transportation support\n    And reduce individual costs through sharing\n    And build neighborhood care economy through mutual aid\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating with neighbors for transportation",
+    "ogDescription": "Coordinating with neighbors for transportation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-coordinating with neighbors for transportation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating with neighbors for transportation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-coordinating with neighbors for transportation",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-coordinating with neighbors for transportation",
+    "name": "Coordinating with neighbors for transportation",
+    "description": "Coordinating with neighbors for transportation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

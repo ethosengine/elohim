@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-educational-journalist investigates school discipline disparities",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational-journalist investigates school discipline disparities",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist investigates school discipline disparities",
   "description": "Journalist investigates school discipline disparities",
   "content": "Scenario: Journalist investigates school discipline disparities\n    Given parents report Black students face harsher discipline\n    And the journalist investigates discipline practices\n    When the Observer analyzes discipline data by race\n    Then the journalist sees Black students suspended at 3.5x rate\n    And documents same behaviors leading to suspension for Black students, warnings for white\n    And tracks individual administrators with extreme disparity patterns\n    And compares to districts using restorative justice successfully\n    And publishes investigation exposing discriminatory discipline\n    And pattern recognition reveals school-to-prison pipeline\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates school discipline disparities",
+    "ogDescription": "Journalist investigates school discipline disparities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-educational-journalist investigates school discipline disparities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates school discipline disparities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-educational-journalist investigates school discipline disparities",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational-journalist investigates school discipline disparities",
+    "name": "Journalist investigates school discipline disparities",
+    "description": "Journalist investigates school discipline disparities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

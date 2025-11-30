@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-neighborhood-building neighborhood relationships across demographic differences",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-building neighborhood relationships across demographic differences",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building neighborhood relationships across demographic differences",
   "description": "Building neighborhood relationships across demographic differences",
   "content": "Scenario: Building neighborhood relationships across demographic differences\n    Given Kenji's neighborhood includes diverse ages, incomes, and backgrounds\n    And care economy requires bridging difference\n    When Kenji builds relationships with non-student neighbors\n    Then the neighborhood_elohim should recognize cross-demographic care work\n    And it should value relationships with elderly neighbors, families, workers\n    And it should show how diverse relationships strengthen neighborhood\n    And bridging work should be recognized as care contribution\n    And the system should foster inclusive neighborhood community\n    And students should learn to build community across difference\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Building neighborhood relationships across demographic differences",
+    "ogDescription": "Building neighborhood relationships across demographic differences",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-building neighborhood relationships across demographic differences",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building neighborhood relationships across demographic differences - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-building neighborhood relationships across demographic differences",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-building neighborhood relationships across demographic differences",
+    "name": "Building neighborhood relationships across demographic differences",
+    "description": "Building neighborhood relationships across demographic differences",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

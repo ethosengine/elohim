@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-municipality-public transportation access supports senior independence",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-public transportation access supports senior independence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Public transportation access supports senior independence",
   "description": "Public transportation access supports senior independence",
   "content": "Scenario: Public transportation access supports senior independence\n    Given Margaret can no longer afford car ownership\n    And she needs transportation for medical appointments, shopping, and social life\n    When the municipality_elohim provides transportation information\n    Then accessible public transit should be available\n    And senior fare programs should be communicated clearly\n    And transportation should enable Margaret's continued independence\n    And mobility should be supported as key to aging in community\n    And municipal transit should be optimized for senior access\n    And affordable transportation should preserve autonomy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Public transportation access supports senior independence",
+    "ogDescription": "Public transportation access supports senior independence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-public transportation access supports senior independence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Public transportation access supports senior independence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-public transportation access supports senior independence",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-public transportation access supports senior independence",
+    "name": "Public transportation access supports senior independence",
+    "description": "Public transportation access supports senior independence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

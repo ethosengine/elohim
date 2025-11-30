@@ -9,6 +9,114 @@ import { ContentAttestation } from '../models/content-attestation.model';
 import { KnowledgeMapIndex, KnowledgeMap } from '../models/knowledge-map.model';
 import { PathExtensionIndex, PathExtension } from '../models/path-extension.model';
 
+// Assessment types (inline until models are expanded)
+export interface AssessmentIndex {
+  lastUpdated: string;
+  totalCount: number;
+  assessments: AssessmentIndexEntry[];
+}
+
+export interface AssessmentIndexEntry {
+  id: string;
+  title: string;
+  domain: string;
+  instrumentType: string;
+  estimatedTime: string;
+}
+
+// Governance types (inline until models are expanded)
+export interface GovernanceIndex {
+  lastUpdated: string;
+  challengeCount: number;
+  proposalCount: number;
+  precedentCount: number;
+  discussionCount: number;
+}
+
+export interface ChallengeRecord {
+  id: string;
+  entityType: string;
+  entityId: string;
+  challenger: { agentId: string; displayName: string; standing: string };
+  grounds: string;
+  description: string;
+  status: string;
+  filedAt: string;
+  slaDeadline?: string;
+  assignedElohim?: string;
+  resolution?: {
+    outcome: string;
+    reasoning: string;
+    decidedBy: string;
+    decidedAt: string;
+  };
+}
+
+export interface ProposalRecord {
+  id: string;
+  title: string;
+  proposalType: string;
+  description: string;
+  proposer: { agentId: string; displayName: string };
+  status: string;
+  phase: string;
+  createdAt: string;
+  votingConfig?: {
+    mechanism: string;
+    quorum: number;
+    passageThreshold: number;
+  };
+  currentVotes?: Record<string, number>;
+  outcome?: {
+    decision: string;
+    reasoning: string;
+  };
+}
+
+export interface PrecedentRecord {
+  id: string;
+  title: string;
+  summary: string;
+  fullReasoning: string;
+  binding: string;
+  scope: { entityTypes: string[]; categories?: string[]; roles?: string[] };
+  citations: number;
+  status: string;
+}
+
+export interface DiscussionRecord {
+  id: string;
+  entityType: string;
+  entityId: string;
+  category: string;
+  title: string;
+  messages: Array<{
+    id: string;
+    authorId: string;
+    authorName: string;
+    content: string;
+    createdAt: string;
+  }>;
+  status: string;
+  messageCount: number;
+}
+
+export interface GovernanceStateRecord {
+  entityType: string;
+  entityId: string;
+  status: string;
+  statusBasis: {
+    method: string;
+    reasoning: string;
+    deciderId: string;
+    deciderType: string;
+    decidedAt: string;
+  };
+  labels: Array<{ labelType: string; severity: string; appliedBy: string }>;
+  activeChallenges: string[];
+  lastUpdated: string;
+}
+
 /**
  * DataLoaderService - Loads data from JSON files (prototype) or Holochain (production).
  *
@@ -465,5 +573,183 @@ export class DataLoaderService {
         version: '1.0.0'
       }
     };
+  }
+
+  // =========================================================================
+  // Assessment Loading
+  // =========================================================================
+
+  /**
+   * Load the assessment index.
+   */
+  getAssessmentIndex(): Observable<AssessmentIndex> {
+    return this.http.get<AssessmentIndex>(
+      `${this.basePath}/assessments/index.json`
+    ).pipe(
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load assessment index', err);
+        return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
+      })
+    );
+  }
+
+  /**
+   * Load a specific assessment instrument.
+   * Assessments are also stored as content nodes, so this uses the content loader.
+   */
+  getAssessment(assessmentId: string): Observable<ContentNode | null> {
+    return this.getContent(assessmentId).pipe(
+      catchError(err => {
+        console.error(`[DataLoaderService] Failed to load assessment: ${assessmentId}`, err);
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Get assessments by domain (values, attachment, strengths, etc.).
+   */
+  getAssessmentsByDomain(domain: string): Observable<AssessmentIndexEntry[]> {
+    return this.getAssessmentIndex().pipe(
+      map(index => index.assessments.filter(a => a.domain === domain))
+    );
+  }
+
+  // =========================================================================
+  // Governance Loading
+  // =========================================================================
+
+  /**
+   * Load the governance index (counts and metadata).
+   */
+  getGovernanceIndex(): Observable<GovernanceIndex> {
+    return this.http.get<GovernanceIndex>(
+      `${this.basePath}/governance/index.json`
+    ).pipe(
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load governance index', err);
+        return of({
+          lastUpdated: new Date().toISOString(),
+          challengeCount: 0,
+          proposalCount: 0,
+          precedentCount: 0,
+          discussionCount: 0
+        });
+      })
+    );
+  }
+
+  /**
+   * Load all challenges.
+   */
+  getChallenges(): Observable<ChallengeRecord[]> {
+    return this.http.get<{ challenges: ChallengeRecord[] }>(
+      `${this.basePath}/governance/challenges.json`
+    ).pipe(
+      map(response => response.challenges || []),
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load challenges', err);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get challenges for a specific entity.
+   */
+  getChallengesForEntity(entityType: string, entityId: string): Observable<ChallengeRecord[]> {
+    return this.getChallenges().pipe(
+      map(challenges => challenges.filter(
+        c => c.entityType === entityType && c.entityId === entityId
+      ))
+    );
+  }
+
+  /**
+   * Load all proposals.
+   */
+  getProposals(): Observable<ProposalRecord[]> {
+    return this.http.get<{ proposals: ProposalRecord[] }>(
+      `${this.basePath}/governance/proposals.json`
+    ).pipe(
+      map(response => response.proposals || []),
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load proposals', err);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get proposals by status (voting, discussion, decided).
+   */
+  getProposalsByStatus(status: string): Observable<ProposalRecord[]> {
+    return this.getProposals().pipe(
+      map(proposals => proposals.filter(p => p.status === status))
+    );
+  }
+
+  /**
+   * Load all precedents.
+   */
+  getPrecedents(): Observable<PrecedentRecord[]> {
+    return this.http.get<{ precedents: PrecedentRecord[] }>(
+      `${this.basePath}/governance/precedents.json`
+    ).pipe(
+      map(response => response.precedents || []),
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load precedents', err);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get precedents by binding level (constitutional, binding-network, binding-local, persuasive).
+   */
+  getPrecedentsByBinding(binding: string): Observable<PrecedentRecord[]> {
+    return this.getPrecedents().pipe(
+      map(precedents => precedents.filter(p => p.binding === binding))
+    );
+  }
+
+  /**
+   * Load all discussion threads.
+   */
+  getDiscussions(): Observable<DiscussionRecord[]> {
+    return this.http.get<{ discussions: DiscussionRecord[] }>(
+      `${this.basePath}/governance/discussions.json`
+    ).pipe(
+      map(response => response.discussions || []),
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load discussions', err);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get discussions for a specific entity.
+   */
+  getDiscussionsForEntity(entityType: string, entityId: string): Observable<DiscussionRecord[]> {
+    return this.getDiscussions().pipe(
+      map(discussions => discussions.filter(
+        d => d.entityType === entityType && d.entityId === entityId
+      ))
+    );
+  }
+
+  /**
+   * Load governance state for a specific entity.
+   */
+  getGovernanceState(entityType: string, entityId: string): Observable<GovernanceStateRecord | null> {
+    return this.http.get<GovernanceStateRecord>(
+      `${this.basePath}/governance/state-${entityType}-${entityId}.json`
+    ).pipe(
+      catchError(err => {
+        // Not all entities have governance state files - that's expected
+        return of(null);
+      })
+    );
   }
 }

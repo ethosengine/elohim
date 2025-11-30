@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-community-community care infrastructure advocacy based on user needs",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community care infrastructure advocacy based on user needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community care infrastructure advocacy based on user needs",
   "description": "Community care infrastructure advocacy based on user needs",
   "content": "Scenario: Community care infrastructure advocacy based on user needs\n    Given Robert uses community care services and sees gaps\n    And he understands what infrastructure would help families like his\n    And community planning should be informed by user experience\n    When community_elohim connects user experience to infrastructure planning\n    Then it should channel Robert's feedback to community planning processes\n    And surface gaps: \"No adult day care available for aging parents in this community\"\n    And help him advocate for infrastructure that serves caregivers\n    And connect his voice to community decision-makers\n    And ensure community care systems are designed by those who use them\n    And build care infrastructure based on actual caregiver needs\n    And demonstrate that users should shape systems\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Community care infrastructure advocacy based on user needs",
+    "ogDescription": "Community care infrastructure advocacy based on user needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community care infrastructure advocacy based on user needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care infrastructure advocacy based on user needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community care infrastructure advocacy based on user needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community care infrastructure advocacy based on user needs",
+    "name": "Community care infrastructure advocacy based on user needs",
+    "description": "Community care infrastructure advocacy based on user needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-municipality-municipal care economy connects to regional and state levels",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal care economy connects to regional and state levels",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal care economy connects to regional and state levels",
   "description": "Municipal care economy connects to regional and state levels",
   "content": "Scenario: Municipal care economy connects to regional and state levels\n    Given Sarah's municipality successfully implements care economy\n    And larger governance scales could benefit from similar approaches\n    When municipal care economy is established\n    Then the municipal_elohim should connect to regional systems\n    And successful municipal practices should inform state policy\n    And care economy should scale beyond municipal boundaries\n    And Sarah's local success should contribute to broader transformation\n    And municipal level should be stepping stone to larger scale change\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal care economy connects to regional and state levels",
+    "ogDescription": "Municipal care economy connects to regional and state levels",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal care economy connects to regional and state levels",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal care economy connects to regional and state levels - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal care economy connects to regional and state levels",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal care economy connects to regional and state levels",
+    "name": "Municipal care economy connects to regional and state levels",
+    "description": "Municipal care economy connects to regional and state levels",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

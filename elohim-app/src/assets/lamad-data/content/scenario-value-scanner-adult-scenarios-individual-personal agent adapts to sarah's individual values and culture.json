@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-individual-personal agent adapts to sarah's individual values and culture",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-personal agent adapts to sarah's individual values and culture",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent adapts to Sarah's individual values and culture",
   "description": "Personal agent adapts to Sarah's individual values and culture",
   "content": "Scenario: Personal agent adapts to Sarah's individual values and culture\n    Given Sarah has specific cultural background and personal values\n    And her family has chosen value frameworks\n    When the personal_agent provides guidance\n    Then it should align with Sarah's cultural context\n    And it should respect her personal value priorities\n    And it should serve her chosen framework, not impose external values\n    And diverse cultural approaches to care should be honored\n    And the protocol should be culturally adaptive, not prescriptive\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent adapts to Sarah's individual values and culture",
+    "ogDescription": "Personal agent adapts to Sarah's individual values and culture",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-personal agent adapts to sarah's individual values and culture",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent adapts to Sarah's individual values and culture - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-personal agent adapts to sarah's individual values and culture",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-personal agent adapts to sarah's individual values and culture",
+    "name": "Personal agent adapts to Sarah's individual values and culture",
+    "description": "Personal agent adapts to Sarah's individual values and culture",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

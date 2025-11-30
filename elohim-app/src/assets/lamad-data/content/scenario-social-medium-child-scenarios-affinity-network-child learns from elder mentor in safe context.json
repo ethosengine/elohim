@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child learns from elder mentor in safe context",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child learns from elder mentor in safe context",
   "description": "Child learns from elder mentor in safe context",
   "content": "Scenario: Child learns from elder mentor in safe context\n    Given Emma has been active in the manga community for 6 months\n    And she shows dedication and growing skill\n    When an elder community artist offers mentorship\n    Then the matching agent verifies the elder's background and trustworthiness\n    And the mentorship is structured with appropriate boundaries\n    And Emma's parents are notified and can approve the arrangement\n    And mentorship interactions are visible to community moderators\n    And Emma receives valuable guidance in a safe learning relationship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child learns from elder mentor in safe context",
+    "ogDescription": "Child learns from elder mentor in safe context",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child learns from elder mentor in safe context - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:affinity-network-child learns from elder mentor in safe context",
+    "name": "Child learns from elder mentor in safe context",
+    "description": "Child learns from elder mentor in safe context",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

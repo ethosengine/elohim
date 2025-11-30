@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-transition steward compensation reflects expertise without recreating extraction",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-transition steward compensation reflects expertise without recreating extraction",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transition steward compensation reflects expertise without recreating extraction",
   "description": "Transition steward compensation reflects expertise without recreating extraction",
   "content": "Scenario: Transition steward compensation reflects expertise without recreating extraction\n    Given Rosa receives $55K annually for coordination and knowledge transfer\n    And this must be fair without enabling exploitation\n    When steward compensation is evaluated democratically\n    Then workers verify Rosa's salary is justified by coordination value\n    And compensation is transparent and subject to democratic approval\n    And Rosa cannot use steward role to reclaim ownership control\n    And after two years, role ends with clear transition to worker autonomy\n    And workplace_elohim monitors to prevent steward role from becoming new hierarchy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Transition steward compensation reflects expertise without recreating extraction",
+    "ogDescription": "Transition steward compensation reflects expertise without recreating extraction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-transition steward compensation reflects expertise without recreating extraction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transition steward compensation reflects expertise without recreating extraction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-transition steward compensation reflects expertise without recreating extraction",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-transition steward compensation reflects expertise without recreating extraction",
+    "name": "Transition steward compensation reflects expertise without recreating extraction",
+    "description": "Transition steward compensation reflects expertise without recreating extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

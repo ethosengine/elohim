@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-ecological-politician tracks accountability for climate action commitments",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician tracks accountability for climate action commitments",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician tracks accountability for climate action commitments",
   "description": "Politician tracks accountability for climate action commitments",
   "content": "Scenario: Politician tracks accountability for climate action commitments\n    Given the politician pledged to reduce municipal carbon emissions\n    And committed to specific climate resilience investments\n    When the Observer monitors climate commitment implementation\n    Then they see actual emissions trends versus reduction targets\n    And identify which climate initiatives launched versus stalled\n    And understand budget allocation for climate versus other priorities\n    And receive alerts when commitments fall behind schedule\n    And maintain accountability for climate action promises\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician tracks accountability for climate action commitments",
+    "ogDescription": "Politician tracks accountability for climate action commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician tracks accountability for climate action commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician tracks accountability for climate action commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician tracks accountability for climate action commitments",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician tracks accountability for climate action commitments",
+    "name": "Politician tracks accountability for climate action commitments",
+    "description": "Politician tracks accountability for climate action commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-household-building household community through shared care",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-building household community through shared care",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building household community through shared care",
   "description": "Building household community through shared care",
   "content": "Scenario: Building household community through shared care\n    Given Kenji and roommates are temporarily living together\n    And they could just be strangers sharing space\n    When the household_elohim fosters care economy culture\n    Then it should help them build genuine community\n    And it should recognize shared meals as community building\n    And it should value emotional support among roommates\n    And it should show how care contributions create belonging\n    And the system should help transform roommates into household family\n    And student households should be recognized as temporary but real communities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Building household community through shared care",
+    "ogDescription": "Building household community through shared care",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-building household community through shared care",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building household community through shared care - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-building household community through shared care",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-building household community through shared care",
+    "name": "Building household community through shared care",
+    "description": "Building household community through shared care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

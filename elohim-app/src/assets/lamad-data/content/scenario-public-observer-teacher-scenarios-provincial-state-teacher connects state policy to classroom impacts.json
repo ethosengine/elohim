@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher connects state policy to classroom impacts",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher connects state policy to classroom impacts",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher connects state policy to classroom impacts",
   "description": "Teacher connects state policy to classroom impacts",
   "content": "Scenario: Teacher connects state policy to classroom impacts\n    Given state cut education budget by $400M this year\n    And politicians claim \"no impact on classroom instruction\"\n    When teachers document actual classroom impacts through Observer\n    Then statewide data shows 1,200 teaching positions eliminated\n    And class sizes increased average 3 students per class\n    And art/music/counseling programs cut in 40% of districts\n    And teachers connect budget abstraction to learning reality\n    And teacher evidence exposes political rhetoric vs classroom truth\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher connects state policy to classroom impacts",
+    "ogDescription": "Teacher connects state policy to classroom impacts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher connects state policy to classroom impacts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher connects state policy to classroom impacts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher connects state policy to classroom impacts",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher connects state policy to classroom impacts",
+    "name": "Teacher connects state policy to classroom impacts",
+    "description": "Teacher connects state policy to classroom impacts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-national-analyze whether initial wellbeing gains sustain or decay",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-analyze whether initial wellbeing gains sustain or decay",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Analyze whether initial wellbeing gains sustain or decay",
   "description": "Analyze whether initial wellbeing gains sustain or decay",
   "content": "Scenario: Analyze whether initial wellbeing gains sustain or decay\n    Given early studies showed 8% life satisfaction improvement\n    And question is whether gains persist long-term\n    When James examines 10-year trajectory\n    Then he finds initial gains sustain through Year 5\n    And he observes additional gains accumulating in Years 6-10\n    And he discovers trust compounds over time\n    And he identifies that sustained benefit requires continued democratic participation\n    And longitudinal perspective distinguishes honeymoon effects from stable transformation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-national",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Analyze whether initial wellbeing gains sustain or decay",
+    "ogDescription": "Analyze whether initial wellbeing gains sustain or decay",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-analyze whether initial wellbeing gains sustain or decay",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Analyze whether initial wellbeing gains sustain or decay - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-analyze whether initial wellbeing gains sustain or decay",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-analyze whether initial wellbeing gains sustain or decay",
+    "name": "Analyze whether initial wellbeing gains sustain or decay",
+    "description": "Analyze whether initial wellbeing gains sustain or decay",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

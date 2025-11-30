@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-individual-planning across time with sophisticated coordination tools",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-planning across time with sophisticated coordination tools",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Planning across time with sophisticated coordination tools",
   "description": "Planning across time with sophisticated coordination tools",
   "content": "Scenario: Planning across time with sophisticated coordination tools\n    Given Marcus plans weekly meals for himself and Keisha\n    And he must coordinate ingredients across multiple meals\n    When Marcus uses planning features\n    Then he should have access to meal planning with nutritional analysis\n    And budget tracking should project across weeks\n    And shopping list optimization should be available\n    And inventory management should prevent waste\n    And multi-store price comparison should support best value finding\n    And planning tools should be professional-grade but accessible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Planning across time with sophisticated coordination tools",
+    "ogDescription": "Planning across time with sophisticated coordination tools",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-planning across time with sophisticated coordination tools",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Planning across time with sophisticated coordination tools - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-individual-planning across time with sophisticated coordination tools",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:individual-planning across time with sophisticated coordination tools",
+    "name": "Planning across time with sophisticated coordination tools",
+    "description": "Planning across time with sophisticated coordination tools",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

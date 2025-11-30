@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-community-community mutual aid framework includes youth contributors",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-community mutual aid framework includes youth contributors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community mutual aid framework includes youth contributors",
   "description": "Community mutual aid framework includes youth contributors",
   "content": "Scenario: Community mutual aid framework includes youth contributors\n    Given Marcus provides substantial care labor\n    And mutual aid operates on everyone having something to give\n    When community mutual aid networks operate\n    Then Marcus should be recognized as legitimate contributor\n    And his household labor should count as mutual aid contribution\n    And youth should be included in reciprocal care networks\n    And age should not exclude him from mutual aid participation\n    And community should value care work regardless of who performs it\n    And Marcus should experience being valued community member\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Community mutual aid framework includes youth contributors",
+    "ogDescription": "Community mutual aid framework includes youth contributors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-community mutual aid framework includes youth contributors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community mutual aid framework includes youth contributors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-community mutual aid framework includes youth contributors",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-community mutual aid framework includes youth contributors",
+    "name": "Community mutual aid framework includes youth contributors",
+    "description": "Community mutual aid framework includes youth contributors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

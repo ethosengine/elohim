@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-individual-personal data privacy under alex's complete control",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-personal data privacy under alex's complete control",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal data privacy under Alex's complete control",
   "description": "Personal data privacy under Alex's complete control",
   "content": "Scenario: Personal data privacy under Alex's complete control\n    Given Alex's data includes sensitive disability and medical information\n    And this data reveals intimate details about Alex's body and needs\n    When data is collected about Alex's care patterns\n    Then Alex must have absolute control over all data sharing\n    And medical information should never be shared without explicit consent\n    And disability status should be shared only when Alex chooses\n    And support coordinators should access only what Alex permits\n    And employers should never see medical or disability data without authorization\n    And Alex's privacy must be protected with highest standards\n    And data governance should respect Alex's autonomy completely\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal data privacy under Alex's complete control",
+    "ogDescription": "Personal data privacy under Alex's complete control",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-personal data privacy under alex's complete control",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal data privacy under Alex's complete control - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-individual-personal data privacy under alex's complete control",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:individual-personal data privacy under alex's complete control",
+    "name": "Personal data privacy under Alex's complete control",
+    "description": "Personal data privacy under Alex's complete control",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-individual-financial autonomy maintained while supporting multiple generations",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-financial autonomy maintained while supporting multiple generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Financial autonomy maintained while supporting multiple generations",
   "description": "Financial autonomy maintained while supporting multiple generations",
   "content": "Scenario: Financial autonomy maintained while supporting multiple generations\n    Given Robert provides financial support to children\n    And he contributes to parents' long-term care costs\n    And he maintains his household\n    And he saves for his own retirement\n    When his personal_agent analyzes his financial situation\n    Then it should help him balance competing financial demands\n    And protect his own financial security\n    And surface when generational support threatens his retirement\n    And provide analysis: \"Continuing current support level will delay retirement by 3 years\"\n    And help him make informed tradeoffs\n    And ensure he doesn't sacrifice his own future for present generational needs\n    And support sustainable multigenerational financial planning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Financial autonomy maintained while supporting multiple generations",
+    "ogDescription": "Financial autonomy maintained while supporting multiple generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-financial autonomy maintained while supporting multiple generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Financial autonomy maintained while supporting multiple generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-financial autonomy maintained while supporting multiple generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-financial autonomy maintained while supporting multiple generations",
+    "name": "Financial autonomy maintained while supporting multiple generations",
+    "description": "Financial autonomy maintained while supporting multiple generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

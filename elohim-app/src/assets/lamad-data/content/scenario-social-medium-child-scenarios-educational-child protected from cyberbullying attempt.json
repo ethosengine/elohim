@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-educational-child protected from cyberbullying attempt",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:educational-child protected from cyberbullying attempt",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child protected from cyberbullying attempt",
   "description": "Child protected from cyberbullying attempt",
   "content": "Scenario: Child protected from cyberbullying attempt\n    Given Emma participates in school reading club space\n    When another student tries to post mean comments about Emma\n    Then the guardian agent detects harmful intent before posting\n    And the comment is prevented from reaching Emma\n    And the space moderator is alerted to address the behavior\n    And the student who posted receives appropriate intervention\n    And Emma continues participating without being harmed\n    And restorative process helps both students learn and grow\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-educational",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child protected from cyberbullying attempt",
+    "ogDescription": "Child protected from cyberbullying attempt",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-educational-child protected from cyberbullying attempt",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child protected from cyberbullying attempt - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-educational-child protected from cyberbullying attempt",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:educational-child protected from cyberbullying attempt",
+    "name": "Child protected from cyberbullying attempt",
+    "description": "Child protected from cyberbullying attempt",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

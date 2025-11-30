@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-individual-privacy protection with emerging concept of data awareness",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-privacy protection with emerging concept of data awareness",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Privacy protection with emerging concept of data awareness",
   "description": "Privacy protection with emerging concept of data awareness",
   "content": "Scenario: Privacy protection with emerging concept of data awareness\n    Given Emma's choices and decision patterns are being tracked\n    And she is beginning to understand privacy concepts\n    When Emma's data is collected\n    Then all data must stay encrypted on family devices\n    And no commercial exploitation should occur\n    And Emma should receive age-appropriate education about privacy\n    And she should learn why data protection matters\n    And the agent should explain \"Your information is private and protected\"\n    And Emma should begin understanding data as something to steward\n    And consent education should begin at this developmental stage\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Privacy protection with emerging concept of data awareness",
+    "ogDescription": "Privacy protection with emerging concept of data awareness",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-privacy protection with emerging concept of data awareness",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy protection with emerging concept of data awareness - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-privacy protection with emerging concept of data awareness",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-privacy protection with emerging concept of data awareness",
+    "name": "Privacy protection with emerging concept of data awareness",
+    "description": "Privacy protection with emerging concept of data awareness",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

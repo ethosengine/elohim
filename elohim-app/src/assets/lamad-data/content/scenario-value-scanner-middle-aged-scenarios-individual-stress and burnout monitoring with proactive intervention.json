@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-individual-stress and burnout monitoring with proactive intervention",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-stress and burnout monitoring with proactive intervention",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Stress and burnout monitoring with proactive intervention",
   "description": "Stress and burnout monitoring with proactive intervention",
   "content": "Scenario: Stress and burnout monitoring with proactive intervention\n    Given Robert carries enormous care burden across contexts\n    And middle-aged adults often experience burnout\n    And he may not recognize his own exhaustion\n    When his personal_agent monitors stress indicators\n    Then it should track signs of burnout across his activities\n    And recognize patterns: \"You've canceled personal activities 8 consecutive weeks\"\n    And flag when burden becomes unsustainable\n    And proactively surface support resources\n    And connect him to respite care, counseling, or community support\n    And validate that asking for help is strength, not weakness\n    And intervene before burnout becomes crisis\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Stress and burnout monitoring with proactive intervention",
+    "ogDescription": "Stress and burnout monitoring with proactive intervention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-stress and burnout monitoring with proactive intervention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Stress and burnout monitoring with proactive intervention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-individual-stress and burnout monitoring with proactive intervention",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:individual-stress and burnout monitoring with proactive intervention",
+    "name": "Stress and burnout monitoring with proactive intervention",
+    "description": "Stress and burnout monitoring with proactive intervention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

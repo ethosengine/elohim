@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:educational-child contributes to science fair project collaboration",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child contributes to science fair project collaboration",
   "description": "Child contributes to science fair project collaboration",
   "content": "Scenario: Child contributes to science fair project collaboration\n    Given Emma is working on a science fair project about local ecology\n    And several classmates are working on related projects\n    When Emma creates a contribution about discovering salamanders in the creek\n    And she shares photos and observations with classmates\n    Then the contribution reaches her project team immediately\n    And her teacher can provide feedback and guidance\n    And the learning agent surfaces related educational resources\n    And Emma learns collaborative research skills\n    And the project documentation is preserved for science fair presentation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-child-scenarios-educational",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Child contributes to science fair project collaboration",
+    "ogDescription": "Child contributes to science fair project collaboration",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child contributes to science fair project collaboration - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:educational-child contributes to science fair project collaboration",
+    "name": "Child contributes to science fair project collaboration",
+    "description": "Child contributes to science fair project collaboration",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

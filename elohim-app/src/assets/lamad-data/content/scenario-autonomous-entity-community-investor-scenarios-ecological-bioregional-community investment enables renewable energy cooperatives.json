@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment enables renewable energy cooperatives",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-community investment enables renewable energy cooperatives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community investment enables renewable energy cooperatives",
   "description": "Community investment enables renewable energy cooperatives",
   "content": "Scenario: Community investment enables renewable energy cooperatives\n    Given fossil fuel dependence threatens climate stability\n    And Patricia wants investment supporting renewable energy transition\n    When community investment expands to renewable energy cooperatives\n    Then her capital supports community solar and wind projects\n    And democratic energy ownership replaces fossil fuel extraction\n    And bioregional energy sovereignty increases through distributed renewables\n    And climate mitigation is advanced through values-aligned investment\n    And bioregional_elohim coordinates renewable energy cooperative investment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Community investment enables renewable energy cooperatives",
+    "ogDescription": "Community investment enables renewable energy cooperatives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment enables renewable energy cooperatives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community investment enables renewable energy cooperatives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-community investment enables renewable energy cooperatives",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-community investment enables renewable energy cooperatives",
+    "name": "Community investment enables renewable energy cooperatives",
+    "description": "Community investment enables renewable energy cooperatives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

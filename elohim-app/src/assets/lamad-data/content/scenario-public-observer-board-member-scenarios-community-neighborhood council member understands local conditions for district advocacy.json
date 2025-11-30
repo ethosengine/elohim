@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-community-neighborhood council member understands local conditions for district advocacy",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-neighborhood council member understands local conditions for district advocacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood council member understands local conditions for district advocacy",
   "description": "Neighborhood council member understands local conditions for district advocacy",
   "content": "Scenario: Neighborhood council member understands local conditions for district advocacy\n    Given neighborhood has concerns about park maintenance and safety\n    And council wants to advocate to city parks department for improvements\n    And needs data to support request competing with other neighborhoods\n    When the council member uses Observer hyperlocal analysis\n    Then they receive documentation of park condition deterioration over time\n    And see usage data showing high community demand despite poor conditions\n    And access comparison to park investment in other neighborhoods\n    And get demographic analysis showing environmental justice dimensions\n    And hyperlocal data strengthens advocacy to broader governance levels\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood council member understands local conditions for district advocacy",
+    "ogDescription": "Neighborhood council member understands local conditions for district advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-neighborhood council member understands local conditions for district advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood council member understands local conditions for district advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-neighborhood council member understands local conditions for district advocacy",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-neighborhood council member understands local conditions for district advocacy",
+    "name": "Neighborhood council member understands local conditions for district advocacy",
+    "description": "Neighborhood council member understands local conditions for district advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

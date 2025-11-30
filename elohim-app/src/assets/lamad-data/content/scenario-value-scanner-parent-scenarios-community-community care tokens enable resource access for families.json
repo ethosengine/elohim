@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-community-community care tokens enable resource access for families",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:community-community care tokens enable resource access for families",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community care tokens enable resource access for families",
   "description": "Community care tokens enable resource access for families",
   "content": "Scenario: Community care tokens enable resource access for families\n    Given Sarah has accumulated care tokens through parenting and civic participation\n    And community resources are allocated partially based on care economy\n    When Sarah's family needs community support\n    Then her care tokens should give standing in resource decisions\n    And the community should provide support based on her contributions\n    And care economy should enable reciprocity between family and community\n    And those who contribute care should receive care in return\n    And the system should create sustainable community mutual aid\n    And parenting contributions should translate to community support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.193597",
-  "updatedAt": "2025-11-21T18:54:29.193597"
+  "openGraphMetadata": {
+    "ogTitle": "Community care tokens enable resource access for families",
+    "ogDescription": "Community care tokens enable resource access for families",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-community-community care tokens enable resource access for families",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community care tokens enable resource access for families - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-community-community care tokens enable resource access for families",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:community-community care tokens enable resource access for families",
+    "name": "Community care tokens enable resource access for families",
+    "description": "Community care tokens enable resource access for families",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

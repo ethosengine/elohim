@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-provincial-state-deliberating multi-community coordination case",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state-deliberating multi-community coordination case",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Deliberating multi-community coordination case",
   "description": "Deliberating multi-community coordination case",
   "content": "Scenario: Deliberating multi-community coordination case\n    Given an appeal involves agent decisions across several communities\n    And different communities have conflicting local calibrations\n    When our regional council reviews the inter-community conflict\n    Then we evaluate: how subsidiarity applies across boundaries\n    And we examine: if regional coordination is constitutionally required\n    And we consider: if local diversity should be harmonized or preserved\n    And we consult: community leaders about local context\n    And we establish: regional minimums while respecting variation\n    And we create: precedent for multi-layer governance coherence\n    And our judgment: enables communities to coordinate democratically\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Deliberating multi-community coordination case",
+    "ogDescription": "Deliberating multi-community coordination case",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-provincial-state-deliberating multi-community coordination case",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Deliberating multi-community coordination case - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-provincial-state-deliberating multi-community coordination case",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state-deliberating multi-community coordination case",
+    "name": "Deliberating multi-community coordination case",
+    "description": "Deliberating multi-community coordination case",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

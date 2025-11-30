@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-advanced care planning supported early and comprehensively",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-advanced care planning supported early and comprehensively",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advanced care planning supported early and comprehensively",
   "description": "Advanced care planning supported early and comprehensively",
   "content": "Scenario: Advanced care planning supported early and comprehensively\n    Given David's condition is progressive and will worsen\n    And advance directives are essential before capability is lost\n    When the healthcare_elohim facilitates care planning\n    Then it should prompt advance directive discussions early\n    And it should help James and David document wishes\n    And it should ensure legal documents are comprehensive\n    And it should coordinate care planning across providers\n    And future care should be planned while David can still participate\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Advanced care planning supported early and comprehensively",
+    "ogDescription": "Advanced care planning supported early and comprehensively",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-advanced care planning supported early and comprehensively",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advanced care planning supported early and comprehensively - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-advanced care planning supported early and comprehensively",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-advanced care planning supported early and comprehensively",
+    "name": "Advanced care planning supported early and comprehensively",
+    "description": "Advanced care planning supported early and comprehensively",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

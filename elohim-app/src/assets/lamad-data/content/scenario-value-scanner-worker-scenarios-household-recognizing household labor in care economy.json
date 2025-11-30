@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-household-recognizing household labor in care economy",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-recognizing household labor in care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognizing household labor in care economy",
   "description": "Recognizing household labor in care economy",
   "content": "Scenario: Recognizing household labor in care economy\n    Given all household work is care contribution\n    When household members clean, cook, maintain, and organize\n    Then the protocol should recognize this as valuable care work\n    And accumulate care tokens for household contributions\n    And make visible that domestic labor supports everyone's flourishing\n    And validate that this work deserves recognition even though unpaid\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing household labor in care economy",
+    "ogDescription": "Recognizing household labor in care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-recognizing household labor in care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing household labor in care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-recognizing household labor in care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-recognizing household labor in care economy",
+    "name": "Recognizing household labor in care economy",
+    "description": "Recognizing household labor in care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

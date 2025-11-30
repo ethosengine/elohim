@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-workplace-organizational-workplace relationships and peer support",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-workplace relationships and peer support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace relationships and peer support",
   "description": "Workplace relationships and peer support",
   "content": "Scenario: Workplace relationships and peer support\n    Given Kenji works with other employees, many also students\n    And workplace can be site of mutual support or competition\n    When the workplace_elohim tracks workplace relationships\n    Then it should recognize peer support among coworkers as care work\n    And it should value helping coworkers, sharing shifts, covering emergencies\n    And it should accumulate care tokens for workplace mutual aid\n    And worker solidarity should be understood as care economy\n    And the system should foster cooperative rather than competitive workplace culture\n    And Kenji should build care relationships with fellow workers\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace relationships and peer support",
+    "ogDescription": "Workplace relationships and peer support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-workplace relationships and peer support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace relationships and peer support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-workplace relationships and peer support",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-workplace relationships and peer support",
+    "name": "Workplace relationships and peer support",
+    "description": "Workplace relationships and peer support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

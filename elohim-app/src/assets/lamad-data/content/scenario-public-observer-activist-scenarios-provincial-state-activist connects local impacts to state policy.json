@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-provincial-state-activist connects local impacts to state policy",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state-activist connects local impacts to state policy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist connects local impacts to state policy",
   "description": "Activist connects local impacts to state policy",
   "content": "Scenario: Activist connects local impacts to state policy\n    Given state education funding formula harms the activist's district\n    And needs to build pressure for reform\n    When the Observer calculates local impacts of state policy\n    Then the activist shows how formula shortchanges their district by $4M\n    And documents impacts on class sizes and programs\n    And connects families affected by funding gaps\n    And state policy debate becomes grounded in local reality\n    And abstract policy becomes personal stakes\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist connects local impacts to state policy",
+    "ogDescription": "Activist connects local impacts to state policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-provincial-state-activist connects local impacts to state policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist connects local impacts to state policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-provincial-state-activist connects local impacts to state policy",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state-activist connects local impacts to state policy",
+    "name": "Activist connects local impacts to state policy",
+    "description": "Activist connects local impacts to state policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

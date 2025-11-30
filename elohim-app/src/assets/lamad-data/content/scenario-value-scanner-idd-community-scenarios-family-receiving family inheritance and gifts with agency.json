@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-family-receiving family inheritance and gifts with agency",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-receiving family inheritance and gifts with agency",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Receiving family inheritance and gifts with agency",
   "description": "Receiving family inheritance and gifts with agency",
   "content": "Scenario: Receiving family inheritance and gifts with agency\n    Given Jordan's grandmother passed away and left Jordan an inheritance\n    And Jordan has the right to benefit from the inheritance\n    When the family discusses the inheritance\n    Then Jordan participates in decisions about the money\n    And the personal_agent helps Jordan understand inheritance options\n    And if guardianship requires oversight, it's done with dignity\n    And Jordan has voice in how the money is used for their benefit\n    And Jordan's personhood and rights are fully respected\n    And the family_elohim ensures Jordan's interests are protected\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Receiving family inheritance and gifts with agency",
+    "ogDescription": "Receiving family inheritance and gifts with agency",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-receiving family inheritance and gifts with agency",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Receiving family inheritance and gifts with agency - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-receiving family inheritance and gifts with agency",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-receiving family inheritance and gifts with agency",
+    "name": "Receiving family inheritance and gifts with agency",
+    "description": "Receiving family inheritance and gifts with agency",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

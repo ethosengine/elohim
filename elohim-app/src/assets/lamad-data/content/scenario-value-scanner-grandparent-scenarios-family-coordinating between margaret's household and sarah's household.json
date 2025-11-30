@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-family-coordinating between margaret's household and sarah's household",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-coordinating between margaret's household and sarah's household",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating between Margaret's household and Sarah's household",
   "description": "Coordinating between Margaret's household and Sarah's household",
   "content": "Scenario: Coordinating between Margaret's household and Sarah's household\n    Given Margaret has her own household with Robert\n    And Sarah has her household with her own governance\n    When the family_elohim coordinates across households\n    Then it should respect both household autonomies\n    And it should help negotiate care arrangements between households\n    And it should coordinate schedules, logistics, and expectations\n    And boundaries between households should be clear and respected\n    And neither household should dominate the other\n    And care coordination should serve both households' needs\n    And multigenerational care should work across household boundaries\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating between Margaret's household and Sarah's household",
+    "ogDescription": "Coordinating between Margaret's household and Sarah's household",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-coordinating between margaret's household and sarah's household",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating between Margaret's household and Sarah's household - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-coordinating between margaret's household and sarah's household",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-coordinating between margaret's household and sarah's household",
+    "name": "Coordinating between Margaret's household and Sarah's household",
+    "description": "Coordinating between Margaret's household and Sarah's household",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

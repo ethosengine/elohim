@@ -29,121 +29,199 @@
     </nav>
 
     <!-- Path Header -->
-    <header class="path-header">
-      <div class="path-meta">
-        <span class="difficulty-badge" [class]="path.difficulty">
-          {{ getDifficultyDisplay() }}
-        </span>
-        @if (path.estimatedDuration) {
-          <span class="duration">{{ path.estimatedDuration }}</span>
-        }
+    <div class="path-header">
+      <div class="path-header-content">
+        <div class="path-meta">
+          <span class="difficulty-badge" [class]="path.difficulty || 'beginner'">
+            {{ getDifficultyDisplay() }}
+          </span>
+          <span class="duration" *ngIf="path.estimatedDuration">
+            ⏱ {{ path.estimatedDuration }}
+          </span>
+        </div>
+
+        <h1 class="path-title">{{ path.title }}</h1>
+        <p class="path-description">{{ path.description }}</p>
+
+        <div class="path-purpose" *ngIf="path.purpose">
+          <strong>Goal:</strong> {{ path.purpose }}
+        </div>
+
+        <div class="path-tags" *ngIf="path.tags && path.tags.length > 0">
+          <span *ngFor="let tag of path.tags" class="tag">#{{ tag }}</span>
+        </div>
       </div>
 
-      <h1 class="path-title">{{ path.title }}</h1>
-      <p class="path-description">{{ path.description }}</p>
+      <div class="path-thumbnail-container">
+        <img [src]="path.thumbnailUrl || 'assets/lamad-data/images/path-placeholder.png'"
+             [alt]="path.thumbnailAlt || path.title"
+             class="path-thumbnail-image"
+             onerror="this.style.display='none'"> <!-- Hide if fails -->
+        <!-- Fallback visual if image hidden/missing? CSS can handle background color -->
+      </div>
+    </div>
 
-      @if (path.purpose) {
-        <div class="path-purpose">
-          <strong>Purpose:</strong> {{ path.purpose }}
-        </div>
-      }
-
-      <!-- Tags -->
-      @if (path.tags && path.tags.length > 0) {
-        <div class="path-tags">
-          @for (tag of path.tags; track tag) {
-            <span class="tag">{{ tag }}</span>
-          }
-        </div>
-      }
-    </header>
-
-    <!-- Progress Section (if started) -->
-    @if (hasStarted()) {
+    <!-- Main Grid Layout -->
+    <div class="overview-main">
+      <!-- Territory Mastery Progress -->
       <section class="progress-section">
         <div class="progress-header">
-          <h2>Your Progress</h2>
-          <span class="progress-percent">{{ getCompletionPercentage() }}% Complete</span>
+          <h2>Territory Mastery</h2>
+          <span class="progress-percent">{{ getCompletionPercentage() }}%</span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" [style.width.%]="getCompletionPercentage()"></div>
+
+        <div class="territory-bar">
+          <!-- Mastered Here -->
+          <div class="bar-segment mastered-here" 
+               [style.width.%]="pathCompletion?.stepCompletionPercentage"
+               title="Mastered in this journey"></div>
+          <!-- Mastered Elsewhere -->
+          <div class="bar-segment mastered-elsewhere" 
+               [style.width.%]="(pathCompletion?.contentCompletionPercentage - pathCompletion?.stepCompletionPercentage)"
+               title="Mastered in other journeys"></div>
+        </div>
+        
+        <div class="shared-mastery-note" *ngIf="pathCompletion?.sharedContentCompleted > 0">
+          <span class="checkmark-green">✓</span>
+          {{ pathCompletion.sharedContentCompleted }} concepts mastered in other paths!
         </div>
       </section>
-    }
 
-    <!-- Action Buttons -->
-    <section class="action-section">
-      @if (isCompleted()) {
-        <div class="completed-message">
-          <span class="checkmark">&#10003;</span>
-          <span>Path Completed!</span>
-        </div>
-        <button class="btn btn-secondary" (click)="beginJourney()">
-          Review from Start
-        </button>
-      } @else if (hasStarted()) {
-        <button class="btn btn-primary btn-large" (click)="continueJourney()">
-          Continue Journey
-        </button>
-        <button class="btn btn-secondary" (click)="beginJourney()">
-          Start from Beginning
-        </button>
-      } @else {
-        <button class="btn btn-primary btn-large" (click)="beginJourney()">
-          Begin Journey
-        </button>
-      }
-    </section>
+      <!-- Chapter View -->
+      @if (chapters.length > 0) {
+        <div class="chapter-list">
+          @for (item of chapters; track item.chapter.id) {
+            <div class="chapter-card">
+              <div class="chapter-header">
+                <h3>{{ item.chapter.title }}</h3>
+                <span class="chapter-meta">{{ item.metrics.completedSteps }}/{{ item.metrics.totalSteps }} Steps</span>
+              </div>
+              
+              <!-- Progress Bar per Chapter -->
+              <div class="chapter-bar-container">
+                <div class="chapter-bar-fill" [style.width.%]="item.metrics.contentCompletionPercentage"></div>
+              </div>
 
-    <!-- Step Outline -->
-    <section class="steps-section">
-      <h2>Path Outline</h2>
-      <p class="steps-count">{{ path.steps.length }} steps</p>
-
-      <ol class="steps-list">
-        @for (step of path.steps; track step.order; let i = $index) {
-          <li
-            class="step-item"
-            [class]="getStepStatusClass(i)"
-            (click)="goToStep(i)"
-            [attr.role]="isStepAccessible(i) ? 'button' : undefined"
-            [attr.tabindex]="isStepAccessible(i) ? 0 : undefined"
-          >
-            <div class="step-indicator">
-              @if (isStepCompleted(i)) {
-                <span class="checkmark">&#10003;</span>
-              } @else if (isStepLocked(i)) {
-                <span class="lock">&#128274;</span>
-              } @else {
-                <span class="number">{{ i + 1 }}</span>
-              }
-            </div>
-
-            <div class="step-content">
-              <h3 class="step-title">{{ step.stepTitle }}</h3>
-              @if (!isStepLocked(i) && step.stepNarrative) {
-                <p class="step-narrative">{{ step.stepNarrative }}</p>
-              }
-              @if (isStepLocked(i)) {
-                <p class="step-locked-message">Complete previous steps to unlock</p>
-              }
-              <div class="step-meta">
-                @if (step.estimatedTime) {
-                  <span class="time">{{ step.estimatedTime }}</span>
+              <!-- Chapter Steps -->
+              <ul class="chapter-step-list">
+                @for (s of item.steps; track s.step.order) {
+                  <li class="chapter-step-item" 
+                      [class.completed]="s.isCompleted"
+                      [class.global-complete]="s.isGlobalCompletion"
+                      [class.locked]="s.isLocked"
+                      (click)="!s.isLocked ? goToStep(s.step.order) : null">
+                    <span class="step-status-icon">
+                      @if (s.isCompleted) {
+                        <span class="checkmark">✓</span>
+                      } @else if (s.isGlobalCompletion) {
+                        <span class="checkmark global" title="Mastered in another journey">✓</span>
+                      } @else if (s.isLocked) {
+                        <span class="lock">🔒</span>
+                      } @else {
+                        <span class="circle">○</span>
+                      }
+                    </span>
+                    <span class="step-icon">{{ s.icon }}</span>
+                    <span class="step-name">{{ s.step.stepTitle }}</span>
+                  </li>
                 }
-                @if (step.optional) {
-                  <span class="optional-badge">Optional</span>
-                }
+              </ul>
+
+              <div class="chapter-actions">
+                <button class="btn btn-sm btn-secondary" (click)="startChapter(item.chapter.id)">
+                  {{ item.metrics.completedSteps > 0 ? 'Continue' : 'Start' }} Chapter
+                </button>
               </div>
             </div>
+          }
+        </div>
+      } 
+      <!-- Flat List Fallback -->
+      @else {
+        <ol class="steps-list">
+          @for (s of flatSteps; track s.step.order) {
+            <li
+              class="step-item"
+              [class.completed]="s.isCompleted"
+              [class.global-complete]="s.isGlobalCompletion"
+              [class.locked]="s.isLocked"
+              (click)="!s.isLocked ? goToStep(s.step.order) : null"
+            >
+              <div class="step-indicator">
+                @if (s.isCompleted) {
+                  <span class="checkmark">&#10003;</span>
+                } @else if (s.isGlobalCompletion) {
+                  <span class="checkmark global" title="Mastered in another journey">✓</span>
+                } @else if (s.isLocked) {
+                  <span class="lock">&#128274;</span>
+                } @else {
+                  <span class="number">{{ s.step.order + 1 }}</span>
+                }
+              </div>
 
-            @if (isStepAccessible(i) && !isStepCompleted(i)) {
-              <span class="step-arrow">&#8594;</span>
+              <div class="step-content">
+                <div class="step-header-row">
+                  <span class="step-icon">{{ s.icon }}</span>
+                  <h3 class="step-title">{{ s.step.stepTitle }}</h3>
+                </div>
+                @if (!s.isLocked && s.step.stepNarrative) {
+                  <p class="step-narrative">{{ s.step.stepNarrative }}</p>
+                }
+                @if (s.isLocked) {
+                  <p class="step-locked-message">Complete previous steps to unlock</p>
+                }
+              </div>
+
+              @if (!s.isLocked && !s.isCompleted) {
+                <span class="step-arrow">&#8594;</span>
+              }
+            </li>
+          }
+        </ol>
+      }
+    </div>
+
+    <div class="overview-sidebar">
+      <!-- Action Buttons -->
+      <section class="action-section">
+        <div *ngIf="isCompleted()" class="completed-message">
+          <span class="checkmark">&#10003;</span>
+          Path Completed!
+        </div>
+
+        <button *ngIf="hasStarted() && !isCompleted()" class="btn btn-primary btn-large" (click)="continueJourney()">
+          Continue Journey
+        </button>
+
+        <button *ngIf="!hasStarted()" class="btn btn-primary btn-large" (click)="beginJourney()">
+          Begin Journey
+        </button>
+
+        <button class="btn btn-secondary" (click)="goHome()">Back to All Paths</button>
+      </section>
+
+      <!-- Concept Mastery Chips -->
+      @if (conceptProgress.length > 0) {
+        <section class="concepts-section">
+          <h3>Concept Mastery</h3>
+          <div class="concepts-grid">
+            @for (concept of conceptProgress; track concept.conceptId) {
+              <div class="concept-chip" [class.mastered]="concept.completionPercentage === 100">
+                <div class="concept-header">
+                  <span class="concept-title">{{ concept.title }}</span>
+                  <span class="concept-stats">{{ concept.completedSteps }}/{{ concept.totalSteps }}</span>
+                </div>
+                <div class="concept-bar">
+                  <div class="concept-bar-fill" [style.width.%]="concept.completionPercentage"></div>
+                </div>
+              </div>
             }
-          </li>
-        }
-      </ol>
-    </section>
+          </div>
+        </section>
+      }
+    </div>
+
+
 
     <!-- Path Metadata Footer -->
     <footer class="path-footer">

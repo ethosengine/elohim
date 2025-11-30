@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-family-family decision-making includes student voice",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-family decision-making includes student voice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family decision-making includes student voice",
   "description": "Family decision-making includes student voice",
   "content": "Scenario: Family decision-making includes student voice\n    Given Kenji is becoming adult family member\n    And family makes decisions that affect him\n    When family discusses major decisions (moving, finances, elder care)\n    Then the family_elohim should ensure Kenji's voice is included\n    And it should recognize his emerging adult perspective as valuable\n    And it should facilitate his participation despite distance\n    And family governance should include student members as participants\n    And the system should support transition from child to adult family voice\n    And Kenji should participate in family decisions appropriately\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Family decision-making includes student voice",
+    "ogDescription": "Family decision-making includes student voice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-family decision-making includes student voice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family decision-making includes student voice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-family decision-making includes student voice",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-family decision-making includes student voice",
+    "name": "Family decision-making includes student voice",
+    "description": "Family decision-making includes student voice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

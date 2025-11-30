@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-municipality-parent connects development pattern to school overcrowding",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent connects development pattern to school overcrowding",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent connects development pattern to school overcrowding",
   "description": "Parent connects development pattern to school overcrowding",
   "content": "Scenario: Parent connects development pattern to school overcrowding\n    Given the parent's child attends chronically overcrowded school\n    And wonders why enrollment keeps increasing\n    When the parent reviews Observer's municipal development history\n    Then they see 5 major residential developments approved in 3 years\n    And learn developers paid minimal school impact fees\n    And understand city approved housing without ensuring school capacity\n    And systematic pattern of municipal decisions harming education becomes visible\n    And parent advocacy targets growth management policies\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent connects development pattern to school overcrowding",
+    "ogDescription": "Parent connects development pattern to school overcrowding",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent connects development pattern to school overcrowding",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent connects development pattern to school overcrowding - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent connects development pattern to school overcrowding",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent connects development pattern to school overcrowding",
+    "name": "Parent connects development pattern to school overcrowding",
+    "description": "Parent connects development pattern to school overcrowding",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

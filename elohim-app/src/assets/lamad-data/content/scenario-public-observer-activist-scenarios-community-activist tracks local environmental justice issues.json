@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-community-activist tracks local environmental justice issues",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist tracks local environmental justice issues",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist tracks local environmental justice issues",
   "description": "Activist tracks local environmental justice issues",
   "content": "Scenario: Activist tracks local environmental justice issues\n    Given pollution sources affect the activist's community\n    And residents report health concerns\n    When the Observer documents environmental conditions\n    Then the activist sees air quality trends by neighborhood\n    And maps proximity of industrial facilities to residences\n    And tracks permit violations and regulatory responses\n    And organizes community for accountability demands\n    And environmental racism becomes documented and actionable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist tracks local environmental justice issues",
+    "ogDescription": "Activist tracks local environmental justice issues",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist tracks local environmental justice issues",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist tracks local environmental justice issues - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist tracks local environmental justice issues",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist tracks local environmental justice issues",
+    "name": "Activist tracks local environmental justice issues",
+    "description": "Activist tracks local environmental justice issues",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-educational-learning economic systems through lived experience",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-learning economic systems through lived experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning economic systems through lived experience",
   "description": "Learning economic systems through lived experience",
   "content": "Scenario: Learning economic systems through lived experience\n    Given Marcus navigates real economic constraints daily\n    And he experiences market systems, pricing, scarcity directly\n    When Marcus develops economic understanding\n    Then he should learn economics through authentic participation\n    And he should understand supply and demand through shopping\n    And he should grasp market failures through food desert experience\n    And economic theory should be grounded in lived reality\n    And his understanding should be deeper than abstract classroom learning\n    And care economy should provide superior economic education\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning economic systems through lived experience",
+    "ogDescription": "Learning economic systems through lived experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-learning economic systems through lived experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning economic systems through lived experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-educational-learning economic systems through lived experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:educational-learning economic systems through lived experience",
+    "name": "Learning economic systems through lived experience",
+    "description": "Learning economic systems through lived experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

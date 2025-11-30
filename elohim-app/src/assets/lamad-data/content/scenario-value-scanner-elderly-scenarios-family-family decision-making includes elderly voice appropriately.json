@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-family-family decision-making includes elderly voice appropriately",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family decision-making includes elderly voice appropriately",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family decision-making includes elderly voice appropriately",
   "description": "Family decision-making includes elderly voice appropriately",
   "content": "Scenario: Family decision-making includes elderly voice appropriately\n    Given family decisions affect Helen's care and wellbeing\n    And Helen retains decision-making capacity\n    When family governance processes occur\n    Then Helen's voice should carry weight in family decisions\n    And she should not be decided about, but consulted\n    And the family_elohim should ensure her input is heard\n    And family should not override her preferences without consent\n    And she should experience agency within family governance\n    And the protocol should preserve her standing as family elder\n    And respect should be maintained even as care needs increase\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Family decision-making includes elderly voice appropriately",
+    "ogDescription": "Family decision-making includes elderly voice appropriately",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family decision-making includes elderly voice appropriately",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family decision-making includes elderly voice appropriately - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family decision-making includes elderly voice appropriately",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family decision-making includes elderly voice appropriately",
+    "name": "Family decision-making includes elderly voice appropriately",
+    "description": "Family decision-making includes elderly voice appropriately",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

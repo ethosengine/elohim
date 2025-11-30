@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-11-27T06:01:59.176683",
+  "lastUpdated": "2025-11-28T21:09:48.300962",
   "zoomLevel": 0,
   "nodes": [
     {
@@ -99,6 +99,21 @@
       },
       "level": 0,
       "isRoot": false
+    },
+    {
+      "id": "lamad-reference-implementation",
+      "title": "Lamad: Reference Implementation",
+      "contentType": "concept",
+      "description": "A reference implementation demonstrating how the Elohim Protocol principles can be embodied in software",
+      "hasChildren": false,
+      "childCount": 0,
+      "position": {
+        "x": 0,
+        "y": -150
+      },
+      "level": 0,
+      "isRoot": false,
+      "isReferenceImplementation": true
     }
   ],
   "edges": [
@@ -161,8 +176,43 @@
       "source": "economic-coordination-epic",
       "target": "governance-epic",
       "type": "RELATES_TO"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "manifesto",
+      "type": "IMPLEMENTS"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "governance-epic",
+      "type": "DEMONSTRATES"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "value-scanner-epic",
+      "type": "DEMONSTRATES"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "public-observer-epic",
+      "type": "DEMONSTRATES"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "autonomous-entity-epic",
+      "type": "DEMONSTRATES"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "social-medium-epic",
+      "type": "DEMONSTRATES"
+    },
+    {
+      "source": "lamad-reference-implementation",
+      "target": "economic-coordination-epic",
+      "type": "DEMONSTRATES"
     }
   ],
-  "totalNodes": 7,
-  "totalEdges": 12
+  "totalNodes": 8,
+  "totalEdges": 19
 }

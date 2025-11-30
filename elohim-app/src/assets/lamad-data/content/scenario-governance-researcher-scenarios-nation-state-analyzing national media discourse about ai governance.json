@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-nation-state-analyzing national media discourse about ai governance",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-analyzing national media discourse about ai governance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Analyzing national media discourse about AI governance",
   "description": "Analyzing national media discourse about AI governance",
   "content": "Scenario: Analyzing national media discourse about AI governance\n    Given public understanding is shaped by media coverage\n    And I want to understand how protocol is portrayed and discussed\n    When I analyze national media coverage over time\n    Then I examine: framing (opportunity vs threat, freedom vs control)\n    And I identify: key narratives and their evolution\n    And I assess: accuracy of coverage vs actual protocol function\n    And I explore: elite discourse vs grassroots perspectives\n    And I analyze: how coverage affects public opinion and adoption\n    And I track: whether critical discourse improves protocol or undermines it\n    And My research reveals: democratic deliberation about democratic AI\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Analyzing national media discourse about AI governance",
+    "ogDescription": "Analyzing national media discourse about AI governance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-analyzing national media discourse about ai governance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Analyzing national media discourse about AI governance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-analyzing national media discourse about ai governance",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-analyzing national media discourse about ai governance",
+    "name": "Analyzing national media discourse about AI governance",
+    "description": "Analyzing national media discourse about AI governance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

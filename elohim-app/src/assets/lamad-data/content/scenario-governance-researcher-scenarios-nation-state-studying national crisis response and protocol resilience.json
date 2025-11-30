@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-nation-state-studying national crisis response and protocol resilience",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-studying national crisis response and protocol resilience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Studying national crisis response and protocol resilience",
   "description": "Studying national crisis response and protocol resilience",
   "content": "Scenario: Studying national crisis response and protocol resilience\n    Given nation experienced major crisis (pandemic, economic collapse, climate disaster)\n    And protocol governance was tested under extreme conditions\n    When I analyze how protocol functioned during and after crisis\n    Then I examine: whether emergency coordination maintained democratic oversight\n    And I assess: whether crisis pressures led to authoritarian drift\n    And I measure: community resilience with protocol vs without\n    And I explore: how Constitutional Councils balanced urgency with deliberation\n    And I identify: protocol vulnerabilities revealed under stress\n    And I analyze: recovery trajectories and institutional learning\n    And My research reveals: whether democratic AI governance is resilient or fragile\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Studying national crisis response and protocol resilience",
+    "ogDescription": "Studying national crisis response and protocol resilience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-studying national crisis response and protocol resilience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Studying national crisis response and protocol resilience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-studying national crisis response and protocol resilience",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-studying national crisis response and protocol resilience",
+    "name": "Studying national crisis response and protocol resilience",
+    "description": "Studying national crisis response and protocol resilience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

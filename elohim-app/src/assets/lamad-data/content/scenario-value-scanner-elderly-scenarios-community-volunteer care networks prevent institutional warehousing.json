@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-community-volunteer care networks prevent institutional warehousing",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:community-volunteer care networks prevent institutional warehousing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Volunteer care networks prevent institutional warehousing",
   "description": "Volunteer care networks prevent institutional warehousing",
   "content": "Scenario: Volunteer care networks prevent institutional warehousing\n    Given institutional care strips autonomy and dignity\n    And community care networks can enable aging in place\n    When volunteers provide support for Helen\n    Then the community_elohim should coordinate volunteer schedules\n    And volunteer care work should be recognized with care tokens\n    And Helen should remain in her home and community\n    And care should be provided with dignity and respect\n    And the protocol should demonstrate alternative to institutional model\n    And community care economy should prove that dignified elder care is possible at scale\n    And success should show that we can care for our elders without warehousing them\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Volunteer care networks prevent institutional warehousing",
+    "ogDescription": "Volunteer care networks prevent institutional warehousing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-community-volunteer care networks prevent institutional warehousing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Volunteer care networks prevent institutional warehousing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-community-volunteer care networks prevent institutional warehousing",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:community-volunteer care networks prevent institutional warehousing",
+    "name": "Volunteer care networks prevent institutional warehousing",
+    "description": "Volunteer care networks prevent institutional warehousing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

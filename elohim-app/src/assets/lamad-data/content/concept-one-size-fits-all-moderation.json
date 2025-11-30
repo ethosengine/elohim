@@ -1,0 +1,28 @@
+{
+  "id": "concept-one-size-fits-all-moderation",
+  "contentType": "concept",
+  "title": "One-size-fits-all moderation",
+  "description": "fails to respect diverse community values and contexts",
+  "content": "fails to respect diverse community values and contexts",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/crisis-digital/concept-one-size-fits-all-moderation.json",
+  "tags": [
+    "crisis",
+    "digital",
+    "moderation",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "crisis-digital",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001082",
+  "updatedAt": "2025-11-28T17:11:57.001082"
+}

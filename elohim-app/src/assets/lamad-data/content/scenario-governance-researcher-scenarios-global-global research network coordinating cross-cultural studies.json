@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-global-global research network coordinating cross-cultural studies",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:global-global research network coordinating cross-cultural studies",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Global research network coordinating cross-cultural studies",
   "description": "Global research network coordinating cross-cultural studies",
   "content": "Scenario: Global research network coordinating cross-cultural studies\n    Given protocol has been adopted in diverse nations worldwide\n    And I am part of international research consortium\n    When we coordinate parallel studies across continents\n    Then we examine: how cultural context shapes constitutional interpretation\n    And we compare: collectivist vs individualist societies' implementations\n    And we analyze: different political systems' integration patterns\n    And we identify: universal patterns vs cultural adaptations\n    And we share: methodologies and data (with appropriate protection)\n    And we test: whether democratic AI governance is Western innovation or universal possibility\n    And Our global collaboration reveals: humanity's shared and diverse governance approaches\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Global research network coordinating cross-cultural studies",
+    "ogDescription": "Global research network coordinating cross-cultural studies",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-global research network coordinating cross-cultural studies",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Global research network coordinating cross-cultural studies - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-global research network coordinating cross-cultural studies",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:global-global research network coordinating cross-cultural studies",
+    "name": "Global research network coordinating cross-cultural studies",
+    "description": "Global research network coordinating cross-cultural studies",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

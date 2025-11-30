@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-municipality-municipal youth advisory board includes teen care economy participants",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality-municipal youth advisory board includes teen care economy participants",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal youth advisory board includes teen care economy participants",
   "description": "Municipal youth advisory board includes teen care economy participants",
   "content": "Scenario: Municipal youth advisory board includes teen care economy participants\n    Given the municipality is establishing youth civic engagement structures\n    And Jasmine has demonstrated leadership through care contributions\n    When the municipal_elohim identifies candidates for youth advisory board\n    Then Jasmine should be surfaced as a potential participant\n    And her care economy track record should demonstrate her capability\n    And selection should be based on demonstrated contribution, not just academic achievement\n    And diverse youth voices should be included in municipal governance\n    And teens should participate in decisions that affect their lives\n    And youth advisory structures should have real power, not just token representation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal youth advisory board includes teen care economy participants",
+    "ogDescription": "Municipal youth advisory board includes teen care economy participants",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-municipality-municipal youth advisory board includes teen care economy participants",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal youth advisory board includes teen care economy participants - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-municipality-municipal youth advisory board includes teen care economy participants",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality-municipal youth advisory board includes teen care economy participants",
+    "name": "Municipal youth advisory board includes teen care economy participants",
+    "description": "Municipal youth advisory board includes teen care economy participants",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

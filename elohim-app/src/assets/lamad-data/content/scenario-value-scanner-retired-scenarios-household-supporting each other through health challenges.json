@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-household-supporting each other through health challenges",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:household-supporting each other through health challenges",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Supporting each other through health challenges",
   "description": "Supporting each other through health challenges",
   "content": "Scenario: Supporting each other through health challenges\n    Given one or both partners may face health crises\n    And partners provide mutual care and support\n    When the household_elohim tracks caregiving between partners\n    Then it should recognize care provided by each partner\n    And it should surface when care burden becomes unsustainable\n    And it should suggest external support when needed\n    And care between partners should be valued and visible\n    And the system should protect relationship health under care stress\n    And mutual care should strengthen rather than strain partnership\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Supporting each other through health challenges",
+    "ogDescription": "Supporting each other through health challenges",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-household-supporting each other through health challenges",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting each other through health challenges - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-household-supporting each other through health challenges",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:household-supporting each other through health challenges",
+    "name": "Supporting each other through health challenges",
+    "description": "Supporting each other through health challenges",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

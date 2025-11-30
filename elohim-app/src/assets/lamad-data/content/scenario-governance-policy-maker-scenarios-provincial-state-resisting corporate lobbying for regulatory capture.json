@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-provincial-state-resisting corporate lobbying for regulatory capture",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-resisting corporate lobbying for regulatory capture",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Resisting corporate lobbying for regulatory capture",
   "description": "Resisting corporate lobbying for regulatory capture",
   "content": "Scenario: Resisting corporate lobbying for regulatory capture\n    Given tech companies lobby for regulations favoring incumbents\n    And they push: backdoor mandates, centralization requirements, licensing barriers\n    When I defend protocol sovereignty against capture\n    Then I use: cryptographic impossibility arguments (backdoors break verification)\n    And I present: evidence that regulation would harm innovation\n    And I coalition: with community leaders showing grassroots opposition\n    And I reference: international examples of protocol sovereignty working\n    And I require: transparency about lobbying and funding\n    And I resist: well-funded pressure through political courage\n    And I protect: democratic governance from corporate control\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Resisting corporate lobbying for regulatory capture",
+    "ogDescription": "Resisting corporate lobbying for regulatory capture",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-resisting corporate lobbying for regulatory capture",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Resisting corporate lobbying for regulatory capture - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-resisting corporate lobbying for regulatory capture",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-resisting corporate lobbying for regulatory capture",
+    "name": "Resisting corporate lobbying for regulatory capture",
+    "description": "Resisting corporate lobbying for regulatory capture",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

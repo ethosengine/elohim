@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-family-family privacy protected while coordinating across contexts",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-family privacy protected while coordinating across contexts",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family privacy protected while coordinating across contexts",
   "description": "Family privacy protected while coordinating across contexts",
   "content": "Scenario: Family privacy protected while coordinating across contexts\n    Given family care economy involves multiple family members\n    And privacy needs differ across individuals\n    When family data is managed\n    Then Sarah should control what's shared with extended family\n    And children's privacy should be protected by parental oversight\n    And partner's privacy should be respected\n    And extended family should only see what Sarah chooses to share\n    And family privacy should be complex, nuanced, and protected\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Family privacy protected while coordinating across contexts",
+    "ogDescription": "Family privacy protected while coordinating across contexts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-family privacy protected while coordinating across contexts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family privacy protected while coordinating across contexts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-family privacy protected while coordinating across contexts",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-family privacy protected while coordinating across contexts",
+    "name": "Family privacy protected while coordinating across contexts",
+    "description": "Family privacy protected while coordinating across contexts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

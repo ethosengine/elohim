@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-customer-scenarios-individual-customer discovers consumption as political act building community wealth",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer discovers consumption as political act building community wealth",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Customer discovers consumption as political act building community wealth",
   "description": "Customer discovers consumption as political act building community wealth",
   "content": "Scenario: Customer discovers consumption as political act building community wealth\n    Given corporate consumption felt powerless and alienating\n    And Ms. Johnson didn't think her spending mattered politically\n    When democratic business makes consumption politically meaningful\n    Then her modest annual spending ($900) supports worker ownership and living wages\n    And money circulates in community rather than extracting to distant shareholders\n    And consumption choice builds democratic economy infrastructure\n    And she understands individual actions aggregate into systemic transformation\n    And community_elohim helps customers see collective impact of consumption choices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Customer discovers consumption as political act building community wealth",
+    "ogDescription": "Customer discovers consumption as political act building community wealth",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer discovers consumption as political act building community wealth",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer discovers consumption as political act building community wealth - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer discovers consumption as political act building community wealth",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer discovers consumption as political act building community wealth",
+    "name": "Customer discovers consumption as political act building community wealth",
+    "description": "Customer discovers consumption as political act building community wealth",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

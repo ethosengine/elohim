@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor participates in community investment pool governance",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor participates in community investment pool governance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor participates in community investment pool governance",
   "description": "Investor participates in community investment pool governance",
   "content": "Scenario: Investor participates in community investment pool governance\n    Given traditional investing gives shareholders plutocratic pseudo-democracy\n    And Patricia wants genuine participation, not capital-weighted control\n    When community investment pool has democratic governance structure\n    Then she participates in pool governance as one voice among equals\n    And investment decisions consider community benefit alongside financial returns\n    And pool priorities are set democratically by investors, workers, and community representatives\n    And governance prevents capital from dominating democratic enterprises\n    And community_elohim manages investment pool democratic governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor participates in community investment pool governance",
+    "ogDescription": "Investor participates in community investment pool governance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor participates in community investment pool governance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor participates in community investment pool governance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor participates in community investment pool governance",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor participates in community investment pool governance",
+    "name": "Investor participates in community investment pool governance",
+    "description": "Investor participates in community investment pool governance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

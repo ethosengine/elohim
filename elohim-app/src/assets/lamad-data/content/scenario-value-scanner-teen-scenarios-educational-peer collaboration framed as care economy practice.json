@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-educational-peer collaboration framed as care economy practice",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-peer collaboration framed as care economy practice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Peer collaboration framed as care economy practice",
   "description": "Peer collaboration framed as care economy practice",
   "content": "Scenario: Peer collaboration framed as care economy practice\n    Given Jasmine collaborates with classmates on group projects\n    And peer learning is valuable educational practice\n    When educational_elohim tracks collaborative learning\n    Then it should frame peer collaboration as care economy\n    And recognize that students teaching each other is care work\n    And value collaborative learning as mutual care\n    And help students understand that knowledge sharing creates collective value\n    And build expectation that learning is community practice, not individual competition\n    And demonstrate care economy principles in educational contexts\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Peer collaboration framed as care economy practice",
+    "ogDescription": "Peer collaboration framed as care economy practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-peer collaboration framed as care economy practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Peer collaboration framed as care economy practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-educational-peer collaboration framed as care economy practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:educational-peer collaboration framed as care economy practice",
+    "name": "Peer collaboration framed as care economy practice",
+    "description": "Peer collaboration framed as care economy practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-household-household care tokens include supplements for single-parent resource constraints",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-household care tokens include supplements for single-parent resource constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household care tokens include supplements for single-parent resource constraints",
   "description": "Household care tokens include supplements for single-parent resource constraints",
   "content": "Scenario: Household care tokens include supplements for single-parent resource constraints\n    Given Maria's household operates on severely limited income\n    And the Value Scanner should be accessible regardless of economic status\n    When household care tokens are calculated\n    Then Maria should receive care token supplements based on income level\n    And her single-parent status should qualify for enhanced support\n    And supplements should enable continued participation without financial barrier\n    And care economy should function as economic support system\n    And access should be dignified, never requiring means-tested humiliation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Household care tokens include supplements for single-parent resource constraints",
+    "ogDescription": "Household care tokens include supplements for single-parent resource constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-household care tokens include supplements for single-parent resource constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household care tokens include supplements for single-parent resource constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-household care tokens include supplements for single-parent resource constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-household care tokens include supplements for single-parent resource constraints",
+    "name": "Household care tokens include supplements for single-parent resource constraints",
+    "description": "Household care tokens include supplements for single-parent resource constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

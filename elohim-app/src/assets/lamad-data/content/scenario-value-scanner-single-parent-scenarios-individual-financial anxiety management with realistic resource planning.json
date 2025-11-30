@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-individual-financial anxiety management with realistic resource planning",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-financial anxiety management with realistic resource planning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Financial anxiety management with realistic resource planning",
   "description": "Financial anxiety management with realistic resource planning",
   "content": "Scenario: Financial anxiety management with realistic resource planning\n    Given Maria constantly calculates whether she can afford necessities\n    And financial stress pervades every decision\n    When Maria faces financial decisions\n    Then the personal_agent should provide clear financial analysis\n    And it should help her see trade-offs and options\n    And it should reduce anxiety through better planning and visibility\n    And it should help her make informed choices within severe constraints\n    And Maria should feel more financial agency despite limited resources\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Financial anxiety management with realistic resource planning",
+    "ogDescription": "Financial anxiety management with realistic resource planning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-financial anxiety management with realistic resource planning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Financial anxiety management with realistic resource planning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-financial anxiety management with realistic resource planning",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-financial anxiety management with realistic resource planning",
+    "name": "Financial anxiety management with realistic resource planning",
+    "description": "Financial anxiety management with realistic resource planning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-participating in workplace decision-making processes",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-participating in workplace decision-making processes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in workplace decision-making processes",
   "description": "Participating in workplace decision-making processes",
   "content": "Scenario: Participating in workplace decision-making processes\n    Given the library is deciding new operating hours\n    And scheduling changes affect all employees\n    When staff input is gathered about the proposed changes\n    Then Jordan's schedule preferences are solicited accessibly\n    And Jordan can express how changes would affect them\n    And Jordan's input is weighted equally with other staff\n    And the workplace_elohim ensures Jordan's voice is heard\n    And final decisions consider Jordan's needs and preferences\n    And Jordan experiences democratic workplace participation\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in workplace decision-making processes",
+    "ogDescription": "Participating in workplace decision-making processes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-participating in workplace decision-making processes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in workplace decision-making processes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-participating in workplace decision-making processes",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-participating in workplace decision-making processes",
+    "name": "Participating in workplace decision-making processes",
+    "description": "Participating in workplace decision-making processes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

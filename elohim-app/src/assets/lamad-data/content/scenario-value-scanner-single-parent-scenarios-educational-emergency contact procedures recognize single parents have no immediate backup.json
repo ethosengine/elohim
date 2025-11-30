@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-educational-emergency contact procedures recognize single parents have no immediate backup",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-emergency contact procedures recognize single parents have no immediate backup",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Emergency contact procedures recognize single parents have no immediate backup",
   "description": "Emergency contact procedures recognize single parents have no immediate backup",
   "content": "Scenario: Emergency contact procedures recognize single parents have no immediate backup\n    Given Maria is the only parent available for children's emergencies\n    And she may be unreachable due to work constraints\n    When schools need emergency parent contact\n    Then the educational_elohim should help Maria establish backup emergency contacts\n    And schools should understand single parents may not be immediately available\n    And emergency protocols should include extended family or neighbor backups\n    And schools should work with Maria's realistic availability constraints\n    And children's emergency needs should be met even when solo parent is unavailable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Emergency contact procedures recognize single parents have no immediate backup",
+    "ogDescription": "Emergency contact procedures recognize single parents have no immediate backup",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-emergency contact procedures recognize single parents have no immediate backup",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency contact procedures recognize single parents have no immediate backup - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-emergency contact procedures recognize single parents have no immediate backup",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-emergency contact procedures recognize single parents have no immediate backup",
+    "name": "Emergency contact procedures recognize single parents have no immediate backup",
+    "description": "Emergency contact procedures recognize single parents have no immediate backup",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,0 +1,32 @@
+{
+  "id": "concept-love-as-technology",
+  "contentType": "concept",
+  "title": "Love as Technology",
+  "description": "The radical proposition at the heart of this protocol is that love\u2014not as sentiment but as committed action toward mutual flourishing\u2014can be encoded into technological systems. Not through rules about love, but through architectures that make exploitation structurally impossible while making care structurally supported.",
+  "content": "The radical proposition at the heart of this protocol is that love\u2014not as sentiment but as committed action toward mutual flourishing\u2014can be encoded into technological systems. Not through rules about love, but through architectures that make exploitation structurally impossible while making care structurally supported.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/call-to-action/concept-love-as-technology.json",
+  "tags": [
+    "love",
+    "philosophy",
+    "foundation",
+    "principle",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "value-scanner-epic",
+    "social-medium-epic",
+    "lamad-reference-implementation"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "call-to-action",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.002774",
+  "updatedAt": "2025-11-28T17:11:57.002774"
+}

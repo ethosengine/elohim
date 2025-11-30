@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-protection from discrimination based on single parent status",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-protection from discrimination based on single parent status",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Protection from discrimination based on single parent status",
   "description": "Protection from discrimination based on single parent status",
   "content": "Scenario: Protection from discrimination based on single parent status\n    Given single parents often face workplace discrimination and bias\n    And employers may view them as less committed or reliable\n    When Maria experiences workplace treatment\n    Then the workplace_elohim should monitor for single parent discrimination\n    And it should document patterns that indicate bias\n    And it should support Maria in addressing discriminatory treatment\n    And single parent status should be protected from workplace discrimination\n    And Maria should have equal opportunity regardless of family structure\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Protection from discrimination based on single parent status",
+    "ogDescription": "Protection from discrimination based on single parent status",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-protection from discrimination based on single parent status",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protection from discrimination based on single parent status - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-protection from discrimination based on single parent status",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-protection from discrimination based on single parent status",
+    "name": "Protection from discrimination based on single parent status",
+    "description": "Protection from discrimination based on single parent status",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

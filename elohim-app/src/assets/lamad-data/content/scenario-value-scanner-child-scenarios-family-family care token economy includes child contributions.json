@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-family-family care token economy includes child contributions",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:family-family care token economy includes child contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family care token economy includes child contributions",
   "description": "Family care token economy includes child contributions",
   "content": "Scenario: Family care token economy includes child contributions\n    Given the family participates in care token system\n    And Emma makes multiple types of care contributions\n    When family care tokens are calculated weekly\n    Then Emma's economic decisions should generate tokens\n    And her care for Tommy should be valued\n    And her household contributions should be recognized\n    And tokens should reflect genuine value created\n    And Emma should have age-appropriate awareness of her economic impact\n    And care token distribution should teach that care creates value\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Family care token economy includes child contributions",
+    "ogDescription": "Family care token economy includes child contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-family care token economy includes child contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care token economy includes child contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-family care token economy includes child contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:family-family care token economy includes child contributions",
+    "name": "Family care token economy includes child contributions",
+    "description": "Family care token economy includes child contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

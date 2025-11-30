@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-developer-interests-scenarios-ecological-developer environmental review gains honest analysis",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:ecological-developer environmental review gains honest analysis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developer environmental review gains honest analysis",
   "description": "Developer environmental review gains honest analysis",
   "content": "Scenario: Developer environmental review gains honest analysis\n    Given a developer's environmental impact report claims minimal impacts\n    And used consultant known for developer-friendly assessments\n    When the Observer provides independent environmental analysis\n    Then comparison shows: wetland impacts understated by 60%\n    And habitat loss affects threatened species not mentioned\n    And stormwater runoff calculations omit downstream impacts\n    And independent assessment reveals actual environmental costs\n    And rubber-stamp reviews face evidence-based scrutiny\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-developer-interests-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Developer environmental review gains honest analysis",
+    "ogDescription": "Developer environmental review gains honest analysis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-ecological-developer environmental review gains honest analysis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer environmental review gains honest analysis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-ecological-developer environmental review gains honest analysis",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:ecological-developer environmental review gains honest analysis",
+    "name": "Developer environmental review gains honest analysis",
+    "description": "Developer environmental review gains honest analysis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

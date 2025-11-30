@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-connection to land through understanding food origins",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-connection to land through understanding food origins",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Connection to land through understanding food origins",
   "description": "Connection to land through understanding food origins",
   "content": "Scenario: Connection to land through understanding food origins\n    Given Marcus eats food grown in soil by farmers\n    And connection to land is part of ecological literacy\n    When Marcus learns about his food sources\n    Then the personal_agent should teach bioregional geography\n    And it should help him understand local agricultural landscape\n    And it should build relationship between Marcus and the land feeding him\n    And he should develop sense of place and bioregional identity\n    And care economy should include care for ecological systems\n    And stewardship should extend beyond human relationships\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Connection to land through understanding food origins",
+    "ogDescription": "Connection to land through understanding food origins",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-connection to land through understanding food origins",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connection to land through understanding food origins - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-connection to land through understanding food origins",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-connection to land through understanding food origins",
+    "name": "Connection to land through understanding food origins",
+    "description": "Connection to land through understanding food origins",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

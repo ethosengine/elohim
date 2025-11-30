@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-community-mediating between community members and agents",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community-mediating between community members and agents",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Mediating between community members and agents",
   "description": "Mediating between community members and agents",
   "content": "Scenario: Mediating between community members and agents\n    Given Community Elohim makes decisions affecting Riverside residents\n    And some residents don't understand or disagree with decisions\n    When I serve as bridge between residents and agent governance\n    Then I explain: how protocol works in accessible language\n    And I facilitate: residents filing appeals when appropriate\n    And I provide: context to Constitutional Council about local culture\n    And I advocate: for residents when agents miss local knowledge\n    And I maintain: boundary where I don't control agents but collaborate\n    And I enable: democratic participation in AI governance\n    And I am accountable: to residents through elections\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Mediating between community members and agents",
+    "ogDescription": "Mediating between community members and agents",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-mediating between community members and agents",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mediating between community members and agents - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-mediating between community members and agents",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:community-mediating between community members and agents",
+    "name": "Mediating between community members and agents",
+    "description": "Mediating between community members and agents",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-nation-state-my judgment influences national legislation",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-my judgment influences national legislation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "My judgment influences national legislation",
   "description": "My judgment influences national legislation",
   "content": "Scenario: My judgment influences national legislation\n    Given Senator Ruiz drafts national AI governance legislation\n    And she cites our national council precedents\n    When my constitutional reasoning shapes democratic law\n    Then my nurse-mother perspective: enriches national policy\n    And my citizen judgment: guides representative government\n    And sortition and elected democracy: work as partners\n    And my unlikely voice: matters at highest levels of governance\n    And I understand: democratic participation as transformation\n    And I have become: constitutional architect for my nation\n    And I know: ordinary people can govern extraordinary complexity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "My judgment influences national legislation",
+    "ogDescription": "My judgment influences national legislation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-my judgment influences national legislation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "My judgment influences national legislation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-nation-state-my judgment influences national legislation",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:nation-state-my judgment influences national legislation",
+    "name": "My judgment influences national legislation",
+    "description": "My judgment influences national legislation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-workplace-organizational-professional development access despite caregiving constraints",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-professional development access despite caregiving constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Professional development access despite caregiving constraints",
   "description": "Professional development access despite caregiving constraints",
   "content": "Scenario: Professional development access despite caregiving constraints\n    Given James wants to maintain professional skills\n    And caregiving prevents traditional professional development\n    When professional development is offered\n    Then the workplace_elohim should advocate for accessible formats\n    And training should be available remotely and asynchronously\n    And caregivers should not be excluded from advancement opportunities\n    And professional growth should be possible during caregiving years\n    And workplace should provide flexible development paths\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Professional development access despite caregiving constraints",
+    "ogDescription": "Professional development access despite caregiving constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-professional development access despite caregiving constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional development access despite caregiving constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-workplace-organizational-professional development access despite caregiving constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:workplace-organizational-professional development access despite caregiving constraints",
+    "name": "Professional development access despite caregiving constraints",
+    "description": "Professional development access despite caregiving constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

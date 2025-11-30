@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-family-teen provides sibling care as valued family contribution",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:family-teen provides sibling care as valued family contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teen provides sibling care as valued family contribution",
   "description": "Teen provides sibling care as valued family contribution",
   "content": "Scenario: Teen provides sibling care as valued family contribution\n    Given Jasmine provides regular after-school care for Jordan\n    And this care enables parent Maya to work full-time\n    And Jasmine's care work has substantial economic value\n    When Jasmine's sibling care is tracked\n    Then it should be valued as the labor it is, not dismissed as \"just babysitting\"\n    And the care should be recognized in family care token allocation\n    And Maya should receive prompts to explicitly acknowledge this contribution\n    And Jordan should learn to recognize Jasmine's care work\n    And the family should understand that Jasmine's care enables their current lifestyle\n    And if external childcare would cost $15/hour, Jasmine's care should be valued accordingly\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Teen provides sibling care as valued family contribution",
+    "ogDescription": "Teen provides sibling care as valued family contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-family-teen provides sibling care as valued family contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen provides sibling care as valued family contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-family-teen provides sibling care as valued family contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:family-teen provides sibling care as valued family contribution",
+    "name": "Teen provides sibling care as valued family contribution",
+    "description": "Teen provides sibling care as valued family contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

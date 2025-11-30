@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-global-learning from diverse national approaches to protocol",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-learning from diverse national approaches to protocol",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning from diverse national approaches to protocol",
   "description": "Learning from diverse national approaches to protocol",
   "content": "Scenario: Learning from diverse national approaches to protocol\n    Given different nations implemented protocol differently\n    And cultural context shapes governance outcomes\n    When I study international variations in implementation\n    Then I learn: from collectivist societies' community emphasis\n    And I examine: how different political systems integrate protocol\n    And I identify: universal patterns vs context-specific adaptations\n    And I share: lessons with other policy makers\n    And I adapt: my legislation based on international evidence\n    And I contribute: to global learning community\n    And I practice: epistemic humility about cultural diversity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning from diverse national approaches to protocol",
+    "ogDescription": "Learning from diverse national approaches to protocol",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-learning from diverse national approaches to protocol",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning from diverse national approaches to protocol - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-global-learning from diverse national approaches to protocol",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:global-learning from diverse national approaches to protocol",
+    "name": "Learning from diverse national approaches to protocol",
+    "description": "Learning from diverse national approaches to protocol",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

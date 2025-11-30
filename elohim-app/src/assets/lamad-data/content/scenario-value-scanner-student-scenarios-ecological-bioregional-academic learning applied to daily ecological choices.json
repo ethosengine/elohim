@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-academic learning applied to daily ecological choices",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-academic learning applied to daily ecological choices",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Academic learning applied to daily ecological choices",
   "description": "Academic learning applied to daily ecological choices",
   "content": "Scenario: Academic learning applied to daily ecological choices\n    Given Kenji studies environmental science academically\n    And he makes consumption decisions daily\n    When the bioregional_elohim connects learning to practice\n    Then it should help him apply academic knowledge to personal choices\n    And it should show \"Your understanding of nitrogen cycles informs food decisions\"\n    And it should bridge theory and practice\n    And it should recognize his daily life as laboratory for ecological care\n    And the system should integrate academic and practical ecological knowledge\n    And Kenji should live his environmental science education\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Academic learning applied to daily ecological choices",
+    "ogDescription": "Academic learning applied to daily ecological choices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-academic learning applied to daily ecological choices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Academic learning applied to daily ecological choices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-academic learning applied to daily ecological choices",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-academic learning applied to daily ecological choices",
+    "name": "Academic learning applied to daily ecological choices",
+    "description": "Academic learning applied to daily ecological choices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

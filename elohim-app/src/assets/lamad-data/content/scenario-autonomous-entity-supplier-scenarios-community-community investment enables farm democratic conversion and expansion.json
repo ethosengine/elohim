@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-supplier-scenarios-community-community investment enables farm democratic conversion and expansion",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community-community investment enables farm democratic conversion and expansion",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community investment enables farm democratic conversion and expansion",
   "description": "Community investment enables farm democratic conversion and expansion",
   "content": "Scenario: Community investment enables farm democratic conversion and expansion\n    Given Tom wants to convert farm to worker ownership but farmworkers lack capital\n    And community members want to support local agriculture but lack pathway\n    When community investment pool funds farm acquisition and expansion\n    Then neighbors invest $2K-$20K each in democratic farm conversion\n    And investors receive fair return (5% annually) plus food security benefit\n    And farm gains capital for sustainable infrastructure and expansion\n    And community builds ownership stake in local food production\n    And community_elohim manages community investment in farm democratization\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-supplier-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Community investment enables farm democratic conversion and expansion",
+    "ogDescription": "Community investment enables farm democratic conversion and expansion",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-community-community investment enables farm democratic conversion and expansion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community investment enables farm democratic conversion and expansion - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-community-community investment enables farm democratic conversion and expansion",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community-community investment enables farm democratic conversion and expansion",
+    "name": "Community investment enables farm democratic conversion and expansion",
+    "description": "Community investment enables farm democratic conversion and expansion",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-individual-accessing precedent to understand similar cases",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-accessing precedent to understand similar cases",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing precedent to understand similar cases",
   "description": "Accessing precedent to understand similar cases",
   "content": "Scenario: Accessing precedent to understand similar cases\n    Given I am considering filing an appeal\n    And I want to understand how similar cases were decided\n    When I search the precedent database for \"mental health intervention + privacy\"\n    Then I can see anonymized cases with constitutional reasoning\n    And I can view outcomes and protocol changes that resulted\n    And I can see success rates for different appeal types\n    And I can understand the constitutional framework being applied\n    And This helps me calibrate my expectations and build my appeal argument\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-individual",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing precedent to understand similar cases",
+    "ogDescription": "Accessing precedent to understand similar cases",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-accessing precedent to understand similar cases",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing precedent to understand similar cases - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-accessing precedent to understand similar cases",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-accessing precedent to understand similar cases",
+    "name": "Accessing precedent to understand similar cases",
+    "description": "Accessing precedent to understand similar cases",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-community-parent participation in school governance and advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:community-parent participation in school governance and advocacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent participation in school governance and advocacy",
   "description": "Parent participation in school governance and advocacy",
   "content": "Scenario: Parent participation in school governance and advocacy\n    Given Sarah participates in school board meetings and parent committees\n    And she advocates for better educational policies\n    When the community_elohim tracks Sarah's civic engagement\n    Then it should recognize school participation as care labor\n    And advocacy for children's education should accumulate care tokens\n    And parent organizing should be valued as political work\n    And Sarah's effort to improve schools should be community contribution\n    And the system should recognize that parents are primary education stakeholders\n    And civic labor should be visible and valued\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.193597",
-  "updatedAt": "2025-11-21T18:54:29.193597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent participation in school governance and advocacy",
+    "ogDescription": "Parent participation in school governance and advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-community-parent participation in school governance and advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent participation in school governance and advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-community-parent participation in school governance and advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:community-parent participation in school governance and advocacy",
+    "name": "Parent participation in school governance and advocacy",
+    "description": "Parent participation in school governance and advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

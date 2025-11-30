@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher coordinates statewide advocacy against testing mandate",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher coordinates statewide advocacy against testing mandate",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher coordinates statewide advocacy against testing mandate",
   "description": "Teacher coordinates statewide advocacy against testing mandate",
   "content": "Scenario: Teacher coordinates statewide advocacy against testing mandate\n    Given state proposes expanding standardized testing requirements\n    And testing already narrows curriculum and stresses students\n    When teachers coordinate through Observer across districts statewide\n    Then 3,200 teachers sign onto collective advocacy campaign\n    And provide testimony on how testing burdens harm learning\n    And build coalition with parents experiencing test stress\n    And present evidence from states that reduced testing\n    And collective professional voice creates political pressure\n    And state testing policy becomes contested not inevitable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher coordinates statewide advocacy against testing mandate",
+    "ogDescription": "Teacher coordinates statewide advocacy against testing mandate",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher coordinates statewide advocacy against testing mandate",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher coordinates statewide advocacy against testing mandate - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher coordinates statewide advocacy against testing mandate",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher coordinates statewide advocacy against testing mandate",
+    "name": "Teacher coordinates statewide advocacy against testing mandate",
+    "description": "Teacher coordinates statewide advocacy against testing mandate",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

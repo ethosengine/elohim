@@ -5,21 +5,46 @@ import { Subject, forkJoin } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
-import { LearningPath, PathStep } from '../../models/learning-path.model';
+import { LearningPath, PathStep, PathChapter } from '../../models/learning-path.model';
 import { AgentProgress } from '../../models/agent.model';
+import { ContentNode } from '../../models/content-node.model';
+
+interface EnrichedStep {
+  step: PathStep;
+  content: ContentNode;
+  isCompleted: boolean;
+  isGlobalCompletion: boolean;
+  icon: string;
+  isLocked: boolean;
+}
+
+interface ChapterDisplay {
+  chapter: PathChapter;
+  metrics: {
+    totalUniqueContent: number;
+    completedUniqueContent: number;
+    contentCompletionPercentage: number;
+    sharedContentCompleted: number;
+    completedSteps: number;
+    totalSteps: number;
+  };
+  steps: EnrichedStep[];
+  absoluteStartIndex: number;
+}
 
 /**
  * PathOverviewComponent - Landing page for a learning path.
  *
  * Displays:
  * - Path metadata (title, description, purpose)
- * - Step outline with progress indicators
+ * - Chapter/Step outline with "Territory Mastery" visualization
  * - Continue/Begin Journey buttons
  * - Estimated duration and difficulty
  *
  * Route: /lamad/path/:pathId
  *
- * Implements Section 1.1 of LAMAD_API_SPECIFICATION_v1.0.md (Path Overview Route)
+ * Implements Section 1.1 of LAMAD_API_SPECIFICATION_v1.0.md
+ * Updated to support Khan Academy-style "Territory Mastery" views.
  */
 @Component({
   selector: 'app-path-overview',
@@ -33,6 +58,22 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   path: LearningPath | null = null;
   progress: AgentProgress | null = null;
   accessibleSteps: number[] = [];
+  
+  // Chapter Data
+  chapters: ChapterDisplay[] = [];
+  pathCompletion: any = null; // Territory-based completion metrics
+  
+  // Concept Progress Data
+  conceptProgress: Array<{
+    conceptId: string;
+    title: string;
+    totalSteps: number;
+    completedSteps: number;
+    completionPercentage: number;
+  }> = [];
+
+  // Flat steps for paths without chapters
+  flatSteps: EnrichedStep[] = [];
 
   isLoading = true;
   error: string | null = null;
@@ -65,12 +106,54 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
     forkJoin({
       path: this.pathService.getPath(this.pathId),
       progress: this.agentService.getProgressForPath(this.pathId),
-      accessible: this.pathService.getAccessibleSteps(this.pathId)
+      accessible: this.pathService.getAccessibleSteps(this.pathId),
+      completion: this.pathService.getPathCompletionByContent(this.pathId),
+      chapterSummaries: this.pathService.getChapterSummariesWithContent(this.pathId),
+      allSteps: this.pathService.getAllStepsWithCompletionStatus(this.pathId),
+      concepts: this.pathService.getConceptProgressForPath(this.pathId)
     }).pipe(takeUntil(this.destroy$)).subscribe({
-      next: ({ path, progress, accessible }) => {
+      next: ({ path, progress, accessible, completion, chapterSummaries, allSteps, concepts }) => {
         this.path = path;
         this.progress = progress;
         this.accessibleSteps = accessible;
+        this.pathCompletion = completion;
+        this.conceptProgress = concepts;
+        
+        // Map all steps to EnrichedStep format
+        const enrichedSteps: EnrichedStep[] = allSteps.map((s, i) => ({
+          step: s.step,
+          content: s.content,
+          isCompleted: s.isCompleted ?? false,
+          isGlobalCompletion: s.completedInOtherPath,
+          icon: this.getContentIcon(s.content.contentType),
+          isLocked: !accessible.includes(i)
+        }));
+
+        if (chapterSummaries.length > 0) {
+          // Map chapter summaries to display format with steps
+          let currentIndex = 0;
+          this.chapters = chapterSummaries.map(summary => {
+            const chapterSteps = enrichedSteps.slice(currentIndex, currentIndex + summary.totalSteps);
+            const display: ChapterDisplay = {
+              chapter: summary.chapter,
+              metrics: {
+                totalUniqueContent: summary.totalUniqueContent,
+                completedUniqueContent: summary.completedUniqueContent,
+                contentCompletionPercentage: summary.contentCompletionPercentage,
+                sharedContentCompleted: summary.sharedContentCompleted,
+                completedSteps: summary.completedSteps,
+                totalSteps: summary.totalSteps
+              },
+              steps: chapterSteps,
+              absoluteStartIndex: currentIndex
+            };
+            currentIndex += summary.totalSteps;
+            return display;
+          });
+        } else {
+          this.flatSteps = enrichedSteps;
+        }
+
         this.isLoading = false;
       },
       error: err => {
@@ -79,6 +162,25 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
         console.error('[PathOverview] Failed to load path:', err);
       }
     });
+  }
+
+  /**
+   * Get icon for content type
+   */
+  getContentIcon(contentType: string): string {
+    const icons: Record<string, string> = {
+      'epic': '📖',
+      'feature': '⚡',
+      'scenario': '✓',
+      'concept': '💡',
+      'simulation': '🎮',
+      'video': '🎥',
+      'assessment': '📝',
+      'organization': '🏢',
+      'book-chapter': '📚',
+      'tool': '🛠️'
+    };
+    return icons[contentType] || '📄';
   }
 
   /**
@@ -103,42 +205,27 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
    * Check if user has completed this path
    */
   isCompleted(): boolean {
+    // Prefer territory completion if available (100% content mastered)
+    if (this.pathCompletion && this.pathCompletion.contentCompletionPercentage === 100) {
+      return true;
+    }
+    
+    // Fallback to step completion logic
     if (!this.path || !this.progress) return false;
     const requiredSteps = this.path.steps.filter(s => !s.optional);
-    return requiredSteps.every(step =>
+    return requiredSteps.length > 0 && requiredSteps.every(step =>
       this.progress!.completedStepIndices.includes(step.order)
     );
   }
 
   /**
-   * Get completion percentage
+   * Get completion percentage (Territory Mastery preferred)
    */
   getCompletionPercentage(): number {
-    if (!this.path || !this.progress) return 0;
-    const total = this.path.steps.length;
-    const completed = this.progress.completedStepIndices.length;
-    return Math.round((completed / total) * 100);
-  }
-
-  /**
-   * Check if a step is completed
-   */
-  isStepCompleted(stepIndex: number): boolean {
-    return this.progress?.completedStepIndices.includes(stepIndex) ?? false;
-  }
-
-  /**
-   * Check if a step is accessible (fog-of-war)
-   */
-  isStepAccessible(stepIndex: number): boolean {
-    return this.accessibleSteps.includes(stepIndex);
-  }
-
-  /**
-   * Check if a step is locked (fog-of-war)
-   */
-  isStepLocked(stepIndex: number): boolean {
-    return !this.isStepAccessible(stepIndex);
+    if (this.pathCompletion) {
+      return this.pathCompletion.contentCompletionPercentage;
+    }
+    return 0;
   }
 
   /**
@@ -157,10 +244,21 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Start specific chapter
+   */
+  startChapter(chapterId: string): void {
+    this.pathService.getChapterFirstStep(this.pathId, chapterId).subscribe(step => {
+      if (step) {
+        this.router.navigate(['/lamad/path', this.pathId, 'step', step.step.order]);
+      }
+    });
+  }
+
+  /**
    * Navigate to a specific step
    */
   goToStep(stepIndex: number): void {
-    if (this.isStepAccessible(stepIndex)) {
+    if (this.accessibleSteps.includes(stepIndex)) {
       this.router.navigate(['/lamad/path', this.pathId, 'step', stepIndex]);
     }
   }
@@ -182,15 +280,5 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       'advanced': 'Advanced'
     };
     return displays[this.path?.difficulty || ''] || this.path?.difficulty || '';
-  }
-
-  /**
-   * Get step status class for styling
-   */
-  getStepStatusClass(stepIndex: number): string {
-    if (this.isStepCompleted(stepIndex)) return 'completed';
-    if (this.isStepLocked(stepIndex)) return 'locked';
-    if (stepIndex === this.getCurrentStepIndex()) return 'current';
-    return 'accessible';
   }
 }

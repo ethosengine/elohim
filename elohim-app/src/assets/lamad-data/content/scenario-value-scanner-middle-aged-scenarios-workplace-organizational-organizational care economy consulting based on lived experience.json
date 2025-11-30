@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-organizational care economy consulting based on lived experience",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-organizational care economy consulting based on lived experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizational care economy consulting based on lived experience",
   "description": "Organizational care economy consulting based on lived experience",
   "content": "Scenario: Organizational care economy consulting based on lived experience\n    Given Robert has decades of experience managing work and care\n    And organizations need care economy expertise\n    And his experience qualifies him as organizational consultant\n    When workplace_elohim recognizes his consulting capability\n    Then it should surface opportunities to consult on care economy workplace transformation\n    And help him translate lived experience into organizational development\n    And recognize his expertise about what supports working caregivers\n    And support him in offering care economy consulting services\n    And value his consulting as professional contribution and care economy advancement\n    And build care economy profession from lived experience\n    And channel his wisdom toward organizational transformation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizational care economy consulting based on lived experience",
+    "ogDescription": "Organizational care economy consulting based on lived experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-organizational care economy consulting based on lived experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizational care economy consulting based on lived experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-organizational care economy consulting based on lived experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-organizational care economy consulting based on lived experience",
+    "name": "Organizational care economy consulting based on lived experience",
+    "description": "Organizational care economy consulting based on lived experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

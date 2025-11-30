@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace advocacy coordinates with other caregiving employees",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-workplace advocacy coordinates with other caregiving employees",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace advocacy coordinates with other caregiving employees",
   "description": "Workplace advocacy coordinates with other caregiving employees",
   "content": "Scenario: Workplace advocacy coordinates with other caregiving employees\n    Given Robert works with other employees managing care responsibilities\n    And collective advocacy is more effective than individual negotiation\n    And workplace care economy benefits all caregiving employees\n    When workplace_elohim facilitates collective advocacy\n    Then it should connect Robert with other caregiving employees\n    And support formation of employee resource groups for caregivers\n    And facilitate collective advocacy for care-friendly policies\n    And build workplace power through caregiver solidarity\n    And demonstrate that care economy includes collective action\n    And create workplace transformation through organized advocacy\n    And leverage numbers for policy change\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace advocacy coordinates with other caregiving employees",
+    "ogDescription": "Workplace advocacy coordinates with other caregiving employees",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace advocacy coordinates with other caregiving employees",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace advocacy coordinates with other caregiving employees - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-workplace advocacy coordinates with other caregiving employees",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-workplace advocacy coordinates with other caregiving employees",
+    "name": "Workplace advocacy coordinates with other caregiving employees",
+    "description": "Workplace advocacy coordinates with other caregiving employees",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

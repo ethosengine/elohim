@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator network emerges supporting democratic conversions",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-franchise operator network emerges supporting democratic conversions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Franchise operator network emerges supporting democratic conversions",
   "description": "Franchise operator network emerges supporting democratic conversions",
   "content": "Scenario: Franchise operator network emerges supporting democratic conversions\n    Given franchise operators are typically isolated competing for corporate favor\n    And isolation prevents collective action against corporate extraction\n    When James connects with other operators considering conversion\n    Then franchise operator solidarity network forms\n    And operators share conversion strategies, legal resources, and emotional support\n    And coordinated multi-operator conversions increase leverage in corporate negotiations\n    And operator-to-operator mentoring spreads democratic conversion knowledge\n    And industry_sector_elohim facilitates operator network development and coordination\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Franchise operator network emerges supporting democratic conversions",
+    "ogDescription": "Franchise operator network emerges supporting democratic conversions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator network emerges supporting democratic conversions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise operator network emerges supporting democratic conversions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-franchise operator network emerges supporting democratic conversions",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-franchise operator network emerges supporting democratic conversions",
+    "name": "Franchise operator network emerges supporting democratic conversions",
+    "description": "Franchise operator network emerges supporting democratic conversions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

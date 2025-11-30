@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-individual-recognition of invisible care labor by 5-year-old",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-recognition of invisible care labor by 5-year-old",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognition of invisible care labor by 5-year-old",
   "description": "Recognition of invisible care labor by 5-year-old",
   "content": "Scenario: Recognition of invisible care labor by 5-year-old\n    Given Tommy has chosen strawberries for his sister Emma\n    And the care contribution has been recorded\n    When the transaction is complete\n    Then Tommy's care work should be made visible to the family\n    And his personal_agent should provide warm recognition\n    And the agent should say \"You helped. Your care matters. You made Emma happy.\"\n    And the recognition should feel like love, not data extraction\n    And care tokens should be allocated to reflect his contribution\n    And no transactional language should be used\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.199597",
-  "updatedAt": "2025-11-21T18:54:29.199597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognition of invisible care labor by 5-year-old",
+    "ogDescription": "Recognition of invisible care labor by 5-year-old",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-recognition of invisible care labor by 5-year-old",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition of invisible care labor by 5-year-old - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-recognition of invisible care labor by 5-year-old",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-recognition of invisible care labor by 5-year-old",
+    "name": "Recognition of invisible care labor by 5-year-old",
+    "description": "Recognition of invisible care labor by 5-year-old",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

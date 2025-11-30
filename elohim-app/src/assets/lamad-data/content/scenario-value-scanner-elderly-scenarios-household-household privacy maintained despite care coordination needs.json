@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-household-household privacy maintained despite care coordination needs",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-household privacy maintained despite care coordination needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household privacy maintained despite care coordination needs",
   "description": "Household privacy maintained despite care coordination needs",
   "content": "Scenario: Household privacy maintained despite care coordination needs\n    Given multiple people enter Helen's home to provide care\n    And care coordination requires information sharing\n    When household privacy is managed\n    Then Helen should control what information is shared with whom\n    And her personal spaces should remain private\n    And intimate care should be provided with maximum dignity\n    And she should have privacy in her own home\n    And surveillance should be minimized to necessity\n    And her home should not feel like an institution\n    And the protocol should preserve the privacy of home life\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household privacy maintained despite care coordination needs",
+    "ogDescription": "Household privacy maintained despite care coordination needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-household privacy maintained despite care coordination needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household privacy maintained despite care coordination needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-household privacy maintained despite care coordination needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-household privacy maintained despite care coordination needs",
+    "name": "Household privacy maintained despite care coordination needs",
+    "description": "Household privacy maintained despite care coordination needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor capital enables community programs addressing neighborhood needs",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor capital enables community programs addressing neighborhood needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor capital enables community programs addressing neighborhood needs",
   "description": "Investor capital enables community programs addressing neighborhood needs",
   "content": "Scenario: Investor capital enables community programs addressing neighborhood needs\n    Given traditional investment extracts value from communities\n    And Patricia wanted investment supporting community benefit, not extraction\n    When democratic business allocates revenue to community programs\n    Then her investment enables senior meal programs, youth employment, community space\n    And investment returns include social dividends: stronger community, less isolation, economic opportunity\n    And capital builds community infrastructure, not just individual wealth\n    And social returns are documented and valued alongside financial returns\n    And community_elohim manages community program funding from democratic business revenue\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor capital enables community programs addressing neighborhood needs",
+    "ogDescription": "Investor capital enables community programs addressing neighborhood needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor capital enables community programs addressing neighborhood needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor capital enables community programs addressing neighborhood needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor capital enables community programs addressing neighborhood needs",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor capital enables community programs addressing neighborhood needs",
+    "name": "Investor capital enables community programs addressing neighborhood needs",
+    "description": "Investor capital enables community programs addressing neighborhood needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

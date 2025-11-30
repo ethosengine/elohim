@@ -1,6 +1,8 @@
 {
   "id": "governance-organizations-agile-learning-centers-education-evolved-readme",
+  "did": "did:web:elohim.host:content:governance:organizations:agile-learning-centers-education-evolved:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.",
   "content": "---\nnode_type: organization\norg_id: agile_learning_centers_education_evolved\nname: \"Agile Learning Centers, Education Evolved\"\nurl: \"https://agilelearningcenters.org\"\ngem_id: \"7bNDScKrXdYhifCfKDYJ\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Agile Learning Centers, Education Evolved inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Agile Learning Centers, Education Evolved\n\n## Description\n\nAgile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.\n\n**Publisher:** Agile Learning Centers\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Agile Learning Centers, Education Evolved relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://agilelearningcenters.org\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -14,8 +16,47 @@
   "metadata": {
     "category": "governance",
     "related_epics": [],
-    "primary_epic": "governance"
+    "primary_epic": "governance",
+    "url": "https://agilelearningcenters.org",
+    "name": "Agile Learning Centers, Education Evolved",
+    "org_id": "agile_learning_centers_education_evolved",
+    "gem_id": "7bNDScKrXdYhifCfKDYJ",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Agile Learning Centers",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Agile Learning Centers, Education Evolved inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-organizations-agile-learning-centers-education-evolved-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/governance-organizations-agile-learning-centers-education-evolved-readme",
+    "identifier": "did:web:elohim.host:content:governance:organizations:agile-learning-centers-education-evolved:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

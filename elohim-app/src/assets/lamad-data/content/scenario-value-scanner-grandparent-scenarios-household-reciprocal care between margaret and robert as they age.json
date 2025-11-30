@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-household-reciprocal care between margaret and robert as they age",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-reciprocal care between margaret and robert as they age",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Reciprocal care between Margaret and Robert as they age",
   "description": "Reciprocal care between Margaret and Robert as they age",
   "content": "Scenario: Reciprocal care between Margaret and Robert as they age\n    Given Margaret and Robert are both aging\n    And they will increasingly need to care for each other\n    When the household_elohim tracks household care patterns\n    Then it should recognize reciprocal care between partners\n    And it should show how they support each other's well-being\n    And it should value care they provide to each other\n    And household care economy should include partner care\n    And both should accumulate care tokens for caring for each other\n    And the system should support their aging together with dignity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Reciprocal care between Margaret and Robert as they age",
+    "ogDescription": "Reciprocal care between Margaret and Robert as they age",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-reciprocal care between margaret and robert as they age",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Reciprocal care between Margaret and Robert as they age - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-reciprocal care between margaret and robert as they age",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-reciprocal care between margaret and robert as they age",
+    "name": "Reciprocal care between Margaret and Robert as they age",
+    "description": "Reciprocal care between Margaret and Robert as they age",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

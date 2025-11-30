@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-seasonal pattern knowledge from decades of observation",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-seasonal pattern knowledge from decades of observation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Seasonal pattern knowledge from decades of observation",
   "description": "Seasonal pattern knowledge from decades of observation",
   "content": "Scenario: Seasonal pattern knowledge from decades of observation\n    Given Helen has observed local seasonal patterns for 82 years\n    And climate change is altering traditional seasonal cycles\n    When Helen shares knowledge of historical seasonal patterns\n    Then her observations should inform understanding of climate shifts\n    And bioregional planning should incorporate elder memory\n    And changes should be documented through personal testimony\n    And Helen should be recognized as expert on local ecology\n    And the protocol should preserve knowledge of pre-change conditions\n    And ecological governance should include elder perspectives\n    And baseline understanding should come from those who remember\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Seasonal pattern knowledge from decades of observation",
+    "ogDescription": "Seasonal pattern knowledge from decades of observation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-seasonal pattern knowledge from decades of observation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Seasonal pattern knowledge from decades of observation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-seasonal pattern knowledge from decades of observation",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-seasonal pattern knowledge from decades of observation",
+    "name": "Seasonal pattern knowledge from decades of observation",
+    "description": "Seasonal pattern knowledge from decades of observation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

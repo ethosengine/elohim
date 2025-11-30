@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-family-grandparent care valued as substantial family contribution",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-grandparent care valued as substantial family contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Grandparent care valued as substantial family contribution",
   "description": "Grandparent care valued as substantial family contribution",
   "content": "Scenario: Grandparent care valued as substantial family contribution\n    Given Frank provides occasional care for grandchildren\n    And this care enables his adult children to work\n    And grandparent care provides developmental benefits beyond childcare\n    When family_elohim tracks grandparent care contributions\n    Then Frank's care labor should be quantified specifically\n    And the market value of childcare should be calculated\n    And developmental benefits of grandparent relationship should be recognized\n    And care should be valued, not assumed as \"leisure time with grandkids\"\n    And Frank's contributions should create legitimate family care tokens\n    And his care work should be visible to adult children\n    And grandparenting should be recognized as valuable care economy participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Grandparent care valued as substantial family contribution",
+    "ogDescription": "Grandparent care valued as substantial family contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-grandparent care valued as substantial family contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grandparent care valued as substantial family contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-grandparent care valued as substantial family contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-grandparent care valued as substantial family contribution",
+    "name": "Grandparent care valued as substantial family contribution",
+    "description": "Grandparent care valued as substantial family contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

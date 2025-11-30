@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-nation-state-appeal escalates to national level due to fundamental constitutional tension",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state-appeal escalates to national level due to fundamental constitutional tension",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal escalates to national level due to fundamental constitutional tension",
   "description": "Appeal escalates to national level due to fundamental constitutional tension",
   "content": "Scenario: Appeal escalates to national level due to fundamental constitutional tension\n    Given my case couldn't be resolved at regional level\n    And it reveals fundamental tension in constitutional principles\n    And regional councils have reached conflicting interpretations\n    When my appeal reaches National Constitutional Council\n    Then randomly-selected citizens from across the nation deliberate\n    And They serve 6-month terms given the gravity of national precedent\n    And They address question \"does mental health intervention ever justify privacy breach at constitutional level?\"\n    And They create precedent affecting millions of people\n    And They produce comprehensive written opinion with deep reasoning\n    And The national precedent guides all lower-layer councils going forward\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal escalates to national level due to fundamental constitutional tension",
+    "ogDescription": "Appeal escalates to national level due to fundamental constitutional tension",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-nation-state-appeal escalates to national level due to fundamental constitutional tension",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal escalates to national level due to fundamental constitutional tension - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-nation-state-appeal escalates to national level due to fundamental constitutional tension",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:nation-state-appeal escalates to national level due to fundamental constitutional tension",
+    "name": "Appeal escalates to national level due to fundamental constitutional tension",
+    "description": "Appeal escalates to national level due to fundamental constitutional tension",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

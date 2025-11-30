@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-community-recognizing paid work as community care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-recognizing paid work as community care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognizing paid work as community care contribution",
   "description": "Recognizing paid work as community care contribution",
   "content": "Scenario: Recognizing paid work as community care contribution\n    Given I work 50+ hours per week preparing food for people\n    And my labor serves community nourishment and flourishing\n    When the community assesses care contributions\n    Then the protocol should recognize my work as care labor\n    And accumulate care tokens reflecting my service to community\n    And make visible that all work serving others is care economy participation\n    And reframe employment from pure extraction to community contribution\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing paid work as community care contribution",
+    "ogDescription": "Recognizing paid work as community care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-recognizing paid work as community care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing paid work as community care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-recognizing paid work as community care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-recognizing paid work as community care contribution",
+    "name": "Recognizing paid work as community care contribution",
+    "description": "Recognizing paid work as community care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

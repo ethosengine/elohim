@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-building neighborhood connections that might endure beyond crisis",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-building neighborhood connections that might endure beyond crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building neighborhood connections that might endure beyond crisis",
   "description": "Building neighborhood connections that might endure beyond crisis",
   "content": "Scenario: Building neighborhood connections that might endure beyond crisis\n    Given I might move to permanent housing in this neighborhood or elsewhere\n    And relationships I build now could become long-term community\n    When I invest in neighborhood relationships\n    Then the Value Scanner helps me identify connections worth developing\n    And supports authentic relationship-building despite uncertainty\n    And validates that building community is valuable regardless of housing permanence\n    And helps me maintain connections if I move within neighborhood\n    And facilitates staying connected if I move to different neighborhood\n    And my personal_agent tracks meaningful neighborhood relationships\n    And recognizes community-building as important social infrastructure work\n    And celebrates relationships that provide support and belonging\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Building neighborhood connections that might endure beyond crisis",
+    "ogDescription": "Building neighborhood connections that might endure beyond crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-building neighborhood connections that might endure beyond crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building neighborhood connections that might endure beyond crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-building neighborhood connections that might endure beyond crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-building neighborhood connections that might endure beyond crisis",
+    "name": "Building neighborhood connections that might endure beyond crisis",
+    "description": "Building neighborhood connections that might endure beyond crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

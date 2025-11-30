@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-receiving fair compensation for real work",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-receiving fair compensation for real work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Receiving fair compensation for real work",
   "description": "Receiving fair compensation for real work",
   "content": "Scenario: Receiving fair compensation for real work\n    Given Jordan works 15 hours per week at the library\n    And Jordan's work contributes genuine value to library operations\n    When Jordan receives their paycheck\n    Then Jordan is paid at least minimum wage for all hours worked\n    And the Value Scanner shows Jordan's earnings and care token accumulation\n    And Jordan's work is compensated fairly, not exploited as \"therapy\"\n    And Jordan experiences being a valued worker earning real wages\n    And Jordan's economic contribution is recognized through fair pay\n    And Jordan's worker status is authentic, not symbolic\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Receiving fair compensation for real work",
+    "ogDescription": "Receiving fair compensation for real work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-receiving fair compensation for real work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Receiving fair compensation for real work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-receiving fair compensation for real work",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-receiving fair compensation for real work",
+    "name": "Receiving fair compensation for real work",
+    "description": "Receiving fair compensation for real work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

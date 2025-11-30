@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-community-community policy advocacy informed by care economy data",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community policy advocacy informed by care economy data",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community policy advocacy informed by care economy data",
   "description": "Community policy advocacy informed by care economy data",
   "content": "Scenario: Community policy advocacy informed by care economy data\n    Given Sarah advocates for community policy changes\n    And data about care work supports policy arguments\n    When Sarah engages in advocacy\n    Then the community_elohim should provide aggregated care economy data\n    And Sarah should show that care work is substantial and invisible\n    And policy discussions should be informed by actual care patterns\n    And advocacy should be strengthened by quantified evidence\n    And care economy data should transform policy debates\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Community policy advocacy informed by care economy data",
+    "ogDescription": "Community policy advocacy informed by care economy data",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community policy advocacy informed by care economy data",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community policy advocacy informed by care economy data - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community policy advocacy informed by care economy data",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community policy advocacy informed by care economy data",
+    "name": "Community policy advocacy informed by care economy data",
+    "description": "Community policy advocacy informed by care economy data",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

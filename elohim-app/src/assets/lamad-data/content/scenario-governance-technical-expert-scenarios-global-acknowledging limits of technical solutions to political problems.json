@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-acknowledging limits of technical solutions to political problems",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-acknowledging limits of technical solutions to political problems",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Acknowledging limits of technical solutions to political problems",
   "description": "Acknowledging limits of technical solutions to political problems",
   "content": "Scenario: Acknowledging limits of technical solutions to political problems\n    Given some delegates hope technology will solve governance challenges\n    And I must clarify what technology can and cannot do\n    When I testify about technical limits\n    Then I explain: technology enables but doesn't replace democratic choice\n    And I clarify: that AI cannot resolve fundamental values conflicts\n    And I acknowledge: many governance problems are political not technical\n    And I resist: techno-solutionism and engineering hubris\n    And I honor: that democracy is about human judgment not optimization\n    And I demonstrate: epistemic humility about technology's role\n    And I serve: realistic understanding of technical possibilities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Acknowledging limits of technical solutions to political problems",
+    "ogDescription": "Acknowledging limits of technical solutions to political problems",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-acknowledging limits of technical solutions to political problems",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Acknowledging limits of technical solutions to political problems - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-acknowledging limits of technical solutions to political problems",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-acknowledging limits of technical solutions to political problems",
+    "name": "Acknowledging limits of technical solutions to political problems",
+    "description": "Acknowledging limits of technical solutions to political problems",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

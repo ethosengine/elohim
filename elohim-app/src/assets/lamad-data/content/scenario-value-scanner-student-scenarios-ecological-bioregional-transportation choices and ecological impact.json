@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-transportation choices and ecological impact",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-transportation choices and ecological impact",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transportation choices and ecological impact",
   "description": "Transportation choices and ecological impact",
   "content": "Scenario: Transportation choices and ecological impact\n    Given Kenji walks most places due to lack of car\n    And walking has minimal ecological impact\n    When the bioregional_elohim tracks transportation\n    Then it should recognize walking as ecological care contribution\n    And it should accumulate care tokens for low-impact transportation\n    And it should show \"Walking instead of driving prevented X carbon emissions\"\n    And it should validate that poverty can align with ecological values\n    And the system should recognize low-impact mobility as care work\n    And Kenji should see his car-free life as ecological stewardship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Transportation choices and ecological impact",
+    "ogDescription": "Transportation choices and ecological impact",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-transportation choices and ecological impact",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transportation choices and ecological impact - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-transportation choices and ecological impact",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-transportation choices and ecological impact",
+    "name": "Transportation choices and ecological impact",
+    "description": "Transportation choices and ecological impact",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

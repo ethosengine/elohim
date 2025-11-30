@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in food sovereignty initiatives",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-participating in food sovereignty initiatives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in food sovereignty initiatives",
   "description": "Participating in food sovereignty initiatives",
   "content": "Scenario: Participating in food sovereignty initiatives\n    Given corporate food systems extract from workers and communities\n    And alternative food systems can support local care economy\n    When I want to participate in food sovereignty organizing\n    Then the protocol should connect me to food justice initiatives\n    And support participation in food co-ops, community agriculture, or food policy\n    And recognize my expertise as food worker in food systems transformation\n    And build bioregional food systems aligned with care economy\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in food sovereignty initiatives",
+    "ogDescription": "Participating in food sovereignty initiatives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in food sovereignty initiatives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in food sovereignty initiatives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in food sovereignty initiatives",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-participating in food sovereignty initiatives",
+    "name": "Participating in food sovereignty initiatives",
+    "description": "Participating in food sovereignty initiatives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

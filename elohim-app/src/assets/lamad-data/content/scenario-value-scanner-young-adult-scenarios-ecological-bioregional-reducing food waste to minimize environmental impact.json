@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-reducing food waste to minimize environmental impact",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-reducing food waste to minimize environmental impact",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Reducing food waste to minimize environmental impact",
   "description": "Reducing food waste to minimize environmental impact",
   "content": "Scenario: Reducing food waste to minimize environmental impact\n    Given food waste has significant ecological costs\n    And Aisha sometimes buys more than she can use\n    When the personal_agent tracks waste patterns\n    Then it should identify environmental impact of waste\n    And it should suggest waste reduction strategies\n    And it should help her buy appropriate quantities\n    And waste reduction should be framed as environmental care\n    And the system should help her minimize ecological harm\n    And practical waste reduction should be taught\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Reducing food waste to minimize environmental impact",
+    "ogDescription": "Reducing food waste to minimize environmental impact",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-reducing food waste to minimize environmental impact",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Reducing food waste to minimize environmental impact - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-reducing food waste to minimize environmental impact",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-reducing food waste to minimize environmental impact",
+    "name": "Reducing food waste to minimize environmental impact",
+    "description": "Reducing food waste to minimize environmental impact",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

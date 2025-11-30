@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-municipality-parent challenges traffic safety near schools",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent challenges traffic safety near schools",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent challenges traffic safety near schools",
   "description": "Parent challenges traffic safety near schools",
   "content": "Scenario: Parent challenges traffic safety near schools\n    Given traffic speeds and volume near the school create danger\n    And the parent has witnessed multiple near-miss incidents\n    When the parent reviews Observer's traffic safety data\n    Then they see documented speeding violations near school hours\n    And learn which other schools have traffic calming measures\n    And understand city transportation department can install measures\n    And coordinate with school principal and other parents\n    And municipal traffic safety includes school zone protection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent challenges traffic safety near schools",
+    "ogDescription": "Parent challenges traffic safety near schools",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent challenges traffic safety near schools",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent challenges traffic safety near schools - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent challenges traffic safety near schools",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent challenges traffic safety near schools",
+    "name": "Parent challenges traffic safety near schools",
+    "description": "Parent challenges traffic safety near schools",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

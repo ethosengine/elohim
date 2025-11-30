@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-community-educational scholarships recognize household stewardship",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-educational scholarships recognize household stewardship",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Educational scholarships recognize household stewardship",
   "description": "Educational scholarships recognize household stewardship",
   "content": "Scenario: Educational scholarships recognize household stewardship\n    Given Marcus demonstrates sophisticated capability through scanner usage\n    And educational opportunities require funding\n    When scholarship opportunities arise\n    Then Marcus's care contributions should be evidence of his capability\n    And his resource management skills should be academically recognized\n    And community should invest in children demonstrating stewardship\n    And scholarships should flow to capable young people like Marcus\n    And his household labor should translate to educational opportunity\n    And care economy should create pathways to advancement\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Educational scholarships recognize household stewardship",
+    "ogDescription": "Educational scholarships recognize household stewardship",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-educational scholarships recognize household stewardship",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Educational scholarships recognize household stewardship - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-educational scholarships recognize household stewardship",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-educational scholarships recognize household stewardship",
+    "name": "Educational scholarships recognize household stewardship",
+    "description": "Educational scholarships recognize household stewardship",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

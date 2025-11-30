@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-municipality-parks board member tracks implementation of playground improvement promises",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:municipality-parks board member tracks implementation of playground improvement promises",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parks board member tracks implementation of playground improvement promises",
   "description": "Parks board member tracks implementation of playground improvement promises",
   "content": "Scenario: Parks board member tracks implementation of playground improvement promises\n    Given board approved contract with playground vendor three years ago\n    And vendor promised high-quality equipment meeting accessibility standards\n    And community members complain about equipment safety and accessibility\n    When the board member uses Observer implementation tracking\n    Then they discover equipment doesn't meet accessibility standards promised\n    And see maintenance issues documented across multiple park sites\n    And find vendor's performance worse than contract specifications\n    And access data showing peer municipalities use better vendors\n    And impact tracking reveals vendor failed to deliver promised outcomes\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Parks board member tracks implementation of playground improvement promises",
+    "ogDescription": "Parks board member tracks implementation of playground improvement promises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-municipality-parks board member tracks implementation of playground improvement promises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parks board member tracks implementation of playground improvement promises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-municipality-parks board member tracks implementation of playground improvement promises",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:municipality-parks board member tracks implementation of playground improvement promises",
+    "name": "Parks board member tracks implementation of playground improvement promises",
+    "description": "Parks board member tracks implementation of playground improvement promises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

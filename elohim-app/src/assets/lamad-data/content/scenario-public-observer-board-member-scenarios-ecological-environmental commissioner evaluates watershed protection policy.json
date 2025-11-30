@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-ecological-environmental commissioner evaluates watershed protection policy",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:ecological-environmental commissioner evaluates watershed protection policy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Environmental commissioner evaluates watershed protection policy",
   "description": "Environmental commissioner evaluates watershed protection policy",
   "content": "Scenario: Environmental commissioner evaluates watershed protection policy\n    Given commission considers strengthening regulations on development near waterways\n    And staff presents complex hydrology analysis and regulatory considerations\n    And development interests argue restrictions are excessive\n    When the commissioner requests Observer environmental policy analysis\n    Then they receive comparison of proposed protections to peer jurisdictions' standards\n    And see water quality trend data showing current protections insufficient\n    And access analysis of development impacts on downstream water quality\n    And get examples of how other communities balanced development and protection\n    And independent analysis helps commissioner evaluate competing claims\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Environmental commissioner evaluates watershed protection policy",
+    "ogDescription": "Environmental commissioner evaluates watershed protection policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-ecological-environmental commissioner evaluates watershed protection policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Environmental commissioner evaluates watershed protection policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-ecological-environmental commissioner evaluates watershed protection policy",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:ecological-environmental commissioner evaluates watershed protection policy",
+    "name": "Environmental commissioner evaluates watershed protection policy",
+    "description": "Environmental commissioner evaluates watershed protection policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

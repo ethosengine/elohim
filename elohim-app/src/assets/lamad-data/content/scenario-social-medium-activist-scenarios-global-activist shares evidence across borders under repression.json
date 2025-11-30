@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist shares evidence across borders under repression",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist shares evidence across borders under repression",
   "description": "Activist shares evidence across borders under repression",
   "content": "Scenario: Activist shares evidence across borders under repression\n    Given an activist documents human rights violations in their country\n    And sharing this evidence locally would endanger them and their community\n    When they contribute documentation to international human rights network\n    And the evidence is verified through multiple independent sources\n    Then the evidence reaches international solidarity organizations\n    And it bypasses national censorship through distributed architecture\n    And the activist's identity is protected through cryptographic anonymity\n    And international pressure can be mobilized while protecting sources\n    And the network coordinates advocacy at UN and regional bodies\n    And documentation is preserved for future accountability processes\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-activist-scenarios-global",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist shares evidence across borders under repression",
+    "ogDescription": "Activist shares evidence across borders under repression",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist shares evidence across borders under repression - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist shares evidence across borders under repression",
+    "name": "Activist shares evidence across borders under repression",
+    "description": "Activist shares evidence across borders under repression",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-individual-expressing food preferences with visual support",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-expressing food preferences with visual support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Expressing food preferences with visual support",
   "description": "Expressing food preferences with visual support",
   "content": "Scenario: Expressing food preferences with visual support\n    Given Jordan has specific food likes and dislikes\n    And the group home is planning weekly meals\n    When Jordan uses the meal preference feature\n    Then the interface shows pictures of food options\n    And Jordan can indicate preferences using simple icons (thumbs up/down)\n    And the system uses simple language (\"Do you like chicken?\")\n    And Jordan's choices are communicated to household meal planning\n    And Jordan experiences their preferences being honored\n    And the personal_agent provides encouragement throughout\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Expressing food preferences with visual support",
+    "ogDescription": "Expressing food preferences with visual support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-expressing food preferences with visual support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Expressing food preferences with visual support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-expressing food preferences with visual support",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-expressing food preferences with visual support",
+    "name": "Expressing food preferences with visual support",
+    "description": "Expressing food preferences with visual support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "feature-value-scanner-worker-scenarios-neighborhood",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Neighborhood Care Participation for Workers",
   "description": "As a worker living in a neighborhood I need to participate in neighborhood care economy when possible So that I can contribute to and benefit from local community resilience",
   "content": "Feature: Neighborhood Care Participation for Workers\n  As a worker living in a neighborhood\n  I need to participate in neighborhood care economy when possible\n  So that I can contribute to and benefit from local community resilience\n\n  Background:\n    Given I am a worker living in a neighborhood\n    And my work schedule limits my availability for neighborhood participation\n    And the neighborhood operates a care economy system\n    And my contributions are recognized even when limited\n\n  Scenario: Participating in neighborhood mutual aid despite time limits\n    Given my neighborhood has mutual aid networks\n    And I have minimal time due to work demands\n    When I want to participate in neighborhood care economy\n    Then the protocol should identify micro-opportunities for contribution\n    And help me participate in ways that fit my schedule\n    And recognize that small contributions matter\n    And connect me to neighborhood resources when I need support\n\n  Scenario: Shopping locally to support neighborhood economy\n    Given I need to buy groceries and household items\n    And local businesses are part of neighborhood care economy\n    When I shop for necessities\n    Then the protocol should identify accessible local businesses\n    And recognize that shopping locally is care economy participation\n    And show me how my purchases support neighborhood resilience\n    And accumulate care tokens for supporting local commerce\n\n  Scenario: Accessing neighborhood food resources during tight budget periods\n    Given neighborhood has community gardens, food co-ops, or meal programs\n    And my budget is extremely tight some periods\n    When I need food support\n    Then the protocol should connect me to neighborhood food resources\n    And help me access support with dignity based on my care contributions\n    And recognize that my work serves community (I am not taking charity)\n    And facilitate reciprocal care economy participation\n\n  Scenario: Building relationships with neighbors despite time constraints\n    Given neighborhood resilience depends on connection between residents\n    And my work schedule limits social time\n    When I have brief moments available\n    Then the protocol should help me build neighbor relationships\n    And suggest low-time ways to connect and contribute\n    And recognize that presence and greeting count as care\n    And support neighborhood social fabric even with limited participation\n\n  Scenario: Contributing skills to neighborhood when available\n    Given I have food preparation skills from my restaurant work\n    And neighbors might benefit from these skills\n    When I have rare free time\n    Then the protocol should help me share skills with neighborhood\n    And coordinate skill-sharing or teaching opportunities\n    And accumulate care tokens for skill contribution\n    And build neighborhood capacity through skill distribution\n\n  Scenario: Participating in neighborhood emergency response\n    Given neighborhoods need mutual aid during emergencies\n    When crisis occurs and I am not working\n    Then the protocol should help me contribute to emergency response\n    And coordinate with neighbors for mutual support\n    And recognize my contribution to neighborhood resilience\n    And ensure I can also access support during my emergencies\n\n  Scenario: Accessing neighborhood time-banking system\n    Given neighborhood operates time-banking for service exchange\n    And I accumulate time credits through my work and contributions\n    When I need services I cannot afford to purchase\n    Then the protocol should connect me to time-banking opportunities\n    And help me exchange my labor/skills for needed services\n    And facilitate reciprocal care economy without money exchange\n    And recognize that care economy can operate beyond cash\n\n  Scenario: Coordinating with neighbors for transportation\n    Given I may not have reliable transportation\n    And neighbors might share rides or have vehicles available\n    When I need transportation for work, shopping, or other needs\n    Then the protocol should help coordinate neighborhood ride-sharing\n    And track reciprocal transportation support\n    And reduce individual costs through sharing\n    And build neighborhood care economy through mutual aid\n\n  Scenario: Supporting neighborhood care infrastructure\n    Given neighborhood has community spaces, gardens, or shared resources\n    When I have time to contribute to maintaining shared infrastructure\n    Then the protocol should recognize this as care contribution\n    And coordinate volunteer opportunities that fit my schedule\n    And accumulate care tokens for infrastructure support\n    And help build neighborhood commons that benefit all residents\n\n  Scenario: Advocating for worker-friendly neighborhood policies\n    Given neighborhood governance makes decisions affecting workers\n    When policies could support workers' care needs and participation\n    Then the protocol should help me participate in neighborhood advocacy\n    And connect me with other workers for collective voice\n    And support advocacy for worker-supportive policies\n    And build neighborhood culture that values workers' care needs\n\n  Scenario: Making visible that work schedules limit neighborhood participation\n    Given many neighborhood activities happen during work hours\n    When my work schedule prevents participation\n    Then the protocol should make visible that employment structures exclude workers\n    And advocate for neighborhood activities at accessible times\n    And help neighborhood understand workers' constraints\n    And push for inclusive neighborhood care economy design\n\n  Scenario: Building neighborhood resilience through worker solidarity\n    Given many neighbors are also workers with similar constraints\n    When workers connect and support each other\n    Then the protocol should facilitate worker mutual aid networks\n    And coordinate support systems designed for workers' schedules\n    And build neighborhood culture of worker solidarity\n    And demonstrate that care economy serves workers' needs\n",
@@ -29,6 +31,32 @@
     "epic": null,
     "scenarioCount": 12
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood Care Participation for Workers",
+    "ogDescription": "As a worker living in a neighborhood I need to participate in neighborhood care economy when possible So that I can contribute to and benefit from local community resilience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-worker-scenarios-neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Neighborhood Care Participation for Workers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-worker-scenarios-neighborhood",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood",
+    "name": "Neighborhood Care Participation for Workers",
+    "description": "As a worker living in a neighborhood I need to participate in neighborhood care economy when possible So that I can contribute to and benefit from local community resilience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-educational-parent tracks special education compliance",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent tracks special education compliance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent tracks special education compliance",
   "description": "Parent tracks special education compliance",
   "content": "Scenario: Parent tracks special education compliance\n    Given the parent's child has IEP for learning disability\n    And required support services aren't being provided\n    When the parent reviews Observer's special education tracking\n    Then they see federal law mandates these services\n    And understand district is violating child's legal rights\n    And learn process for filing compliance complaint\n    And connect with other special education parents\n    And district cannot quietly violate disability rights\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent tracks special education compliance",
+    "ogDescription": "Parent tracks special education compliance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent tracks special education compliance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent tracks special education compliance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent tracks special education compliance",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent tracks special education compliance",
+    "name": "Parent tracks special education compliance",
+    "description": "Parent tracks special education compliance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

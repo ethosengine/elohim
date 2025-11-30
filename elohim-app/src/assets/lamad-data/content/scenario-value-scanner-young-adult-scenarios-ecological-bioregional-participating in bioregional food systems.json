@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-participating in bioregional food systems",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-participating in bioregional food systems",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in bioregional food systems",
   "description": "Participating in bioregional food systems",
   "content": "Scenario: Participating in bioregional food systems\n    Given bioregional food systems reduce environmental impact\n    And Aisha could access local food networks\n    When the bioregional_elohim surfaces opportunities\n    Then it should connect her to farmers markets, CSAs, or food hubs\n    And it should explain benefits of bioregional food systems\n    And it should help her participate within budget constraints\n    And local food networks should be accessible and affordable\n    And bioregional participation should support environmental sustainability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in bioregional food systems",
+    "ogDescription": "Participating in bioregional food systems",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-participating in bioregional food systems",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in bioregional food systems - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-participating in bioregional food systems",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-participating in bioregional food systems",
+    "name": "Participating in bioregional food systems",
+    "description": "Participating in bioregional food systems",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

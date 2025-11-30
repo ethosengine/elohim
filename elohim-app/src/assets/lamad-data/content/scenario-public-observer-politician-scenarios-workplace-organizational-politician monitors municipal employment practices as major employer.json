@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician monitors municipal employment practices as major employer",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician monitors municipal employment practices as major employer",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician monitors municipal employment practices as major employer",
   "description": "Politician monitors municipal employment practices as major employer",
   "content": "Scenario: Politician monitors municipal employment practices as major employer\n    Given the politician has authority over city or state employment\n    And serves as model employer in jurisdiction\n    When the Observer analyzes public sector employment patterns\n    Then they see whether public wages meet living wage standards\n    And identify disparities in public sector compensation by role\n    And understand whether public employment offers quality jobs\n    And learn contractor and subcontractor wage and labor practices\n    And ensure public sector models worker-centered employment practices\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician monitors municipal employment practices as major employer",
+    "ogDescription": "Politician monitors municipal employment practices as major employer",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician monitors municipal employment practices as major employer",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician monitors municipal employment practices as major employer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician monitors municipal employment practices as major employer",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician monitors municipal employment practices as major employer",
+    "name": "Politician monitors municipal employment practices as major employer",
+    "description": "Politician monitors municipal employment practices as major employer",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

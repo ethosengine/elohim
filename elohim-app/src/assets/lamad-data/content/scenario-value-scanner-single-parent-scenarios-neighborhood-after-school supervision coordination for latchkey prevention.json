@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-after-school supervision coordination for latchkey prevention",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-after-school supervision coordination for latchkey prevention",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "After-school supervision coordination for latchkey prevention",
   "description": "After-school supervision coordination for latchkey prevention",
   "content": "Scenario: After-school supervision coordination for latchkey prevention\n    Given Maria works until 5pm while school ends at 3pm\n    And she cannot afford formal after-school care for three children\n    When children need supervision between school and Maria's work end\n    Then the neighborhood_elohim should coordinate informal after-school care\n    And it should connect Maria to neighbors who are home during those hours\n    And it should track reciprocal care contributions to maintain fairness\n    And neighborhood coordination should provide affordable childcare solution\n    And Maria's children should have safe supervision despite her work schedule\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "After-school supervision coordination for latchkey prevention",
+    "ogDescription": "After-school supervision coordination for latchkey prevention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-after-school supervision coordination for latchkey prevention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "After-school supervision coordination for latchkey prevention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-after-school supervision coordination for latchkey prevention",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-after-school supervision coordination for latchkey prevention",
+    "name": "After-school supervision coordination for latchkey prevention",
+    "description": "After-school supervision coordination for latchkey prevention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

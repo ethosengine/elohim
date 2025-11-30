@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-manager-scenarios-community-manager coordinates operations to serve community needs workers prioritize",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community-manager coordinates operations to serve community needs workers prioritize",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Manager coordinates operations to serve community needs workers prioritize",
   "description": "Manager coordinates operations to serve community needs workers prioritize",
   "content": "Scenario: Manager coordinates operations to serve community needs workers prioritize\n    Given workers democratically decided to prioritize local sourcing\n    And operational coordination is needed for supply chain transition\n    When Marcus coordinates shift from Sysco to Johnson Farm\n    Then Marcus manages logistics of local procurement\n    And Marcus tracks quality, costs, and community feedback\n    And Marcus ensures operational transition doesn't disrupt service\n    And workers govern strategic decision, Marcus executes operationally\n    And community benefits from local food system Marcus helps coordinate\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Manager coordinates operations to serve community needs workers prioritize",
+    "ogDescription": "Manager coordinates operations to serve community needs workers prioritize",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-community-manager coordinates operations to serve community needs workers prioritize",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Manager coordinates operations to serve community needs workers prioritize - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-community-manager coordinates operations to serve community needs workers prioritize",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community-manager coordinates operations to serve community needs workers prioritize",
+    "name": "Manager coordinates operations to serve community needs workers prioritize",
+    "description": "Manager coordinates operations to serve community needs workers prioritize",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

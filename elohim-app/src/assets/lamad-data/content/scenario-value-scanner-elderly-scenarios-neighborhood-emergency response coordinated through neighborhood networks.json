@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-neighborhood-emergency response coordinated through neighborhood networks",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-emergency response coordinated through neighborhood networks",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Emergency response coordinated through neighborhood networks",
   "description": "Emergency response coordinated through neighborhood networks",
   "content": "Scenario: Emergency response coordinated through neighborhood networks\n    Given emergencies may occur when Helen is alone\n    And rapid response requires nearby support\n    When emergency alert is triggered\n    Then the neighborhood_elohim should contact nearby neighbors immediately\n    And neighbors should be briefed on Helen's health conditions\n    And her advance directives should guide neighbor response\n    And network should be activated before or alongside 911\n    And Helen should feel safe knowing neighbors will respond\n    And the protocol should leverage proximity for emergency care\n    And neighborhood networks should provide safety infrastructure\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Emergency response coordinated through neighborhood networks",
+    "ogDescription": "Emergency response coordinated through neighborhood networks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-emergency response coordinated through neighborhood networks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency response coordinated through neighborhood networks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-emergency response coordinated through neighborhood networks",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-emergency response coordinated through neighborhood networks",
+    "name": "Emergency response coordinated through neighborhood networks",
+    "description": "Emergency response coordinated through neighborhood networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

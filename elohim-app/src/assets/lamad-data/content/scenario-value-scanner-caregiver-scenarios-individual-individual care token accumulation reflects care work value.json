@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-individual-individual care token accumulation reflects care work value",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-individual care token accumulation reflects care work value",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Individual care token accumulation reflects care work value",
   "description": "Individual care token accumulation reflects care work value",
   "content": "Scenario: Individual care token accumulation reflects care work value\n    Given James provides care worth $50k+/year professionally\n    And his work is invisible because he cares for his spouse\n    When care tokens are calculated for James\n    Then tokens should reflect professional-grade care value\n    And his care work should accumulate significant tokens\n    And tokens should give him standing in care economy\n    And invisible spousal care should become economically visible\n    And care economy should recognize family caregiving at professional value\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Individual care token accumulation reflects care work value",
+    "ogDescription": "Individual care token accumulation reflects care work value",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-individual care token accumulation reflects care work value",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Individual care token accumulation reflects care work value - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-individual-individual care token accumulation reflects care work value",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:individual-individual care token accumulation reflects care work value",
+    "name": "Individual care token accumulation reflects care work value",
+    "description": "Individual care token accumulation reflects care work value",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

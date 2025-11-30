@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-individual-medication interactions and dietary considerations tracked",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-medication interactions and dietary considerations tracked",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Medication interactions and dietary considerations tracked",
   "description": "Medication interactions and dietary considerations tracked",
   "content": "Scenario: Medication interactions and dietary considerations tracked\n    Given Margaret takes multiple medications\n    And medications interact with certain foods\n    When Margaret shops for groceries\n    Then her personal_agent should be aware of medication interactions\n    And it should flag potentially problematic food-drug combinations\n    And it should suggest foods that support medication effectiveness\n    And medication data should remain private and encrypted\n    And the system should support her health management\n    And Margaret should feel supported in complex health navigation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Medication interactions and dietary considerations tracked",
+    "ogDescription": "Medication interactions and dietary considerations tracked",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-medication interactions and dietary considerations tracked",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Medication interactions and dietary considerations tracked - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-medication interactions and dietary considerations tracked",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-medication interactions and dietary considerations tracked",
+    "name": "Medication interactions and dietary considerations tracked",
+    "description": "Medication interactions and dietary considerations tracked",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

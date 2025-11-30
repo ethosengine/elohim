@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-household-balancing care contributions with household needs",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-balancing care contributions with household needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Balancing care contributions with household needs",
   "description": "Balancing care contributions with household needs",
   "content": "Scenario: Balancing care contributions with household needs\n    Given Margaret provides extensive care outside her household\n    And household tasks still require attention\n    When the household_elohim monitors Margaret's overall care burden\n    Then it should track time spent on external care commitments\n    And it should ensure household needs aren't neglected\n    And it should flag if Margaret's care burden becomes overwhelming\n    And it should suggest balance between giving and self-care\n    And Margaret's own household should remain a priority\n    And burnout prevention should be built into system\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Balancing care contributions with household needs",
+    "ogDescription": "Balancing care contributions with household needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-balancing care contributions with household needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Balancing care contributions with household needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-balancing care contributions with household needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-balancing care contributions with household needs",
+    "name": "Balancing care contributions with household needs",
+    "description": "Balancing care contributions with household needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

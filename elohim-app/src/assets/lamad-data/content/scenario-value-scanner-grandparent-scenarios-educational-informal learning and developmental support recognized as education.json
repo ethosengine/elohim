@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-educational-informal learning and developmental support recognized as education",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:educational-informal learning and developmental support recognized as education",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Informal learning and developmental support recognized as education",
   "description": "Informal learning and developmental support recognized as education",
   "content": "Scenario: Informal learning and developmental support recognized as education\n    Given Margaret teaches grandchildren through daily interactions\n    And she provides learning opportunities through play, conversation, activities\n    When the educational_elohim tracks Margaret's educational contributions\n    Then it should recognize informal teaching as valuable education\n    And it should value developmental care as sophisticated work\n    And it should track learning moments and educational interactions\n    And informal education should accumulate care tokens\n    And Margaret's teaching should be recognized alongside formal schooling\n    And grandparent education should be valued as essential learning\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Informal learning and developmental support recognized as education",
+    "ogDescription": "Informal learning and developmental support recognized as education",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-educational-informal learning and developmental support recognized as education",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Informal learning and developmental support recognized as education - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-educational-informal learning and developmental support recognized as education",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:educational-informal learning and developmental support recognized as education",
+    "name": "Informal learning and developmental support recognized as education",
+    "description": "Informal learning and developmental support recognized as education",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

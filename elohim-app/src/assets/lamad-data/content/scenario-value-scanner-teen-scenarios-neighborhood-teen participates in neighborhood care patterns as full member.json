@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-neighborhood-teen participates in neighborhood care patterns as full member",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:neighborhood-teen participates in neighborhood care patterns as full member",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teen participates in neighborhood care patterns as full member",
   "description": "Teen participates in neighborhood care patterns as full member",
   "content": "Scenario: Teen participates in neighborhood care patterns as full member\n    Given Jasmine's neighborhood has established care economy practices\n    And she has accumulated care contributions across contexts\n    When Jasmine engages neighborhood-level activities\n    Then she should be recognized as a full participant, not a future member\n    And her care contributions should aggregate with neighbors' contributions\n    And she should have access to neighborhood collective resources\n    And the neighborhood_elohim should recognize her as a constitutional participant\n    And her voice should matter in neighborhood decisions\n    And she should experience being a valued member of her neighborhood community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Teen participates in neighborhood care patterns as full member",
+    "ogDescription": "Teen participates in neighborhood care patterns as full member",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-neighborhood-teen participates in neighborhood care patterns as full member",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen participates in neighborhood care patterns as full member - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-neighborhood-teen participates in neighborhood care patterns as full member",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:neighborhood-teen participates in neighborhood care patterns as full member",
+    "name": "Teen participates in neighborhood care patterns as full member",
+    "description": "Teen participates in neighborhood care patterns as full member",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

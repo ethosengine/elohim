@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-industry-sector-advocating for industry training and skill development",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-advocating for industry training and skill development",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Advocating for industry training and skill development",
   "description": "Advocating for industry training and skill development",
   "content": "Scenario: Advocating for industry training and skill development\n    Given food service work involves significant skill but is undervalued\n    When workers advocate for professional development and advancement paths\n    Then the protocol should support advocacy for industry training programs\n    And help workers demand investment in skill development\n    And push for career pathways and mobility within industry\n    And challenge perception of food service as unskilled disposable labor\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for industry training and skill development",
+    "ogDescription": "Advocating for industry training and skill development",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-advocating for industry training and skill development",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for industry training and skill development - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-advocating for industry training and skill development",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-advocating for industry training and skill development",
+    "name": "Advocating for industry training and skill development",
+    "description": "Advocating for industry training and skill development",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

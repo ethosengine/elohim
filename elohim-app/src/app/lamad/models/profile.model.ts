@@ -13,6 +13,8 @@
 
 import { ContentType } from './content-node.model';
 import { MasteryLevel } from './agent.model';
+import { OpenGraphMetadata } from './open-graph.model';
+import { JsonLdMetadata } from './json-ld.model';
 
 /**
  * Human Profile Summary
@@ -44,6 +46,36 @@ export interface HumanProfile {
 
   /** Gifts developed through learning (imagodei-gifts) */
   developedCapabilities: DevelopedCapability[];
+
+  // =========================================================================
+  // Social Graph Metadata (for sharing human profiles)
+  // =========================================================================
+
+  /**
+   * Open Graph metadata for social sharing.
+   * When a human's profile is shared, this provides rich preview cards.
+   */
+  socialMetadata?: OpenGraphMetadata;
+
+  /**
+   * Optional JSON-LD metadata for semantic web interoperability.
+   *
+   * Future: Schema.org Person type.
+   * Prevents tech debt when we need semantic web export.
+   */
+  linkedData?: JsonLdMetadata;
+
+  /**
+   * Decentralized Identifier (DID) for cryptographic identity.
+   *
+   * Separate from `id` to maintain human-friendly URLs and filenames.
+   * The `id` field remains the primary routing identifier.
+   *
+   * Example: "did:web:elohim.host:humans:user123"
+   *
+   * Reference: https://www.w3.org/TR/did-core/
+   */
+  did?: string;
 }
 
 /**

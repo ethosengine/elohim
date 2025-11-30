@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-alex's accessibility advocacy improves neighborhood for everyone",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-alex's accessibility advocacy improves neighborhood for everyone",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Alex's accessibility advocacy improves neighborhood for everyone",
   "description": "Alex's accessibility advocacy improves neighborhood for everyone",
   "content": "Scenario: Alex's accessibility advocacy improves neighborhood for everyone\n    Given Alex documents accessibility barriers in the neighborhood\n    And improved accessibility benefits elderly residents, parents with strollers, delivery workers\n    When the neighborhood_elohim tracks Alex's advocacy contributions\n    Then Alex's work identifying barriers should accumulate care tokens\n    And advocacy for curb cuts, accessible entrances, better lighting benefits whole neighborhood\n    And Alex's contributions should be recognized as care work for community\n    And the protocol should make visible how disability advocacy serves everyone\n    And Alex should be seen as neighborhood improver, not complainer\n    And care economy should value Alex's expertise about accessibility\n    And neighborhood should understand Alex's work as gift to all residents\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Alex's accessibility advocacy improves neighborhood for everyone",
+    "ogDescription": "Alex's accessibility advocacy improves neighborhood for everyone",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-alex's accessibility advocacy improves neighborhood for everyone",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Alex's accessibility advocacy improves neighborhood for everyone - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-alex's accessibility advocacy improves neighborhood for everyone",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-alex's accessibility advocacy improves neighborhood for everyone",
+    "name": "Alex's accessibility advocacy improves neighborhood for everyone",
+    "description": "Alex's accessibility advocacy improves neighborhood for everyone",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

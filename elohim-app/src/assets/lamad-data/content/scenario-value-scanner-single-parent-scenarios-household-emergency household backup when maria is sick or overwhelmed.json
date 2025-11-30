@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-household-emergency household backup when maria is sick or overwhelmed",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-emergency household backup when maria is sick or overwhelmed",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Emergency household backup when Maria is sick or overwhelmed",
   "description": "Emergency household backup when Maria is sick or overwhelmed",
   "content": "Scenario: Emergency household backup when Maria is sick or overwhelmed\n    Given Maria has no co-parent to tag in during crisis\n    And she must parent even when sick or exhausted\n    When Maria faces personal emergency or is at breaking point\n    Then the household_elohim should detect crisis situation\n    And it should activate emergency backup networks\n    And it should connect to neighbors who can provide temporary support\n    And it should help coordinate emergency meal provision or childcare\n    And Maria should have safety net for the inevitable times she cannot function alone\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Emergency household backup when Maria is sick or overwhelmed",
+    "ogDescription": "Emergency household backup when Maria is sick or overwhelmed",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-emergency household backup when maria is sick or overwhelmed",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency household backup when Maria is sick or overwhelmed - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-emergency household backup when maria is sick or overwhelmed",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-emergency household backup when maria is sick or overwhelmed",
+    "name": "Emergency household backup when Maria is sick or overwhelmed",
+    "description": "Emergency household backup when Maria is sick or overwhelmed",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

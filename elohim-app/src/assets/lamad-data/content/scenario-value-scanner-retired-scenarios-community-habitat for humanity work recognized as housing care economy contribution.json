@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-community-habitat for humanity work recognized as housing care economy contribution",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-habitat for humanity work recognized as housing care economy contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Habitat for Humanity work recognized as housing care economy contribution",
   "description": "Habitat for Humanity work recognized as housing care economy contribution",
   "content": "Scenario: Habitat for Humanity work recognized as housing care economy contribution\n    Given Frank's volunteer work builds housing for families in need\n    And his construction expertise enables affordable housing\n    When the community_elohim tracks housing care economy\n    Then Frank's work should be recognized as addressing housing crisis\n    And building homes should be valued as community care contribution\n    And his labor should be connected to housing outcomes (families housed)\n    And community should see that Frank's work creates housing that policy fails to provide\n    And volunteer construction should be understood as care economy infrastructure\n    And Frank should experience his work as meaningful community contribution\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Habitat for Humanity work recognized as housing care economy contribution",
+    "ogDescription": "Habitat for Humanity work recognized as housing care economy contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-habitat for humanity work recognized as housing care economy contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Habitat for Humanity work recognized as housing care economy contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-habitat for humanity work recognized as housing care economy contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-habitat for humanity work recognized as housing care economy contribution",
+    "name": "Habitat for Humanity work recognized as housing care economy contribution",
+    "description": "Habitat for Humanity work recognized as housing care economy contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

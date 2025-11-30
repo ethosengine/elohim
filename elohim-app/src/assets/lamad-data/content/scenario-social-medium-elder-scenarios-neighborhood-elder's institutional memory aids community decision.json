@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-elder-scenarios-neighborhood-elder's institutional memory aids community decision",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder's institutional memory aids community decision",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Elder's institutional memory aids community decision",
   "description": "Elder's institutional memory aids community decision",
   "content": "Scenario: Elder's institutional memory aids community decision\n    Given the neighborhood is debating a proposed development\n    And there are questions about past flooding patterns\n    When Rose contributes her memory of the 1995 flood\n    And she describes how the proposed site was underwater\n    Then her historical knowledge is valued in the discussion\n    And her contribution earns reach based on relevance and credibility\n    And the community makes better-informed decisions\n    And Rose experiences being an essential community asset\n    And institutional memory is preserved and utilized\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-elder-scenarios-neighborhood",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Elder's institutional memory aids community decision",
+    "ogDescription": "Elder's institutional memory aids community decision",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder's institutional memory aids community decision",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder's institutional memory aids community decision - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-neighborhood-elder's institutional memory aids community decision",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:neighborhood-elder's institutional memory aids community decision",
+    "name": "Elder's institutional memory aids community decision",
+    "description": "Elder's institutional memory aids community decision",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-accessible technology is workplace obligation not special treatment",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-accessible technology is workplace obligation not special treatment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessible technology is workplace obligation not special treatment",
   "description": "Accessible technology is workplace obligation not special treatment",
   "content": "Scenario: Accessible technology is workplace obligation not special treatment\n    Given Alex requires accessible technology to perform job functions\n    And technology access is fundamental workplace accommodation\n    When Alex uses workplace technology\n    Then employer must provide accessible technology as legal requirement\n    And the workplace_elohim should document technology accessibility\n    And it should track when technology barriers prevent Alex from working\n    And Alex should not have to use inaccessible systems\n    And employer should be held accountable for accessibility failures\n    And the protocol should recognize accessible tech as baseline, not luxury\n    And Alex's right to accessible tools should be systematically defended\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessible technology is workplace obligation not special treatment",
+    "ogDescription": "Accessible technology is workplace obligation not special treatment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-accessible technology is workplace obligation not special treatment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessible technology is workplace obligation not special treatment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-accessible technology is workplace obligation not special treatment",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-accessible technology is workplace obligation not special treatment",
+    "name": "Accessible technology is workplace obligation not special treatment",
+    "description": "Accessible technology is workplace obligation not special treatment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-neighborhood-snow removal and seasonal support coordinated through neighbors",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-snow removal and seasonal support coordinated through neighbors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Snow removal and seasonal support coordinated through neighbors",
   "description": "Snow removal and seasonal support coordinated through neighbors",
   "content": "Scenario: Snow removal and seasonal support coordinated through neighbors\n    Given Helen cannot safely shovel snow or do seasonal maintenance\n    And neighbors have varying capabilities and availability\n    When seasonal support needs arise\n    Then the neighborhood_elohim should coordinate volunteer schedules\n    And neighbors should be matched to tasks based on capability\n    And Helen should experience this as neighborly care, not charity\n    And volunteer work should be recognized with care tokens\n    And reciprocal support should be tracked across seasons\n    And the protocol should coordinate practical mutual aid\n    And neighborhood care economy should handle seasonal challenges\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Snow removal and seasonal support coordinated through neighbors",
+    "ogDescription": "Snow removal and seasonal support coordinated through neighbors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-snow removal and seasonal support coordinated through neighbors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Snow removal and seasonal support coordinated through neighbors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-snow removal and seasonal support coordinated through neighbors",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-snow removal and seasonal support coordinated through neighbors",
+    "name": "Snow removal and seasonal support coordinated through neighbors",
+    "description": "Snow removal and seasonal support coordinated through neighbors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

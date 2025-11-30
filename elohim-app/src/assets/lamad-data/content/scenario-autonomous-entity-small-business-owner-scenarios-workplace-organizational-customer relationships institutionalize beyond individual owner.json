@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-customer relationships institutionalize beyond individual owner",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-customer relationships institutionalize beyond individual owner",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Customer relationships institutionalize beyond individual owner",
   "description": "Customer relationships institutionalize beyond individual owner",
   "content": "Scenario: Customer relationships institutionalize beyond individual owner\n    Given Rosa built customer loyalty through personal trust over 15 years\n    And these relationships are valuable but currently dependent on her\n    When customer relationship transition process begins\n    Then Rosa introduces workers to customers as new business leaders\n    And customer histories are documented (with privacy protection)\n    And workers learn customer preferences and build direct relationships\n    And customers discover democratic ownership often deepens their loyalty\n    And relationships survive and strengthen beyond Rosa's involvement\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.167597",
-  "updatedAt": "2025-11-21T18:54:29.167597"
+  "openGraphMetadata": {
+    "ogTitle": "Customer relationships institutionalize beyond individual owner",
+    "ogDescription": "Customer relationships institutionalize beyond individual owner",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-customer relationships institutionalize beyond individual owner",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer relationships institutionalize beyond individual owner - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-customer relationships institutionalize beyond individual owner",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-customer relationships institutionalize beyond individual owner",
+    "name": "Customer relationships institutionalize beyond individual owner",
+    "description": "Customer relationships institutionalize beyond individual owner",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

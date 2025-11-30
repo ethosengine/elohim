@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-family-coordinating with parental authority while maintaining grandparent role",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-coordinating with parental authority while maintaining grandparent role",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating with parental authority while maintaining grandparent role",
   "description": "Coordinating with parental authority while maintaining grandparent role",
   "content": "Scenario: Coordinating with parental authority while maintaining grandparent role\n    Given Sarah is the parent with primary authority over children\n    And Margaret needs to honor Sarah's parenting choices\n    When the family_elohim coordinates care boundaries\n    Then it should help Margaret align with Sarah's values and rules\n    And it should preserve Margaret's unique grandparent identity\n    And it should navigate between parental authority and grandparent autonomy\n    And Margaret should not be subordinate (taking orders) or superior (overriding choices)\n    And family_elohim should help them work as partners in child-rearing\n    And relationship should be mutually respectful and collaborative\n    And complex multigenerational dynamics should be coordinated skillfully\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating with parental authority while maintaining grandparent role",
+    "ogDescription": "Coordinating with parental authority while maintaining grandparent role",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-coordinating with parental authority while maintaining grandparent role",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating with parental authority while maintaining grandparent role - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-coordinating with parental authority while maintaining grandparent role",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-coordinating with parental authority while maintaining grandparent role",
+    "name": "Coordinating with parental authority while maintaining grandparent role",
+    "description": "Coordinating with parental authority while maintaining grandparent role",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-family-child influences family values while family shapes child",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:family-child influences family values while family shapes child",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Child influences family values while family shapes child",
   "description": "Child influences family values while family shapes child",
   "content": "Scenario: Child influences family values while family shapes child\n    Given Emma is forming her own values at age 8\n    And family values still primarily guide her\n    When Emma suggests trying new products or priorities\n    Then the family_elohim should track her value proposals\n    And Sarah should receive prompts to consider Emma's input\n    And Emma's voice should genuinely influence family decisions\n    And bidirectional value formation should occur\n    And Emma should experience being heard in family governance\n    And family culture should evolve with children's input\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Child influences family values while family shapes child",
+    "ogDescription": "Child influences family values while family shapes child",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-child influences family values while family shapes child",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Child influences family values while family shapes child - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-family-child influences family values while family shapes child",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:family-child influences family values while family shapes child",
+    "name": "Child influences family values while family shapes child",
+    "description": "Child influences family values while family shapes child",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

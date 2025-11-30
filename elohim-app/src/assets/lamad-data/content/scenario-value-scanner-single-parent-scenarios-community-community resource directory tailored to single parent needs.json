@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-community-community resource directory tailored to single parent needs",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-community resource directory tailored to single parent needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community resource directory tailored to single parent needs",
   "description": "Community resource directory tailored to single parent needs",
   "content": "Scenario: Community resource directory tailored to single parent needs\n    Given Maria needs to know about available resources but has no time to research\n    And single parents have specific resource needs different from partnered families\n    When Maria seeks community resources\n    Then the community_elohim should provide tailored resource directory\n    And it should highlight programs specifically supporting single parents\n    And it should filter for her family size, income level, and location\n    And resource discovery should be efficient, not an exhausting research project\n    And Maria should easily find help available to her without extensive searching\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Community resource directory tailored to single parent needs",
+    "ogDescription": "Community resource directory tailored to single parent needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-community resource directory tailored to single parent needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community resource directory tailored to single parent needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-community resource directory tailored to single parent needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-community resource directory tailored to single parent needs",
+    "name": "Community resource directory tailored to single parent needs",
+    "description": "Community resource directory tailored to single parent needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

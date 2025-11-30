@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-provincial-state-appeal outcome influences provincial policy making",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal outcome influences provincial policy making",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal outcome influences provincial policy making",
   "description": "Appeal outcome influences provincial policy making",
   "content": "Scenario: Appeal outcome influences provincial policy making\n    Given my appeal revealed gap between agent governance and state law\n    And Constitutional Council recommendations identify needed legal changes\n    When Senator Ruiz reviews appeal precedents for policy insights\n    Then she uses my case as evidence in legislative hearings\n    And She crafts legislation addressing the constitutional gap\n    And She cites the council's reasoning in justifying policy changes\n    And My individual appeal contributes to democratic policy improvement\n    And Constitutional governance and representative democracy work together\n    And Policy makers learn from Constitutional Council wisdom\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal outcome influences provincial policy making",
+    "ogDescription": "Appeal outcome influences provincial policy making",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal outcome influences provincial policy making",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal outcome influences provincial policy making - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal outcome influences provincial policy making",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal outcome influences provincial policy making",
+    "name": "Appeal outcome influences provincial policy making",
+    "description": "Appeal outcome influences provincial policy making",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

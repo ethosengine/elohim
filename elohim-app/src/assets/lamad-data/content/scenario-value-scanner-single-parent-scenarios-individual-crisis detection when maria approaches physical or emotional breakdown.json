@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-individual-crisis detection when maria approaches physical or emotional breakdown",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-crisis detection when maria approaches physical or emotional breakdown",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Crisis detection when Maria approaches physical or emotional breakdown",
   "description": "Crisis detection when Maria approaches physical or emotional breakdown",
   "content": "Scenario: Crisis detection when Maria approaches physical or emotional breakdown\n    Given Maria operates at unsustainable intensity with no backup\n    And she cannot afford to collapse because there's no one else\n    When the personal_agent monitors Maria's health and stress levels\n    Then it should detect warning signs of approaching breakdown\n    And it should alert Maria before crisis becomes emergency\n    And it should proactively surface support options\n    And it should connect her to emergency resources if needed\n    And it should treat Maria's well-being as critical infrastructure for family survival\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Crisis detection when Maria approaches physical or emotional breakdown",
+    "ogDescription": "Crisis detection when Maria approaches physical or emotional breakdown",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-crisis detection when maria approaches physical or emotional breakdown",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crisis detection when Maria approaches physical or emotional breakdown - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-crisis detection when maria approaches physical or emotional breakdown",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-crisis detection when maria approaches physical or emotional breakdown",
+    "name": "Crisis detection when Maria approaches physical or emotional breakdown",
+    "description": "Crisis detection when Maria approaches physical or emotional breakdown",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

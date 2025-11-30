@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-community-community organizations coordinate through care economy principles",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community organizations coordinate through care economy principles",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community organizations coordinate through care economy principles",
   "description": "Community organizations coordinate through care economy principles",
   "content": "Scenario: Community organizations coordinate through care economy principles\n    Given Sarah participates in multiple community organizations\n    And these organizations share care economy values\n    When community organizations coordinate activities\n    Then the community_elohim should facilitate coordination\n    And it should prevent Sarah from being overcommitted\n    And it should enable meaningful contribution across organizations\n    And community sector should adopt care economy practices\n    And organizational effectiveness should improve through coordination\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Community organizations coordinate through care economy principles",
+    "ogDescription": "Community organizations coordinate through care economy principles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community organizations coordinate through care economy principles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community organizations coordinate through care economy principles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-community-community organizations coordinate through care economy principles",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:community-community organizations coordinate through care economy principles",
+    "name": "Community organizations coordinate through care economy principles",
+    "description": "Community organizations coordinate through care economy principles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

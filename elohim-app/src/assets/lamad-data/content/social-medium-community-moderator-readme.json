@@ -1,15 +1,17 @@
 {
   "id": "social-medium-community-moderator-readme",
+  "did": "did:web:elohim.host:content:social-medium:community-moderator:readme",
   "contentType": "concept",
+  "activityPubType": "Page",
   "title": "Community Moderator - Social Medium",
   "description": "A community moderator is someone who maintains healthy, productive spaces at various governance layers. Unlike platform moderators enforcing top-down rules, Elohim moderators serve their communities by upholding locally-determined standards, responding to conflicts with restorative approaches, and working alongside AI agents to maintain spaces where human flourishing is possible. They may be volunteer community members, elected representatives, or recognized leaders.",
   "content": "---\nepic: social_medium\nuser_type: community_moderator\narchetype_name: \"Community Moderator\"\nepic_domain: \"Digital Communication - Relationship-centered social media\"\ngovernance_scope: [neighborhood, community, district, affinity_network, cultural_linguistic, educational]\nrelated_users: [activist, child, elder, content_creator]\n---\n\n# Community Moderator - Social Medium\n\n## Archetype\n\nA community moderator is someone who maintains healthy, productive spaces at various governance layers. Unlike platform moderators enforcing top-down rules, Elohim moderators serve their communities by upholding locally-determined standards, responding to conflicts with restorative approaches, and working alongside AI agents to maintain spaces where human flourishing is possible. They may be volunteer community members, elected representatives, or recognized leaders.\n\nKey characteristics:\n- Age range: Typically adults (25+) with demonstrated community wisdom\n- Serves specific communities rather than enforcing platform-wide rules\n- Uses restorative justice approaches over punitive moderation\n- Works with AI agents as partners in maintaining healthy spaces\n- Accountable to the communities they serve\n- Balances free expression with harm prevention\n- Focuses on community flourishing, not rule enforcement\n\n## Core Needs\n\n- **Agent Partnership**: AI agents handle pattern detection and routine tasks; humans handle nuanced judgment\n- **Restorative Tools**: Approaches that heal harm and restore relationships rather than just punish\n- **Community Accountability**: Clear mandate from and accountability to the communities they serve\n- **Burnout Prevention**: Sustainable moderation that doesn't extract moderators' wellbeing\n- **Context Understanding**: Tools that provide full context for making wise decisions\n\n## Key Relationships\n\n- **activist**: Supports organizing spaces while preventing infiltration and bad actors\n- **child**: Ensures safe spaces for youth participation and learning\n- **elder**: Protects vulnerable elders while preserving their dignity and agency\n- **content_creator**: Works with creators to maintain quality and truth standards\n- **Elohim Moderation Agent**: Partners with AI to detect patterns, surface concerns, and maintain health\n\n## Relevant Governance Layers\n\n### Geographic/Political\n\n- **neighborhood**: Local community space moderation, neighbor dispute resolution\n- **community**: Community-wide space management, standard setting\n- **district**: Cross-community moderation coordination\n\n### Functional\n\n- **affinity_network**: Interest community moderation (hobby groups, support networks)\n- **cultural_linguistic**: Cultural community space moderation, cultural standard preservation\n- **educational**: Educational space moderation, learning environment maintenance\n\n## Implementation Notes\n\n- **AI Partnership**: Agents detect patterns, moderators exercise judgment; hybrid human-AI approach\n- **Context Visibility**: Moderators see full context, user history, community patterns before decisions\n- **Restorative Priority**: System encourages restoration over punishment wherever possible\n- **Local Standards**: Each community sets own standards within constitutional constraints\n- **Appeal Process**: Decisions can be appealed to broader community governance\n- **Moderator Support**: Mental health resources, peer support, rotation to prevent burnout\n- **Transparency**: Moderation decisions and reasoning visible to community (privacy-respecting)\n- **Pattern Learning**: System learns from successful moderator decisions across communities\n- **Emergency Protocols**: Rapid response for serious threats (violence, abuse, exploitation)\n- **Cultural Competence**: Moderation respects diverse cultural norms and contexts\n- **No Arbitrary Power**: Moderators work within community charters, not personal preference\n",
   "contentFormat": "markdown",
   "tags": [
     "epic:social_medium",
-    "concept",
+    "social-medium",
     "user:community_moderator",
-    "social-medium"
+    "concept"
   ],
   "sourcePath": "social_medium/community_moderator/README.md",
   "relatedNodeIds": [
@@ -40,6 +42,33 @@
       "content_creator"
     ]
   },
-  "createdAt": "2025-11-21T18:54:29.187597",
-  "updatedAt": "2025-11-21T18:54:29.187597"
+  "openGraphMetadata": {
+    "ogTitle": "Community Moderator - Social Medium",
+    "ogDescription": "A community moderator is someone who maintains healthy, productive spaces at various governance layers. Unlike platform moderators enforcing top-down rules, Elohim moderators serve their communities b",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/social-medium-community-moderator-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "articleSection": "social_medium",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/concept.jpg",
+    "ogImageAlt": "Community Moderator - Social Medium - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/social-medium-community-moderator-readme",
+    "identifier": "did:web:elohim.host:content:social-medium:community-moderator:readme",
+    "name": "Community Moderator - Social Medium",
+    "description": "A community moderator is someone who maintains healthy, productive spaces at various governance layers. Unlike platform moderators enforcing top-down rules, Elohim moderators serve their communities by upholding locally-determined standards, responding to conflicts with restorative approaches, and working alongside AI agents to maintain spaces where human flourishing is possible. They may be volunteer community members, elected representatives, or recognized leaders.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-neighborhood-building social capital for future care needs",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood-building social capital for future care needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building social capital for future care needs",
   "description": "Building social capital for future care needs",
   "content": "Scenario: Building social capital for future care needs\n    Given Margaret is relatively healthy and capable now\n    And she will need more support as she ages\n    When Margaret makes neighborhood care contributions\n    Then she should be building relationships for her future\n    And social capital should accumulate through current contributions\n    And neighbors should develop sense of connection and reciprocity\n    And Margaret's future care needs will be met by strong relationships\n    And she's investing in the community that will care for her\n    And strategic relationship-building for aging should be supported\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Building social capital for future care needs",
+    "ogDescription": "Building social capital for future care needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-neighborhood-building social capital for future care needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building social capital for future care needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-neighborhood-building social capital for future care needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:neighborhood-building social capital for future care needs",
+    "name": "Building social capital for future care needs",
+    "description": "Building social capital for future care needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

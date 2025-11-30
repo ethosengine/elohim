@@ -21,6 +21,8 @@
  */
 
 import type { ContentReach, ContentMetadata, ContentFlag } from './content-node.model';
+import { OpenGraphMetadata } from './open-graph.model';
+import { JsonLdMetadata } from './json-ld.model';
 
 // ============================================================================
 // PLACE TYPE CLASSIFICATION
@@ -652,6 +654,24 @@ export interface Place {
 
   /** Author/contributor who created this place entry */
   authorId?: string;
+
+  // =========================================================================
+  // Social Graph Metadata (for sharing places)
+  // =========================================================================
+
+  /**
+   * Open Graph metadata for social sharing.
+   * When a place is shared, this provides rich preview cards with maps/images.
+   */
+  socialMetadata?: OpenGraphMetadata;
+
+  /**
+   * Optional JSON-LD metadata for semantic web interoperability.
+   *
+   * Future: Schema.org Place or AdministrativeArea types.
+   * Prevents tech debt when we need semantic web export.
+   */
+  linkedData?: JsonLdMetadata;
 }
 
 // ============================================================================

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-household-impact of care work on household energy and capacity",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-impact of care work on household energy and capacity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Impact of care work on household energy and capacity",
   "description": "Impact of care work on household energy and capacity",
   "content": "Scenario: Impact of care work on household energy and capacity\n    Given Margaret is 68 and active grandchild care is physically demanding\n    And 25 hours/week of childcare affects household energy\n    When the household_elohim monitors capacity\n    Then it should track if care work is affecting Margaret's well-being\n    And it should recognize when care burden is too high\n    And it should help household discuss sustainable care levels\n    And Robert should understand and support Margaret's capacity\n    And household should be able to negotiate care boundaries with family\n    And both partners' well-being should be protected\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Impact of care work on household energy and capacity",
+    "ogDescription": "Impact of care work on household energy and capacity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-impact of care work on household energy and capacity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Impact of care work on household energy and capacity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-household-impact of care work on household energy and capacity",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:household-impact of care work on household energy and capacity",
+    "name": "Impact of care work on household energy and capacity",
+    "description": "Impact of care work on household energy and capacity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

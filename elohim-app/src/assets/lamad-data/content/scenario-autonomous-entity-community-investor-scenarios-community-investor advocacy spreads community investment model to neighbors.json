@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor advocacy spreads community investment model to neighbors",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor advocacy spreads community investment model to neighbors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor advocacy spreads community investment model to neighbors",
   "description": "Investor advocacy spreads community investment model to neighbors",
   "content": "Scenario: Investor advocacy spreads community investment model to neighbors\n    Given most community members don't know democratic investment options exist\n    And Patricia's neighbors invest in stock market by default\n    When she shares community investment experience\n    Then neighbors learn about values-aligned local investment opportunities\n    And some redirect capital from stock market to community investment pool\n    And investment pool grows enabling more democratic conversions\n    And movement builds through investor advocacy and demonstration\n    And community_elohim supports investor education and community outreach\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor advocacy spreads community investment model to neighbors",
+    "ogDescription": "Investor advocacy spreads community investment model to neighbors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor advocacy spreads community investment model to neighbors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor advocacy spreads community investment model to neighbors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor advocacy spreads community investment model to neighbors",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor advocacy spreads community investment model to neighbors",
+    "name": "Investor advocacy spreads community investment model to neighbors",
+    "description": "Investor advocacy spreads community investment model to neighbors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-ecological-politician understands environmental justice patterns in jurisdiction",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician understands environmental justice patterns in jurisdiction",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician understands environmental justice patterns in jurisdiction",
   "description": "Politician understands environmental justice patterns in jurisdiction",
   "content": "Scenario: Politician understands environmental justice patterns in jurisdiction\n    Given the politician governs environmental policy at city or state level\n    And suspects environmental burdens fall disproportionately\n    When the Observer maps environmental conditions and demographics\n    Then they see pollution sources concentrated in communities of color\n    And identify park access disparities by neighborhood income\n    And understand health impact patterns from environmental exposure\n    And learn which communities bear cumulative environmental burdens\n    And champion environmental justice policies with documented inequities\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician understands environmental justice patterns in jurisdiction",
+    "ogDescription": "Politician understands environmental justice patterns in jurisdiction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician understands environmental justice patterns in jurisdiction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician understands environmental justice patterns in jurisdiction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician understands environmental justice patterns in jurisdiction",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician understands environmental justice patterns in jurisdiction",
+    "name": "Politician understands environmental justice patterns in jurisdiction",
+    "description": "Politician understands environmental justice patterns in jurisdiction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

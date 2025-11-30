@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-individual-developing cooking skills as care economy capability",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-developing cooking skills as care economy capability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Developing cooking skills as care economy capability",
   "description": "Developing cooking skills as care economy capability",
   "content": "Scenario: Developing cooking skills as care economy capability\n    Given Kenji is learning to cook efficiently on tight budget\n    And cooking is new skill he's developing as independent adult\n    When the personal_agent teaches Kenji cooking techniques\n    Then it should provide patient, practical instruction\n    And it should teach him to plan meals that use ingredients efficiently\n    And it should help him learn techniques that reduce prep time\n    And the agent should recognize cooking as care economy skill\n    And it should validate his progress: \"You can now make 5 meals confidently\"\n    And Kenji should experience cooking as capability, not chore\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Developing cooking skills as care economy capability",
+    "ogDescription": "Developing cooking skills as care economy capability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-developing cooking skills as care economy capability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developing cooking skills as care economy capability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-developing cooking skills as care economy capability",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-developing cooking skills as care economy capability",
+    "name": "Developing cooking skills as care economy capability",
+    "description": "Developing cooking skills as care economy capability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

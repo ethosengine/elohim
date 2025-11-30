@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-educational-special education or support service coordination across siblings",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-special education or support service coordination across siblings",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Special education or support service coordination across siblings",
   "description": "Special education or support service coordination across siblings",
   "content": "Scenario: Special education or support service coordination across siblings\n    Given one or more of Maria's children may need educational support services\n    And she must coordinate any special needs alone across multiple children\n    When children require special education services or support\n    Then the educational_elohim should help Maria coordinate across children and schools\n    And schools should recognize she's managing support needs without co-parent\n    And scheduling of meetings and services should accommodate her work constraints\n    And single parents should receive extra support for complex special education navigation\n    And Maria should be able to advocate effectively for children's needs despite time limitations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Special education or support service coordination across siblings",
+    "ogDescription": "Special education or support service coordination across siblings",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-special education or support service coordination across siblings",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Special education or support service coordination across siblings - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-special education or support service coordination across siblings",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-special education or support service coordination across siblings",
+    "name": "Special education or support service coordination across siblings",
+    "description": "Special education or support service coordination across siblings",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

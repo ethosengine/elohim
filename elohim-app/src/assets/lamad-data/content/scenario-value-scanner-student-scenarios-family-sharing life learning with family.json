@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-family-sharing life learning with family",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:family-sharing life learning with family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Sharing life learning with family",
   "description": "Sharing life learning with family",
   "content": "Scenario: Sharing life learning with family\n    Given Kenji is developing new knowledge and capabilities\n    And his learning could benefit family members\n    When Kenji shares environmental science knowledge with family\n    Then the family_elohim should recognize teaching family as care contribution\n    And it should value knowledge transfer from student to parents\n    And it should recognize reverse mentoring (young teaching old) as valid\n    And Kenji's education should benefit whole family, not just himself\n    And the system should value educational contributions to family\n    And students should be recognized as bringing new knowledge to family\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Sharing life learning with family",
+    "ogDescription": "Sharing life learning with family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-sharing life learning with family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sharing life learning with family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-family-sharing life learning with family",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:family-sharing life learning with family",
+    "name": "Sharing life learning with family",
+    "description": "Sharing life learning with family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

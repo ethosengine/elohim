@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-municipal elohim provides cross-neighborhood insights",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal elohim provides cross-neighborhood insights",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal Elohim provides cross-neighborhood insights",
   "description": "Municipal Elohim provides cross-neighborhood insights",
   "content": "Scenario: Municipal Elohim provides cross-neighborhood insights\n    Given different neighborhoods have distinct challenges\n    And patterns aren't visible at single-neighborhood scale\n    When Municipal Elohim synthesizes cross-neighborhood data\n    Then I see: resource flows between neighborhoods\n    And I identify: opportunities for coordination\n    And I notice: problems emerging in multiple areas\n    And I recognize: how neighborhoods affect each other\n    And I use: this information for city council decisions\n    And I maintain: human judgment over agent information\n    And agent enhances: my understanding without replacing leadership\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal Elohim provides cross-neighborhood insights",
+    "ogDescription": "Municipal Elohim provides cross-neighborhood insights",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal elohim provides cross-neighborhood insights",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal Elohim provides cross-neighborhood insights - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal elohim provides cross-neighborhood insights",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal elohim provides cross-neighborhood insights",
+    "name": "Municipal Elohim provides cross-neighborhood insights",
+    "description": "Municipal Elohim provides cross-neighborhood insights",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-low consumption as climate justice leadership",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-low consumption as climate justice leadership",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Low consumption as climate justice leadership",
   "description": "Low consumption as climate justice leadership",
   "content": "Scenario: Low consumption as climate justice leadership\n    Given wealthy overconsumption drives climate crisis\n    And Maria's low-income household has minimal climate impact\n    When climate justice is assessed\n    Then the bioregional_elohim should recognize that Maria is not causing climate crisis\n    And it should acknowledge that low-income households bear crisis costs without causing it\n    And her low consumption should be honored, not stigmatized\n    And climate justice should recognize economic inequality in emissions\n    And Maria should be seen as climate leader, not climate burden\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Low consumption as climate justice leadership",
+    "ogDescription": "Low consumption as climate justice leadership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-low consumption as climate justice leadership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Low consumption as climate justice leadership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-low consumption as climate justice leadership",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-low consumption as climate justice leadership",
+    "name": "Low consumption as climate justice leadership",
+    "description": "Low consumption as climate justice leadership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

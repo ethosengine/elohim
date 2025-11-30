@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-household-financial planning coordinates household resources across generations",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-financial planning coordinates household resources across generations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Financial planning coordinates household resources across generations",
   "description": "Financial planning coordinates household resources across generations",
   "content": "Scenario: Financial planning coordinates household resources across generations\n    Given Robert and Jennifer support children, care for parents, and plan for retirement\n    And they have $95k/year to allocate across competing needs\n    When household_elohim supports financial planning\n    Then it should help them balance generational financial demands\n    And surface tradeoffs: \"Increasing parent care support by $500/month reduces retirement savings\"\n    And provide scenarios for different allocation strategies\n    And help them understand long-term implications of current choices\n    And support transparent decision-making about resource allocation\n    And ensure both partners understand and agree to financial priorities\n    And protect their own financial security while supporting generations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Financial planning coordinates household resources across generations",
+    "ogDescription": "Financial planning coordinates household resources across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-financial planning coordinates household resources across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Financial planning coordinates household resources across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-financial planning coordinates household resources across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-financial planning coordinates household resources across generations",
+    "name": "Financial planning coordinates household resources across generations",
+    "description": "Financial planning coordinates household resources across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

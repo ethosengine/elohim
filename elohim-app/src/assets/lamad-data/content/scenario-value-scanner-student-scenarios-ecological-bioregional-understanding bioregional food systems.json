@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-ecological-bioregional-understanding bioregional food systems",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-understanding bioregional food systems",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Understanding bioregional food systems",
   "description": "Understanding bioregional food systems",
   "content": "Scenario: Understanding bioregional food systems\n    Given Kenji's food comes from complex global supply chains\n    And bioregional food systems are more sustainable\n    When the bioregional_elohim educates about food sourcing\n    Then it should show him where his food comes from\n    And it should help him identify local and seasonal options within budget\n    And it should teach him about bioregional food production\n    And it should connect his shopping to support for local food systems\n    And the system should build bioregional food literacy\n    And Kenji should understand food through ecological and regional lens\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Understanding bioregional food systems",
+    "ogDescription": "Understanding bioregional food systems",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-understanding bioregional food systems",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding bioregional food systems - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-ecological-bioregional-understanding bioregional food systems",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:ecological-bioregional-understanding bioregional food systems",
+    "name": "Understanding bioregional food systems",
+    "description": "Understanding bioregional food systems",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

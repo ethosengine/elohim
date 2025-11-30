@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-individual-personal agent adapts to individual child's developmental pace",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-personal agent adapts to individual child's developmental pace",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Personal agent adapts to individual child's developmental pace",
   "description": "Personal agent adapts to individual child's developmental pace",
   "content": "Scenario: Personal agent adapts to individual child's developmental pace\n    Given Tommy is 5 years old\n    And his developmental pace may differ from age-based averages\n    When the personal_agent interacts with Tommy over time\n    Then it should observe Tommy's actual capabilities\n    And it should adapt guidance to his individual pace\n    And it should not enforce rigid age-based expectations\n    And it should support Tommy's unique development\n    And learning should be paced to Tommy's readiness\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.199597",
-  "updatedAt": "2025-11-21T18:54:29.199597"
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent adapts to individual child's developmental pace",
+    "ogDescription": "Personal agent adapts to individual child's developmental pace",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-personal agent adapts to individual child's developmental pace",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent adapts to individual child's developmental pace - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-personal agent adapts to individual child's developmental pace",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-personal agent adapts to individual child's developmental pace",
+    "name": "Personal agent adapts to individual child's developmental pace",
+    "description": "Personal agent adapts to individual child's developmental pace",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

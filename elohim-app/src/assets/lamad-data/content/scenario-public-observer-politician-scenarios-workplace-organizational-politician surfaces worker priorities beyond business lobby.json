@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician surfaces worker priorities beyond business lobby",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician surfaces worker priorities beyond business lobby",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician surfaces worker priorities beyond business lobby",
   "description": "Politician surfaces worker priorities beyond business lobby",
   "content": "Scenario: Politician surfaces worker priorities beyond business lobby\n    Given the politician hears from business groups on labor policy\n    But limited direct contact with worker constituents\n    When the Observer aggregates worker constituent input\n    Then they see workers prioritize healthcare access and paid sick leave\n    And identify childcare costs as barrier to workforce participation\n    And understand workplace safety concerns in specific industries\n    And learn wage theft affects significant worker population\n    And align labor policy with worker constituent needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician surfaces worker priorities beyond business lobby",
+    "ogDescription": "Politician surfaces worker priorities beyond business lobby",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician surfaces worker priorities beyond business lobby",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician surfaces worker priorities beyond business lobby - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician surfaces worker priorities beyond business lobby",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician surfaces worker priorities beyond business lobby",
+    "name": "Politician surfaces worker priorities beyond business lobby",
+    "description": "Politician surfaces worker priorities beyond business lobby",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

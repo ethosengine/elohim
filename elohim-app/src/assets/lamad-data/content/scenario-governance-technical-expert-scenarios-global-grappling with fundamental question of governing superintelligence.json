@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-technical-expert-scenarios-global-grappling with fundamental question of governing superintelligence",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-grappling with fundamental question of governing superintelligence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Grappling with fundamental question of governing superintelligence",
   "description": "Grappling with fundamental question of governing superintelligence",
   "content": "Scenario: Grappling with fundamental question of governing superintelligence\n    Given agents approaching superintelligence exceed human comprehension\n    And delegates must decide if democratic oversight is possible\n    When I testify about the superintelligence governance challenge\n    Then I honestly state: we don't know if this is solvable\n    And I explain: why comprehension might be fundamental barrier\n    And I present: approaches being researched (amplification, debate, explainability)\n    And I acknowledge: that cryptographic proof might not suffice\n    And I explore: whether capability limits are necessary\n    And I accept: uncertainty about humanity's most important challenge\n    And I demonstrate: intellectual honesty in face of existential questions\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-technical-expert-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.174597",
-  "updatedAt": "2025-11-21T18:54:29.174597"
+  "openGraphMetadata": {
+    "ogTitle": "Grappling with fundamental question of governing superintelligence",
+    "ogDescription": "Grappling with fundamental question of governing superintelligence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-grappling with fundamental question of governing superintelligence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grappling with fundamental question of governing superintelligence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-global-grappling with fundamental question of governing superintelligence",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:global-grappling with fundamental question of governing superintelligence",
+    "name": "Grappling with fundamental question of governing superintelligence",
+    "description": "Grappling with fundamental question of governing superintelligence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

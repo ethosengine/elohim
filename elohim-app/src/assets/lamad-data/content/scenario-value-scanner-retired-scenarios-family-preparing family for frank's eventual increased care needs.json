@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-family-preparing family for frank's eventual increased care needs",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-preparing family for frank's eventual increased care needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Preparing family for Frank's eventual increased care needs",
   "description": "Preparing family for Frank's eventual increased care needs",
   "content": "Scenario: Preparing family for Frank's eventual increased care needs\n    Given Frank is currently more provider than receiver\n    And his care needs will likely increase in next 10-20 years\n    When family_elohim supports care planning\n    Then it should help Frank discuss future care needs with family\n    And prepare adult children for eventual role reversal\n    And surface: \"Frank's contributions now create legitimate claims later\"\n    And facilitate planning conversations that preserve Frank's dignity\n    And help family anticipate and prepare for increasing needs\n    And ensure Frank experiences agency in planning his aging\n    And care reciprocity across time should be made explicit\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Preparing family for Frank's eventual increased care needs",
+    "ogDescription": "Preparing family for Frank's eventual increased care needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-preparing family for frank's eventual increased care needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preparing family for Frank's eventual increased care needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-family-preparing family for frank's eventual increased care needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:family-preparing family for frank's eventual increased care needs",
+    "name": "Preparing family for Frank's eventual increased care needs",
+    "description": "Preparing family for Frank's eventual increased care needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

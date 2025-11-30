@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-ecological-bioregional-weather pattern knowledge from lifetime of observation",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-weather pattern knowledge from lifetime of observation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Weather pattern knowledge from lifetime of observation",
   "description": "Weather pattern knowledge from lifetime of observation",
   "content": "Scenario: Weather pattern knowledge from lifetime of observation\n    Given Helen has observed local weather patterns for 82 years\n    And her memory includes pre-climate change baselines\n    When Helen describes historical weather patterns\n    Then her observations should inform climate adaptation planning\n    And community should learn from her memory of normal patterns\n    And changes should be understood through personal testimony\n    And bioregional climate knowledge should include elder perspectives\n    And the protocol should capture knowledge before it's lost\n    And Helen's observations should contribute to local climate understanding\n    And environmental memory should be preserved through elder participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Weather pattern knowledge from lifetime of observation",
+    "ogDescription": "Weather pattern knowledge from lifetime of observation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-weather pattern knowledge from lifetime of observation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Weather pattern knowledge from lifetime of observation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-ecological-bioregional-weather pattern knowledge from lifetime of observation",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:ecological-bioregional-weather pattern knowledge from lifetime of observation",
+    "name": "Weather pattern knowledge from lifetime of observation",
+    "description": "Weather pattern knowledge from lifetime of observation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

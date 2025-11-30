@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional governance participation includes ecological voice",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-bioregional governance participation includes ecological voice",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional governance participation includes ecological voice",
   "description": "Bioregional governance participation includes ecological voice",
   "content": "Scenario: Bioregional governance participation includes ecological voice\n    Given bioregional health requires governance that includes ecological considerations\n    And Robert participates in community and municipal governance\n    And his voice can advocate for bioregional ecological health\n    When bioregional_elohim supports ecological governance\n    Then it should help Robert bring ecological perspective to governance participation\n    And support advocacy for bioregional ecological protection\n    And connect him to watershed councils, land use planning, and environmental policy\n    And recognize his care economy participation as qualifying him for ecological governance\n    And build governance that integrates human and ecological flourishing\n    And advance bioregional policy that serves care economy and ecology\n    And demonstrate that care economy includes bioregional stewardship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional governance participation includes ecological voice",
+    "ogDescription": "Bioregional governance participation includes ecological voice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional governance participation includes ecological voice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional governance participation includes ecological voice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-bioregional governance participation includes ecological voice",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-bioregional governance participation includes ecological voice",
+    "name": "Bioregional governance participation includes ecological voice",
+    "description": "Bioregional governance participation includes ecological voice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-reducing food waste through care economy planning",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-reducing food waste through care economy planning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Reducing food waste through care economy planning",
   "description": "Reducing food waste through care economy planning",
   "content": "Scenario: Reducing food waste through care economy planning\n    Given household food waste has environmental and economic costs\n    And Sarah wants to minimize waste\n    When Sarah plans shopping and meals\n    Then the bioregional_elohim should help prevent overbuying\n    And it should track household consumption patterns\n    And it should suggest portions appropriate to family size\n    And food waste should be minimized through better planning\n    And care for food should include using what is purchased\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Reducing food waste through care economy planning",
+    "ogDescription": "Reducing food waste through care economy planning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-reducing food waste through care economy planning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Reducing food waste through care economy planning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-reducing food waste through care economy planning",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-reducing food waste through care economy planning",
+    "name": "Reducing food waste through care economy planning",
+    "description": "Reducing food waste through care economy planning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood representation and voice for retirees",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-neighborhood representation and voice for retirees",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood representation and voice for retirees",
   "description": "Neighborhood representation and voice for retirees",
   "content": "Scenario: Neighborhood representation and voice for retirees\n    Given Margaret has time to attend neighborhood meetings\n    And retired residents have important perspective and needs\n    When neighborhood governance decisions are made\n    Then Margaret's participation and voice should be valued\n    And retired residents' interests should be represented\n    And her care contributions should give her standing in decisions\n    And neighborhood should benefit from elder wisdom and participation\n    And Margaret should help shape neighborhood policies and priorities\n    And all age groups should be represented in neighborhood governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood representation and voice for retirees",
+    "ogDescription": "Neighborhood representation and voice for retirees",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood representation and voice for retirees",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood representation and voice for retirees - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood representation and voice for retirees",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-neighborhood representation and voice for retirees",
+    "name": "Neighborhood representation and voice for retirees",
+    "description": "Neighborhood representation and voice for retirees",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

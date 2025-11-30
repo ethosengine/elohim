@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-provincial-state-creating novel constitutional precedent for new situation",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state-creating novel constitutional precedent for new situation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Creating novel constitutional precedent for new situation",
   "description": "Creating novel constitutional precedent for new situation",
   "content": "Scenario: Creating novel constitutional precedent for new situation\n    Given an appeal presents situation never before encountered\n    And existing precedents don't clearly apply\n    When we engage in deep constitutional interpretation\n    Then we examine: fundamental principles and their application\n    And we consider: multiple interpretations and their implications\n    And we consult: technical experts about possibilities\n    And we study: similar cases from other regions for insight\n    And we deliberate: for extended time given novelty and stakes\n    And we craft: new precedent with careful reasoning\n    And we document: our constitutional analysis thoroughly\n    And we create: guidance for future similar cases\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Creating novel constitutional precedent for new situation",
+    "ogDescription": "Creating novel constitutional precedent for new situation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-provincial-state-creating novel constitutional precedent for new situation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creating novel constitutional precedent for new situation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-provincial-state-creating novel constitutional precedent for new situation",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state-creating novel constitutional precedent for new situation",
+    "name": "Creating novel constitutional precedent for new situation",
+    "description": "Creating novel constitutional precedent for new situation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

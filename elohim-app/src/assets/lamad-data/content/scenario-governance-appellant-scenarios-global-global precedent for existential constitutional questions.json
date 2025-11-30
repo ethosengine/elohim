@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-global-global precedent for existential constitutional questions",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:global-global precedent for existential constitutional questions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Global precedent for existential constitutional questions",
   "description": "Global precedent for existential constitutional questions",
   "content": "Scenario: Global precedent for existential constitutional questions\n    Given an appeal raises question about superintelligence governance\n    And the question is whether humans can oversee reasoning they can't understand\n    When the case reaches global Constitutional Council\n    Then the council convenes emergency global deliberation\n    And experts like Amara explain technical constraints\n    And appellants explain dignity concerns about being governed by incomprehensible systems\n    And the council establishes global precedent on explainability requirements\n    And the precedent applies to all jurisdictions implementing protocol\n    And human dignity is preserved even as AI capabilities grow\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Global precedent for existential constitutional questions",
+    "ogDescription": "Global precedent for existential constitutional questions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-global precedent for existential constitutional questions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Global precedent for existential constitutional questions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-global precedent for existential constitutional questions",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:global-global precedent for existential constitutional questions",
+    "name": "Global precedent for existential constitutional questions",
+    "description": "Global precedent for existential constitutional questions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

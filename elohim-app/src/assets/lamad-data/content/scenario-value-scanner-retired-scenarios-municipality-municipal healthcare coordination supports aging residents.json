@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-municipality-municipal healthcare coordination supports aging residents",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal healthcare coordination supports aging residents",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal healthcare coordination supports aging residents",
   "description": "Municipal healthcare coordination supports aging residents",
   "content": "Scenario: Municipal healthcare coordination supports aging residents\n    Given Frank and his wife both have aging-related healthcare needs\n    And navigating healthcare is increasingly complex\n    When the municipal_elohim coordinates healthcare access\n    Then it should help Frank navigate Medicare and healthcare systems\n    And coordinate with municipal health services\n    And support access to preventive and chronic care\n    And connect healthcare to care economy support systems\n    And Frank should maintain health through accessible municipal infrastructure\n    And municipal health policy should serve aging residents effectively\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal healthcare coordination supports aging residents",
+    "ogDescription": "Municipal healthcare coordination supports aging residents",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal healthcare coordination supports aging residents",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal healthcare coordination supports aging residents - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal healthcare coordination supports aging residents",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal healthcare coordination supports aging residents",
+    "name": "Municipal healthcare coordination supports aging residents",
+    "description": "Municipal healthcare coordination supports aging residents",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

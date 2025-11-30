@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-neighborhood-shopping locally contributes to neighborhood economy",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-shopping locally contributes to neighborhood economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Shopping locally contributes to neighborhood economy",
   "description": "Shopping locally contributes to neighborhood economy",
   "content": "Scenario: Shopping locally contributes to neighborhood economy\n    Given Kenji buys groceries at neighborhood corner store and farmer's market\n    And local shopping supports neighborhood businesses\n    When the neighborhood_elohim tracks local economic participation\n    Then it should recognize Kenji's local purchases as neighborhood contribution\n    And it should show him \"You've spent $X at local businesses this month\"\n    And it should help him understand his economic impact on neighborhood\n    And local shopping should accumulate care tokens\n    And the system should make visible how spending choices support community\n    And students should see themselves as neighborhood economic participants\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Shopping locally contributes to neighborhood economy",
+    "ogDescription": "Shopping locally contributes to neighborhood economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-shopping locally contributes to neighborhood economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Shopping locally contributes to neighborhood economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-neighborhood-shopping locally contributes to neighborhood economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:neighborhood-shopping locally contributes to neighborhood economy",
+    "name": "Shopping locally contributes to neighborhood economy",
+    "description": "Shopping locally contributes to neighborhood economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

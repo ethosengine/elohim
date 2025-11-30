@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-family decision making includes preteen's substantial input",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-family decision making includes preteen's substantial input",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family decision making includes preteen's substantial input",
   "description": "Family decision making includes preteen's substantial input",
   "content": "Scenario: Family decision making includes preteen's substantial input\n    Given Marcus has real knowledge of household needs and constraints\n    And he manages daily household operations\n    When family decisions about resources are made\n    Then Marcus's input should carry genuine weight\n    And his knowledge should inform family planning\n    And the family_elohim should surface his insights to Sarah\n    And his voice should be respected as informed perspective\n    And family governance should reflect that he has legitimate standing\n    And his participation should be meaningful, not token\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Family decision making includes preteen's substantial input",
+    "ogDescription": "Family decision making includes preteen's substantial input",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-family decision making includes preteen's substantial input",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family decision making includes preteen's substantial input - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-family decision making includes preteen's substantial input",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-family decision making includes preteen's substantial input",
+    "name": "Family decision making includes preteen's substantial input",
+    "description": "Family decision making includes preteen's substantial input",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

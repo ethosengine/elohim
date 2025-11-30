@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-municipality-housing authority board member evaluates rent increase proposal",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:municipality-housing authority board member evaluates rent increase proposal",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Housing authority board member evaluates rent increase proposal",
   "description": "Housing authority board member evaluates rent increase proposal",
   "content": "Scenario: Housing authority board member evaluates rent increase proposal\n    Given authority staff recommends rent increases to cover operating costs\n    And staff presentation emphasizes authority's fiduciary responsibility and budget needs\n    And tenant advocates testify about hardship but lack supporting data\n    When the board member requests Observer independent analysis\n    Then they receive comparison of authority's costs to peer housing authorities\n    And see tenant income data showing rent burden impacts by increase level\n    And access analysis of cost drivers and alternative budget approaches\n    And discover authority's administrative costs higher than similar authorities\n    And independent analysis reveals trade-offs staff presentation minimized\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Housing authority board member evaluates rent increase proposal",
+    "ogDescription": "Housing authority board member evaluates rent increase proposal",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-municipality-housing authority board member evaluates rent increase proposal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Housing authority board member evaluates rent increase proposal - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-municipality-housing authority board member evaluates rent increase proposal",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:municipality-housing authority board member evaluates rent increase proposal",
+    "name": "Housing authority board member evaluates rent increase proposal",
+    "description": "Housing authority board member evaluates rent increase proposal",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

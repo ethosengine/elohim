@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-community-participating in community food systems",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-participating in community food systems",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in community food systems",
   "description": "Participating in community food systems",
   "content": "Scenario: Participating in community food systems\n    Given I work in food preparation and understand food systems\n    And community has food co-ops, gardens, or alternative food access\n    When I participate in community food initiatives\n    Then the protocol should recognize my expertise and contribution\n    And help me access affordable, quality food through community systems\n    And accumulate care tokens for food systems participation\n    And support building community food sovereignty\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in community food systems",
+    "ogDescription": "Participating in community food systems",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-participating in community food systems",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in community food systems - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-participating in community food systems",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-participating in community food systems",
+    "name": "Participating in community food systems",
+    "description": "Participating in community food systems",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

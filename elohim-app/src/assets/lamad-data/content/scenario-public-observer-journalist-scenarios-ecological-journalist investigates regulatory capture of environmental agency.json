@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-ecological-journalist investigates regulatory capture of environmental agency",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:ecological-journalist investigates regulatory capture of environmental agency",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist investigates regulatory capture of environmental agency",
   "description": "Journalist investigates regulatory capture of environmental agency",
   "content": "Scenario: Journalist investigates regulatory capture of environmental agency\n    Given environmental regulations are weakly enforced\n    And the journalist suspects industry influence over regulators\n    When the Observer tracks regulatory agency decisions and relationships\n    Then the journalist sees violation fines reduced 78% in 3 years\n    And documents revolving door between industry and agency leadership\n    And identifies campaign contributions from regulated industries\n    And shows pattern of violations detected but not penalized\n    And publishes investigation exposing regulatory capture\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates regulatory capture of environmental agency",
+    "ogDescription": "Journalist investigates regulatory capture of environmental agency",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-ecological-journalist investigates regulatory capture of environmental agency",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates regulatory capture of environmental agency - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-ecological-journalist investigates regulatory capture of environmental agency",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:ecological-journalist investigates regulatory capture of environmental agency",
+    "name": "Journalist investigates regulatory capture of environmental agency",
+    "description": "Journalist investigates regulatory capture of environmental agency",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

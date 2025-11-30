@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-state legislator understands local impacts of statewide policy",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator understands local impacts of statewide policy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "State legislator understands local impacts of statewide policy",
   "description": "State legislator understands local impacts of statewide policy",
   "content": "Scenario: State legislator understands local impacts of statewide policy\n    Given the politician represents specific legislative district\n    And considers statewide legislation\n    When the Observer analyzes district-specific impacts\n    Then they see how legislation affects their constituents specifically\n    And identify trade-offs between district and statewide interests\n    And understand which constituent communities benefit versus harmed\n    And explain vote to constituents with local impact data\n    And balance representation of district versus state interests\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "State legislator understands local impacts of statewide policy",
+    "ogDescription": "State legislator understands local impacts of statewide policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator understands local impacts of statewide policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "State legislator understands local impacts of statewide policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator understands local impacts of statewide policy",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator understands local impacts of statewide policy",
+    "name": "State legislator understands local impacts of statewide policy",
+    "description": "State legislator understands local impacts of statewide policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

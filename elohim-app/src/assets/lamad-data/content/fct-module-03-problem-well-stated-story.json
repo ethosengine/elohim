@@ -1,0 +1,54 @@
+{
+  "id": "fct-module-03-problem-well-stated-story",
+  "contentType": "narrative",
+  "title": "Story: A Problem Well Stated",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": {
+    "narrative": "The quotes by Daniel Schmachtenberger and Dr. E.O. Wilson succinctly encapsulate the challenges faced by humanity in the modern era, characterized by the immense capabilities of our technology, the lagging evolution of our social and emotional faculties, and the often antiquated structures of our institutions. The Bible, both in the Old and New Testaments, addresses similar themes of human inadequacy, the quest for wisdom and moral guidance, and the vision of a reconciled world under God. \n\nThe biblical narrative, from the covenants of the Old Testament to the teachings and sacrifice of Jesus in the New Testament, frames a journey towards a reconciled world where divine principles guide human relations, transcending the limitations of our primal instincts and outdated social constructs. This vision aligns with the aspiration for a humanity that wields its \"godlike technology\" with the wisdom, love, and prudence of the divine, moving towards a more harmonious and sustainable existence.\n\nExpanding Responsibility in Biblical Context  \nExpanding Responsibility: This concept is rooted in biblical teachings about how God's people are called to grow in responsibility not through worldly power, but through deeper obedience and faithfulness to God.\n\nOld Testament Perspective:  \nGod's people were expected to expand their influence not through political alliances or military might (treaties and chariots), but through obedience to God's laws and commandments.  \nExamples:\n\n\\- Solomon's early reign focused on wisdom and justice rather than military expansion.  \n\\- Josiah's reforms centered on returning the people to God's law, not expanding the kingdom's borders.\n\nNew Testament Perspective:  \n\\- Jesus taught servant leadership, inverting worldly power structures.  \n\\- Church leaders were cautioned about the weightier responsibility that comes with teaching and leading:  \n\\- \\-\"Not many of you should become teachers, my fellow believers, because you know that we who teach will be judged more strictly.\" (James 3:1)\n\nThis increased responsibility for leaders was coupled with the encouragement for followers to be gracious and supportive.",
+    "narrativeType": "biblical-example"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-03-problem-well-stated"
+  },
+  "createdAt": "2025-11-28T21:10:19.196185",
+  "updatedAt": "2025-11-28T21:10:19.196186",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Story: A Problem Well Stated",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Story: A Problem Well Stated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-story",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "Story: A Problem Well Stated",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.196185",
+    "dateModified": "2025-11-28T21:10:19.196186",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

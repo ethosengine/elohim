@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-ecological-organizer tracks accountability for green space investment promise",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer tracks accountability for green space investment promise",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer tracks accountability for green space investment promise",
   "description": "Organizer tracks accountability for green space investment promise",
   "content": "Scenario: Organizer tracks accountability for green space investment promise\n    Given city committed to park improvements in underserved neighborhoods\n    And the organizer's coalition won the commitment through campaign\n    When the Observer tracks implementation progress\n    Then the organizer monitors park renovation timeline and budget\n    And receives alerts when spending lags or shifts to other areas\n    And documents completion showing community organizing created change\n    And has evidence to pressure officials if promises aren't kept\n    And environmental justice organizing includes accountability for implementation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer tracks accountability for green space investment promise",
+    "ogDescription": "Organizer tracks accountability for green space investment promise",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer tracks accountability for green space investment promise",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer tracks accountability for green space investment promise - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer tracks accountability for green space investment promise",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer tracks accountability for green space investment promise",
+    "name": "Organizer tracks accountability for green space investment promise",
+    "description": "Organizer tracks accountability for green space investment promise",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

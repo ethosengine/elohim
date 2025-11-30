@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-nation-state-participating in national media discourse on ai governance",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-participating in national media discourse on ai governance",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in national media discourse on AI governance",
   "description": "Participating in national media discourse on AI governance",
   "content": "Scenario: Participating in national media discourse on AI governance\n    Given public understanding shapes political will\n    And my voice carries weight as committee chair\n    When I engage in public education\n    Then I explain: why democratic AI governance matters\n    And I describe: how protocol works and what's at stake\n    And I acknowledge: uncertainties and limitations\n    And I present: alternatives honestly (corporate control, heavy regulation, protocol)\n    And I make: case for democratic choice\n    And I avoid: partisan framing or ideological advocacy\n    And I serve: informed democratic deliberation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in national media discourse on AI governance",
+    "ogDescription": "Participating in national media discourse on AI governance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-participating in national media discourse on ai governance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in national media discourse on AI governance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-nation-state-participating in national media discourse on ai governance",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:nation-state-participating in national media discourse on ai governance",
+    "name": "Participating in national media discourse on AI governance",
+    "description": "Participating in national media discourse on AI governance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

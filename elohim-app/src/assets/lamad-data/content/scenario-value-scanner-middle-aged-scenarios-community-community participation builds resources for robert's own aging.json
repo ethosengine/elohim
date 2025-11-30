@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-community-community participation builds resources for robert's own aging",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community participation builds resources for robert's own aging",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community participation builds resources for Robert's own aging",
   "description": "Community participation builds resources for Robert's own aging",
   "content": "Scenario: Community participation builds resources for Robert's own aging\n    Given Robert is preparing for his own eventual care needs\n    And community participation now builds networks for later\n    And care economy operates on long-term reciprocity\n    When community_elohim helps Robert plan for aging\n    Then it should help him see that current community participation builds future support\n    And recognize that relationships now will remain as he ages\n    And surface how care tokens accumulate toward future care\n    And support him in building community that will serve his aging\n    And demonstrate that care economy investment pays forward\n    And help him prepare for aging with dignity through community connection\n    And recognize that community care is lifecycle reciprocity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Community participation builds resources for Robert's own aging",
+    "ogDescription": "Community participation builds resources for Robert's own aging",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community participation builds resources for robert's own aging",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community participation builds resources for Robert's own aging - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community participation builds resources for robert's own aging",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community participation builds resources for robert's own aging",
+    "name": "Community participation builds resources for Robert's own aging",
+    "description": "Community participation builds resources for Robert's own aging",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

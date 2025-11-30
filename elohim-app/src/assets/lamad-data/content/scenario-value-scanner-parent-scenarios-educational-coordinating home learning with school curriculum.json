@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-educational-coordinating home learning with school curriculum",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-coordinating home learning with school curriculum",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating home learning with school curriculum",
   "description": "Coordinating home learning with school curriculum",
   "content": "Scenario: Coordinating home learning with school curriculum\n    Given Emma is learning math at school\n    And Sarah reinforces and extends learning at home\n    When the educational_elohim coordinates home and school\n    Then it should share relevant learning information between contexts\n    And it should help Sarah support Emma's school learning\n    And it should recognize Sarah's home teaching as essential to school success\n    And home and school should be integrated educational environment\n    And the system should facilitate coordination between parents and teachers\n    And Sarah's educational labor should be visible to Emma's school\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating home learning with school curriculum",
+    "ogDescription": "Coordinating home learning with school curriculum",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-coordinating home learning with school curriculum",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating home learning with school curriculum - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-coordinating home learning with school curriculum",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-coordinating home learning with school curriculum",
+    "name": "Coordinating home learning with school curriculum",
+    "description": "Coordinating home learning with school curriculum",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

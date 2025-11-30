@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-workplace-organizational-part-time work options during intensive parenting periods",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-part-time work options during intensive parenting periods",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Part-time work options during intensive parenting periods",
   "description": "Part-time work options during intensive parenting periods",
   "content": "Scenario: Part-time work options during intensive parenting periods\n    Given some life stages require more intensive parenting presence\n    And Maria may need reduced hours during children's critical developmental periods\n    When Maria's care responsibilities temporarily increase\n    Then workplace should offer part-time or reduced hours options\n    And reduced schedule should not mean permanent career penalty or benefit loss\n    And single parents should be able to modulate work based on care needs\n    And career paths should accommodate care economy participation\n    And Maria should have flexibility to adjust work commitment based on family needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Part-time work options during intensive parenting periods",
+    "ogDescription": "Part-time work options during intensive parenting periods",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-part-time work options during intensive parenting periods",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Part-time work options during intensive parenting periods - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-workplace-organizational-part-time work options during intensive parenting periods",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:workplace-organizational-part-time work options during intensive parenting periods",
+    "name": "Part-time work options during intensive parenting periods",
+    "description": "Part-time work options during intensive parenting periods",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

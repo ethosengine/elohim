@@ -1,6 +1,8 @@
 {
   "id": "value-scanner-organizations-valueflows-readme",
+  "did": "did:web:elohim.host:content:value-scanner:organizations:valueflows:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "[Description to be added]",
   "content": "---\nnode_type: organization\norg_id: valueflows\nname: \"Valueflows\"\nurl: \"https://valueflo.ws/\"\ngem_id: \"RfLGdS8XN4eIyll9lgMo\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: value_scanner\nrelated_epics: [autonomous_entity, governance]\n\nepic_relationships:\n  value_scanner:\n    inspiration: \"[How Valueflows inspires the value_scanner epic]\"\n    parallel_work: []\n  autonomous_entity:\n    inspiration: \"[How Valueflows inspires the autonomous_entity epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How Valueflows inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Valueflows\n\n## Description\n\n[Description to be added]\n\n**Publisher:** logo\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: value_scanner\n\n[Detailed explanation of how Valueflows relates to and inspires the value_scanner epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: autonomous_entity\n\n[How Valueflows also inspires the autonomous_entity epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: governance\n\n[How Valueflows also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://valueflo.ws/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `value_scanner` - Primary focus and location\n- `autonomous_entity` - [Connection description]\n- `governance` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -20,8 +22,55 @@
       "autonomous_entity",
       "governance"
     ],
-    "primary_epic": "value_scanner"
+    "primary_epic": "value_scanner",
+    "url": "https://valueflo.ws/",
+    "name": "Valueflows",
+    "org_id": "valueflows",
+    "gem_id": "RfLGdS8XN4eIyll9lgMo",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "logo",
+    "epic_relationships": {
+      "value_scanner": {
+        "inspiration": "[How Valueflows inspires the value_scanner epic]",
+        "parallel_work": []
+      },
+      "autonomous_entity": {
+        "inspiration": "[How Valueflows inspires the autonomous_entity epic]",
+        "parallel_work": []
+      },
+      "governance": {
+        "inspiration": "[How Valueflows inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.193597",
-  "updatedAt": "2025-11-21T18:54:29.193597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "[Description to be added]",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/value-scanner-organizations-valueflows-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/value-scanner-organizations-valueflows-readme",
+    "identifier": "did:web:elohim.host:content:value-scanner:organizations:valueflows:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "[Description to be added]",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

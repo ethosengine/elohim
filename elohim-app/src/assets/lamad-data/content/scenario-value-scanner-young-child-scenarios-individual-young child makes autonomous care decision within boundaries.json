@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-child-scenarios-individual-young child makes autonomous care decision within boundaries",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-young child makes autonomous care decision within boundaries",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Young child makes autonomous care decision within boundaries",
   "description": "Young child makes autonomous care decision within boundaries",
   "content": "Scenario: Young child makes autonomous care decision within boundaries\n    Given Tommy is selecting fruit for his sister Emma\n    And Emma has nut allergies configured in the system\n    And the family budget constraints are active\n    When Tommy scans strawberries for Emma\n    Then his personal_agent should recognize the care intention\n    And the agent should say \"Remember, Emma loves the red ones\"\n    And the choice should be recorded as a care contribution\n    And Tommy should experience genuine autonomy\n    And invisible guardrails should prevent allergen selection\n    And Tommy should not be aware of the protective boundaries\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-child-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.199597",
-  "updatedAt": "2025-11-21T18:54:29.199597"
+  "openGraphMetadata": {
+    "ogTitle": "Young child makes autonomous care decision within boundaries",
+    "ogDescription": "Young child makes autonomous care decision within boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-young child makes autonomous care decision within boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Young child makes autonomous care decision within boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-individual-young child makes autonomous care decision within boundaries",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:individual-young child makes autonomous care decision within boundaries",
+    "name": "Young child makes autonomous care decision within boundaries",
+    "description": "Young child makes autonomous care decision within boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

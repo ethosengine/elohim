@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-sustainable protein choices within budget",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-sustainable protein choices within budget",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Sustainable protein choices within budget",
   "description": "Sustainable protein choices within budget",
   "content": "Scenario: Sustainable protein choices within budget\n    Given protein production has varied environmental impact\n    And Aisha wants to make sustainable choices\n    When Aisha selects protein sources\n    Then the bioregional_elohim should show environmental impact differences\n    And it should highlight lower-impact protein options\n    And it should help her access affordable sustainable proteins\n    And plant-based options should be presented when cheaper\n    And environmental impact should inform protein decisions\n    And sustainable nutrition should be achievable on her budget\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Sustainable protein choices within budget",
+    "ogDescription": "Sustainable protein choices within budget",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-sustainable protein choices within budget",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sustainable protein choices within budget - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-sustainable protein choices within budget",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-sustainable protein choices within budget",
+    "name": "Sustainable protein choices within budget",
+    "description": "Sustainable protein choices within budget",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

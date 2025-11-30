@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-ecological-bioregional-activist documents industrial pollution concentration pattern",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional-activist documents industrial pollution concentration pattern",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist documents industrial pollution concentration pattern",
   "description": "Activist documents industrial pollution concentration pattern",
   "content": "Scenario: Activist documents industrial pollution concentration pattern\n    Given the activist works on environmental justice\n    And suspects systematic pollution burden on communities of color\n    When the Observer maps pollution sources and demographics\n    Then the activist sees industrial permits cluster in Black and Latino neighborhoods\n    And parks and trees concentrate in white affluent areas\n    And asthma hospitalizations correlate with pollution exposure\n    And environmental racism pattern becomes statistically undeniable\n    And legal and regulatory action gains evidentiary foundation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-ecological-bioregional",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist documents industrial pollution concentration pattern",
+    "ogDescription": "Activist documents industrial pollution concentration pattern",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-ecological-bioregional-activist documents industrial pollution concentration pattern",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist documents industrial pollution concentration pattern - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-ecological-bioregional-activist documents industrial pollution concentration pattern",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:ecological-bioregional-activist documents industrial pollution concentration pattern",
+    "name": "Activist documents industrial pollution concentration pattern",
+    "description": "Activist documents industrial pollution concentration pattern",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

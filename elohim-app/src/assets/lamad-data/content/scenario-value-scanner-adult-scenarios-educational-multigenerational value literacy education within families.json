@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-educational-multigenerational value literacy education within families",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-multigenerational value literacy education within families",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Multigenerational value literacy education within families",
   "description": "Multigenerational value literacy education within families",
   "content": "Scenario: Multigenerational value literacy education within families\n    Given Sarah is teaching her children\n    And she's learning from her parents' care wisdom\n    And multiple generations participate in value education\n    When family engages in value literacy learning\n    Then the educational_elohim should coordinate across generations\n    And grandparents' care knowledge should be honored\n    And parents should teach children while still learning themselves\n    And value literacy should be transmitted across generations\n    And family should be primary educational site for care economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Multigenerational value literacy education within families",
+    "ogDescription": "Multigenerational value literacy education within families",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-multigenerational value literacy education within families",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multigenerational value literacy education within families - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-multigenerational value literacy education within families",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-multigenerational value literacy education within families",
+    "name": "Multigenerational value literacy education within families",
+    "description": "Multigenerational value literacy education within families",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

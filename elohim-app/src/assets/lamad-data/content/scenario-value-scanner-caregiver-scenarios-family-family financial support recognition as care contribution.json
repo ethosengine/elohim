@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-family-family financial support recognition as care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family financial support recognition as care contribution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Family financial support recognition as care contribution",
   "description": "Family financial support recognition as care contribution",
   "content": "Scenario: Family financial support recognition as care contribution\n    Given James's household income has plummeted due to caregiving\n    And family members may provide financial assistance\n    When family financial support is tracked\n    Then the family_elohim should recognize financial help as care contribution\n    And it should value financial support alongside direct care labor\n    And family members unable to provide direct care can contribute financially\n    And care economy should include multiple forms of contribution\n    And financial support should be recognized, not taken for granted\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Family financial support recognition as care contribution",
+    "ogDescription": "Family financial support recognition as care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family financial support recognition as care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family financial support recognition as care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-family financial support recognition as care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-family financial support recognition as care contribution",
+    "name": "Family financial support recognition as care contribution",
+    "description": "Family financial support recognition as care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

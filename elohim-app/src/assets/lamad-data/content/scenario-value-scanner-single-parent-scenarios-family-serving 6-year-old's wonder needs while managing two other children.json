@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-serving 6-year-old's wonder needs while managing two other children",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-serving 6-year-old's wonder needs while managing two other children",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Serving 6-year-old's wonder needs while managing two other children",
   "description": "Serving 6-year-old's wonder needs while managing two other children",
   "content": "Scenario: Serving 6-year-old's wonder needs while managing two other children\n    Given her youngest child is at peak wonder and exploration stage\n    And this age needs substantial parental engagement and presence\n    When Maria serves her 6-year-old's developmental needs\n    Then the family_elohim should remind her of age-appropriate activities\n    And it should help her protect wonder time despite other demands\n    And it should prevent youngest from being neglected due to older siblings' needs\n    And it should help her be present for this critical developmental stage\n    And Maria should successfully nurture her youngest despite impossible time constraints\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Serving 6-year-old's wonder needs while managing two other children",
+    "ogDescription": "Serving 6-year-old's wonder needs while managing two other children",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-serving 6-year-old's wonder needs while managing two other children",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Serving 6-year-old's wonder needs while managing two other children - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-serving 6-year-old's wonder needs while managing two other children",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-serving 6-year-old's wonder needs while managing two other children",
+    "name": "Serving 6-year-old's wonder needs while managing two other children",
+    "description": "Serving 6-year-old's wonder needs while managing two other children",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

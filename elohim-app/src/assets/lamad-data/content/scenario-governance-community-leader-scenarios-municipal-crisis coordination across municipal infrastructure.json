@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipal-crisis coordination across municipal infrastructure",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-crisis coordination across municipal infrastructure",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Crisis coordination across municipal infrastructure",
   "description": "Crisis coordination across municipal infrastructure",
   "content": "Scenario: Crisis coordination across municipal infrastructure\n    Given opioid overdose cluster occurs in downtown\n    When Municipal Elohim detects crisis pattern\n    Then agent coordinates emergency services, health services, and social support\n    And agent identifies who needs help across multiple systems\n    And agent enables rapid mutual aid mobilization\n    And Jamal maintains human judgment for crisis decisions\n    And agents inform while humans decide under uncertainty\n    And coordinated response saves lives\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipal",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Crisis coordination across municipal infrastructure",
+    "ogDescription": "Crisis coordination across municipal infrastructure",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-crisis coordination across municipal infrastructure",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crisis coordination across municipal infrastructure - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-crisis coordination across municipal infrastructure",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-crisis coordination across municipal infrastructure",
+    "name": "Crisis coordination across municipal infrastructure",
+    "description": "Crisis coordination across municipal infrastructure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -12,10 +12,24 @@
  * - Trust: TrustBadgeService (UI-ready trust indicators)
  * - Search: SearchService (enhanced search with scoring and facets)
  * - Affinity: AffinityTrackingService (learner engagement tracking)
+ * - Assessment: AssessmentService (psychometric instruments and self-knowledge)
+ * - Governance: GovernanceService (challenges, proposals, precedents)
  */
 
 // Data loading
 export { DataLoaderService } from './data-loader.service';
+
+// Also export data types for consumers
+export type {
+  AssessmentIndex,
+  AssessmentIndexEntry,
+  GovernanceIndex,
+  ChallengeRecord,
+  ProposalRecord,
+  PrecedentRecord,
+  DiscussionRecord,
+  GovernanceStateRecord
+} from './data-loader.service';
 
 // Path navigation
 export { PathService } from './path.service';
@@ -45,8 +59,16 @@ export { SearchService } from './search.service';
 // Learning state
 export { AffinityTrackingService } from './affinity-tracking.service';
 
-// Session user (MVP temporary identity)
-export { SessionUserService } from './session-user.service';
+// Session human (MVP temporary identity)
+export { SessionHumanService } from './session-human.service';
 
 // Profile (human-centered identity view, Imago Dei aligned)
 export { ProfileService } from './profile.service';
+
+// Assessments (psychometric instruments, self-knowledge)
+export { AssessmentService } from './assessment.service';
+export type { AssessmentResult, AssessmentSession, QuestionResponse } from './assessment.service';
+
+// Governance (challenges, proposals, precedents, deliberation)
+export { GovernanceService } from './governance.service';
+export type { ChallengeSubmission, ProposalSubmission, Vote, DiscussionMessage } from './governance.service';

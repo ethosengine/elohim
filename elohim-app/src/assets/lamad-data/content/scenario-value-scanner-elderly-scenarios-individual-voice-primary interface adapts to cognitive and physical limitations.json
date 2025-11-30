@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-individual-voice-primary interface adapts to cognitive and physical limitations",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-voice-primary interface adapts to cognitive and physical limitations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Voice-primary interface adapts to cognitive and physical limitations",
   "description": "Voice-primary interface adapts to cognitive and physical limitations",
   "content": "Scenario: Voice-primary interface adapts to cognitive and physical limitations\n    Given Helen has difficulty with small text and complex navigation\n    And her mobility makes precise touch targets challenging\n    When Helen opens the Value Scanner application\n    Then the interface should use voice-primary interaction\n    And visual elements should have large fonts and high contrast\n    And touch targets should be large and forgiving\n    And navigation should be simple with minimal steps\n    And the pace should be slow with no time pressure\n    And error recovery should be patient and supportive\n    And the interface should preserve Helen's dignity throughout\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Voice-primary interface adapts to cognitive and physical limitations",
+    "ogDescription": "Voice-primary interface adapts to cognitive and physical limitations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-voice-primary interface adapts to cognitive and physical limitations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Voice-primary interface adapts to cognitive and physical limitations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-voice-primary interface adapts to cognitive and physical limitations",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-voice-primary interface adapts to cognitive and physical limitations",
+    "name": "Voice-primary interface adapts to cognitive and physical limitations",
+    "description": "Voice-primary interface adapts to cognitive and physical limitations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

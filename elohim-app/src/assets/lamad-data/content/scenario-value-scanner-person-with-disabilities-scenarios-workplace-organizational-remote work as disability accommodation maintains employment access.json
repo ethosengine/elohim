@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-remote work as disability accommodation maintains employment access",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-remote work as disability accommodation maintains employment access",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Remote work as disability accommodation maintains employment access",
   "description": "Remote work as disability accommodation maintains employment access",
   "content": "Scenario: Remote work as disability accommodation maintains employment access\n    Given Alex works remotely as necessary accommodation\n    And remote work enables Alex's employment despite mobility limitations\n    When workplace policies change\n    Then Alex's right to remote work accommodation should be protected\n    And the workplace_elohim should document remote work as accommodation\n    And employer cannot eliminate remote work for Alex without undue hardship proof\n    And Alex's legal right to accommodation should override general policy changes\n    And the protocol should help Alex defend remote work arrangement\n    And pandemic-normalized remote work should benefit disabled workers permanently\n    And Alex should not lose employment due to return-to-office mandates\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Remote work as disability accommodation maintains employment access",
+    "ogDescription": "Remote work as disability accommodation maintains employment access",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-remote work as disability accommodation maintains employment access",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Remote work as disability accommodation maintains employment access - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-workplace-organizational-remote work as disability accommodation maintains employment access",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:workplace-organizational-remote work as disability accommodation maintains employment access",
+    "name": "Remote work as disability accommodation maintains employment access",
+    "description": "Remote work as disability accommodation maintains employment access",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

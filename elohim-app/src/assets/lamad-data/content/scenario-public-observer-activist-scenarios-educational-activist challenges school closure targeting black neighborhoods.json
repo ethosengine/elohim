@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-activist-scenarios-educational-activist challenges school closure targeting black neighborhoods",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist challenges school closure targeting black neighborhoods",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist challenges school closure targeting Black neighborhoods",
   "description": "Activist challenges school closure targeting Black neighborhoods",
   "content": "Scenario: Activist challenges school closure targeting Black neighborhoods\n    Given the district proposes closing schools for \"efficiency\"\n    And the activist suspects racial targeting\n    When the Observer analyzes closure patterns across time\n    Then the activist sees schools in Black neighborhoods systematically closed\n    And white neighborhood schools remain open despite similar enrollment\n    And \"efficiency\" rationale masks structural racism\n    And community organizes opposition with documented evidence\n    And racist policy becomes undeniable and challengeable\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-activist-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.182597",
-  "updatedAt": "2025-11-21T18:54:29.182597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist challenges school closure targeting Black neighborhoods",
+    "ogDescription": "Activist challenges school closure targeting Black neighborhoods",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist challenges school closure targeting black neighborhoods",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist challenges school closure targeting Black neighborhoods - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-educational-activist challenges school closure targeting black neighborhoods",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:educational-activist challenges school closure targeting black neighborhoods",
+    "name": "Activist challenges school closure targeting Black neighborhoods",
+    "description": "Activist challenges school closure targeting Black neighborhoods",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

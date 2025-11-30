@@ -1,6 +1,8 @@
 {
   "id": "scenario-social-medium-activist-scenarios-affinity-network-activist prevents movement co-optation by bad actors",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:affinity-network-activist prevents movement co-optation by bad actors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Activist prevents movement co-optation by bad actors",
   "description": "Activist prevents movement co-optation by bad actors",
   "content": "Scenario: Activist prevents movement co-optation by bad actors\n    Given a corporate-funded organization tries to join the network\n    And they claim to support climate action but oppose systemic change\n    When they attempt to participate in network coordination\n    Then their limited community trust becomes visible\n    And their ties to fossil fuel funding are surfaced through documentation\n    And the network collectively evaluates the participation request\n    And communities share experiences with similar co-optation attempts\n    And the network maintains boundaries while remaining open to good-faith participation\n    And the movement's integrity is protected through transparent evaluation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-social-medium-activist-scenarios-affinity-network",
     "epic": "social_medium"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Activist prevents movement co-optation by bad actors",
+    "ogDescription": "Activist prevents movement co-optation by bad actors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-affinity-network-activist prevents movement co-optation by bad actors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist prevents movement co-optation by bad actors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-affinity-network-activist prevents movement co-optation by bad actors",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:affinity-network-activist prevents movement co-optation by bad actors",
+    "name": "Activist prevents movement co-optation by bad actors",
+    "description": "Activist prevents movement co-optation by bad actors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-environmental impact visible in consumption decisions",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-environmental impact visible in consumption decisions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Environmental impact visible in consumption decisions",
   "description": "Environmental impact visible in consumption decisions",
   "content": "Scenario: Environmental impact visible in consumption decisions\n    Given Sarah wants to minimize environmental harm\n    And impact information is often hidden from consumers\n    When Sarah scans products\n    Then the bioregional_elohim should display environmental impact data\n    And it should show carbon footprint, water use, soil health, biodiversity effects\n    And it should make ecological costs visible alongside monetary costs\n    And Sarah should make informed choices about environmental impact\n    And visibility should enable environmentally conscious consumption\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Environmental impact visible in consumption decisions",
+    "ogDescription": "Environmental impact visible in consumption decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-environmental impact visible in consumption decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Environmental impact visible in consumption decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-environmental impact visible in consumption decisions",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-environmental impact visible in consumption decisions",
+    "name": "Environmental impact visible in consumption decisions",
+    "description": "Environmental impact visible in consumption decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

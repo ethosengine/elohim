@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-household-roommate coordination for shared meals vs individual cooking",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-roommate coordination for shared meals vs individual cooking",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Roommate coordination for shared meals vs individual cooking",
   "description": "Roommate coordination for shared meals vs individual cooking",
   "content": "Scenario: Roommate coordination for shared meals vs individual cooking\n    Given some meals are shared and some are individual\n    And coordination requires planning around different schedules\n    When the household_elohim manages meal coordination\n    Then it should track who's eating shared meals vs cooking separately\n    And it should help schedule shared dinners when roommates are available\n    And it should recognize Kenji's labor preparing shared meals\n    And it should calculate fair cost sharing for shared food\n    And the system should make coordination easy rather than burdensome\n    And shared meals should build household community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Roommate coordination for shared meals vs individual cooking",
+    "ogDescription": "Roommate coordination for shared meals vs individual cooking",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-roommate coordination for shared meals vs individual cooking",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Roommate coordination for shared meals vs individual cooking - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-roommate coordination for shared meals vs individual cooking",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-roommate coordination for shared meals vs individual cooking",
+    "name": "Roommate coordination for shared meals vs individual cooking",
+    "description": "Roommate coordination for shared meals vs individual cooking",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

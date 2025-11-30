@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-workplace-organizational-coordinating work schedule with personal life",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-coordinating work schedule with personal life",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating work schedule with personal life",
   "description": "Coordinating work schedule with personal life",
   "content": "Scenario: Coordinating work schedule with personal life\n    Given Jordan has medical appointments and personal commitments\n    And all employees need schedule flexibility sometimes\n    When Jordan needs to request time off\n    Then the personal_agent helps Jordan submit the request\n    And the request process is accessible and clear\n    And Jordan's time-off requests are handled like any employee's\n    And the workplace_elohim facilitates reasonable accommodation\n    And Jordan can balance work and personal life with dignity\n    And Jordan's needs are honored without special pleading\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-workplace-organizational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating work schedule with personal life",
+    "ogDescription": "Coordinating work schedule with personal life",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-coordinating work schedule with personal life",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating work schedule with personal life - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-workplace-organizational-coordinating work schedule with personal life",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:workplace-organizational-coordinating work schedule with personal life",
+    "name": "Coordinating work schedule with personal life",
+    "description": "Coordinating work schedule with personal life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

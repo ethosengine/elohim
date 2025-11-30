@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-community-community intergenerational connection facilitated by middle-aged bridge",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community intergenerational connection facilitated by middle-aged bridge",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Community intergenerational connection facilitated by middle-aged bridge",
   "description": "Community intergenerational connection facilitated by middle-aged bridge",
   "content": "Scenario: Community intergenerational connection facilitated by middle-aged bridge\n    Given Robert connects to multiple generations: children, peers, parents\n    And he understands needs and perspectives across age ranges\n    And community thrives through intergenerational connection\n    When community_elohim leverages his intergenerational position\n    Then it should recognize him as bridge between generations\n    And support him in facilitating intergenerational community programs\n    And help younger and older community members connect through him\n    And value his translation between generational perspectives\n    And build community cohesion through intergenerational care\n    And demonstrate that middle-aged adults uniquely enable community integration\n    And strengthen community through lifecycle diversity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Community intergenerational connection facilitated by middle-aged bridge",
+    "ogDescription": "Community intergenerational connection facilitated by middle-aged bridge",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community intergenerational connection facilitated by middle-aged bridge",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community intergenerational connection facilitated by middle-aged bridge - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community intergenerational connection facilitated by middle-aged bridge",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community intergenerational connection facilitated by middle-aged bridge",
+    "name": "Community intergenerational connection facilitated by middle-aged bridge",
+    "description": "Community intergenerational connection facilitated by middle-aged bridge",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

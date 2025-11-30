@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-individual-managing personal care routine with autonomy",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-managing personal care routine with autonomy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing personal care routine with autonomy",
   "description": "Managing personal care routine with autonomy",
   "content": "Scenario: Managing personal care routine with autonomy\n    Given Jordan has a morning self-care routine\n    And Jordan can complete most tasks independently with reminders\n    When Jordan uses the morning routine feature\n    Then the interface shows each task as a picture checklist\n    And Jordan can mark tasks complete as they finish them\n    And the system provides gentle audio reminders if Jordan forgets\n    And the personal_agent celebrates Jordan's independence\n    And support workers only assist when Jordan requests help\n    And Jordan's autonomy is maximized within their capabilities\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Managing personal care routine with autonomy",
+    "ogDescription": "Managing personal care routine with autonomy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-managing personal care routine with autonomy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing personal care routine with autonomy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-managing personal care routine with autonomy",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-managing personal care routine with autonomy",
+    "name": "Managing personal care routine with autonomy",
+    "description": "Managing personal care routine with autonomy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

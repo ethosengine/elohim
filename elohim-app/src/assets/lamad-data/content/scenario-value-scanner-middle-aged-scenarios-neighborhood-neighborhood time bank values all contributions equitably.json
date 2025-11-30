@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood time bank values all contributions equitably",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood time bank values all contributions equitably",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood time bank values all contributions equitably",
   "description": "Neighborhood time bank values all contributions equitably",
   "content": "Scenario: Neighborhood time bank values all contributions equitably\n    Given Robert contributes professional skills and labor\n    And neighbors contribute different skills and capacities\n    And all contributions have value in care economy\n    When neighborhood_elohim manages time bank\n    Then it should value Robert's professional mentoring and manual labor equally\n    And recognize all neighborhood contributions as care work\n    And prevent hierarchy where professional skills are valued more than care labor\n    And build neighborhood equity through time bank reciprocity\n    And demonstrate care economy principles in practice\n    And strengthen neighborhood through mutual recognition\n    And create alternative economy based on care rather than market\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood time bank values all contributions equitably",
+    "ogDescription": "Neighborhood time bank values all contributions equitably",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood time bank values all contributions equitably",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood time bank values all contributions equitably - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-neighborhood-neighborhood time bank values all contributions equitably",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:neighborhood-neighborhood time bank values all contributions equitably",
+    "name": "Neighborhood time bank values all contributions equitably",
+    "description": "Neighborhood time bank values all contributions equitably",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

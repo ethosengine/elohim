@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-workplace-organizational-care leave policies advocated based on personal experience",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-care leave policies advocated based on personal experience",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Care leave policies advocated based on personal experience",
   "description": "Care leave policies advocated based on personal experience",
   "content": "Scenario: Care leave policies advocated based on personal experience\n    Given Robert has navigated inadequate care leave policies\n    And he knows what workplace support caregivers need\n    And his leadership position enables policy advocacy\n    When workplace_elohim supports policy advocacy\n    Then it should help Robert advocate for expanded care leave\n    And provide evidence about care leave benefits for retention and productivity\n    And connect him to policy development processes\n    And support him in proposing paid family leave, elder care leave, and flexible care arrangements\n    And build workplace policy that supports employees' care responsibilities\n    And leverage his experience and standing for systemic improvement\n    And demonstrate that middle managers can drive workplace transformation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Care leave policies advocated based on personal experience",
+    "ogDescription": "Care leave policies advocated based on personal experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-care leave policies advocated based on personal experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Care leave policies advocated based on personal experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-workplace-organizational-care leave policies advocated based on personal experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:workplace-organizational-care leave policies advocated based on personal experience",
+    "name": "Care leave policies advocated based on personal experience",
+    "description": "Care leave policies advocated based on personal experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

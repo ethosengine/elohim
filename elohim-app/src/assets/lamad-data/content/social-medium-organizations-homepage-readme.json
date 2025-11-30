@@ -1,6 +1,8 @@
 {
   "id": "social-medium-organizations-homepage-readme",
+  "did": "did:web:elohim.host:content:social-medium:organizations:homepage:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "The blockchain dispute resolution layer. Fast, open and affordable justice for all.",
   "content": "---\nnode_type: organization\norg_id: homepage\nname: \"Homepage\"\nurl: \"https://kleros.io/\"\ngem_id: \"qXACAjJWFb1wbnNsAqmS\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: social_medium\nrelated_epics: []\n\nepic_relationships:\n  social_medium:\n    inspiration: \"[How Homepage inspires the social_medium epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Homepage\n\n## Description\n\nThe blockchain dispute resolution layer. Fast, open and affordable justice for all.\n\n**Publisher:** Kleros\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: social_medium\n\n[Detailed explanation of how Homepage relates to and inspires the social_medium epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://kleros.io/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `social_medium` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -14,8 +16,47 @@
   "metadata": {
     "category": "social-medium",
     "related_epics": [],
-    "primary_epic": "social_medium"
+    "primary_epic": "social_medium",
+    "url": "https://kleros.io/",
+    "name": "Homepage",
+    "org_id": "homepage",
+    "gem_id": "qXACAjJWFb1wbnNsAqmS",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Kleros",
+    "epic_relationships": {
+      "social_medium": {
+        "inspiration": "[How Homepage inspires the social_medium epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "The blockchain dispute resolution layer. Fast, open and affordable justice for all.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/social-medium-organizations-homepage-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/social-medium-organizations-homepage-readme",
+    "identifier": "did:web:elohim.host:content:social-medium:organizations:homepage:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "The blockchain dispute resolution layer. Fast, open and affordable justice for all.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

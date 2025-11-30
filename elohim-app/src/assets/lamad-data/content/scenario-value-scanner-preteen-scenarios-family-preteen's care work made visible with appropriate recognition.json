@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-preteen's care work made visible with appropriate recognition",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-preteen's care work made visible with appropriate recognition",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Preteen's care work made visible with appropriate recognition",
   "description": "Preteen's care work made visible with appropriate recognition",
   "content": "Scenario: Preteen's care work made visible with appropriate recognition\n    Given Marcus has completed weekly grocery shopping\n    And he has managed budget, nutrition, and meal planning\n    When the family_elohim processes Marcus's contributions\n    Then his care work should be visible on family dashboard\n    And Sarah should receive specific recognition prompts\n    And the prompt should detail \"Marcus managed $75 budget, maintained 92% nutrition, planned 21 meals\"\n    And care tokens should reflect genuine economic value of his work\n    And recognition should communicate that this is substantial labor\n    And Sarah should be prompted to acknowledge his capability\n    And Marcus should feel valued as major family contributor\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Preteen's care work made visible with appropriate recognition",
+    "ogDescription": "Preteen's care work made visible with appropriate recognition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-preteen's care work made visible with appropriate recognition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preteen's care work made visible with appropriate recognition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-preteen's care work made visible with appropriate recognition",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-preteen's care work made visible with appropriate recognition",
+    "name": "Preteen's care work made visible with appropriate recognition",
+    "description": "Preteen's care work made visible with appropriate recognition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

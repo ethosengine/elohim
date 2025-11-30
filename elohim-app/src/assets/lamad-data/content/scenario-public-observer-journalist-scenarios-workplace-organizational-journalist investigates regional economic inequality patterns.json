@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates regional economic inequality patterns",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist investigates regional economic inequality patterns",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist investigates regional economic inequality patterns",
   "description": "Journalist investigates regional economic inequality patterns",
   "content": "Scenario: Journalist investigates regional economic inequality patterns\n    Given the journalist covers regional economy\n    And economic growth statistics mask inequality\n    When the Observer analyzes economic data by demographics and geography\n    Then the journalist sees wage growth concentrated in top income brackets\n    And documents working-class wage stagnation despite economic growth claims\n    And shows poverty increasing in communities of color despite job growth\n    And identifies industries paying poverty wages receiving subsidies\n    And publishes investigation exposing economic inequality\n    And pattern recognition reveals who benefits from \"strong economy\"\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates regional economic inequality patterns",
+    "ogDescription": "Journalist investigates regional economic inequality patterns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates regional economic inequality patterns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates regional economic inequality patterns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist investigates regional economic inequality patterns",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist investigates regional economic inequality patterns",
+    "name": "Journalist investigates regional economic inequality patterns",
+    "description": "Journalist investigates regional economic inequality patterns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

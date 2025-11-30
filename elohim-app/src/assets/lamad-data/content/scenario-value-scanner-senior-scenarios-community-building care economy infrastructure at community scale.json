@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-community-building care economy infrastructure at community scale",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-building care economy infrastructure at community scale",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building care economy infrastructure at community scale",
   "description": "Building care economy infrastructure at community scale",
   "content": "Scenario: Building care economy infrastructure at community scale\n    Given Margaret has time and motivation to build new systems\n    And care economy requires infrastructure development\n    When the community_elohim coordinates care economy building\n    Then Margaret should be identified as potential infrastructure builder\n    And her generation could establish care economy as normal practice\n    And seniors could be powerful advocates and practitioners\n    And community care economy infrastructure should be senior-led\n    And Margaret's cohort could transform how community operates\n    And systemic change should be enabled through senior participation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Building care economy infrastructure at community scale",
+    "ogDescription": "Building care economy infrastructure at community scale",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-building care economy infrastructure at community scale",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building care economy infrastructure at community scale - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-building care economy infrastructure at community scale",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-building care economy infrastructure at community scale",
+    "name": "Building care economy infrastructure at community scale",
+    "description": "Building care economy infrastructure at community scale",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -6,10 +6,31 @@
  * - id becomes AgentPubKey
  * - Profile data published to DHT if visibility allows
  *
+ * W3C DECENTRALIZED IDENTIFIERS (DID) ALIGNMENT:
+ * The `id` field remains human-friendly for routing and file paths.
+ * The optional `did` field provides cryptographic identity.
+ *
+ * Separation rationale:
+ * - id: Human-friendly routing ("user123", "alice-smith")
+ * - did: Cryptographic identity ("did:web:elohim.host:agents:user123")
+ *
+ * This separation prevents:
+ * - Breaking URLs (/lamad/resource/:id uses clean IDs)
+ * - Breaking file paths (content/{id}.json on Windows doesn't allow colons)
+ * - Ugly user-facing identifiers in localStorage keys
+ *
+ * Migration path for `did` field:
+ * 1. Current: Optional, not yet populated
+ * 2. Phase 2: did:web:elohim.host:agents:{id}
+ * 3. Holochain: did:holochain:{AgentPubKey}
+ *
+ * W3C DID Spec: https://www.w3.org/TR/did-core/
+ * DID Format: did:<method>:<method-specific-id>
+ *
  * For Elohim agents, additional properties are available.
  */
 export interface Agent {
-  id: string;  // AgentPubKey in Holochain
+  id: string;  // Future: DID or AgentPubKey in Holochain
   displayName: string;
   type: 'human' | 'organization' | 'ai-agent' | 'elohim';
 
@@ -22,6 +43,31 @@ export interface Agent {
   // Timestamps
   createdAt: string;
   updatedAt: string;
+
+  /**
+   * ActivityPub Actor type for federated social web.
+   *
+   * Maps to ActivityStreams vocabulary:
+   * - type='human' → 'Person'
+   * - type='organization' → 'Organization'
+   * - type='ai-agent' → 'Service'
+   * - type='elohim' → 'Service' (with constitutional binding metadata)
+   *
+   * Reference: https://www.w3.org/TR/activitystreams-vocabulary/#actor-types
+   */
+  activityPubType?: 'Person' | 'Organization' | 'Service' | 'Application' | 'Group';
+
+  /**
+   * Decentralized Identifier (DID) for cryptographic identity.
+   *
+   * Separate from `id` to maintain human-friendly URLs and filenames.
+   * The `id` field remains the primary routing identifier.
+   *
+   * Example: "did:web:elohim.host:agents:user123"
+   *
+   * Reference: https://www.w3.org/TR/did-core/
+   */
+  did?: string;
 
   // Elohim-specific properties (optional, only present for type: 'elohim')
   layer?: string;
@@ -64,6 +110,21 @@ export interface AgentProgress {
 
   // Achievement attestations earned through this path
   attestationsEarned: string[];
+
+  /**
+   * Global content completion tracking (Khan Academy-style shared completion)
+   *
+   * Tracks which content nodes (by resourceId) have been completed across ALL paths.
+   * This enables cross-path completion views:
+   * - If content X is completed in "1st Grade Math", it shows as completed in "Early Math Review"
+   * - Path completion calculated by unique content mastered, not just step indices
+   *
+   * Storage note: Stored as array in JSON, converted to Set in services for O(1) lookup.
+   * Typical learner completes <500 content nodes = <10KB storage, well within localStorage limits.
+   *
+   * Special pathId '__global__' is used to store this field for cross-path tracking.
+   */
+  completedContentIds?: string[];
 }
 
 /**
@@ -76,8 +137,81 @@ export type AttestationCategory =
   | 'achievement';      // One-time participation recognition
 
 /**
- * MasteryLevel - For Phase 6 mastery system
- * Values track learning progression from initial exposure to mastery.
+ * BloomMasteryLevel - Content mastery based on Bloom's Taxonomy.
+ *
+ * Progression from passive consumption to active contribution.
+ * The 'apply' level is the attestation gate - crossing it unlocks
+ * participation privileges in the content's governance.
+ *
+ * Levels:
+ * - not_started (0): No engagement
+ * - seen (1): Content viewed
+ * - remember (2): Basic recall demonstrated (identify, list, name)
+ * - understand (3): Comprehension demonstrated (explain, summarize)
+ * - apply (4): Application in novel contexts (ATTESTATION GATE)
+ * - analyze (5): Can break down, connect, contribute analysis
+ * - evaluate (6): Can assess, critique, peer review
+ * - create (7): Can author, derive, synthesize
+ *
+ * Reference: Anderson & Krathwohl (2001), Bloom's Revised Taxonomy
+ */
+export type BloomMasteryLevel =
+  | 'not_started' // 0 - No engagement
+  | 'seen' // 1 - Content viewed
+  | 'remember' // 2 - Basic recall demonstrated
+  | 'understand' // 3 - Comprehension demonstrated
+  | 'apply' // 4 - Application in novel contexts (ATTESTATION GATE)
+  | 'analyze' // 5 - Can break down, connect, contribute analysis
+  | 'evaluate' // 6 - Can assess, critique, peer review
+  | 'create'; // 7 - Can author, derive, synthesize
+
+/**
+ * Numeric value for BloomMasteryLevel for comparison and persistence.
+ */
+export const BLOOM_LEVEL_VALUES: Record<BloomMasteryLevel, number> = {
+  not_started: 0,
+  seen: 1,
+  remember: 2,
+  understand: 3,
+  apply: 4,
+  analyze: 5,
+  evaluate: 6,
+  create: 7,
+};
+
+/**
+ * The level at which participation privileges unlock.
+ * Below this: passive learning (practice anything, no contribution privileges)
+ * At/above this: active participation (comment, review, create)
+ */
+export const ATTESTATION_GATE_LEVEL: BloomMasteryLevel = 'apply';
+
+/**
+ * Check if a mastery level is at or above the attestation gate.
+ */
+export function isAboveGate(level: BloomMasteryLevel): boolean {
+  return BLOOM_LEVEL_VALUES[level] >= BLOOM_LEVEL_VALUES[ATTESTATION_GATE_LEVEL];
+}
+
+/**
+ * Compare two mastery levels.
+ * Returns negative if a < b, zero if equal, positive if a > b.
+ */
+export function compareMasteryLevels(
+  a: BloomMasteryLevel,
+  b: BloomMasteryLevel
+): number {
+  return BLOOM_LEVEL_VALUES[a] - BLOOM_LEVEL_VALUES[b];
+}
+
+/**
+ * @deprecated Use BloomMasteryLevel instead.
+ * Old MasteryLevel mapped to new levels:
+ * - 'not-started' → 'not_started'
+ * - 'struggling' → 'remember' (attempting recall)
+ * - 'learning' → 'understand'
+ * - 'practicing' → 'apply'
+ * - 'mastered' → 'create' (full mastery includes creation)
  */
 export type MasteryLevel =
   | 'not-started'

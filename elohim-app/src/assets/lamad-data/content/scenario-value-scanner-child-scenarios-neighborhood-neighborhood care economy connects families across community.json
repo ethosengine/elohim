@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-neighborhood-neighborhood care economy connects families across community",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-neighborhood care economy connects families across community",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood care economy connects families across community",
   "description": "Neighborhood care economy connects families across community",
   "content": "Scenario: Neighborhood care economy connects families across community\n    Given multiple families in neighborhood participate in Value Scanner\n    And Emma's family is part of neighborhood network\n    When Emma makes care contributions through shopping\n    Then her contributions should feed into neighborhood care economy\n    And the neighborhood_elohim should track community care patterns\n    And Emma should learn care extends beyond her household\n    And she should see her family as part of larger community\n    And neighborhood-level recognition should be age-appropriate\n    And community belonging should be built through care visibility\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood care economy connects families across community",
+    "ogDescription": "Neighborhood care economy connects families across community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-neighborhood care economy connects families across community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood care economy connects families across community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-neighborhood care economy connects families across community",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-neighborhood care economy connects families across community",
+    "name": "Neighborhood care economy connects families across community",
+    "description": "Neighborhood care economy connects families across community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

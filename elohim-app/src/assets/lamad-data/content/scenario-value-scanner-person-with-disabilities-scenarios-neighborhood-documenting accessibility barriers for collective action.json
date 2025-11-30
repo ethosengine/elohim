@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-documenting accessibility barriers for collective action",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-documenting accessibility barriers for collective action",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Documenting accessibility barriers for collective action",
   "description": "Documenting accessibility barriers for collective action",
   "content": "Scenario: Documenting accessibility barriers for collective action\n    Given the neighborhood has many accessibility barriers\n    And individual complaints often go unaddressed\n    When Alex uses the system to document barriers\n    Then the neighborhood_elohim should collect systematic barrier data\n    And it should identify patterns across multiple residents' reports\n    And documentation should support collective advocacy\n    And data should enable organized demands for improvements\n    And Alex's expertise should strengthen neighborhood organizing\n    And the protocol should facilitate collective power-building\n    And systematic change should become possible through organized documentation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Documenting accessibility barriers for collective action",
+    "ogDescription": "Documenting accessibility barriers for collective action",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-documenting accessibility barriers for collective action",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Documenting accessibility barriers for collective action - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-documenting accessibility barriers for collective action",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-documenting accessibility barriers for collective action",
+    "name": "Documenting accessibility barriers for collective action",
+    "description": "Documenting accessibility barriers for collective action",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

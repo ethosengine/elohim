@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-national-document how national constitutional council precedents evolve",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-document how national constitutional council precedents evolve",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Document how national Constitutional Council precedents evolve",
   "description": "Document how national Constitutional Council precedents evolve",
   "content": "Scenario: Document how national Constitutional Council precedents evolve\n    Given James has access to decade of council decisions\n    When he analyzes constitutional interpretation evolution\n    Then he tracks how privacy threshold precedents changed over time\n    And he examines what drives constitutional evolution (new cases, research, social change)\n    And he identifies increasing sophistication in council reasoning\n    And he documents how precedent database becomes institutional wisdom\n    And constitutional evolution is captured empirically\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-national",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Document how national Constitutional Council precedents evolve",
+    "ogDescription": "Document how national Constitutional Council precedents evolve",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-document how national constitutional council precedents evolve",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Document how national Constitutional Council precedents evolve - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-document how national constitutional council precedents evolve",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-document how national constitutional council precedents evolve",
+    "name": "Document how national Constitutional Council precedents evolve",
+    "description": "Document how national Constitutional Council precedents evolve",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

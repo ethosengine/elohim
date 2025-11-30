@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-budget crisis triggers appropriate intervention",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-budget crisis triggers appropriate intervention",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Budget crisis triggers appropriate intervention",
   "description": "Budget crisis triggers appropriate intervention",
   "content": "Scenario: Budget crisis triggers appropriate intervention\n    Given Marcus manages $75 weekly budget\n    And unexpected expenses could create crisis\n    When budget becomes unsustainable\n    Then the family_elohim should alert Sarah immediately\n    And it should connect family to emergency resources\n    And crisis intervention should preserve Marcus's dignity\n    And the system should prevent budget failure from becoming catastrophic\n    And support should be framed through care economy, not charity\n    And Marcus should not feel responsible for systemic poverty\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Budget crisis triggers appropriate intervention",
+    "ogDescription": "Budget crisis triggers appropriate intervention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-budget crisis triggers appropriate intervention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Budget crisis triggers appropriate intervention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-budget crisis triggers appropriate intervention",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-budget crisis triggers appropriate intervention",
+    "name": "Budget crisis triggers appropriate intervention",
+    "description": "Budget crisis triggers appropriate intervention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-individual-exercising financial autonomy despite constrained resources",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-exercising financial autonomy despite constrained resources",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Exercising financial autonomy despite constrained resources",
   "description": "Exercising financial autonomy despite constrained resources",
   "content": "Scenario: Exercising financial autonomy despite constrained resources\n    Given I am managing an extremely limited budget\n    And I have temporary assistance and unreliable child support\n    When I make spending decisions for my household\n    Then the Value Scanner supports MY financial choices\n    And does not impose external judgments about \"proper\" spending\n    And helps me track and optimize within my constraints\n    And recognizes that I understand my children's needs\n    And provides decision support without taking over decisions\n    And validates that my resource management under crisis is sophisticated work\n    And my personal_agent suggests options without prescribing choices\n    And my financial sovereignty is respected\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Exercising financial autonomy despite constrained resources",
+    "ogDescription": "Exercising financial autonomy despite constrained resources",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-exercising financial autonomy despite constrained resources",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Exercising financial autonomy despite constrained resources - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-individual-exercising financial autonomy despite constrained resources",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:individual-exercising financial autonomy despite constrained resources",
+    "name": "Exercising financial autonomy despite constrained resources",
+    "description": "Exercising financial autonomy despite constrained resources",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in composting and food waste reduction",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-participating in composting and food waste reduction",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in composting and food waste reduction",
   "description": "Participating in composting and food waste reduction",
   "content": "Scenario: Participating in composting and food waste reduction\n    Given restaurants generate significant compostable waste\n    And composting returns nutrients to soil and supports local ecology\n    When I want to participate in composting initiatives\n    Then the protocol should connect me to composting programs\n    And recognize participation in waste reduction as care work\n    And support workplace implementation of composting\n    And contribute to bioregional nutrient cycling and soil health\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in composting and food waste reduction",
+    "ogDescription": "Participating in composting and food waste reduction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in composting and food waste reduction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in composting and food waste reduction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-participating in composting and food waste reduction",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-participating in composting and food waste reduction",
+    "name": "Participating in composting and food waste reduction",
+    "description": "Participating in composting and food waste reduction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

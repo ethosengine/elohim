@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-household-coordinating household care labor in retirement",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:household-coordinating household care labor in retirement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinating household care labor in retirement",
   "description": "Coordinating household care labor in retirement",
   "content": "Scenario: Coordinating household care labor in retirement\n    Given Frank and his wife both have time freedom from employment\n    And household labor needs to be distributed equitably\n    And traditional gender patterns may persist despite retirement\n    When the household_elohim monitors labor distribution\n    Then it should track household tasks performed by each partner\n    And it should identify unfair distributions early\n    And it should surface imbalances: \"Frank's wife handles 75% of meal preparation\"\n    And both partners should receive prompts about equity\n    And adjustments should be negotiated from data, not resentment\n    And retirement should enable more equitable household partnerships\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating household care labor in retirement",
+    "ogDescription": "Coordinating household care labor in retirement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-household-coordinating household care labor in retirement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating household care labor in retirement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-household-coordinating household care labor in retirement",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:household-coordinating household care labor in retirement",
+    "name": "Coordinating household care labor in retirement",
+    "description": "Coordinating household care labor in retirement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

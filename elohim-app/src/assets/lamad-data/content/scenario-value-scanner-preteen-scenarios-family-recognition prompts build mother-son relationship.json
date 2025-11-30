@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-recognition prompts build mother-son relationship",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-recognition prompts build mother-son relationship",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognition prompts build mother-son relationship",
   "description": "Recognition prompts build mother-son relationship",
   "content": "Scenario: Recognition prompts build mother-son relationship\n    Given Sarah has limited time with Marcus\n    And their relationship could be strained by her absence and his burden\n    When the family_elohim generates recognition prompts\n    Then prompts should facilitate positive connection moments\n    And Sarah should be given specific appreciations to express\n    And Marcus should receive recognition from Sarah, not just system\n    And their relationship should be strengthened by care visibility\n    And prompts should create opportunities for bonding\n    And love should be communicated despite difficult circumstances\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognition prompts build mother-son relationship",
+    "ogDescription": "Recognition prompts build mother-son relationship",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-recognition prompts build mother-son relationship",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition prompts build mother-son relationship - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-recognition prompts build mother-son relationship",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-recognition prompts build mother-son relationship",
+    "name": "Recognition prompts build mother-son relationship",
+    "description": "Recognition prompts build mother-son relationship",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

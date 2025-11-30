@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medication management supported across multiple providers",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medication management supported across multiple providers",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Medication management supported across multiple providers",
   "description": "Medication management supported across multiple providers",
   "content": "Scenario: Medication management supported across multiple providers\n    Given David takes multiple medications from different specialists\n    And medication interactions could be dangerous\n    When the healthcare_elohim tracks David's medications\n    Then it should maintain comprehensive medication list\n    And it should identify potential interactions across providers\n    And it should alert James to medication concerns\n    And medication timing and administration should be tracked\n    And medical complexity should be managed systematically\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Medication management supported across multiple providers",
+    "ogDescription": "Medication management supported across multiple providers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medication management supported across multiple providers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Medication management supported across multiple providers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medication management supported across multiple providers",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medication management supported across multiple providers",
+    "name": "Medication management supported across multiple providers",
+    "description": "Medication management supported across multiple providers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

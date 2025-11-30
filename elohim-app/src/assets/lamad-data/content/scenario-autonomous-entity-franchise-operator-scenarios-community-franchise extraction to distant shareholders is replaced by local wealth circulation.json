@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-community-franchise extraction to distant shareholders is replaced by local wealth circulation",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-franchise extraction to distant shareholders is replaced by local wealth circulation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Franchise extraction to distant shareholders is replaced by local wealth circulation",
   "description": "Franchise extraction to distant shareholders is replaced by local wealth circulation",
   "content": "Scenario: Franchise extraction to distant shareholders is replaced by local wealth circulation\n    Given franchise locations extracted $120K annually to corporate (fees and markups across three locations)\n    And profits beyond operator's modest take also left community\n    When conversion eliminates corporate extraction and distributes value locally\n    Then $120K annually circulates in neighborhood economies instead of extracting\n    And workers earning higher wages spend locally, multiplying community benefit\n    And community programs receive funding from value previously extracted\n    And wealth circulation is documented showing dramatic shift from extraction to community benefit\n    And community_elohim tracks neighborhood economic impact of conversion\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "ogDescription": "Franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Franchise extraction to distant shareholders is replaced by local wealth circulation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-community-franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:community-franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "name": "Franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "description": "Franchise extraction to distant shareholders is replaced by local wealth circulation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

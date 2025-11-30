@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-community-cultural and artistic contributions to community life",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-cultural and artistic contributions to community life",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Cultural and artistic contributions to community life",
   "description": "Cultural and artistic contributions to community life",
   "content": "Scenario: Cultural and artistic contributions to community life\n    Given Margaret has time for cultural and creative pursuits\n    And community cultural life requires participation\n    When Margaret engages in community cultural activities\n    Then her participation and leadership should be tracked\n    And cultural contributions should be recognized as care work\n    And community flourishing includes cultural richness\n    And Margaret's creative labor should be valued\n    And seniors should be visible in community cultural life\n    And arts and culture should be part of care economy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Cultural and artistic contributions to community life",
+    "ogDescription": "Cultural and artistic contributions to community life",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-cultural and artistic contributions to community life",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Cultural and artistic contributions to community life - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-community-cultural and artistic contributions to community life",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:community-cultural and artistic contributions to community life",
+    "name": "Cultural and artistic contributions to community life",
+    "description": "Cultural and artistic contributions to community life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

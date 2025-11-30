@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-educational-school curriculum integration supports value literacy",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-school curriculum integration supports value literacy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "School curriculum integration supports value literacy",
   "description": "School curriculum integration supports value literacy",
   "content": "Scenario: School curriculum integration supports value literacy\n    Given Emma's school may integrate Value Scanner data\n    And educational layer includes formal learning contexts\n    When Emma's anonymized scanner data is shared with school (with family permission)\n    Then data should support curriculum in nutrition, math, social studies\n    And learning should be reinforced across contexts\n    And family permission should be required for school integration\n    And Emma's privacy should be protected in educational use\n    And formal education should complement experiential learning\n    And value literacy should be built across multiple contexts\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "School curriculum integration supports value literacy",
+    "ogDescription": "School curriculum integration supports value literacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-school curriculum integration supports value literacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "School curriculum integration supports value literacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-school curriculum integration supports value literacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-school curriculum integration supports value literacy",
+    "name": "School curriculum integration supports value literacy",
+    "description": "School curriculum integration supports value literacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

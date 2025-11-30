@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor earns fair financial returns without requiring extraction",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor earns fair financial returns without requiring extraction",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor earns fair financial returns without requiring extraction",
   "description": "Investor earns fair financial returns without requiring extraction",
   "content": "Scenario: Investor earns fair financial returns without requiring extraction\n    Given stock market averages ~7% annual returns through maximizing extraction\n    And Patricia accepted lower returns (5%) for values alignment\n    When democratic business proves financially sustainable\n    Then 5% returns are paid reliably from business revenue\n    And returns come from democratic value circulation, not worker exploitation\n    And financial viability proves extraction isn't necessary for investor returns\n    And she earns modestly while workers earn living wages and community benefits\n    And community_elohim ensures transparent return calculations and timely payments\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor earns fair financial returns without requiring extraction",
+    "ogDescription": "Investor earns fair financial returns without requiring extraction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor earns fair financial returns without requiring extraction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor earns fair financial returns without requiring extraction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor earns fair financial returns without requiring extraction",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor earns fair financial returns without requiring extraction",
+    "name": "Investor earns fair financial returns without requiring extraction",
+    "description": "Investor earns fair financial returns without requiring extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

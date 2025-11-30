@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipal-coordinate resource allocation across diverse neighborhoods",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-coordinate resource allocation across diverse neighborhoods",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Coordinate resource allocation across diverse neighborhoods",
   "description": "Coordinate resource allocation across diverse neighborhoods",
   "content": "Scenario: Coordinate resource allocation across diverse neighborhoods\n    Given downtown needs economic development support\n    And residential areas prioritize environmental protection\n    And outskirts need infrastructure investment\n    When Municipal Elohim analyzes resource allocation\n    Then agent shows resource flows and gaps across neighborhoods\n    And agent identifies conflicts and synergies\n    And Jamal facilitates city council deliberation with agent data\n    And city council makes democratic allocation decisions\n    And protocol enables informed democratic choice\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipal",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Coordinate resource allocation across diverse neighborhoods",
+    "ogDescription": "Coordinate resource allocation across diverse neighborhoods",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-coordinate resource allocation across diverse neighborhoods",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinate resource allocation across diverse neighborhoods - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-coordinate resource allocation across diverse neighborhoods",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-coordinate resource allocation across diverse neighborhoods",
+    "name": "Coordinate resource allocation across diverse neighborhoods",
+    "description": "Coordinate resource allocation across diverse neighborhoods",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

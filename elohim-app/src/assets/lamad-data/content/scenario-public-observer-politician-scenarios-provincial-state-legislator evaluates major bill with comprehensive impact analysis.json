@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-legislator evaluates major bill with comprehensive impact analysis",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator evaluates major bill with comprehensive impact analysis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Legislator evaluates major bill with comprehensive impact analysis",
   "description": "Legislator evaluates major bill with comprehensive impact analysis",
   "content": "Scenario: Legislator evaluates major bill with comprehensive impact analysis\n    Given education reform legislation has 200 pages\n    And supporters present optimistic outcomes while opponents predict disaster\n    When the Observer provides evidence-based impact analysis\n    Then they see how similar legislation performed in other states\n    And understand fiscal impacts on districts with different demographics\n    And identify which students benefit versus harmed by changes\n    And review educator and parent perspectives from constituent communities\n    And make informed vote beyond partisan talking points\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Legislator evaluates major bill with comprehensive impact analysis",
+    "ogDescription": "Legislator evaluates major bill with comprehensive impact analysis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator evaluates major bill with comprehensive impact analysis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Legislator evaluates major bill with comprehensive impact analysis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator evaluates major bill with comprehensive impact analysis",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator evaluates major bill with comprehensive impact analysis",
+    "name": "Legislator evaluates major bill with comprehensive impact analysis",
+    "description": "Legislator evaluates major bill with comprehensive impact analysis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

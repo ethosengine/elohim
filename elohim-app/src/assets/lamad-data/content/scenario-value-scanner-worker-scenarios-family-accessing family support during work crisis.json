@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-family-accessing family support during work crisis",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-accessing family support during work crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Accessing family support during work crisis",
   "description": "Accessing family support during work crisis",
   "content": "Scenario: Accessing family support during work crisis\n    Given my work demands sometimes become overwhelming\n    When I need family support during difficult work periods\n    Then the protocol should help me ask for help\n    And coordinate family support when I am struggling\n    And enable reciprocity when my situation improves\n    And recognize that care flows both ways in family systems\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-family",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Accessing family support during work crisis",
+    "ogDescription": "Accessing family support during work crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-accessing family support during work crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing family support during work crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-accessing family support during work crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-accessing family support during work crisis",
+    "name": "Accessing family support during work crisis",
+    "description": "Accessing family support during work crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

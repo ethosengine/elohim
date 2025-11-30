@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-educational-organizer tracks implementation of restorative justice commitment",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational-organizer tracks implementation of restorative justice commitment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer tracks implementation of restorative justice commitment",
   "description": "Organizer tracks implementation of restorative justice commitment",
   "content": "Scenario: Organizer tracks implementation of restorative justice commitment\n    Given district adopted restorative justice to reduce suspensions\n    And the organizer's coalition of parents and students won the policy\n    When the Observer tracks implementation progress\n    Then the organizer monitors training of school staff\n    And sees suspension data by school, race, and disability status\n    And identifies schools not implementing restorative practices\n    And documents where implementation succeeds and changes outcomes\n    And policy victory leads to implementation accountability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer tracks implementation of restorative justice commitment",
+    "ogDescription": "Organizer tracks implementation of restorative justice commitment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-educational-organizer tracks implementation of restorative justice commitment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer tracks implementation of restorative justice commitment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-educational-organizer tracks implementation of restorative justice commitment",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational-organizer tracks implementation of restorative justice commitment",
+    "name": "Organizer tracks implementation of restorative justice commitment",
+    "description": "Organizer tracks implementation of restorative justice commitment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

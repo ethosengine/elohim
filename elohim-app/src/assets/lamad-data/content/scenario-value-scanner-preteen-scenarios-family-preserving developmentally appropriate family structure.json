@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-family-preserving developmentally appropriate family structure",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-preserving developmentally appropriate family structure",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Preserving developmentally appropriate family structure",
   "description": "Preserving developmentally appropriate family structure",
   "content": "Scenario: Preserving developmentally appropriate family structure\n    Given Marcus has adult-level responsibilities\n    And he is still a 12-year-old child\n    When family dynamics are shaped by care economy\n    Then the family_elohim should work to preserve appropriate boundaries\n    And Marcus should not become de facto parent\n    And Sarah should remain ultimate authority and protector\n    And age-appropriate childhood should be preserved where possible\n    And the protocol should prevent role reversal damage\n    And family structure should remain as healthy as circumstances allow\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Preserving developmentally appropriate family structure",
+    "ogDescription": "Preserving developmentally appropriate family structure",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-preserving developmentally appropriate family structure",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preserving developmentally appropriate family structure - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-family-preserving developmentally appropriate family structure",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:family-preserving developmentally appropriate family structure",
+    "name": "Preserving developmentally appropriate family structure",
+    "description": "Preserving developmentally appropriate family structure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

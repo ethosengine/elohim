@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-individual-appeal contributes to constitutional evolution",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-appeal contributes to constitutional evolution",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal contributes to constitutional evolution",
   "description": "Appeal contributes to constitutional evolution",
   "content": "Scenario: Appeal contributes to constitutional evolution\n    Given my appeal revealed a fundamental gap in the constitutional framework\n    And the Constitutional Council identified this as a recurring issue\n    When the council documents recommendations for protocol improvement\n    Then my case becomes input for the next 7-year Constitutional Convention\n    And My lived experience of feeling violated despite life-saving intervention\n    And This helps shape how care and autonomy are balanced at constitutional level\n    And I can see the long-term impact of my appeal beyond my individual case\n    And My suffering wasn't wasted\u2014it made the system better for everyone\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-individual",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal contributes to constitutional evolution",
+    "ogDescription": "Appeal contributes to constitutional evolution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-appeal contributes to constitutional evolution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal contributes to constitutional evolution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-appeal contributes to constitutional evolution",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-appeal contributes to constitutional evolution",
+    "name": "Appeal contributes to constitutional evolution",
+    "description": "Appeal contributes to constitutional evolution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

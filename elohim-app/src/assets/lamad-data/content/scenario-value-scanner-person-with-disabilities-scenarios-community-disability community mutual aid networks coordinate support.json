@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-disability community mutual aid networks coordinate support",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-disability community mutual aid networks coordinate support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Disability community mutual aid networks coordinate support",
   "description": "Disability community mutual aid networks coordinate support",
   "content": "Scenario: Disability community mutual aid networks coordinate support\n    Given disabled people practice mutual aid extensively\n    And peer support networks are essential for survival and flourishing\n    When the community_elohim tracks disability community care flows\n    Then mutual aid within disability community should be highly valued\n    And Alex's participation in peer networks should accumulate tokens\n    And care should be recognized as flowing in multiple directions\n    And disability mutual aid should be seen as care economy infrastructure\n    And the protocol should honor interdependence as community practice\n    And peer support should be valued as essential care work\n    And disabled people's care for each other should be made visible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Disability community mutual aid networks coordinate support",
+    "ogDescription": "Disability community mutual aid networks coordinate support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-disability community mutual aid networks coordinate support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Disability community mutual aid networks coordinate support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-disability community mutual aid networks coordinate support",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-disability community mutual aid networks coordinate support",
+    "name": "Disability community mutual aid networks coordinate support",
+    "description": "Disability community mutual aid networks coordinate support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

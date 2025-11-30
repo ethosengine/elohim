@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-municipal financial institutions develop community investment products",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-municipal financial institutions develop community investment products",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal financial institutions develop community investment products",
   "description": "Municipal financial institutions develop community investment products",
   "content": "Scenario: Municipal financial institutions develop community investment products\n    Given banks and credit unions lack experience with democratic business investment\n    And institutional support would scale community investment dramatically\n    When Patricia and other investors demonstrate model viability\n    Then local banks develop community investment accounts and funds\n    And credit unions prioritize democratic business lending\n    And financial institutions see community investment as sound business opportunity\n    And municipal policy supports financial institution democratic business focus\n    And municipality_elohim coordinates with financial institutions on product development\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal financial institutions develop community investment products",
+    "ogDescription": "Municipal financial institutions develop community investment products",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-municipal financial institutions develop community investment products",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal financial institutions develop community investment products - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-municipal financial institutions develop community investment products",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-municipal financial institutions develop community investment products",
+    "name": "Municipal financial institutions develop community investment products",
+    "description": "Municipal financial institutions develop community investment products",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

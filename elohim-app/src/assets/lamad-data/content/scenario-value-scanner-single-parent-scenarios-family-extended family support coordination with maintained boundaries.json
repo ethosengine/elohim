@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-family-extended family support coordination with maintained boundaries",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-extended family support coordination with maintained boundaries",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Extended family support coordination with maintained boundaries",
   "description": "Extended family support coordination with maintained boundaries",
   "content": "Scenario: Extended family support coordination with maintained boundaries\n    Given Maria may receive support from her own parents or siblings\n    And extended family help can be complicated by distance or family dynamics\n    When extended family contributes to children's care\n    Then the family_elohim should track and coordinate extended family involvement\n    And it should help Maria maintain boundaries around parenting authority\n    And it should recognize extended family contributions without ceding control\n    And it should prevent grandparents or others from overstepping\n    And Maria should retain parental sovereignty while accepting help\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Extended family support coordination with maintained boundaries",
+    "ogDescription": "Extended family support coordination with maintained boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-extended family support coordination with maintained boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Extended family support coordination with maintained boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-family-extended family support coordination with maintained boundaries",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:family-extended family support coordination with maintained boundaries",
+    "name": "Extended family support coordination with maintained boundaries",
+    "description": "Extended family support coordination with maintained boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

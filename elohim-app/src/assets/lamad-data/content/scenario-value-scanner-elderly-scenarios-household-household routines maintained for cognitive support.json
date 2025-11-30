@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-elderly-scenarios-household-household routines maintained for cognitive support",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-household routines maintained for cognitive support",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household routines maintained for cognitive support",
   "description": "Household routines maintained for cognitive support",
   "content": "Scenario: Household routines maintained for cognitive support\n    Given Helen's dementia makes routine important for functioning\n    And familiar patterns help her maintain independence\n    When the household_elohim supports daily routines\n    Then her established patterns should be preserved\n    And reminders should support her existing habits\n    And changes should be minimized to reduce confusion\n    And her personal_agent should say \"Time for your morning tea, like always\"\n    And routine should provide cognitive scaffolding\n    And household familiarity should support her capability\n    And the protocol should recognize that routine enables autonomy\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-elderly-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household routines maintained for cognitive support",
+    "ogDescription": "Household routines maintained for cognitive support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-household routines maintained for cognitive support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household routines maintained for cognitive support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-household-household routines maintained for cognitive support",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:household-household routines maintained for cognitive support",
+    "name": "Household routines maintained for cognitive support",
+    "description": "Household routines maintained for cognitive support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

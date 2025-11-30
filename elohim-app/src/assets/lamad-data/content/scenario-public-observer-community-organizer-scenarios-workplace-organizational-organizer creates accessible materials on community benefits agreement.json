@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer creates accessible materials on community benefits agreement",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer creates accessible materials on community benefits agreement",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer creates accessible materials on community benefits agreement",
   "description": "Organizer creates accessible materials on community benefits agreement",
   "content": "Scenario: Organizer creates accessible materials on community benefits agreement\n    Given developer seeks public subsidy for major project\n    And promises to \"create jobs\" but history shows otherwise\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of community benefits agreements\n    And see developer's labor track record from past projects\n    And get template for CBA with binding labor standards\n    And access wage and hiring data to counter developer claims\n    And complex economic development becomes community organizing opportunity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer creates accessible materials on community benefits agreement",
+    "ogDescription": "Organizer creates accessible materials on community benefits agreement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer creates accessible materials on community benefits agreement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer creates accessible materials on community benefits agreement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer creates accessible materials on community benefits agreement",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer creates accessible materials on community benefits agreement",
+    "name": "Organizer creates accessible materials on community benefits agreement",
+    "description": "Organizer creates accessible materials on community benefits agreement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

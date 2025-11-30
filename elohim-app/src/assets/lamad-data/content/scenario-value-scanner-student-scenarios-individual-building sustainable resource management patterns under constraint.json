@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-student-scenarios-individual-building sustainable resource management patterns under constraint",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-building sustainable resource management patterns under constraint",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building sustainable resource management patterns under constraint",
   "description": "Building sustainable resource management patterns under constraint",
   "content": "Scenario: Building sustainable resource management patterns under constraint\n    Given Kenji manages extreme resource constraint with $180/week total budget\n    And his scarcity requires sophisticated planning and discipline\n    When the personal_agent helps Kenji develop resource management practices\n    Then it should teach budgeting, meal planning, and strategic shopping\n    And it should help him distinguish needs from wants under pressure\n    And it should validate that managing scarcity is skilled work\n    And the agent should recognize his constraint management as capability development\n    And patterns learned now should become sustainable adult habits\n    And Kenji should learn that resource stewardship is care economy skill\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-student-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Building sustainable resource management patterns under constraint",
+    "ogDescription": "Building sustainable resource management patterns under constraint",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-building sustainable resource management patterns under constraint",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building sustainable resource management patterns under constraint - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-building sustainable resource management patterns under constraint",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-building sustainable resource management patterns under constraint",
+    "name": "Building sustainable resource management patterns under constraint",
+    "description": "Building sustainable resource management patterns under constraint",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

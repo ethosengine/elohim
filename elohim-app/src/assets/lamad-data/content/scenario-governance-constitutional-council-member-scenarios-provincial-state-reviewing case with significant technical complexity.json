@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-provincial-state-reviewing case with significant technical complexity",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state-reviewing case with significant technical complexity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Reviewing case with significant technical complexity",
   "description": "Reviewing case with significant technical complexity",
   "content": "Scenario: Reviewing case with significant technical complexity\n    Given appeal involves cryptographic verification questions\n    And I lack technical expertise to understand the details\n    When Dr. Okonkwo provides expert testimony\n    Then she explains: in language I can understand\n    And she shows: what can and cannot be technically verified\n    And she presents: competing expert interpretations\n    And she informs: without advocating for particular outcome\n    And I ask: questions until I understand enough to judge\n    And I weigh: technical information alongside human wisdom\n    And I decide: on constitutional alignment not technical optimization\n    And I honor: the boundary between expertise and judgment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Reviewing case with significant technical complexity",
+    "ogDescription": "Reviewing case with significant technical complexity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-provincial-state-reviewing case with significant technical complexity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Reviewing case with significant technical complexity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-provincial-state-reviewing case with significant technical complexity",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:provincial-state-reviewing case with significant technical complexity",
+    "name": "Reviewing case with significant technical complexity",
+    "description": "Reviewing case with significant technical complexity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

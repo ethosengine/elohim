@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-educational-parent recognized as child's primary educator",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent recognized as child's primary educator",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent recognized as child's primary educator",
   "description": "Parent recognized as child's primary educator",
   "content": "Scenario: Parent recognized as child's primary educator\n    Given Sarah teaches Tommy and Emma continuously at home\n    And she is their first and most influential teacher\n    When the educational_elohim tracks educational contributions\n    Then it should recognize Sarah's parenting as educational work\n    And it should value home education alongside school education\n    And Sarah's teaching labor should accumulate care tokens\n    And parents should be understood as primary educators\n    And schools should be partners in education, not replacements for parents\n    And the system should make parent educational labor visible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent recognized as child's primary educator",
+    "ogDescription": "Parent recognized as child's primary educator",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent recognized as child's primary educator",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent recognized as child's primary educator - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent recognized as child's primary educator",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent recognized as child's primary educator",
+    "name": "Parent recognized as child's primary educator",
+    "description": "Parent recognized as child's primary educator",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

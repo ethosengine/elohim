@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-municipality-parent evaluates city's childcare infrastructure crisis",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent evaluates city's childcare infrastructure crisis",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent evaluates city's childcare infrastructure crisis",
   "description": "Parent evaluates city's childcare infrastructure crisis",
   "content": "Scenario: Parent evaluates city's childcare infrastructure crisis\n    Given the parent struggles to find affordable childcare\n    And municipal zoning rules restrict home-based childcare\n    When the parent reviews Observer's childcare access analysis\n    Then they see municipality has 1 childcare slot per 4 children\n    And understand zoning restrictions reduce supply\n    And learn neighboring cities changed zoning to expand access\n    And discover other parents facing same childcare crisis\n    And parent advocacy targets municipal policy barriers\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-municipality",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent evaluates city's childcare infrastructure crisis",
+    "ogDescription": "Parent evaluates city's childcare infrastructure crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent evaluates city's childcare infrastructure crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent evaluates city's childcare infrastructure crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent evaluates city's childcare infrastructure crisis",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent evaluates city's childcare infrastructure crisis",
+    "name": "Parent evaluates city's childcare infrastructure crisis",
+    "description": "Parent evaluates city's childcare infrastructure crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

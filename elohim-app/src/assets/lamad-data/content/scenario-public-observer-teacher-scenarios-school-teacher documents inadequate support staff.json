@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-school-teacher documents inadequate support staff",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher documents inadequate support staff",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher documents inadequate support staff",
   "description": "Teacher documents inadequate support staff",
   "content": "Scenario: Teacher documents inadequate support staff\n    Given the school lacks sufficient counselors and specialists\n    And students with learning needs aren't getting services\n    When teachers collectively document support staff gaps through Observer\n    Then aggregated data shows 300 students per counselor vs 250 recommended\n    And student impact patterns become visible\n    And teachers coordinate advocacy with parents for resources\n    And principal takes evidence to district for staffing increase\n    And professional knowledge drives resource allocation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-school",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher documents inadequate support staff",
+    "ogDescription": "Teacher documents inadequate support staff",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher documents inadequate support staff",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher documents inadequate support staff - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-school-teacher documents inadequate support staff",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:school-teacher documents inadequate support staff",
+    "name": "Teacher documents inadequate support staff",
+    "description": "Teacher documents inadequate support staff",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

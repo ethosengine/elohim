@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-manager-scenarios-community-manager responds to community concerns about operations",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community-manager responds to community concerns about operations",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Manager responds to community concerns about operations",
   "description": "Manager responds to community concerns about operations",
   "content": "Scenario: Manager responds to community concerns about operations\n    Given community member complains about noise from early morning deliveries\n    And legitimate community concern requires operational adjustment\n    When Marcus receives the complaint\n    Then Marcus investigates the noise issue objectively\n    And Marcus proposes delivery schedule modification to worker council\n    And workers deliberate balancing operational needs with community impact\n    And workers vote on delivery schedule change\n    And Marcus implements worker decision and communicates to community\n    And community_elohim facilitates community-worker dialogue\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-manager-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Manager responds to community concerns about operations",
+    "ogDescription": "Manager responds to community concerns about operations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-community-manager responds to community concerns about operations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Manager responds to community concerns about operations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-community-manager responds to community concerns about operations",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community-manager responds to community concerns about operations",
+    "name": "Manager responds to community concerns about operations",
+    "description": "Manager responds to community concerns about operations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

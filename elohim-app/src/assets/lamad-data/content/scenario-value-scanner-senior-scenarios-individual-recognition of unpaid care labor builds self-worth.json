@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-individual-recognition of unpaid care labor builds self-worth",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-recognition of unpaid care labor builds self-worth",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Recognition of unpaid care labor builds self-worth",
   "description": "Recognition of unpaid care labor builds self-worth",
   "content": "Scenario: Recognition of unpaid care labor builds self-worth\n    Given Margaret's care contributions are substantial but unpaid\n    And traditional economics labels her as \"not working\"\n    When Margaret reviews her care contribution data\n    Then she should see quantified value of her labor\n    And she should understand her economic contribution is significant\n    And she should experience herself as productive member of society\n    And the narrative of retirement as obsolescence should be countered\n    And Margaret should have data to assert her value\n    And her dignity and self-worth should be affirmed\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-individual",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Recognition of unpaid care labor builds self-worth",
+    "ogDescription": "Recognition of unpaid care labor builds self-worth",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-recognition of unpaid care labor builds self-worth",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition of unpaid care labor builds self-worth - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-recognition of unpaid care labor builds self-worth",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-recognition of unpaid care labor builds self-worth",
+    "name": "Recognition of unpaid care labor builds self-worth",
+    "description": "Recognition of unpaid care labor builds self-worth",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

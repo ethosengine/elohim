@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-ecological-bioregional-local food systems participation through necessity and community",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-local food systems participation through necessity and community",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Local food systems participation through necessity and community",
   "description": "Local food systems participation through necessity and community",
   "content": "Scenario: Local food systems participation through necessity and community\n    Given Maria seeks affordable food through farmers markets, co-ops, and bulk buying\n    And she participates in local food economy when economically viable\n    When food sourcing patterns are analyzed\n    Then the bioregional_elohim should recognize her local food participation\n    And it should value community-based food systems engagement\n    And her food choices should be seen as supporting regional resilience\n    And economic cooperation should be honored as bioregional participation\n    And Maria should see her food practices as locally sustaining\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Local food systems participation through necessity and community",
+    "ogDescription": "Local food systems participation through necessity and community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-local food systems participation through necessity and community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Local food systems participation through necessity and community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-ecological-bioregional-local food systems participation through necessity and community",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:ecological-bioregional-local food systems participation through necessity and community",
+    "name": "Local food systems participation through necessity and community",
+    "description": "Local food systems participation through necessity and community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

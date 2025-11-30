@@ -1,6 +1,8 @@
 {
   "id": "feature-public-observer-parent-scenarios-community",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:community",
   "contentType": "feature",
+  "activityPubType": "Article",
   "title": "Community Parent Advocacy",
   "description": "As a parent in the public_observer system Operating at the community governance layer I want to engage in decisions affecting my children within my limited time So that my children's needs shape community decisions without requiring full-time advocacy",
   "content": "@epic:public_observer\n@user_type:parent\n@governance_layer:community\n@related_users:citizen,teacher,community_organizer,activist\n@related_layers:district,municipality,neighborhood\n@elohim_agents:public_observer,community_elohim,family_elohim\n\nFeature: Community Parent Advocacy\n  As a parent in the public_observer system\n  Operating at the community governance layer\n  I want to engage in decisions affecting my children within my limited time\n  So that my children's needs shape community decisions without requiring full-time advocacy\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the parent user is registered in the system\n    And the parent has linked their children's schools and activities\n    And the community governance context is active\n\n  Scenario: Parent receives child-focused community updates\n    Given the parent works shifts and has 15 minutes during lunch\n    And community decisions were made last night about parks and safety\n    When the parent checks their morning brief\n    Then they see only decisions affecting their children's bus stops, parks, and routes\n    And the summary takes 3 minutes to read\n    And jargon is translated to real impacts (\"longer walk,\" \"no crossing guard\")\n    And the parent can submit feedback during their break\n    And civic engagement fits into a working parent's schedule\n\n  Scenario: Parent discovers coalition for school bus safety\n    Given the parent's child rides Route 17 with chronic delays\n    And 13 other parents along Route 17 report the same safety concerns\n    When the Observer detects the alignment pattern\n    Then the parent receives opt-in coalition notification\n    And can see aggregated data on delay patterns and incidents\n    And can coordinate testimony with other affected parents\n    And isolated frustration becomes documented collective concern\n    And 14 coordinated parents change the transportation meeting outcome\n\n  Scenario: Parent tracks playground repair commitments\n    Given the community council promised playground equipment repairs in 60 days\n    And the parent reported broken equipment their child uses\n    When 60 days pass without repairs being completed\n    Then the Observer alerts the parent about the missed deadline\n    And provides evidence from the original meeting commitment\n    And facilitates coordinated follow-up with other affected parents\n    And institutional memory extends beyond administrator turnover\n    And accountability prevents promises from being forgotten\n\n  Scenario: Parent participates without attending evening meetings\n    Given the parent has evening work shifts and bedtime routines\n    And cannot attend 7 PM community meetings in person\n    When decisions about afterschool programs are being made\n    Then the parent reviews 5-minute summaries during lunch break\n    And submits questions and positions via mobile app\n    And receives alerts if live intervention would be high-impact\n    And gets post-meeting summary with next action steps\n    And democracy respects that raising children is the priority job\n\n  Scenario: Parent evaluates development affecting school routes\n    Given a developer proposes construction near their child's school\n    And claims it will \"benefit the community\"\n    When the parent reviews Observer analysis\n    Then they see traffic impacts on school walking routes\n    And understand safety implications for children's commutes\n    And view how construction timing affects school access\n    And can challenge developer claims with child-safety data\n    And parent concerns are grounded in evidence not just fear\n\n  Scenario: Parent coordinates school crossing guard advocacy\n    Given the community removed crossing guards at three intersections\n    And the parent's child crosses one of these intersections daily\n    When the Observer connects parents with children at all three crossings\n    Then parents form rapid coalition with documented safety data\n    And coordinate to attend the community safety meeting together\n    And present unified testimony about near-miss incidents\n    And individual parent concerns become undeniable pattern\n    And crossing guards are restored within two weeks\n\n  Scenario: Parent tracks afterschool program changes\n    Given the parent relies on community afterschool program for childcare\n    And works until 6 PM making program essential for family functioning\n    When the community discusses cutting program hours or funding\n    Then the parent receives immediate alert about the threat\n    And sees which council members support vs oppose the cuts\n    And connects with other parents dependent on the program\n    And submits testimony explaining family economic impacts\n    And childcare infrastructure doesn't disappear without parent input\n",
@@ -31,6 +33,32 @@
     "epic": "public_observer",
     "scenarioCount": 7
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Community Parent Advocacy",
+    "ogDescription": "As a parent in the public_observer system Operating at the community governance layer I want to engage in decisions affecting my children within my limited time So that my children's needs shape commu",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-parent-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Parent Advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-parent-scenarios-community",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:community",
+    "name": "Community Parent Advocacy",
+    "description": "As a parent in the public_observer system Operating at the community governance layer I want to engage in decisions affecting my children within my limited time So that my children's needs shape community decisions without requiring full-time advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

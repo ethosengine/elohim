@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-county-regional-journalist investigates regional transit inequity",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional-journalist investigates regional transit inequity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist investigates regional transit inequity",
   "description": "Journalist investigates regional transit inequity",
   "content": "Scenario: Journalist investigates regional transit inequity\n    Given transit access varies dramatically across metropolitan area\n    And the journalist covers regional transit authority\n    When the Observer analyzes transit service distribution\n    Then the journalist sees frequent service to employment centers from white suburbs\n    And finds infrequent service in communities of color despite higher ridership\n    And documents decades of investment decisions favoring certain areas\n    And compares stated equity goals to actual funding allocation\n    And publishes accountability story on transit racism\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-county-regional",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates regional transit inequity",
+    "ogDescription": "Journalist investigates regional transit inequity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-county-regional-journalist investigates regional transit inequity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates regional transit inequity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-county-regional-journalist investigates regional transit inequity",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:county-regional-journalist investigates regional transit inequity",
+    "name": "Journalist investigates regional transit inequity",
+    "description": "Journalist investigates regional transit inequity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-community-connecting with community mutual aid networks",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-connecting with community mutual aid networks",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Connecting with community mutual aid networks",
   "description": "Connecting with community mutual aid networks",
   "content": "Scenario: Connecting with community mutual aid networks\n    Given workers need mutual aid during economic precarity\n    And community has mutual aid organizing\n    When I participate in mutual aid networks\n    Then the protocol should connect me to appropriate networks\n    And facilitate giving and receiving support\n    And recognize that mutual aid is care economy practice\n    And support building community resilience beyond market systems\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Connecting with community mutual aid networks",
+    "ogDescription": "Connecting with community mutual aid networks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-connecting with community mutual aid networks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting with community mutual aid networks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-connecting with community mutual aid networks",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-connecting with community mutual aid networks",
+    "name": "Connecting with community mutual aid networks",
+    "description": "Connecting with community mutual aid networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

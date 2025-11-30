@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-municipal governance evolution through protocol learning",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal governance evolution through protocol learning",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal governance evolution through protocol learning",
   "description": "Municipal governance evolution through protocol learning",
   "content": "Scenario: Municipal governance evolution through protocol learning\n    Given Riverside has three years implementing protocol\n    And we have learned what works and what doesn't\n    When I reflect on governance transformation\n    Then I see: city council making better-informed decisions\n    And I notice: residents more engaged through transparency\n    And I observe: faster crisis response with better coordination\n    And I acknowledge: challenges with accessibility and occasional controversy\n    And I understand: protocol enhanced but didn't replace democratic governance\n    And I know: community remains in control through sovereignty and calibration\n    And I have become: leader facilitating partnership with AI not commanding it\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal governance evolution through protocol learning",
+    "ogDescription": "Municipal governance evolution through protocol learning",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal governance evolution through protocol learning",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal governance evolution through protocol learning - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-municipal governance evolution through protocol learning",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-municipal governance evolution through protocol learning",
+    "name": "Municipal governance evolution through protocol learning",
+    "description": "Municipal governance evolution through protocol learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

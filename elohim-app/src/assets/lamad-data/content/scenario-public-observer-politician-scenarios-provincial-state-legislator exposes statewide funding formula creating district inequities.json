@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-provincial-state-legislator exposes statewide funding formula creating district inequities",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator exposes statewide funding formula creating district inequities",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Legislator exposes statewide funding formula creating district inequities",
   "description": "Legislator exposes statewide funding formula creating district inequities",
   "content": "Scenario: Legislator exposes statewide funding formula creating district inequities\n    Given education funding formula creates disparities\n    When the Observer analyzes statewide funding patterns\n    Then they see low-income districts receive $3,000 less per student\n    And identify property tax base driving inequitable outcomes\n    And connect families in underfunded districts across state\n    And compare state formula to more equitable models in other states\n    And champion funding reform with comprehensive evidence\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Legislator exposes statewide funding formula creating district inequities",
+    "ogDescription": "Legislator exposes statewide funding formula creating district inequities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator exposes statewide funding formula creating district inequities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Legislator exposes statewide funding formula creating district inequities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-legislator exposes statewide funding formula creating district inequities",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-legislator exposes statewide funding formula creating district inequities",
+    "name": "Legislator exposes statewide funding formula creating district inequities",
+    "description": "Legislator exposes statewide funding formula creating district inequities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

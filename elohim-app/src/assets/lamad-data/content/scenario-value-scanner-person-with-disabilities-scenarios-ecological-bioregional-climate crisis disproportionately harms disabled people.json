@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-climate crisis disproportionately harms disabled people",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-climate crisis disproportionately harms disabled people",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Climate crisis disproportionately harms disabled people",
   "description": "Climate crisis disproportionately harms disabled people",
   "content": "Scenario: Climate crisis disproportionately harms disabled people\n    Given disabled people are especially vulnerable to climate impacts\n    And emergency systems often fail disabled people\n    When climate adaptation is planned\n    Then the bioregional_elohim should center disabled people in climate planning\n    And Alex's perspective should inform climate justice strategies\n    And emergency preparedness should account for disability needs\n    And climate solutions should be accessible to disabled people\n    And the protocol should recognize disability as environmental justice issue\n    And Alex's expertise about vulnerability should guide climate work\n    And resilience planning should protect most vulnerable community members\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Climate crisis disproportionately harms disabled people",
+    "ogDescription": "Climate crisis disproportionately harms disabled people",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-climate crisis disproportionately harms disabled people",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Climate crisis disproportionately harms disabled people - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-climate crisis disproportionately harms disabled people",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-climate crisis disproportionately harms disabled people",
+    "name": "Climate crisis disproportionately harms disabled people",
+    "description": "Climate crisis disproportionately harms disabled people",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-individual-operator experiences relief from dual extraction trap",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:individual-operator experiences relief from dual extraction trap",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Operator experiences relief from dual extraction trap",
   "description": "Operator experiences relief from dual extraction trap",
   "content": "Scenario: Operator experiences relief from dual extraction trap\n    Given corporate extracts from above (fees, mandatory purchasing, controlled pricing)\n    And profitability required worker extraction from below (low wages, speedup, surveillance)\n    When EAE conversion eliminates corporate extraction entirely\n    Then $100K+ annually per location is freed from franchise fees and markups\n    And workers receive substantial wage increases without threatening sustainability\n    And James escapes impossible position of implementing exploitation he knows is harmful\n    And dual extraction trap that made ethical operation impossible is broken\n    And workplace_elohim documents liberation from extraction on both levels\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Operator experiences relief from dual extraction trap",
+    "ogDescription": "Operator experiences relief from dual extraction trap",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-individual-operator experiences relief from dual extraction trap",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Operator experiences relief from dual extraction trap - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-individual-operator experiences relief from dual extraction trap",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:individual-operator experiences relief from dual extraction trap",
+    "name": "Operator experiences relief from dual extraction trap",
+    "description": "Operator experiences relief from dual extraction trap",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

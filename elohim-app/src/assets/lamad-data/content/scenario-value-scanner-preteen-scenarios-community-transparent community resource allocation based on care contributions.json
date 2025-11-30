@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-community-transparent community resource allocation based on care contributions",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-transparent community resource allocation based on care contributions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Transparent community resource allocation based on care contributions",
   "description": "Transparent community resource allocation based on care contributions",
   "content": "Scenario: Transparent community resource allocation based on care contributions\n    Given community resources are limited\n    And allocation decisions must be made\n    When the community_elohim allocates resources\n    Then allocation should be based on transparent care economy principles\n    And care contributions should influence resource access\n    And Marcus's substantial household labor should be weighted appropriately\n    And the process should be visible and accountable\n    And community members should understand allocation rationale\n    And care economy should provide fair distribution framework\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-community",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Transparent community resource allocation based on care contributions",
+    "ogDescription": "Transparent community resource allocation based on care contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-transparent community resource allocation based on care contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transparent community resource allocation based on care contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-transparent community resource allocation based on care contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-transparent community resource allocation based on care contributions",
+    "name": "Transparent community resource allocation based on care contributions",
+    "description": "Transparent community resource allocation based on care contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

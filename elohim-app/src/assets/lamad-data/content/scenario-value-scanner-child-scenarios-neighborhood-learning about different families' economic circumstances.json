@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-neighborhood-learning about different families' economic circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-learning about different families' economic circumstances",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning about different families' economic circumstances",
   "description": "Learning about different families' economic circumstances",
   "content": "Scenario: Learning about different families' economic circumstances\n    Given Emma's family has $40k/year income\n    And neighborhood includes families with varied economic situations\n    When Emma learns about community economic diversity\n    Then teaching should be age-appropriate about economic difference\n    And the personal_agent should explain without judgment\n    And Emma should learn that families have different resources\n    And she should develop empathy about economic constraint\n    And class awareness should be taught with dignity for all\n    And care economy should serve families across income spectrum\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning about different families' economic circumstances",
+    "ogDescription": "Learning about different families' economic circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-learning about different families' economic circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning about different families' economic circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-neighborhood-learning about different families' economic circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood-learning about different families' economic circumstances",
+    "name": "Learning about different families' economic circumstances",
+    "description": "Learning about different families' economic circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

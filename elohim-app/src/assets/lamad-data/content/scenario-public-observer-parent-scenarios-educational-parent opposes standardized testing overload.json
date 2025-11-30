@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-educational-parent opposes standardized testing overload",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent opposes standardized testing overload",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent opposes standardized testing overload",
   "description": "Parent opposes standardized testing overload",
   "content": "Scenario: Parent opposes standardized testing overload\n    Given the parent's child faces excessive standardized testing\n    And tests create stress without improving learning\n    When the parent reviews Observer's testing policy context\n    Then they see how many instructional days lost to testing\n    And understand which tests are federally required vs optional\n    And learn about opt-out policies and parent rights\n    And discover other parents concerned about testing burden\n    And parent coalition advocates for reducing unnecessary testing\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent opposes standardized testing overload",
+    "ogDescription": "Parent opposes standardized testing overload",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent opposes standardized testing overload",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent opposes standardized testing overload - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent opposes standardized testing overload",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent opposes standardized testing overload",
+    "name": "Parent opposes standardized testing overload",
+    "description": "Parent opposes standardized testing overload",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

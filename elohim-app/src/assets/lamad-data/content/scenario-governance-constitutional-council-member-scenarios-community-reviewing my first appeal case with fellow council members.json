@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-constitutional-council-member-scenarios-community-reviewing my first appeal case with fellow council members",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-reviewing my first appeal case with fellow council members",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Reviewing my first appeal case with fellow council members",
   "description": "Reviewing my first appeal case with fellow council members",
   "content": "Scenario: Reviewing my first appeal case with fellow council members\n    Given Marcus appealed his Family Elohim's mental health intervention decision\n    And I am reviewing this case with my diverse council\n    When we deliberate on whether the agent followed constitutional bounds\n    Then I bring: my nurse perspective on mental health and care\n    And retired teacher brings: education and developmental insights\n    And construction worker brings: working-class resource constraint understanding\n    And grad student brings: research and analytical skills\n    And business owner brings: economic and practical judgment\n    And together we form: collective wisdom greater than any individual\n    And we ask: \"Did this demonstrate love as committed action?\"\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-constitutional-council-member-scenarios-community",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.169597",
-  "updatedAt": "2025-11-21T18:54:29.169597"
+  "openGraphMetadata": {
+    "ogTitle": "Reviewing my first appeal case with fellow council members",
+    "ogDescription": "Reviewing my first appeal case with fellow council members",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-reviewing my first appeal case with fellow council members",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Reviewing my first appeal case with fellow council members - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-reviewing my first appeal case with fellow council members",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-reviewing my first appeal case with fellow council members",
+    "name": "Reviewing my first appeal case with fellow council members",
+    "description": "Reviewing my first appeal case with fellow council members",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

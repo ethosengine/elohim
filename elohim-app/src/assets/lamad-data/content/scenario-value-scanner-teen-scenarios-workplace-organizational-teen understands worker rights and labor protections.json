@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen understands worker rights and labor protections",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-teen understands worker rights and labor protections",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teen understands worker rights and labor protections",
   "description": "Teen understands worker rights and labor protections",
   "content": "Scenario: Teen understands worker rights and labor protections\n    Given Jasmine is entitled to labor protections as a worker\n    And many young workers don't know their rights\n    When workplace_elohim provides education about worker rights\n    Then it should teach her about minimum wage, overtime, breaks, and safety regulations\n    And explain youth-specific labor protections\n    And inform her about right to organize and collective bargaining\n    And provide resources about reporting labor violations\n    And help her understand that worker rights exist to prevent exploitation\n    And build her expectation that labor deserves legal protection\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Teen understands worker rights and labor protections",
+    "ogDescription": "Teen understands worker rights and labor protections",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-teen understands worker rights and labor protections",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen understands worker rights and labor protections - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-teen understands worker rights and labor protections",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-teen understands worker rights and labor protections",
+    "name": "Teen understands worker rights and labor protections",
+    "description": "Teen understands worker rights and labor protections",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

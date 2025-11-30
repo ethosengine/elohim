@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-community-organizer-scenarios-ecological-organizer builds coalition for climate adaptation investment",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer builds coalition for climate adaptation investment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Organizer builds coalition for climate adaptation investment",
   "description": "Organizer builds coalition for climate adaptation investment",
   "content": "Scenario: Organizer builds coalition for climate adaptation investment\n    Given low-income neighborhoods face worst climate impacts\n    But climate funding flows to wealthy areas\n    When the organizer uses Observer to identify alignment\n    Then they connect communities facing flooding, heat islands, poor air quality\n    And document systematic disinvestment in climate resilience\n    And coordinate coalition demanding equitable climate spending\n    And facilitate testimony from diverse affected communities\n    And climate justice becomes redistributive investment campaign\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-community-organizer-scenarios-ecological",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Organizer builds coalition for climate adaptation investment",
+    "ogDescription": "Organizer builds coalition for climate adaptation investment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer builds coalition for climate adaptation investment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer builds coalition for climate adaptation investment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-ecological-organizer builds coalition for climate adaptation investment",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:ecological-organizer builds coalition for climate adaptation investment",
+    "name": "Organizer builds coalition for climate adaptation investment",
+    "description": "Organizer builds coalition for climate adaptation investment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

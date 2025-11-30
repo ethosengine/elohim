@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-industry investment patterns shift toward democratic enterprise financing",
+  "did": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-industry investment patterns shift toward democratic enterprise financing",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Industry investment patterns shift toward democratic enterprise financing",
   "description": "Industry investment patterns shift toward democratic enterprise financing",
   "content": "Scenario: Industry investment patterns shift toward democratic enterprise financing\n    Given traditional food service finance supports franchise expansion and corporate consolidation\n    And democratic conversions need different investment structures (patient capital, community investment)\n    When democratic food service conversions prove financially viable\n    Then impact investors and CDFIs develop franchise-to-democratic conversion financing products\n    And community investment pools proliferate to support local conversions\n    And financial sector recognizes democratic food service as sound investment\n    And capital availability for conversions increases, accelerating sector transformation\n    And industry_sector_elohim coordinates with financial institutions on democratic business lending\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-franchise-operator-scenarios-industry-sector",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Industry investment patterns shift toward democratic enterprise financing",
+    "ogDescription": "Industry investment patterns shift toward democratic enterprise financing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-industry investment patterns shift toward democratic enterprise financing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Industry investment patterns shift toward democratic enterprise financing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-franchise-operator-scenarios-industry-sector-industry investment patterns shift toward democratic enterprise financing",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:franchise-operator:scenarios:industry-sector-industry investment patterns shift toward democratic enterprise financing",
+    "name": "Industry investment patterns shift toward democratic enterprise financing",
+    "description": "Industry investment patterns shift toward democratic enterprise financing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

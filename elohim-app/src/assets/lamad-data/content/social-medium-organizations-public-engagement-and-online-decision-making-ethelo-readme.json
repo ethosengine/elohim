@@ -1,6 +1,8 @@
 {
   "id": "social-medium-organizations-public-engagement-and-online-decision-making-ethelo-readme",
+  "did": "did:web:elohim.host:content:social-medium:organizations:public-engagement-and-online-decision-making-ethelo:readme",
   "contentType": "organization",
+  "activityPubType": "Organization",
   "title": "Epic relationships (NO DUPLICATION NEEDED)",
   "description": "Make big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.",
   "content": "---\nnode_type: organization\norg_id: public_engagement_and_online_decision_making_ethelo\nname: \"Public Engagement and Online Decision-Making | Ethelo\"\nurl: \"https://ethelo.com/\"\ngem_id: \"LgRbEbMxYvjsttkNQjhk\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: social_medium\nrelated_epics: [public_observer, governance]\n\nepic_relationships:\n  social_medium:\n    inspiration: \"[How Public Engagement and Online Decision-Making | Ethelo inspires the social_medium epic]\"\n    parallel_work: []\n  public_observer:\n    inspiration: \"[How Public Engagement and Online Decision-Making | Ethelo inspires the public_observer epic]\"\n    parallel_work: []\n  governance:\n    inspiration: \"[How Public Engagement and Online Decision-Making | Ethelo inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Public Engagement and Online Decision-Making | Ethelo\n\n## Description\n\nMake big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.\n\n**Publisher:** Ethelo\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: social_medium\n\n[Detailed explanation of how Public Engagement and Online Decision-Making | Ethelo relates to and inspires the social_medium epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n### Related Epic: public_observer\n\n[How Public Engagement and Online Decision-Making | Ethelo also inspires the public_observer epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n### Related Epic: governance\n\n[How Public Engagement and Online Decision-Making | Ethelo also inspires the governance epic]\n\n**Parallel Work:**\n- [What relates to this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://ethelo.com/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `social_medium` - Primary focus and location\n- `public_observer` - [Connection description]\n- `governance` - [Connection description]\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
@@ -20,8 +22,55 @@
       "public_observer",
       "governance"
     ],
-    "primary_epic": "social_medium"
+    "primary_epic": "social_medium",
+    "url": "https://ethelo.com/",
+    "name": "Public Engagement and Online Decision-Making | Ethelo",
+    "org_id": "public_engagement_and_online_decision_making_ethelo",
+    "gem_id": "LgRbEbMxYvjsttkNQjhk",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Ethelo",
+    "epic_relationships": {
+      "social_medium": {
+        "inspiration": "[How Public Engagement and Online Decision-Making | Ethelo inspires the social_medium epic]",
+        "parallel_work": []
+      },
+      "public_observer": {
+        "inspiration": "[How Public Engagement and Online Decision-Making | Ethelo inspires the public_observer epic]",
+        "parallel_work": []
+      },
+      "governance": {
+        "inspiration": "[How Public Engagement and Online Decision-Making | Ethelo inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
   },
-  "createdAt": "2025-11-21T18:54:29.188597",
-  "updatedAt": "2025-11-21T18:54:29.188597"
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Make big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/social-medium-organizations-public-engagement-and-online-decision-making-ethelo-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/social-medium-organizations-public-engagement-and-online-decision-making-ethelo-readme",
+    "identifier": "did:web:elohim.host:content:social-medium:organizations:public-engagement-and-online-decision-making-ethelo:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Make big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

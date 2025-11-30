@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-community-journalist monitors all neighborhood meetings despite being one person",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist monitors all neighborhood meetings despite being one person",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist monitors all neighborhood meetings despite being one person",
   "description": "Journalist monitors all neighborhood meetings despite being one person",
   "content": "Scenario: Journalist monitors all neighborhood meetings despite being one person\n    Given the journalist covers 8 neighborhood associations\n    And can only attend one meeting per week physically\n    When the Observer monitors all neighborhood meetings simultaneously\n    Then the journalist reviews transcripts of all 8 weekly meetings\n    And receives alerts for newsworthy developments\n    And identifies stories across all neighborhoods efficiently\n    And comprehensive hyperlocal coverage becomes sustainable\n    And no important neighborhood decision goes unreported\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-community",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist monitors all neighborhood meetings despite being one person",
+    "ogDescription": "Journalist monitors all neighborhood meetings despite being one person",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist monitors all neighborhood meetings despite being one person",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist monitors all neighborhood meetings despite being one person - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-community-journalist monitors all neighborhood meetings despite being one person",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:community-journalist monitors all neighborhood meetings despite being one person",
+    "name": "Journalist monitors all neighborhood meetings despite being one person",
+    "description": "Journalist monitors all neighborhood meetings despite being one person",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

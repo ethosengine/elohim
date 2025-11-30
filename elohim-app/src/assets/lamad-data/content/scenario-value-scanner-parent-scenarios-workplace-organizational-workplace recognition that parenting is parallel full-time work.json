@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-workplace recognition that parenting is parallel full-time work",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-workplace recognition that parenting is parallel full-time work",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Workplace recognition that parenting is parallel full-time work",
   "description": "Workplace recognition that parenting is parallel full-time work",
   "content": "Scenario: Workplace recognition that parenting is parallel full-time work\n    Given Sarah works 40 hours weekly as teacher\n    And she also performs 60+ hours weekly of parenting labor\n    When the workplace_elohim analyzes Sarah's total work\n    Then it should recognize she's working two full-time jobs\n    And it should make visible the dual burden she carries\n    And workplace should understand why flexibility is essential\n    And the system should demonstrate that working parents need support\n    And professional expectations should account for parenting responsibilities\n    And Sarah's full workload should be undeniably visible\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.194597",
-  "updatedAt": "2025-11-21T18:54:29.194597"
+  "openGraphMetadata": {
+    "ogTitle": "Workplace recognition that parenting is parallel full-time work",
+    "ogDescription": "Workplace recognition that parenting is parallel full-time work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-workplace recognition that parenting is parallel full-time work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace recognition that parenting is parallel full-time work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-workplace recognition that parenting is parallel full-time work",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-workplace recognition that parenting is parallel full-time work",
+    "name": "Workplace recognition that parenting is parallel full-time work",
+    "description": "Workplace recognition that parenting is parallel full-time work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household food planning for specialized care needs",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household food planning for specialized care needs",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household food planning for specialized care needs",
   "description": "Household food planning for specialized care needs",
   "content": "Scenario: Household food planning for specialized care needs\n    Given David requires special nutrition for Alzheimer's care\n    And James must manage David's changing appetite and needs\n    And household food budget is constrained\n    When James plans household meals\n    Then the household_elohim should support specialized meal planning\n    And it should track David's nutritional requirements\n    And it should help James meet care needs within budget\n    And it should ensure James's own nutrition isn't neglected\n    And household food planning should serve both members\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household food planning for specialized care needs",
+    "ogDescription": "Household food planning for specialized care needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household food planning for specialized care needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household food planning for specialized care needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household food planning for specialized care needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household food planning for specialized care needs",
+    "name": "Household food planning for specialized care needs",
+    "description": "Household food planning for specialized care needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

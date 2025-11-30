@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-policy-maker-scenarios-provincial-state-establishing legal recognition of constitutional council decisions",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-establishing legal recognition of constitutional council decisions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Establishing legal recognition of Constitutional Council decisions",
   "description": "Establishing legal recognition of Constitutional Council decisions",
   "content": "Scenario: Establishing legal recognition of Constitutional Council decisions\n    Given courts need to know how to treat council precedents\n    And government agencies must understand council authority\n    When I craft legislation recognizing council legitimacy\n    Then I establish: statutory basis for council decisions\n    And I specify: courts recognize precedents in protocol-related cases\n    And I ensure: agencies defer to council constitutional interpretation\n    And I maintain: judicial review for constitutional questions\n    And I create: legal framework for sortition governance\n    And councils gain: legitimacy within existing legal system\n    And new democratic form: integrates with traditional structures\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Establishing legal recognition of Constitutional Council decisions",
+    "ogDescription": "Establishing legal recognition of Constitutional Council decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-establishing legal recognition of constitutional council decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Establishing legal recognition of Constitutional Council decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-establishing legal recognition of constitutional council decisions",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-establishing legal recognition of constitutional council decisions",
+    "name": "Establishing legal recognition of Constitutional Council decisions",
+    "description": "Establishing legal recognition of Constitutional Council decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

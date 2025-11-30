@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-child-scenarios-educational-building judgment before adolescence raises stakes",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-building judgment before adolescence raises stakes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Building judgment before adolescence raises stakes",
   "description": "Building judgment before adolescence raises stakes",
   "content": "Scenario: Building judgment before adolescence raises stakes\n    Given Emma is practicing value decisions ages 8-10\n    And adolescence will bring higher-stakes choices\n    When Emma develops decision-making skills through scanner\n    Then she should build capacity while consequences are manageable\n    And judgment should be practiced in low-risk context\n    And she should develop value literacy before teen years\n    And safe practice should prepare her for Real Responsibility phase (11-13)\n    And developmental progression should scaffold increasing autonomy\n    And early practice should enable later capability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-child-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Building judgment before adolescence raises stakes",
+    "ogDescription": "Building judgment before adolescence raises stakes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-building judgment before adolescence raises stakes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building judgment before adolescence raises stakes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-building judgment before adolescence raises stakes",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-building judgment before adolescence raises stakes",
+    "name": "Building judgment before adolescence raises stakes",
+    "description": "Building judgment before adolescence raises stakes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

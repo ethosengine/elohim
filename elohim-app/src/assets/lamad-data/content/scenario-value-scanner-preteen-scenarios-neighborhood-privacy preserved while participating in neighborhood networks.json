@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-neighborhood-privacy preserved while participating in neighborhood networks",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-privacy preserved while participating in neighborhood networks",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Privacy preserved while participating in neighborhood networks",
   "description": "Privacy preserved while participating in neighborhood networks",
   "content": "Scenario: Privacy preserved while participating in neighborhood networks\n    Given Marcus's household circumstances are sensitive\n    And participation in neighborhood networks requires some visibility\n    When Marcus's data contributes to neighborhood coordination\n    Then his specific situation must remain private\n    And only anonymized aggregate data should be used\n    And neighborhood support should flow without stigmatizing exposure\n    And his dignity should be protected while receiving benefits\n    And privacy should be balanced with community participation\n    And the protocol should enable solidarity without surveillance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Privacy preserved while participating in neighborhood networks",
+    "ogDescription": "Privacy preserved while participating in neighborhood networks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-privacy preserved while participating in neighborhood networks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy preserved while participating in neighborhood networks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-neighborhood-privacy preserved while participating in neighborhood networks",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:neighborhood-privacy preserved while participating in neighborhood networks",
+    "name": "Privacy preserved while participating in neighborhood networks",
+    "description": "Privacy preserved while participating in neighborhood networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-community-leader-scenarios-municipality-training city staff to work alongside protocol agents",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-training city staff to work alongside protocol agents",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Training city staff to work alongside protocol agents",
   "description": "Training city staff to work alongside protocol agents",
   "content": "Scenario: Training city staff to work alongside protocol agents\n    Given city employees need to understand protocol to do their jobs\n    And they may feel threatened by AI systems\n    When I coordinate staff training and cultural adaptation\n    Then we explain: how protocol augments not replaces their work\n    And we provide: training on working with agent information\n    And we clarify: that professional judgment remains valued\n    And we ensure: staff see agents as tools not replacements\n    And we maintain: good jobs with dignity for city workers\n    And we demonstrate: that democratic AI can strengthen not undermine labor\n    And implementation respects: people doing the work\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-community-leader-scenarios-municipality",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Training city staff to work alongside protocol agents",
+    "ogDescription": "Training city staff to work alongside protocol agents",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-training city staff to work alongside protocol agents",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Training city staff to work alongside protocol agents - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipality-training city staff to work alongside protocol agents",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipality-training city staff to work alongside protocol agents",
+    "name": "Training city staff to work alongside protocol agents",
+    "description": "Training city staff to work alongside protocol agents",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

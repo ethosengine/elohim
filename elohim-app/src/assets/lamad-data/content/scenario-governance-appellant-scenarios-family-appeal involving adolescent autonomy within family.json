@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-family-appeal involving adolescent autonomy within family",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:family-appeal involving adolescent autonomy within family",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal involving adolescent autonomy within family",
   "description": "Appeal involving adolescent autonomy within family",
   "content": "Scenario: Appeal involving adolescent autonomy within family\n    Given I am a teenager whose Family Elohim restricted my social media use\n    And I believe this violates my developing autonomy\n    And my parents supported the agent's decision\n    When I file an appeal for my individual autonomy rights\n    Then the Constitutional Council considers \"developing autonomy\" as constitutional value\n    And They balance parental care responsibility with adolescent independence\n    And They evaluate if the restriction was proportionate to actual risk\n    And They consider age-appropriate autonomy recognition\n    And The appeal may establish family-specific boundaries for future interventions\n    And My voice is heard even within family authority structures\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-family",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal involving adolescent autonomy within family",
+    "ogDescription": "Appeal involving adolescent autonomy within family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-appeal involving adolescent autonomy within family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal involving adolescent autonomy within family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-appeal involving adolescent autonomy within family",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:family-appeal involving adolescent autonomy within family",
+    "name": "Appeal involving adolescent autonomy within family",
+    "description": "Appeal involving adolescent autonomy within family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

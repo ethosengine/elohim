@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-customer-scenarios-individual-customer experiences transparency about where money goes",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer experiences transparency about where money goes",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Customer experiences transparency about where money goes",
   "description": "Customer experiences transparency about where money goes",
   "content": "Scenario: Customer experiences transparency about where money goes\n    Given corporate spending is opaque\u2014customers don't know how their payment distributes\n    And Ms. Johnson cares about supporting fair wages but had no information\n    When democratic business provides complete value distribution transparency\n    Then she sees exactly: 60% to worker wages and benefits, 30% to community programs, 10% to sustainability\n    And workers earn $18/hour minimum vs. previous corporate $11/hour\n    And her $8.99 meal supports specific visible outcomes\n    And transparency enables ethical consumption through informed choice\n    And community_elohim provides accessible transparency dashboard for interested customers\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-customer-scenarios-individual",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Customer experiences transparency about where money goes",
+    "ogDescription": "Customer experiences transparency about where money goes",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer experiences transparency about where money goes",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer experiences transparency about where money goes - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer experiences transparency about where money goes",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer experiences transparency about where money goes",
+    "name": "Customer experiences transparency about where money goes",
+    "description": "Customer experiences transparency about where money goes",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

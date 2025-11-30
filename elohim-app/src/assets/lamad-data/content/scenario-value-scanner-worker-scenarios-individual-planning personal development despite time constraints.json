@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-individual-planning personal development despite time constraints",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-planning personal development despite time constraints",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Planning personal development despite time constraints",
   "description": "Planning personal development despite time constraints",
   "content": "Scenario: Planning personal development despite time constraints\n    Given I have skills and interests beyond my current job\n    And employment leaves minimal time for personal development\n    When I want to learn new skills or pursue interests\n    Then the protocol should help me find micro-opportunities\n    And connect me to accessible learning resources\n    And recognize that my growth and flourishing matter\n    And support me in maintaining identity beyond worker role\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-individual",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Planning personal development despite time constraints",
+    "ogDescription": "Planning personal development despite time constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-planning personal development despite time constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Planning personal development despite time constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-individual-planning personal development despite time constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:individual-planning personal development despite time constraints",
+    "name": "Planning personal development despite time constraints",
+    "description": "Planning personal development despite time constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

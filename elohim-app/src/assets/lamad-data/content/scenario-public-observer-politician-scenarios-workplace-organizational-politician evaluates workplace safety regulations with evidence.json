@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician evaluates workplace safety regulations with evidence",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician evaluates workplace safety regulations with evidence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician evaluates workplace safety regulations with evidence",
   "description": "Politician evaluates workplace safety regulations with evidence",
   "content": "Scenario: Politician evaluates workplace safety regulations with evidence\n    Given business lobby opposes workplace safety regulations\n    And claims compliance costs will harm competitiveness\n    When the Observer analyzes workplace safety data and regulatory impacts\n    Then they see injury and fatality rates in regulated versus unregulated contexts\n    And understand compliance costs versus worker compensation and healthcare costs\n    And identify which safety regulations most effectively prevent harm\n    And review enforcement patterns and violation rates\n    And make evidence-based decisions prioritizing worker safety\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician evaluates workplace safety regulations with evidence",
+    "ogDescription": "Politician evaluates workplace safety regulations with evidence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician evaluates workplace safety regulations with evidence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician evaluates workplace safety regulations with evidence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician evaluates workplace safety regulations with evidence",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician evaluates workplace safety regulations with evidence",
+    "name": "Politician evaluates workplace safety regulations with evidence",
+    "description": "Politician evaluates workplace safety regulations with evidence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

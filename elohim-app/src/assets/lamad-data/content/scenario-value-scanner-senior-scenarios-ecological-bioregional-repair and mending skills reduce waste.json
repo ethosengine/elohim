@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-ecological-bioregional-repair and mending skills reduce waste",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:ecological-bioregional-repair and mending skills reduce waste",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Repair and mending skills reduce waste",
   "description": "Repair and mending skills reduce waste",
   "content": "Scenario: Repair and mending skills reduce waste\n    Given Margaret knows how to repair clothing, household items, equipment\n    And repair culture counters disposability\n    When the bioregional_elohim tracks repair practices\n    Then Margaret's mending and repair should be recognized\n    And skills should be valued as ecological care contribution\n    And repair knowledge should be shared with younger generations\n    And community repair culture should be strengthened\n    And disposability should be countered by repair practices\n    And Margaret's skills should serve bioregional sustainability\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Repair and mending skills reduce waste",
+    "ogDescription": "Repair and mending skills reduce waste",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-ecological-bioregional-repair and mending skills reduce waste",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Repair and mending skills reduce waste - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-ecological-bioregional-repair and mending skills reduce waste",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:ecological-bioregional-repair and mending skills reduce waste",
+    "name": "Repair and mending skills reduce waste",
+    "description": "Repair and mending skills reduce waste",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

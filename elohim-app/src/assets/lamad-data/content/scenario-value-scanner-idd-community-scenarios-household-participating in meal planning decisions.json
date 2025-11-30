@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-household-participating in meal planning decisions",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-participating in meal planning decisions",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Participating in meal planning decisions",
   "description": "Participating in meal planning decisions",
   "content": "Scenario: Participating in meal planning decisions\n    Given the household plans weekly meals together\n    And each housemate has food preferences and dietary needs\n    When the household holds their weekly meal planning meeting\n    Then Jordan's personal_agent presents meal options visually\n    And Jordan can express preferences using simple voting (thumbs up/down)\n    And the support worker facilitates but doesn't override Jordan's choices\n    And Jordan's food preferences are honored in the meal plan\n    And Jordan participates as an equal household member\n    And the household_elohim coordinates fair preference balancing\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Participating in meal planning decisions",
+    "ogDescription": "Participating in meal planning decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-participating in meal planning decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in meal planning decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-participating in meal planning decisions",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-participating in meal planning decisions",
+    "name": "Participating in meal planning decisions",
+    "description": "Participating in meal planning decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

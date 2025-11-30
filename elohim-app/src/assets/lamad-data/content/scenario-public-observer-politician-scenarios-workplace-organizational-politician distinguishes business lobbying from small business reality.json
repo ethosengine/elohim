@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician distinguishes business lobbying from small business reality",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician distinguishes business lobbying from small business reality",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician distinguishes business lobbying from small business reality",
   "description": "Politician distinguishes business lobbying from small business reality",
   "content": "Scenario: Politician distinguishes business lobbying from small business reality\n    Given corporate lobbying claims to represent small business\n    And uses small business owners in advocacy campaigns\n    When the Observer analyzes business community diversity\n    Then they see large corporations drive policy positions\n    And identify actual small business priorities differ from lobbying\n    And understand small businesses harmed by corporate subsidies\n    And distinguish authentic small business concerns from corporate manipulation\n    And align economic policy with diverse business community\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician distinguishes business lobbying from small business reality",
+    "ogDescription": "Politician distinguishes business lobbying from small business reality",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician distinguishes business lobbying from small business reality",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician distinguishes business lobbying from small business reality - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician distinguishes business lobbying from small business reality",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician distinguishes business lobbying from small business reality",
+    "name": "Politician distinguishes business lobbying from small business reality",
+    "description": "Politician distinguishes business lobbying from small business reality",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

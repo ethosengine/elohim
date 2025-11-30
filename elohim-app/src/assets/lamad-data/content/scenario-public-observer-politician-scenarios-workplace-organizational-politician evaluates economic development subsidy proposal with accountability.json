@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician evaluates economic development subsidy proposal with accountability",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician evaluates economic development subsidy proposal with accountability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician evaluates economic development subsidy proposal with accountability",
   "description": "Politician evaluates economic development subsidy proposal with accountability",
   "content": "Scenario: Politician evaluates economic development subsidy proposal with accountability\n    Given corporation seeks tax breaks for promised job creation\n    And presents rosy projections of economic benefits\n    When the Observer analyzes company track record and subsidy impacts\n    Then they see company's job creation performance in other jurisdictions\n    And understand actual jobs created versus promised in past subsidies\n    And calculate public cost per job versus wage quality\n    And identify whether subsidized jobs pay living wages or require public assistance\n    And demand accountability provisions in economic development deals\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician evaluates economic development subsidy proposal with accountability",
+    "ogDescription": "Politician evaluates economic development subsidy proposal with accountability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician evaluates economic development subsidy proposal with accountability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician evaluates economic development subsidy proposal with accountability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician evaluates economic development subsidy proposal with accountability",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician evaluates economic development subsidy proposal with accountability",
+    "name": "Politician evaluates economic development subsidy proposal with accountability",
+    "description": "Politician evaluates economic development subsidy proposal with accountability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

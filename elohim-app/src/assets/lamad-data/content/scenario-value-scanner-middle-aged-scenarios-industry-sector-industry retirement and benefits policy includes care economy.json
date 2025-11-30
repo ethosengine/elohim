@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry retirement and benefits policy includes care economy",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry retirement and benefits policy includes care economy",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Industry retirement and benefits policy includes care economy",
   "description": "Industry retirement and benefits policy includes care economy",
   "content": "Scenario: Industry retirement and benefits policy includes care economy\n    Given Robert approaches retirement years\n    And industry benefits often inadequately support caregivers\n    And retirement policy should recognize care contributions\n    When industry_elohim supports benefits policy advocacy\n    Then it should help Robert advocate for care-inclusive benefits\n    And support industry adoption of caregiver support benefits\n    And help develop retirement policy that values care economy participation\n    And build benefits frameworks that support multigenerational care\n    And advance industry benefits that recognize whole-person needs\n    And demonstrate that care economy should inform benefits design\n    And create industry practices that support lifecycle care needs\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Industry retirement and benefits policy includes care economy",
+    "ogDescription": "Industry retirement and benefits policy includes care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry retirement and benefits policy includes care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Industry retirement and benefits policy includes care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry retirement and benefits policy includes care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry retirement and benefits policy includes care economy",
+    "name": "Industry retirement and benefits policy includes care economy",
+    "description": "Industry retirement and benefits policy includes care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

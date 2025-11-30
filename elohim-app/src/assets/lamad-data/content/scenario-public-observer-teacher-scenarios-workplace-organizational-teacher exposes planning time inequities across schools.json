@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher exposes planning time inequities across schools",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher exposes planning time inequities across schools",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teacher exposes planning time inequities across schools",
   "description": "Teacher exposes planning time inequities across schools",
   "content": "Scenario: Teacher exposes planning time inequities across schools\n    Given some schools provide adequate planning time while others don't\n    And teachers don't know if their conditions are typical or problematic\n    When the Observer documents planning time across district\n    Then teachers see stark disparities (30 min vs 90 min daily planning)\n    And identify which principals prioritize teacher planning time\n    And understand patterns (wealthy schools get more planning time)\n    And coordinate advocacy for district-wide planning time standards\n    And working conditions comparison drives equity\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Teacher exposes planning time inequities across schools",
+    "ogDescription": "Teacher exposes planning time inequities across schools",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher exposes planning time inequities across schools",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher exposes planning time inequities across schools - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher exposes planning time inequities across schools",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher exposes planning time inequities across schools",
+    "name": "Teacher exposes planning time inequities across schools",
+    "description": "Teacher exposes planning time inequities across schools",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

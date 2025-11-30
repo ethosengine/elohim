@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment reduces fossil fuel dependence across sectors",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-bioregional investment reduces fossil fuel dependence across sectors",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional investment reduces fossil fuel dependence across sectors",
   "description": "Bioregional investment reduces fossil fuel dependence across sectors",
   "content": "Scenario: Bioregional investment reduces fossil fuel dependence across sectors\n    Given fossil fuel dependence threatens climate stability\n    And Patricia's investments can support energy transition\n    When democratic businesses across bioregion prioritize renewable energy\n    Then local food systems eliminate long-haul transportation fossil fuel use\n    And businesses invest in renewable energy through community investment support\n    And bioregional fossil fuel consumption decreases measurably\n    And investment accelerates just energy transition\n    And bioregional_elohim tracks energy transition and coordinates renewable investment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-ecological-bioregional",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional investment reduces fossil fuel dependence across sectors",
+    "ogDescription": "Bioregional investment reduces fossil fuel dependence across sectors",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment reduces fossil fuel dependence across sectors",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional investment reduces fossil fuel dependence across sectors - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-ecological-bioregional-bioregional investment reduces fossil fuel dependence across sectors",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:ecological-bioregional-bioregional investment reduces fossil fuel dependence across sectors",
+    "name": "Bioregional investment reduces fossil fuel dependence across sectors",
+    "description": "Bioregional investment reduces fossil fuel dependence across sectors",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

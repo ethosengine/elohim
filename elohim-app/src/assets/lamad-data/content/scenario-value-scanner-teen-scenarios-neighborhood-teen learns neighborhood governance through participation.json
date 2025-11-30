@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-teen-scenarios-neighborhood-teen learns neighborhood governance through participation",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:neighborhood-teen learns neighborhood governance through participation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Teen learns neighborhood governance through participation",
   "description": "Teen learns neighborhood governance through participation",
   "content": "Scenario: Teen learns neighborhood governance through participation\n    Given Jasmine is preparing for adult civic engagement\n    And neighborhood is a foundational governance layer\n    When she participates in neighborhood care economy\n    Then she should learn how neighborhoods function as governance units\n    And understand how collective decisions are made\n    And practice participating in community conversations\n    And build relationships with neighbors across differences\n    And develop civic skills that will serve her adult life\n    And internalize that communities require active participation to flourish\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-teen-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Teen learns neighborhood governance through participation",
+    "ogDescription": "Teen learns neighborhood governance through participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-neighborhood-teen learns neighborhood governance through participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen learns neighborhood governance through participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-neighborhood-teen learns neighborhood governance through participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:neighborhood-teen learns neighborhood governance through participation",
+    "name": "Teen learns neighborhood governance through participation",
+    "description": "Teen learns neighborhood governance through participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

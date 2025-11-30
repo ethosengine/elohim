@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-worker-scenarios-community-contributing care tokens to community initiatives",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-contributing care tokens to community initiatives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Contributing care tokens to community initiatives",
   "description": "Contributing care tokens to community initiatives",
   "content": "Scenario: Contributing care tokens to community initiatives\n    Given I accumulate care tokens through my work and participation\n    And community initiatives need resource pooling\n    When I want to support community projects or people in need\n    Then the protocol should enable me to contribute care tokens\n    And facilitate care economy resource distribution\n    And recognize that even workers with limited money can contribute meaningfully\n    And build community care economy beyond cash transactions\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-worker-scenarios-community",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.198597",
-  "updatedAt": "2025-11-21T18:54:29.198597"
+  "openGraphMetadata": {
+    "ogTitle": "Contributing care tokens to community initiatives",
+    "ogDescription": "Contributing care tokens to community initiatives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-contributing care tokens to community initiatives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing care tokens to community initiatives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-community-contributing care tokens to community initiatives",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:community-contributing care tokens to community initiatives",
+    "name": "Contributing care tokens to community initiatives",
+    "description": "Contributing care tokens to community initiatives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

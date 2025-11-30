@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-household-household safety modifications for aging in place",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-household safety modifications for aging in place",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household safety modifications for aging in place",
   "description": "Household safety modifications for aging in place",
   "content": "Scenario: Household safety modifications for aging in place\n    Given Margaret wants to continue living independently\n    And aging may require household modifications\n    When the household_elohim assesses safety needs\n    Then it should identify potential safety hazards\n    And it should suggest affordable modifications\n    And it should connect Margaret to assistance programs\n    And modifications should support long-term independence\n    And Margaret should be able to age safely at home\n    And proactive planning should prevent crisis\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Household safety modifications for aging in place",
+    "ogDescription": "Household safety modifications for aging in place",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-household safety modifications for aging in place",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household safety modifications for aging in place - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-household-household safety modifications for aging in place",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:household-household safety modifications for aging in place",
+    "name": "Household safety modifications for aging in place",
+    "description": "Household safety modifications for aging in place",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

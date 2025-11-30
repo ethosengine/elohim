@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member tracks promised jobs from past incentives",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:workplace-organizational-economic development board member tracks promised jobs from past incentives",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Economic development board member tracks promised jobs from past incentives",
   "description": "Economic development board member tracks promised jobs from past incentives",
   "content": "Scenario: Economic development board member tracks promised jobs from past incentives\n    Given board previously approved incentive packages for business attraction\n    And businesses promised specific job creation targets as incentive condition\n    And board wants to know if incentives produced promised economic benefits\n    When the board member uses Observer accountability tracking\n    Then they see actual job creation versus promises for past incentive deals\n    And discover many businesses created fewer jobs than committed\n    And find weak enforcement mechanisms allowing businesses to keep incentives despite failures\n    And access fiscal impact analysis showing poor return on incentive investment\n    And accountability tracking reveals incentive outcomes diverged from projections\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-board-member-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.183597",
-  "updatedAt": "2025-11-21T18:54:29.183597"
+  "openGraphMetadata": {
+    "ogTitle": "Economic development board member tracks promised jobs from past incentives",
+    "ogDescription": "Economic development board member tracks promised jobs from past incentives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member tracks promised jobs from past incentives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Economic development board member tracks promised jobs from past incentives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-workplace-organizational-economic development board member tracks promised jobs from past incentives",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:workplace-organizational-economic development board member tracks promised jobs from past incentives",
+    "name": "Economic development board member tracks promised jobs from past incentives",
+    "description": "Economic development board member tracks promised jobs from past incentives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

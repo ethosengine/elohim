@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-family-grandparent role supported as new generation emerges",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-grandparent role supported as new generation emerges",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Grandparent role supported as new generation emerges",
   "description": "Grandparent role supported as new generation emerges",
   "content": "Scenario: Grandparent role supported as new generation emerges\n    Given Robert occasionally provides care for his grandchild\n    And he's learning the grandparent role\n    And his care enables his adult child to work\n    When family_elohim tracks grandparent care contributions\n    Then it should recognize grandparent care as valuable family contribution\n    And help Robert understand his role in the four-generation family\n    And support him in providing care without overstepping parenting boundaries\n    And recognize that his grandparent care enables the middle generation\n    And value his care appropriately in family care economy\n    And help him see himself as part of ongoing care reciprocity\n    And model care patterns for when he'll need care\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-family",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Grandparent role supported as new generation emerges",
+    "ogDescription": "Grandparent role supported as new generation emerges",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-grandparent role supported as new generation emerges",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grandparent role supported as new generation emerges - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-grandparent role supported as new generation emerges",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-grandparent role supported as new generation emerges",
+    "name": "Grandparent role supported as new generation emerges",
+    "description": "Grandparent role supported as new generation emerges",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

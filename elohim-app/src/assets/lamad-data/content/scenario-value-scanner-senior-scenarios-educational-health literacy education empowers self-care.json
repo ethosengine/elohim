@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-senior-scenarios-educational-health literacy education empowers self-care",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-health literacy education empowers self-care",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Health literacy education empowers self-care",
   "description": "Health literacy education empowers self-care",
   "content": "Scenario: Health literacy education empowers self-care\n    Given Margaret navigates complex health systems\n    And health literacy affects health outcomes\n    When the educational_elohim provides health education\n    Then Margaret should access senior-appropriate health information\n    And education should empower her health decision-making\n    And her nursing background should be acknowledged\n    And health literacy should support active aging\n    And education should enhance autonomy in health care\n    And Margaret should be informed patient and advocate\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-senior-scenarios-educational",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Health literacy education empowers self-care",
+    "ogDescription": "Health literacy education empowers self-care",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-health literacy education empowers self-care",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Health literacy education empowers self-care - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-health literacy education empowers self-care",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-health literacy education empowers self-care",
+    "name": "Health literacy education empowers self-care",
+    "description": "Health literacy education empowers self-care",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

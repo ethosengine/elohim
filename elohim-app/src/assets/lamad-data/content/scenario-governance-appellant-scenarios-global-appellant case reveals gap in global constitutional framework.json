@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-global-appellant case reveals gap in global constitutional framework",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:global-appellant case reveals gap in global constitutional framework",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appellant case reveals gap in global constitutional framework",
   "description": "Appellant case reveals gap in global constitutional framework",
   "content": "Scenario: Appellant case reveals gap in global constitutional framework\n    Given Marcus's mental health intervention appeal\n    And similar appeals occur worldwide across cultures\n    And constitutional interpretations vary dramatically between regions\n    When the pattern is analyzed for global constitutional significance\n    Then researchers identify fundamental unresolved question\n    And the question is whether privacy is universal right or culturally specific\n    And appellants from diverse cultures share their experiences\n    And the question is elevated for Constitutional Convention consideration\n    And Marcus's case contributes to global constitutional deliberation\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-global",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appellant case reveals gap in global constitutional framework",
+    "ogDescription": "Appellant case reveals gap in global constitutional framework",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-appellant case reveals gap in global constitutional framework",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appellant case reveals gap in global constitutional framework - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-global-appellant case reveals gap in global constitutional framework",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:global-appellant case reveals gap in global constitutional framework",
+    "name": "Appellant case reveals gap in global constitutional framework",
+    "description": "Appellant case reveals gap in global constitutional framework",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

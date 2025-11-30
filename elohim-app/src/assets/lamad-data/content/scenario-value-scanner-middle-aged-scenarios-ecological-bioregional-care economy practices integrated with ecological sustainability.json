@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-care economy practices integrated with ecological sustainability",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-care economy practices integrated with ecological sustainability",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Care economy practices integrated with ecological sustainability",
   "description": "Care economy practices integrated with ecological sustainability",
   "content": "Scenario: Care economy practices integrated with ecological sustainability\n    Given care work requires resources: food, transportation, housing, energy\n    And care practices can be more or less ecologically sustainable\n    And sustainable care economy serves both human and ecological flourishing\n    When bioregional_elohim integrates care and ecology\n    Then it should help Robert align care practices with ecological sustainability\n    And surface opportunities: \"Local food sourcing reduces transportation impact while supporting regional care economy\"\n    And recognize that care for people and care for planet are interconnected\n    And support practices that serve both human and ecological wellbeing\n    And demonstrate that care economy must be ecologically sustainable\n    And build integrated understanding of care and ecology\n    And model for next generation that care includes ecological stewardship\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.192597",
-  "updatedAt": "2025-11-21T18:54:29.192597"
+  "openGraphMetadata": {
+    "ogTitle": "Care economy practices integrated with ecological sustainability",
+    "ogDescription": "Care economy practices integrated with ecological sustainability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-care economy practices integrated with ecological sustainability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Care economy practices integrated with ecological sustainability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-care economy practices integrated with ecological sustainability",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-care economy practices integrated with ecological sustainability",
+    "name": "Care economy practices integrated with ecological sustainability",
+    "description": "Care economy practices integrated with ecological sustainability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

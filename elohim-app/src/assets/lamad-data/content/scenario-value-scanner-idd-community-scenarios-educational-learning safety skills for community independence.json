@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-idd-community-scenarios-educational-learning safety skills for community independence",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning safety skills for community independence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Learning safety skills for community independence",
   "description": "Learning safety skills for community independence",
   "content": "Scenario: Learning safety skills for community independence\n    Given Jordan wants to navigate community more independently\n    And safety education supports risk-taking and growth\n    When Jordan takes community safety education\n    Then the training covers real-world scenarios (crossing streets, stranger danger)\n    And instruction uses visual supports and repeated practice\n    And Jordan can demonstrate understanding in accessible ways\n    And safety skills increase Jordan's independent community access\n    And education balances safety with dignity and autonomy\n    And Jordan's capability for safe independence grows through learning\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-idd-community-scenarios-educational",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Learning safety skills for community independence",
+    "ogDescription": "Learning safety skills for community independence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning safety skills for community independence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning safety skills for community independence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-educational-learning safety skills for community independence",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:educational-learning safety skills for community independence",
+    "name": "Learning safety skills for community independence",
+    "description": "Learning safety skills for community independence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

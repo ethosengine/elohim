@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-retired-scenarios-municipality-municipal public transit serves retired residents without car access",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal public transit serves retired residents without car access",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Municipal public transit serves retired residents without car access",
   "description": "Municipal public transit serves retired residents without car access",
   "content": "Scenario: Municipal public transit serves retired residents without car access\n    Given Frank may not be able to afford car ownership\n    And he relies on public transit and walking\n    When the municipal_elohim coordinates transportation\n    Then public transit should serve Frank's mobility needs effectively\n    And routes and schedules should accommodate non-employment patterns\n    And transit should enable access to medical, social, and civic destinations\n    And affordable transit should support continued community participation\n    And Frank should maintain mobility and independence through public infrastructure\n    And municipal transportation should serve residents across lifespan\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-retired-scenarios-municipality",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Municipal public transit serves retired residents without car access",
+    "ogDescription": "Municipal public transit serves retired residents without car access",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal public transit serves retired residents without car access",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal public transit serves retired residents without car access - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-municipality-municipal public transit serves retired residents without car access",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:municipality-municipal public transit serves retired residents without car access",
+    "name": "Municipal public transit serves retired residents without car access",
+    "description": "Municipal public transit serves retired residents without car access",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

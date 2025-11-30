@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-27T06:01:59.174162",
-  "totalCount": 2913,
+  "lastUpdated": "2025-11-28T21:10:19.553805",
+  "totalCount": 3170,
   "relationships": [
     {
       "id": "rel-0",
@@ -26217,6 +26217,2345 @@
       "type": "RELATES_TO",
       "metadata": {
         "cross_domain": true
+      }
+    },
+    {
+      "id": "rel-2913",
+      "source": "lamad-reference-implementation",
+      "target": "manifesto",
+      "type": "IMPLEMENTS",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2914",
+      "source": "lamad-reference-implementation",
+      "target": "governance-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2915",
+      "source": "lamad-reference-implementation",
+      "target": "value-scanner-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2916",
+      "source": "lamad-reference-implementation",
+      "target": "public-observer-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2917",
+      "source": "lamad-reference-implementation",
+      "target": "autonomous-entity-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2918",
+      "source": "lamad-reference-implementation",
+      "target": "social-medium-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2919",
+      "source": "lamad-reference-implementation",
+      "target": "economic-coordination-epic",
+      "type": "DEMONSTRATES",
+      "metadata": {
+        "referenceImplementation": true
+      }
+    },
+    {
+      "id": "rel-2920",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-bible-genisis-11-1",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2921",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-bible-deuteronomy-6-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2922",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-bible-matthew-14-22-31",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2923",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-bible-jeremiah-17-1",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2924",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-media-00-video-the-hidden-tribes-of",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-2925",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-media-00-documentary-the-social-dilemma",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-2926",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-media-00-documentary-after-truth-disinfor",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-2927",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-media-00-documentary-coded-bias",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-2928",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-module-01-church-dilemma-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-2929",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-module-01-church-dilemma-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-2930",
+      "source": "fct-module-01-church-dilemma",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "attention-economy",
+          "metacrisis"
+        ]
+      }
+    },
+    {
+      "id": "rel-2931",
+      "source": "fct-module-01-church-dilemma",
+      "target": "social-medium-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "attention-economy",
+          "metacrisis"
+        ]
+      }
+    },
+    {
+      "id": "rel-2932",
+      "source": "fct-media-00-book-at-the-blue-hole-boo",
+      "target": "fct-contributor-jack-reese",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2933",
+      "source": "fct-media-00-documentary-the-social-dilemma",
+      "target": "fct-org-netflix",
+      "type": "PUBLISHED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2934",
+      "source": "fct-media-00-documentary-after-truth-disinfor",
+      "target": "fct-org-hbo",
+      "type": "PUBLISHED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2935",
+      "source": "fct-media-00-book-why-were-polarized",
+      "target": "fct-contributor-ezra-klein",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2936",
+      "source": "fct-media-00-book-the-death-of-experti",
+      "target": "fct-contributor-tom-nichols",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2937",
+      "source": "fct-media-00-book-the-organized-mind",
+      "target": "fct-contributor-daniel-levitin",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2938",
+      "source": "fct-media-00-book-is-google-making-us-",
+      "target": "fct-contributor-nicholas-carr",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2939",
+      "source": "fct-media-00-book-post-truth",
+      "target": "fct-contributor-lee-mc",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2940",
+      "source": "fct-media-00-book-the-death-of-truth",
+      "target": "fct-contributor-michiko-kakutani",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2941",
+      "source": "fct-media-00-book-the-knowledge-illusi",
+      "target": "fct-contributor-steven-sloman",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2942",
+      "source": "fct-media-00-book-the-enigma-of-reason",
+      "target": "fct-contributor-hugo-mercier",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2943",
+      "source": "fct-media-00-book-deep-work",
+      "target": "fct-contributor-cal-newport",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2944",
+      "source": "fct-media-00-book-web-literacy-for-stu",
+      "target": "fct-contributor-mike-caulfield",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2945",
+      "source": "fct-media-00-book-thinking-fast-and-sl",
+      "target": "fct-contributor-daniel-kahneman",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2946",
+      "source": "fct-media-00-book-the-art-of-thinking-",
+      "target": "fct-contributor-rolf-dobelli",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2947",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-romans-12-2",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2948",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-2-kings-23-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2949",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-1-corinthians-12-12-27",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2950",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-ephesians-4-11-16",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2951",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-proverbs-4-23",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2952",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-romans-12-1-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2953",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-zechariah-4-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2954",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-matthew-13-31-32",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2955",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-bible-john-17-20-23",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2956",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-module-02-systems-thinking-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-2957",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-module-02-systems-thinking-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-2958",
+      "source": "fct-module-02-systems-thinking",
+      "target": "governance-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "systems-thinking"
+        ]
+      }
+    },
+    {
+      "id": "rel-2959",
+      "source": "fct-media-01-book-antifragility-strong",
+      "target": "fct-contributor-nassim-taleb",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-2960",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-proverbs-3-5-6",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2961",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-genesis-11-1-9",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2962",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-genesis-9-8-17",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2963",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-exodus-19-5-6",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2964",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-matthew-5-1-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2965",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-john-13-34-35",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2966",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-luke-12-1",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2967",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-2-corinthians-5-17-19",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2968",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-bible-1-corinthians-1-25-29",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2969",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-module-03-problem-well-stated-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-2970",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-module-03-problem-well-stated-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-2971",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "metacrisis",
+          "attention-economy"
+        ]
+      }
+    },
+    {
+      "id": "rel-2972",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "social-medium-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "metacrisis",
+          "attention-economy"
+        ]
+      }
+    },
+    {
+      "id": "rel-2973",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-matthew-10-16",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2974",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-matthew-5-9",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2975",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-james-3-18",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2976",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-james-3-17",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2977",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-matthew-25-14-30",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2978",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-genesis-2-15",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2979",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-1-corinthians-12-12-27",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2980",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-luke-10-25-37",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2981",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-micah-6-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2982",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-matthew-5-3-12",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2983",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-acts-2-1-12",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2984",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-1-kings-3-16-28",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2985",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-daniel-1-8-20",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2986",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-bible-matthew-5-1-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2987",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-module-04-scaling-wisdom-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-2988",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-module-04-scaling-wisdom-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-2989",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "governance-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "trust-evolution",
+          "systems-thinking"
+        ]
+      }
+    },
+    {
+      "id": "rel-2990",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "social-medium-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "trust-evolution",
+          "systems-thinking"
+        ]
+      }
+    },
+    {
+      "id": "rel-2991",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-bible-deuteronomy-11-1",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2992",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-bible-revelation-3-20",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2993",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-bible-hebrews-3-1",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2994",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-bible-colossians-3-1-3",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-2995",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-module-05-respecting-human-nature-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-2996",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-module-05-respecting-human-nature-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-2997",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "human-dignity",
+          "attention-economy"
+        ]
+      }
+    },
+    {
+      "id": "rel-2998",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "social-medium-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "human-dignity",
+          "attention-economy"
+        ]
+      }
+    },
+    {
+      "id": "rel-2999",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-genesis-2-15",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3000",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-matthew-22-39",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3001",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-philippians-1-9-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3002",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-revelation-21-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3003",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-amos-3-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3004",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-1-corinthians-3-6-9",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3005",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-galatians-6-4-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3006",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-james-1-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3007",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-2-peter-3-8-9",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3008",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-bible-micah-6-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3009",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-media-05-video-jesus-camp",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-3010",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-media-05-video-love-your-neighbor-a",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-3011",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-media-05-video-shiny-happy-people-d",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-3012",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-module-06-harmful-consequences-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3013",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-module-06-harmful-consequences-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3014",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "economic-coordination-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "externalities"
+        ]
+      }
+    },
+    {
+      "id": "rel-3015",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "public-observer-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "externalities"
+        ]
+      }
+    },
+    {
+      "id": "rel-3016",
+      "source": "fct-module-07-regeneration",
+      "target": "fct-bible-acts-2-42-47",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3017",
+      "source": "fct-module-07-regeneration",
+      "target": "fct-bible-haggai-1-2",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3018",
+      "source": "fct-module-07-regeneration",
+      "target": "fct-module-07-regeneration-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3019",
+      "source": "fct-module-07-regeneration",
+      "target": "fct-module-07-regeneration-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3020",
+      "source": "fct-module-07-regeneration",
+      "target": "autonomous-entity-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "regeneration"
+        ]
+      }
+    },
+    {
+      "id": "rel-3021",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-ephesians-4-15-16",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3022",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-matthew-5-17",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3023",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-matthew-22-36-40",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3024",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-john-13-34-35",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3025",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-luke-6-31",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3026",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-romans-13-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3027",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-romans-13-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3028",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-galatians-5-14",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3029",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-james-2-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3030",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-bible-micah-6-7-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3031",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-media-07-documentary-poverty-inc",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-3032",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-media-07-documentary-13th",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "video"
+      }
+    },
+    {
+      "id": "rel-3033",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-module-08-centering-love-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3034",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-module-08-centering-love-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3035",
+      "source": "fct-module-08-centering-love",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "values-centered"
+        ]
+      }
+    },
+    {
+      "id": "rel-3036",
+      "source": "fct-module-08-centering-love",
+      "target": "value-scanner-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "values-centered"
+        ]
+      }
+    },
+    {
+      "id": "rel-3037",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "fct-bible-matthew-7-15-19",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3038",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "fct-bible-james-1-27",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3039",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "fct-module-09-fruits-of-spirit-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3040",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "fct-module-09-fruits-of-spirit-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3041",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "values-centered"
+        ]
+      }
+    },
+    {
+      "id": "rel-3042",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "value-scanner-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "values-centered"
+        ]
+      }
+    },
+    {
+      "id": "rel-3043",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-john-14-6",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3044",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-1-corinthians-13-6",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3045",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-3-john-1-4",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3046",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-exodus-20-16",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3047",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-proverbs-12-22",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3048",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-colossians-3-9-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3049",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-proverbs-6-16-19",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3050",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-psalm-101-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3051",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-james-3-5-6",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3052",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-proverbs-26-28",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3053",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-bible-ephesians-4-25",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3054",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-module-10-recognize-distortions-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3055",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-module-10-recognize-distortions-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3056",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "governance-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "shared-understanding"
+        ]
+      }
+    },
+    {
+      "id": "rel-3057",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "social-medium-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "shared-understanding"
+        ]
+      }
+    },
+    {
+      "id": "rel-3058",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-john-17-20-23",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3059",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-1-corinthians-1-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3060",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-john-14-6",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3061",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-philippians-2-3-4",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3062",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-james-4-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3063",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-1-peter-5-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3064",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-acts-2-42-47",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3065",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-hebrews-10-24-25",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3066",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-genesis-1-26-28",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3067",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-proverbs-12-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3068",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-1-corinthians-13-4-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3069",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-colossians-3-12-14",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3070",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-proverbs-15-22",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3071",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-ecclesiastes-4-9-12",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3072",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-matthew-22-37-39",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3073",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-bible-philippians-4-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3074",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-module-11-collaboration-sensemaking-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3075",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-module-11-collaboration-sensemaking-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3076",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "governance-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "shared-understanding"
+        ]
+      }
+    },
+    {
+      "id": "rel-3077",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "public-observer-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "shared-understanding"
+        ]
+      }
+    },
+    {
+      "id": "rel-3078",
+      "source": "fct-media-10-book-everything-you-think",
+      "target": "fct-contributor-johann-hari",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3079",
+      "source": "fct-media-10-book-the-knowledge-illusi",
+      "target": "fct-contributor-steven-sloman",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3080",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-bible-micah-6-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3081",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-bible-luke-14-15-24",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3082",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-bible-luke-14-22-23",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3083",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-bible-luke-14-13-14",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3084",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-module-12-fairness-justice-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3085",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-module-12-fairness-justice-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3086",
+      "source": "fct-module-12-fairness-justice",
+      "target": "governance-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "justice-fairness"
+        ]
+      }
+    },
+    {
+      "id": "rel-3087",
+      "source": "fct-module-12-fairness-justice",
+      "target": "autonomous-entity-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "justice-fairness"
+        ]
+      }
+    },
+    {
+      "id": "rel-3088",
+      "source": "fct-media-11-book-revisit-this-interac",
+      "target": "fct-contributor-vi-hart",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3089",
+      "source": "fct-media-11-book-poverty-by-america",
+      "target": "fct-contributor-matthew-desmond",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3090",
+      "source": "fct-media-11-book-the-color-of-law",
+      "target": "fct-contributor-richard-rothstein",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3091",
+      "source": "fct-media-11-book-the-sum-of-us",
+      "target": "fct-contributor-heather-mc",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3092",
+      "source": "fct-media-11-book-the-new-jim-crow",
+      "target": "fct-contributor-michelle-alexander",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3093",
+      "source": "fct-media-11-book-automating-inequalit",
+      "target": "fct-contributor-virginia-eubanks",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3094",
+      "source": "fct-media-11-book-directed",
+      "target": "fct-contributor-ava-du",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3095",
+      "source": "fct-media-11-book-the-characteristics-",
+      "target": "fct-contributor-tema-okun",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3096",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-john-10-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3097",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-psalm-1-3",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3098",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-ecclesiastes-3-1-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3099",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-romans-5-3-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3100",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-1-thessalonians-5-18",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3101",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-exodus-35-31-32",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3102",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-philippians-4-11-13",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3103",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-james-1-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3104",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-1-corinthians-13-4-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3105",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-proverbs-17-17",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3106",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-galatians-6-4-5",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3107",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-matthew-6-33",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3108",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-acts-4-32-35",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3109",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-proverbs-31-8-9",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3110",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-ephesians-5-15-16",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3111",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-psalm-90-12",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3112",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-joshua-24-15",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3113",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-1-corinthians-10-31",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3114",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-colossians-3-23-24",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3115",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-bible-philippians-4-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3116",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-module-13-helping-thrive-discussion",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "activity"
+      }
+    },
+    {
+      "id": "rel-3117",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-module-13-helping-thrive-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3118",
+      "source": "fct-module-13-helping-thrive",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "human-flourishing"
+        ]
+      }
+    },
+    {
+      "id": "rel-3119",
+      "source": "fct-module-13-helping-thrive",
+      "target": "value-scanner-epic",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "human-flourishing"
+        ]
+      }
+    },
+    {
+      "id": "rel-3120",
+      "source": "fct-media-12-book-the-new-parish",
+      "target": "fct-contributor-paul-sparks",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3121",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-matthew-5-13-16",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3122",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-james-1-22",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3123",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-colossians-3-23-24",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3124",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-1-corinthians-10-31",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3125",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-ephesians-2-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3126",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-proverbs-3-27",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3127",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-micah-6-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3128",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-romans-12-2",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3129",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-1-peter-4-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3130",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-philippians-2-3-4",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3131",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-galatians-6-9-10",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3132",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-matthew-25-14-30",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3133",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-acts-1-8",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3134",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-2-timothy-1-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3135",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-bible-jeremiah-29-7",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "bible-verse"
+      }
+    },
+    {
+      "id": "rel-3136",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-module-14-ready-to-act-story",
+      "type": "CONTAINS",
+      "metadata": {
+        "contentType": "narrative"
+      }
+    },
+    {
+      "id": "rel-3137",
+      "source": "fct-module-14-ready-to-act",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "human-flourishing",
+          "values-centered"
+        ]
+      }
+    },
+    {
+      "id": "rel-3138",
+      "source": "fct-media-13-book-from-the-garden-to-t",
+      "target": "fct-contributor-john-dyer",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3139",
+      "source": "fct-media-13-book-the-tech-wise-family",
+      "target": "fct-contributor-andy-crouch",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3140",
+      "source": "fct-media-13-book-digital-minimalism",
+      "target": "fct-contributor-cal-newport",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3141",
+      "source": "fct-media-13-book-the-next-story-faith",
+      "target": "fct-contributor-tim-challies",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3142",
+      "source": "fct-media-13-book-transhumanism-and-th",
+      "target": "fct-contributor-jacob-shatzer",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3143",
+      "source": "fct-media-13-book-habits-of-the-high-t",
+      "target": "fct-contributor-quentin-schultze",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3144",
+      "source": "fct-media-13-book-12-ways-your-phone-i",
+      "target": "fct-contributor-tony-reinke",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3145",
+      "source": "fct-media-13-book-ethics-in-the-age-of",
+      "target": "fct-contributor-george-hunsberger",
+      "type": "CREATED_BY",
+      "metadata": {}
+    },
+    {
+      "id": "rel-3146",
+      "source": "fct-module-15-retrospective",
+      "target": "manifesto",
+      "type": "CONCEPTUALLY_RELATED",
+      "metadata": {
+        "bridge": "fct-elohim",
+        "sharedConcepts": [
+          "human-flourishing"
+        ]
+      }
+    },
+    {
+      "id": "rel-3147",
+      "source": "fct-module-02-systems-thinking",
+      "target": "public-observer-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "systems-thinking",
+        "conceptLabel": "Systems Thinking"
+      }
+    },
+    {
+      "id": "rel-3148",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "public-observer-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "systems-thinking",
+        "conceptLabel": "Systems Thinking"
+      }
+    },
+    {
+      "id": "rel-3149",
+      "source": "fct-module-01-church-dilemma",
+      "target": "governance-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "metacrisis",
+        "conceptLabel": "Metacrisis & Polycrisis"
+      }
+    },
+    {
+      "id": "rel-3150",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "governance-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "metacrisis",
+        "conceptLabel": "Metacrisis & Polycrisis"
+      }
+    },
+    {
+      "id": "rel-3151",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "value-scanner-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "human-dignity",
+        "conceptLabel": "Human Dignity & Imago Dei"
+      }
+    },
+    {
+      "id": "rel-3152",
+      "source": "fct-module-07-regeneration",
+      "target": "economic-coordination-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "regeneration",
+        "conceptLabel": "Regenerative Systems"
+      }
+    },
+    {
+      "id": "rel-3153",
+      "source": "fct-module-14-ready-to-act",
+      "target": "value-scanner-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "values-centered",
+        "conceptLabel": "Values-Centered Design"
+      }
+    },
+    {
+      "id": "rel-3154",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "social-medium-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "shared-understanding",
+        "conceptLabel": "Collective Sensemaking"
+      }
+    },
+    {
+      "id": "rel-3155",
+      "source": "fct-module-15-retrospective",
+      "target": "value-scanner-epic",
+      "type": "SHARED_CONCEPT",
+      "metadata": {
+        "concept": "human-flourishing",
+        "conceptLabel": "Human Flourishing"
+      }
+    },
+    {
+      "id": "rel-3156",
+      "source": "fct-module-01-church-dilemma",
+      "target": "fct-module-02-systems-thinking",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3157",
+      "source": "fct-module-02-systems-thinking",
+      "target": "fct-module-03-problem-well-stated",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3158",
+      "source": "fct-module-03-problem-well-stated",
+      "target": "fct-module-04-scaling-wisdom",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3159",
+      "source": "fct-module-04-scaling-wisdom",
+      "target": "fct-module-05-respecting-human-nature",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3160",
+      "source": "fct-module-05-respecting-human-nature",
+      "target": "fct-module-06-harmful-consequences",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3161",
+      "source": "fct-module-06-harmful-consequences",
+      "target": "fct-module-07-regeneration",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3162",
+      "source": "fct-module-07-regeneration",
+      "target": "fct-module-08-centering-love",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3163",
+      "source": "fct-module-08-centering-love",
+      "target": "fct-module-09-fruits-of-spirit",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3164",
+      "source": "fct-module-09-fruits-of-spirit",
+      "target": "fct-module-10-recognize-distortions",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3165",
+      "source": "fct-module-10-recognize-distortions",
+      "target": "fct-module-11-collaboration-sensemaking",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3166",
+      "source": "fct-module-11-collaboration-sensemaking",
+      "target": "fct-module-12-fairness-justice",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3167",
+      "source": "fct-module-12-fairness-justice",
+      "target": "fct-module-13-helping-thrive",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3168",
+      "source": "fct-module-13-helping-thrive",
+      "target": "fct-module-14-ready-to-act",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3169",
+      "source": "fct-module-14-ready-to-act",
+      "target": "fct-module-15-retrospective",
+      "type": "PRECEDES",
+      "metadata": {
+        "course": "fct"
       }
     }
   ],

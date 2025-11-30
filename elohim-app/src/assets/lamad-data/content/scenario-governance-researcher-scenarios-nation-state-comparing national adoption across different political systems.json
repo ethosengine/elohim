@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-nation-state-comparing national adoption across different political systems",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-comparing national adoption across different political systems",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Comparing national adoption across different political systems",
   "description": "Comparing national adoption across different political systems",
   "content": "Scenario: Comparing national adoption across different political systems\n    Given different nations with different political systems adopted protocol\n    And I want to understand how political context shapes implementation\n    When I conduct cross-national comparative analysis\n    Then I examine: adoption patterns in democracies vs mixed regimes\n    And I analyze: how existing institutions integrate or resist protocol\n    And I explore: whether protocol strengthens or threatens existing power structures\n    And I assess: cultural factors that predict adoption success\n    And I identify: universal patterns vs context-dependent adaptations\n    And My research tests: whether democratic AI governance is culturally specific or universal\n    And Findings inform: international adoption strategies and expectations\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-nation-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Comparing national adoption across different political systems",
+    "ogDescription": "Comparing national adoption across different political systems",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-comparing national adoption across different political systems",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Comparing national adoption across different political systems - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-nation-state-comparing national adoption across different political systems",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:nation-state-comparing national adoption across different political systems",
+    "name": "Comparing national adoption across different political systems",
+    "description": "Comparing national adoption across different political systems",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

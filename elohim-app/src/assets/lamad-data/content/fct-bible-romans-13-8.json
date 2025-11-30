@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-romans-13-8",
+  "contentType": "bible-verse",
+  "title": "Romans 13:8",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Romans 13:8",
+    "book": "Romans",
+    "chapter": 13,
+    "verseStart": 8,
+    "verseEnd": null,
+    "contextInModule": "Romans 13:8\nBe indebted to no one, except to one another in love. For he who loves his neighbor has fulfilled the law.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "romans",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T21:10:19.208437",
+  "updatedAt": "2025-11-28T21:10:19.208438",
+  "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Romans 13:8",
+    "ogDescription": "Scripture reference used in FCT Module 8",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-romans-13-8",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Romans 13:8 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-romans-13-8",
+    "identifier": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+    "name": "Romans 13:8",
+    "description": "Scripture reference used in FCT Module 8",
+    "dateCreated": "2025-11-28T21:10:19.208437",
+    "dateModified": "2025-11-28T21:10:19.208438",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

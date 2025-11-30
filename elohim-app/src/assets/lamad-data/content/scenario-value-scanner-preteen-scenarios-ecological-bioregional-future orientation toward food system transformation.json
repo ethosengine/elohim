@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-future orientation toward food system transformation",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-future orientation toward food system transformation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Future orientation toward food system transformation",
   "description": "Future orientation toward food system transformation",
   "content": "Scenario: Future orientation toward food system transformation\n    Given Marcus experiences food system failures personally\n    And he is developing values and political consciousness\n    When Marcus reflects on food systems\n    Then he should envision better alternatives\n    And the personal_agent should present possibilities for transformation\n    And it should explain food sovereignty and community agriculture\n    And his generation should expect fundamental food system change\n    And care economy should provide framework for reimagining food systems\n    And his current struggles should fuel commitment to creating just alternatives\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.195597",
-  "updatedAt": "2025-11-21T18:54:29.195597"
+  "openGraphMetadata": {
+    "ogTitle": "Future orientation toward food system transformation",
+    "ogDescription": "Future orientation toward food system transformation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-future orientation toward food system transformation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Future orientation toward food system transformation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-future orientation toward food system transformation",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-future orientation toward food system transformation",
+    "name": "Future orientation toward food system transformation",
+    "description": "Future orientation toward food system transformation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

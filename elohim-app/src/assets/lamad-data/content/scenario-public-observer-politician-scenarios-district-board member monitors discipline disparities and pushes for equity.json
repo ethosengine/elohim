@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-district-board member monitors discipline disparities and pushes for equity",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member monitors discipline disparities and pushes for equity",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Board member monitors discipline disparities and pushes for equity",
   "description": "Board member monitors discipline disparities and pushes for equity",
   "content": "Scenario: Board member monitors discipline disparities and pushes for equity\n    Given the politician committed to equitable school climate\n    When the Observer tracks discipline outcomes by demographics\n    Then they see Black students suspended at 3x rate of white students\n    And learn similar behaviors result in different consequences by race\n    And identify which schools have restorative practices versus zero-tolerance\n    And compare district patterns to best-practice districts\n    And champion policy reform for equitable discipline\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-district",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Board member monitors discipline disparities and pushes for equity",
+    "ogDescription": "Board member monitors discipline disparities and pushes for equity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member monitors discipline disparities and pushes for equity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Board member monitors discipline disparities and pushes for equity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member monitors discipline disparities and pushes for equity",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member monitors discipline disparities and pushes for equity",
+    "name": "Board member monitors discipline disparities and pushes for equity",
+    "description": "Board member monitors discipline disparities and pushes for equity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional care economy connects households to land stewardship",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-bioregional care economy connects households to land stewardship",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Bioregional care economy connects households to land stewardship",
   "description": "Bioregional care economy connects households to land stewardship",
   "content": "Scenario: Bioregional care economy connects households to land stewardship\n    Given Sarah's household depends on bioregional ecological health\n    And land stewardship is collective care work\n    When Sarah participates in bioregional care economy\n    Then the bioregional_elohim should connect her to land stewardship opportunities\n    And it should link food purchases to regenerative agriculture\n    And it should enable Sarah to support ecological restoration\n    And care for land should be recognized as care work\n    And bioregional care should extend beyond human relationships\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional care economy connects households to land stewardship",
+    "ogDescription": "Bioregional care economy connects households to land stewardship",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional care economy connects households to land stewardship",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional care economy connects households to land stewardship - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional care economy connects households to land stewardship",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-bioregional care economy connects households to land stewardship",
+    "name": "Bioregional care economy connects households to land stewardship",
+    "description": "Bioregional care economy connects households to land stewardship",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

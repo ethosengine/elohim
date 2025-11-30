@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-single-parent-scenarios-household-grocery management with $175 per week for four people",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-grocery management with $175 per week for four people",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Grocery management with $175 per week for four people",
   "description": "Grocery management with $175 per week for four people",
   "content": "Scenario: Grocery management with $175 per week for four people\n    Given Maria feeds four people on $175/week budget\n    And this requires strategic planning and waste prevention\n    When Maria plans grocery shopping\n    Then the household_elohim should optimize for maximum nutrition per dollar\n    And it should coordinate strategic shopping across stores based on sales\n    And it should plan meals that stretch ingredients efficiently\n    And it should prevent food waste she cannot afford\n    And Maria should achieve remarkable efficiency with AI support\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-single-parent-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.196597",
-  "updatedAt": "2025-11-21T18:54:29.196597"
+  "openGraphMetadata": {
+    "ogTitle": "Grocery management with $175 per week for four people",
+    "ogDescription": "Grocery management with $175 per week for four people",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-grocery management with $175 per week for four people",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Grocery management with $175 per week for four people - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-household-grocery management with $175 per week for four people",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:household-grocery management with $175 per week for four people",
+    "name": "Grocery management with $175 per week for four people",
+    "description": "Grocery management with $175 per week for four people",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

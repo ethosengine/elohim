@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-parent-scenarios-educational-parent tracks board accountability for promises",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent tracks board accountability for promises",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Parent tracks board accountability for promises",
   "description": "Parent tracks board accountability for promises",
   "content": "Scenario: Parent tracks board accountability for promises\n    Given the school board promised to address transportation by Q2\n    And the parent's child still has unreliable dangerous bus service\n    When three months pass without action on the commitment\n    Then the Observer alerts parent about broken promise\n    And provides exact quote from February board meeting\n    And shows which board members made the commitment\n    And parent raises specific accountability question publicly\n    And board commitments to families persist despite turnover\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-parent-scenarios-educational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.185597",
-  "updatedAt": "2025-11-21T18:54:29.185597"
+  "openGraphMetadata": {
+    "ogTitle": "Parent tracks board accountability for promises",
+    "ogDescription": "Parent tracks board accountability for promises",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent tracks board accountability for promises",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent tracks board accountability for promises - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent tracks board accountability for promises",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent tracks board accountability for promises",
+    "name": "Parent tracks board accountability for promises",
+    "description": "Parent tracks board accountability for promises",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

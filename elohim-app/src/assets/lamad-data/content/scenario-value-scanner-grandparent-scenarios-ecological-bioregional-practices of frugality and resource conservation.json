@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-ecological-bioregional-practices of frugality and resource conservation",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:ecological-bioregional-practices of frugality and resource conservation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Practices of frugality and resource conservation",
   "description": "Practices of frugality and resource conservation",
   "content": "Scenario: Practices of frugality and resource conservation\n    Given Margaret's generation learned to waste nothing and maximize resources\n    And these practices are essential for ecological sustainability\n    When the bioregional_elohim tracks resource conservation\n    Then it should recognize Margaret's frugal practices as ecological wisdom\n    And it should value conservation skills and waste reduction\n    And it should track resource efficiency and reuse practices\n    And frugality should be reframed as environmental stewardship\n    And Margaret's practices should be recognized as climate action\n    And traditional conservation knowledge should be valued and transmitted\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-ecological-bioregional",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Practices of frugality and resource conservation",
+    "ogDescription": "Practices of frugality and resource conservation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-ecological-bioregional-practices of frugality and resource conservation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Practices of frugality and resource conservation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-ecological-bioregional-practices of frugality and resource conservation",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:ecological-bioregional-practices of frugality and resource conservation",
+    "name": "Practices of frugality and resource conservation",
+    "description": "Practices of frugality and resource conservation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

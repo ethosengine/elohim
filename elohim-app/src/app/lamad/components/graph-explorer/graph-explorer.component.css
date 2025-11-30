@@ -13,8 +13,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: rgba(15, 23, 42, 0.8);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+  background: var(--lamad-surface, #ffffff);
+  border-bottom: 1px solid var(--lamad-border, #e5e7eb);
 }
 
 .breadcrumbs {
@@ -26,7 +26,7 @@
 .crumb {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--lamad-text-secondary, #6b7280);
   font-size: 0.875rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
@@ -35,18 +35,18 @@
 }
 
 .crumb:hover {
-  background: rgba(99, 102, 241, 0.2);
-  color: #e0e6ed;
+  background: var(--lamad-bg-secondary, #f3f4f6);
+  color: var(--lamad-text-primary, #111827);
 }
 
 .crumb.current {
-  color: #e0e6ed;
+  color: var(--lamad-text-primary, #111827);
   font-weight: 600;
   cursor: default;
 }
 
 .crumb-separator {
-  color: #475569;
+  color: var(--lamad-text-muted, #9ca3af);
 }
 
 .controls {
@@ -59,18 +59,19 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: var(--lamad-surface, #ffffff);
+  border: 1px solid var(--lamad-border, #e5e7eb);
   border-radius: 6px;
-  color: #e0e6ed;
+  color: var(--lamad-text-primary, #374151);
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .control-btn:hover {
-  background: rgba(99, 102, 241, 0.3);
-  border-color: rgba(99, 102, 241, 0.5);
+  background: var(--lamad-bg-secondary, #f3f4f6);
+  border-color: var(--lamad-accent-primary, #6366f1);
+  color: var(--lamad-accent-primary, #6366f1);
 }
 
 .control-btn .icon {

@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-provincial-state-journalist grounds state education policy in local school impacts",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state-journalist grounds state education policy in local school impacts",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist grounds state education policy in local school impacts",
   "description": "Journalist grounds state education policy in local school impacts",
   "content": "Scenario: Journalist grounds state education policy in local school impacts\n    Given state legislature debates education funding formula\n    And the journalist covers state education policy\n    When the Observer shows local impacts across specific districts\n    Then the journalist sees how formula change affects 230 individual schools\n    And identifies which communities gain or lose funding\n    And contacts affected teachers, parents, and students in specific districts\n    And publishes story connecting state policy to lived local experiences\n    And policy journalism serves communities not just political class\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-provincial-state",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist grounds state education policy in local school impacts",
+    "ogDescription": "Journalist grounds state education policy in local school impacts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-provincial-state-journalist grounds state education policy in local school impacts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist grounds state education policy in local school impacts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-provincial-state-journalist grounds state education policy in local school impacts",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state-journalist grounds state education policy in local school impacts",
+    "name": "Journalist grounds state education policy in local school impacts",
+    "description": "Journalist grounds state education policy in local school impacts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

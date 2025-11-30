@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood knowledge and connection from long residence",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-neighborhood knowledge and connection from long residence",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood knowledge and connection from long residence",
   "description": "Neighborhood knowledge and connection from long residence",
   "content": "Scenario: Neighborhood knowledge and connection from long residence\n    Given Margaret has lived in neighborhood for many years\n    And she knows neighborhood history, patterns, and relationships\n    When the neighborhood_elohim recognizes resident knowledge\n    Then it should value Margaret's accumulated neighborhood wisdom\n    And it should recognize long-term residents as knowledge keepers\n    And her connections should be seen as neighborhood social capital\n    And institutional memory should be valued and utilized\n    And Margaret's knowledge should inform neighborhood decisions\n    And elder residents should be recognized as neighborhood resources\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood knowledge and connection from long residence",
+    "ogDescription": "Neighborhood knowledge and connection from long residence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood knowledge and connection from long residence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood knowledge and connection from long residence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood knowledge and connection from long residence",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-neighborhood knowledge and connection from long residence",
+    "name": "Neighborhood knowledge and connection from long residence",
+    "description": "Neighborhood knowledge and connection from long residence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

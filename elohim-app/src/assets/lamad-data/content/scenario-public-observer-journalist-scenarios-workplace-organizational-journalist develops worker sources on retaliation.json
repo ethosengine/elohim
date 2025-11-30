@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-journalist-scenarios-workplace-organizational-journalist develops worker sources on retaliation",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist develops worker sources on retaliation",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Journalist develops worker sources on retaliation",
   "description": "Journalist develops worker sources on retaliation",
   "content": "Scenario: Journalist develops worker sources on retaliation\n    Given workers face retaliation for organizing or complaining\n    And fear job loss for speaking to journalist\n    When the Observer provides secure anonymous channel\n    Then workers share evidence of retaliation and illegal firings\n    And journalist investigates without exposing individual sources\n    And aggregates worker experiences to show pattern\n    And verifies claims through labor board records\n    And publishes investigation protecting sources while exposing employer\n    And source protection enables workers to speak truth\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-journalist-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.184597",
-  "updatedAt": "2025-11-21T18:54:29.184597"
+  "openGraphMetadata": {
+    "ogTitle": "Journalist develops worker sources on retaliation",
+    "ogDescription": "Journalist develops worker sources on retaliation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist develops worker sources on retaliation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist develops worker sources on retaliation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-workplace-organizational-journalist develops worker sources on retaliation",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:workplace-organizational-journalist develops worker sources on retaliation",
+    "name": "Journalist develops worker sources on retaliation",
+    "description": "Journalist develops worker sources on retaliation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

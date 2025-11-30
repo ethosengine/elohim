@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood walking and outdoor activity with grandchildren",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-neighborhood walking and outdoor activity with grandchildren",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood walking and outdoor activity with grandchildren",
   "description": "Neighborhood walking and outdoor activity with grandchildren",
   "content": "Scenario: Neighborhood walking and outdoor activity with grandchildren\n    Given Margaret takes grandchildren on neighborhood walks\n    And they visit parks, library, neighbors, and local businesses\n    When the neighborhood_elohim tracks local engagement\n    Then it should recognize this as neighborhood participation\n    And it should value intergenerational use of neighborhood spaces\n    And it should show Margaret teaching grandchildren about their community\n    And walking should build neighborhood social connections\n    And local business patronage should support neighborhood economy\n    And Margaret's activities should strengthen neighborhood vitality\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.191597",
-  "updatedAt": "2025-11-21T18:54:29.191597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood walking and outdoor activity with grandchildren",
+    "ogDescription": "Neighborhood walking and outdoor activity with grandchildren",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood walking and outdoor activity with grandchildren",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood walking and outdoor activity with grandchildren - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-neighborhood walking and outdoor activity with grandchildren",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-neighborhood walking and outdoor activity with grandchildren",
+    "name": "Neighborhood walking and outdoor activity with grandchildren",
+    "description": "Neighborhood walking and outdoor activity with grandchildren",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

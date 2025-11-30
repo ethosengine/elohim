@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-researcher-scenarios-provincial-state-identifying emerging issues through annual evaluation cycles",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-identifying emerging issues through annual evaluation cycles",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Identifying emerging issues through annual evaluation cycles",
   "description": "Identifying emerging issues through annual evaluation cycles",
   "content": "Scenario: Identifying emerging issues through annual evaluation cycles\n    Given I analyze regional data annually to track trends\n    And I want to identify problems before they become crises\n    When I examine this year's patterns compared to previous years\n    Then I notice: appeal rates trending up (good\u2014people know recourse exists)\n    And I identify: recurring adolescent autonomy conflicts emerging\n    And I detect: systematic issue with business loan evaluation criteria\n    And I recognize: elderly accessibility remaining challenging\n    And I flag: potential issues for community leaders and policymakers\n    And My timely analysis enables: proactive response to emerging challenges\n    And Research provides: early warning system for governance problems\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-researcher-scenarios-provincial-state",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.173597",
-  "updatedAt": "2025-11-21T18:54:29.173597"
+  "openGraphMetadata": {
+    "ogTitle": "Identifying emerging issues through annual evaluation cycles",
+    "ogDescription": "Identifying emerging issues through annual evaluation cycles",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-identifying emerging issues through annual evaluation cycles",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Identifying emerging issues through annual evaluation cycles - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-provincial-state-identifying emerging issues through annual evaluation cycles",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:provincial-state-identifying emerging issues through annual evaluation cycles",
+    "name": "Identifying emerging issues through annual evaluation cycles",
+    "description": "Identifying emerging issues through annual evaluation cycles",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household during crisis transitions (shelter to housing, housing to housing)",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:household-managing household during crisis transitions (shelter to housing, housing to housing)",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Managing household during crisis transitions (shelter to housing, housing to housing)",
   "description": "Managing household during crisis transitions (shelter to housing, housing to housing)",
   "content": "Scenario: Managing household during crisis transitions (shelter to housing, housing to housing)\n    Given I am moving from transitional housing to permanent housing\n    And household operations must continue during major disruption\n    When I coordinate the moving transition\n    Then the Value Scanner helps me manage transition logistics\n    And maintains children's routines as much as possible during chaos\n    And tracks what needs to happen when (utilities, school transfers, address changes)\n    And helps me coordinate assistance with moving\n    And ensures essential household functions continue uninterrupted\n    And my personal_agent prevents critical tasks from being forgotten\n    And recognizes transition management as substantial invisible labor\n    And celebrates successful navigation of major household disruption\n",
@@ -18,6 +20,32 @@
     "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-household",
     "epic": null
   },
-  "createdAt": "2025-11-21T18:54:29.197598",
-  "updatedAt": "2025-11-21T18:54:29.197598"
+  "openGraphMetadata": {
+    "ogTitle": "Managing household during crisis transitions (shelter to housing, housing to housing)",
+    "ogDescription": "Managing household during crisis transitions (shelter to housing, housing to housing)",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household during crisis transitions (shelter to housing, housing to housing)",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing household during crisis transitions (shelter to housing, housing to housing) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-household-managing household during crisis transitions (shelter to housing, housing to housing)",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:household-managing household during crisis transitions (shelter to housing, housing to housing)",
+    "name": "Managing household during crisis transitions (shelter to housing, housing to housing)",
+    "description": "Managing household during crisis transitions (shelter to housing, housing to housing)",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

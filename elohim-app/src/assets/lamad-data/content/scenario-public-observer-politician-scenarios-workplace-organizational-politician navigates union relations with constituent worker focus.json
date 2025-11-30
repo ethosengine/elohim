@@ -1,6 +1,8 @@
 {
   "id": "scenario-public-observer-politician-scenarios-workplace-organizational-politician navigates union relations with constituent worker focus",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician navigates union relations with constituent worker focus",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Politician navigates union relations with constituent worker focus",
   "description": "Politician navigates union relations with constituent worker focus",
   "content": "Scenario: Politician navigates union relations with constituent worker focus\n    Given the politician receives support from labor unions\n    And business groups warn against union influence\n    When the Observer provides balanced labor relations analysis\n    Then they see how unionization affects worker wages and conditions\n    And understand union priorities versus broader worker constituent needs\n    And identify where union advocacy aligns with constituent interests\n    And review economic impacts of unionization across industries\n    And navigate union relations focused on worker constituent wellbeing\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-public-observer-politician-scenarios-workplace-organizational",
     "epic": "public_observer"
   },
-  "createdAt": "2025-11-21T18:54:29.186597",
-  "updatedAt": "2025-11-21T18:54:29.186597"
+  "openGraphMetadata": {
+    "ogTitle": "Politician navigates union relations with constituent worker focus",
+    "ogDescription": "Politician navigates union relations with constituent worker focus",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician navigates union relations with constituent worker focus",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician navigates union relations with constituent worker focus - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-workplace-organizational-politician navigates union relations with constituent worker focus",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:workplace-organizational-politician navigates union relations with constituent worker focus",
+    "name": "Politician navigates union relations with constituent worker focus",
+    "description": "Politician navigates union relations with constituent worker focus",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

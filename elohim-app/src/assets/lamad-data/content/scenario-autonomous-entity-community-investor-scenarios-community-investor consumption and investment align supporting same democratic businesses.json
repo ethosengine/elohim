@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor consumption and investment align supporting same democratic businesses",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor consumption and investment align supporting same democratic businesses",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor consumption and investment align supporting same democratic businesses",
   "description": "Investor consumption and investment align supporting same democratic businesses",
   "content": "Scenario: Investor consumption and investment align supporting same democratic businesses\n    Given Patricia's consumption and investment were previously disconnected activities\n    And roles as customer and investor didn't integrate\n    When she invests in and patronizes same democratic businesses\n    Then consumption supports investment supports values supports community\n    And economic activities align creating virtuous cycle\n    And integrated participation deepens commitment and impact\n    And community economic participation becomes holistic, not fragmented\n    And community_elohim helps investors see connections between consumption and investment\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor consumption and investment align supporting same democratic businesses",
+    "ogDescription": "Investor consumption and investment align supporting same democratic businesses",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor consumption and investment align supporting same democratic businesses",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor consumption and investment align supporting same democratic businesses - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor consumption and investment align supporting same democratic businesses",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor consumption and investment align supporting same democratic businesses",
+    "name": "Investor consumption and investment align supporting same democratic businesses",
+    "description": "Investor consumption and investment align supporting same democratic businesses",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

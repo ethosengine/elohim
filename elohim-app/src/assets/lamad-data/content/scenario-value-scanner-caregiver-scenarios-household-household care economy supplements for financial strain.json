@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-caregiver-scenarios-household-household care economy supplements for financial strain",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household care economy supplements for financial strain",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Household care economy supplements for financial strain",
   "description": "Household care economy supplements for financial strain",
   "content": "Scenario: Household care economy supplements for financial strain\n    Given household income is severely reduced by caregiving\n    And care expenses are high and increasing\n    When household economic status is assessed\n    Then care token supplements should be available\n    And household should receive care economy financial support\n    And access should be dignified and non-stigmatizing\n    And care economy should function as household safety net\n    And financial support should recognize caregiving economic impact\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-caregiver-scenarios-household",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.190597",
-  "updatedAt": "2025-11-21T18:54:29.190597"
+  "openGraphMetadata": {
+    "ogTitle": "Household care economy supplements for financial strain",
+    "ogDescription": "Household care economy supplements for financial strain",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household care economy supplements for financial strain",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household care economy supplements for financial strain - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-household-household care economy supplements for financial strain",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:household-household care economy supplements for financial strain",
+    "name": "Household care economy supplements for financial strain",
+    "description": "Household care economy supplements for financial strain",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

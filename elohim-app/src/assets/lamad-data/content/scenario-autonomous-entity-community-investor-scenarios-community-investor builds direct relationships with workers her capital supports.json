@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-community-investor-scenarios-community-investor builds direct relationships with workers her capital supports",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor builds direct relationships with workers her capital supports",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Investor builds direct relationships with workers her capital supports",
   "description": "Investor builds direct relationships with workers her capital supports",
   "content": "Scenario: Investor builds direct relationships with workers her capital supports\n    Given stock market investment is anonymous and extractive\n    And Patricia never met workers her capital exploited\n    When community investment creates relationship opportunities\n    Then she knows Maria, DeShawn, Emma\u2014workers her investment helped liberate\n    And attends stakeholder meetings learning about challenges and successes\n    And workers appreciate her support without surrendering governance autonomy\n    And relationship is asymmetric but not extractive (she has capital, they create value, both benefit fairly)\n    And community_elohim facilitates investor-worker relationships protecting democratic governance\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-community-investor-scenarios-community",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.165597",
-  "updatedAt": "2025-11-21T18:54:29.165597"
+  "openGraphMetadata": {
+    "ogTitle": "Investor builds direct relationships with workers her capital supports",
+    "ogDescription": "Investor builds direct relationships with workers her capital supports",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor builds direct relationships with workers her capital supports",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Investor builds direct relationships with workers her capital supports - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-community-investor builds direct relationships with workers her capital supports",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:community-investor builds direct relationships with workers her capital supports",
+    "name": "Investor builds direct relationships with workers her capital supports",
+    "description": "Investor builds direct relationships with workers her capital supports",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

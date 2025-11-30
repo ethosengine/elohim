@@ -1,6 +1,8 @@
 {
   "id": "scenario-value-scanner-adult-scenarios-neighborhood-neighborhood resilience built through care economy practices",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood resilience built through care economy practices",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Neighborhood resilience built through care economy practices",
   "description": "Neighborhood resilience built through care economy practices",
   "content": "Scenario: Neighborhood resilience built through care economy practices\n    Given traditional economic systems leave neighborhoods vulnerable\n    And Sarah wants her neighborhood to be resilient\n    When neighborhood adopts care economy practices\n    Then the neighborhood_elohim should coordinate resource sharing\n    And it should build mutual aid capacity\n    And it should create social capital through care exchanges\n    And neighborhood should become more resilient to crises\n    And care economy should strengthen community fabric\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-value-scanner-adult-scenarios-neighborhood",
     "epic": "value_scanner"
   },
-  "createdAt": "2025-11-21T18:54:29.189597",
-  "updatedAt": "2025-11-21T18:54:29.189597"
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood resilience built through care economy practices",
+    "ogDescription": "Neighborhood resilience built through care economy practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood resilience built through care economy practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood resilience built through care economy practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-neighborhood-neighborhood resilience built through care economy practices",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:neighborhood-neighborhood resilience built through care economy practices",
+    "name": "Neighborhood resilience built through care economy practices",
+    "description": "Neighborhood resilience built through care economy practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

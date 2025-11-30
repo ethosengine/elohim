@@ -1,6 +1,8 @@
 {
   "id": "scenario-governance-appellant-scenarios-individual-family-appeal agent decision that involved factual error",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-appeal agent decision that involved factual error",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Appeal agent decision that involved factual error",
   "description": "Appeal agent decision that involved factual error",
   "content": "Scenario: Appeal agent decision that involved factual error\n    Given a Family Elohim agent denies teenager permission to attend event\n    And the agent based decision on incorrect data about event location\n    And the event was actually a volunteer environmental cleanup\n    When the teenager files an appeal citing factual error\n    Then the appeal is fast-tracked for factual verification\n    And peer agents cross-reference data sources\n    And the address parsing error is identified\n    And the original decision is immediately overturned\n    And the appellant receives acknowledgment of the error\n    And the error pattern is flagged for protocol improvement\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-governance-appellant-scenarios-individual-family",
     "epic": "governance"
   },
-  "createdAt": "2025-11-21T18:54:29.168597",
-  "updatedAt": "2025-11-21T18:54:29.168597"
+  "openGraphMetadata": {
+    "ogTitle": "Appeal agent decision that involved factual error",
+    "ogDescription": "Appeal agent decision that involved factual error",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-appeal agent decision that involved factual error",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal agent decision that involved factual error - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-individual-family-appeal agent decision that involved factual error",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:individual-family-appeal agent decision that involved factual error",
+    "name": "Appeal agent decision that involved factual error",
+    "description": "Appeal agent decision that involved factual error",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }

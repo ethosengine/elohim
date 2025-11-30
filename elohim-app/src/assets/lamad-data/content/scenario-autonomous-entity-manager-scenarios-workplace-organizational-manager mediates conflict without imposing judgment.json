@@ -1,6 +1,8 @@
 {
   "id": "scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager mediates conflict without imposing judgment",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:workplace-organizational-manager mediates conflict without imposing judgment",
   "contentType": "scenario",
+  "activityPubType": "Note",
   "title": "Manager mediates conflict without imposing judgment",
   "description": "Manager mediates conflict without imposing judgment",
   "content": "Scenario: Manager mediates conflict without imposing judgment\n    Given two workers have disagreement about task allocation\n    And corporate model had Marcus impose solution or discipline both\n    When workers bring conflict to Marcus for mediation\n    Then Marcus facilitates structured conversation between parties\n    And Marcus helps each worker express their perspective and needs\n    And Marcus proposes potential compromise solutions\n    And workers, not Marcus, decide on resolution\n    And workplace_elohim documents process ensuring fairness\n    And conflict resolves through dialogue, not managerial authority\n",
@@ -25,6 +27,32 @@
     "featureId": "feature-autonomous-entity-manager-scenarios-workplace-organizational",
     "epic": "autonomous_entity"
   },
-  "createdAt": "2025-11-21T18:54:29.166597",
-  "updatedAt": "2025-11-21T18:54:29.166597"
+  "openGraphMetadata": {
+    "ogTitle": "Manager mediates conflict without imposing judgment",
+    "ogDescription": "Manager mediates conflict without imposing judgment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager mediates conflict without imposing judgment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Manager mediates conflict without imposing judgment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-manager-scenarios-workplace-organizational-manager mediates conflict without imposing judgment",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:workplace-organizational-manager mediates conflict without imposing judgment",
+    "name": "Manager mediates conflict without imposing judgment",
+    "description": "Manager mediates conflict without imposing judgment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
 }
