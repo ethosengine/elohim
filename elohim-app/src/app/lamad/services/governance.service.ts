@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, BehaviorSubject, combineLatest } from 'rxjs';
-import { map, tap, catchError, shareReplay } from 'rxjs/operators';
+import { Observable, of, combineLatest } from 'rxjs';
+import { map, shareReplay } from 'rxjs/operators';
 import {
   DataLoaderService,
   GovernanceIndex,
@@ -95,8 +95,8 @@ export class GovernanceService {
   private precedentsCache$: Observable<PrecedentRecord[]> | null = null;
 
   constructor(
-    private dataLoader: DataLoaderService,
-    private sessionUser: SessionHumanService
+    private readonly dataLoader: DataLoaderService,
+    private readonly sessionUser: SessionHumanService
   ) {}
 
   // =========================================================================

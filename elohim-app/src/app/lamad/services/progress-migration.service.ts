@@ -20,7 +20,7 @@ import { AgentProgress } from '../models/agent.model';
  */
 @Injectable({ providedIn: 'root' })
 export class ProgressMigrationService {
-  constructor(private dataLoader: DataLoaderService) {}
+  constructor(private readonly dataLoader: DataLoaderService) {}
 
   /**
    * Migrate all progress records for all agents in localStorage.
@@ -153,7 +153,7 @@ export class ProgressMigrationService {
 
     const now = new Date().toISOString();
 
-    const globalProgress: AgentProgress = existingProgress || {
+    const globalProgress: AgentProgress = existingProgress ?? {
       agentId,
       pathId: '__global__',
       currentStepIndex: 0,
@@ -168,7 +168,7 @@ export class ProgressMigrationService {
     };
 
     // Merge content IDs (avoid duplicates)
-    const existingIds = new Set(globalProgress.completedContentIds || []);
+    const existingIds = new Set(globalProgress.completedContentIds ?? []);
     for (const id of contentIds) {
       existingIds.add(id);
     }

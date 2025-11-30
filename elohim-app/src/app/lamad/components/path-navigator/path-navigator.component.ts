@@ -5,11 +5,9 @@ import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
-import { PathStepView, LearningPath, PathChapter } from '../../models/learning-path.model';
-import { AgentProgress } from '../../models/agent.model';
-import { BLOOM_LEVEL_VALUES, BloomMasteryLevel } from '../../models/content-mastery.model';
+import { PathStepView, LearningPath } from '../../models/learning-path.model';
+import { BloomMasteryLevel } from '../../models/content-mastery.model';
 import { RendererRegistryService, ContentRenderer } from '../../renderers/renderer-registry.service';
-import { ContentNode } from '../../models/content-node.model';
 
 interface SidebarStep {
   index: number;

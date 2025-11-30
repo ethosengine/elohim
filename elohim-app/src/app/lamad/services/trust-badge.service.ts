@@ -63,9 +63,9 @@ import {
 @Injectable({ providedIn: 'root' })
 export class TrustBadgeService {
   constructor(
-    private dataLoader: DataLoaderService,
-    private contentService: ContentService,
-    private agentService: AgentService
+    private readonly dataLoader: DataLoaderService,
+    private readonly contentService: ContentService,
+    private readonly agentService: AgentService
   ) {}
 
   /**

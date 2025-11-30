@@ -42,8 +42,7 @@ import {
   ExternalIdentifier,
   EconomicResource,
   Commitment,
-  Measure,
-  LAMAD_UNITS,
+  Measure
 } from './rea-bridge.model';
 import { OpenGraphMetadata } from './open-graph.model';
 

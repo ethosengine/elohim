@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional } from '@angular/core';
+import { Injectable, Optional } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import {
   HumanAffinity,
@@ -40,7 +40,7 @@ export class AffinityTrackingService {
     this.changeSubject.asObservable();
 
   constructor(
-    @Optional() private sessionHumanService: SessionHumanService | null
+    @Optional() private readonly sessionHumanService: SessionHumanService | null
   ) {
     // Re-load if session changes
     if (this.sessionHumanService) {

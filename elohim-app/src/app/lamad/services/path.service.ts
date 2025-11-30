@@ -27,8 +27,8 @@ export interface AccessCheckResult {
 @Injectable({ providedIn: 'root' })
 export class PathService {
   constructor(
-    private dataLoader: DataLoaderService,
-    private agentService: AgentService
+    private readonly dataLoader: DataLoaderService,
+    private readonly agentService: AgentService
   ) {}
 
   /**
@@ -280,7 +280,7 @@ export class PathService {
     }).pipe(
       map(({ path, progress, completedContentIds }) => {
         const totalSteps = path.steps.length;
-        const completedSteps = progress?.completedStepIndices.length || 0;
+        const completedSteps = progress?.completedStepIndices.length ?? 0;
 
         // Extract unique content IDs from this path
         const pathContentIds = new Set(
@@ -452,10 +452,10 @@ export class PathService {
         }
 
         // 2. Load content nodes for concepts to get titles
-        const contentObservables = uniqueConceptIds.map(id => 
+        const contentObservables = uniqueConceptIds.map(id =>
           this.dataLoader.getContent(id).pipe(
             // Handle error gracefully if a concept node is missing
-            map(node => ({ id, title: node?.title || id }))
+            map(node => ({ id, title: node?.title ?? id }))
           )
         );
 
@@ -463,7 +463,7 @@ export class PathService {
           map(conceptNodes => {
             // 3. Aggregate progress
             return conceptNodes.map(node => {
-              const stepIndices = conceptMap.get(node.id) || [];
+              const stepIndices = conceptMap.get(node.id) ?? [];
               const totalSteps = stepIndices.length;
               
               // Calculate completed steps for this concept

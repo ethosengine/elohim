@@ -253,10 +253,6 @@
   color: var(--lamad-text-primary, #1f2328);
 }
 
-:host ::ng-deep .markdown-content .heading-anchor {
-  color: var(--lamad-text-primary, #1f2328);
-}
-
 :host ::ng-deep .markdown-content h1 {
   font-size: 2em;
   padding-bottom: 0.3em;
@@ -310,6 +306,7 @@
 :host ::ng-deep .markdown-content .heading-anchor {
   position: relative;
   scroll-margin-top: 2rem;
+  color: var(--lamad-text-primary, #1f2328);
 }
 
 :host ::ng-deep .markdown-content .heading-anchor .anchor-link {

@@ -34,9 +34,7 @@
 import {
   REAAction,
   Measure,
-  ResourceClassification,
-  LAMAD_UNITS,
-  REA_ACTION_EFFECTS,
+  ResourceClassification
 } from './rea-bridge.model';
 
 // ============================================================================

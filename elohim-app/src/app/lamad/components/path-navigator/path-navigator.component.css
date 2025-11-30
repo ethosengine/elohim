@@ -120,12 +120,6 @@
   background-color: var(--lamad-bg-secondary, #f3f4f6);
 }
 
-.expand-icon {
-  font-size: 0.75rem;
-  color: var(--lamad-text-secondary, #6b7280);
-  width: 1rem;
-}
-
 .step-list {
   list-style: none;
   padding: 0;
@@ -671,6 +665,12 @@
 }
 
 .expand-icon {
+  font-size: 0.75rem;
+  color: var(--lamad-text-secondary, #6b7280);
+  width: 1rem;
+}
+
+.sidebar-expand-btn .expand-icon {
   font-size: 1rem;
   font-weight: bold;
 }

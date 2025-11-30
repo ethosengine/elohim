@@ -7,7 +7,7 @@
 
   <!-- Mobile Sidebar Backdrop - click to dismiss -->
   @if (sidebarOpen) {
-    <div class="sidebar-backdrop" (click)="toggleSidebar()"></div>
+    <div class="sidebar-backdrop" (click)="toggleSidebar()" (keydown.escape)="toggleSidebar()" tabindex="-1"></div>
   }
 
   <!-- PATH TOOLING: Sidebar -->
@@ -51,14 +51,15 @@
               @if (chapter.isExpanded) {
                 <ul class="step-list">
                   @for (step of chapter.steps; track step.index) {
-                    <li class="step-item" 
+                    <li class="step-item"
                         [class.current]="step.isCurrent"
                         [class.completed]="step.isCompleted"
                         [class.global-complete]="step.isGlobalCompletion"
                         [class.locked]="step.isLocked">
-                      <a (click)="!step.isLocked ? goToStep(step.index) : null" 
+                      <a (click)="!step.isLocked ? goToStep(step.index) : null"
+                         (keydown.enter)="!step.isLocked ? goToStep(step.index) : null"
                          [attr.role]="step.isLocked ? null : 'link'"
-                         tabindex="0">
+                         [attr.tabindex]="step.isLocked ? -1 : 0">
                         <span class="status-icon">
                           @if (step.isCompleted) {
                             <span class="checkmark">✓</span>
@@ -85,12 +86,15 @@
       @else {
         <ul class="step-list flat">
           @for (step of flatSidebarSteps; track step.index) {
-            <li class="step-item" 
+            <li class="step-item"
                 [class.current]="step.isCurrent"
                 [class.completed]="step.isCompleted"
                 [class.global-complete]="step.isGlobalCompletion"
                 [class.locked]="step.isLocked">
-              <a (click)="!step.isLocked ? goToStep(step.index) : null">
+              <a (click)="!step.isLocked ? goToStep(step.index) : null"
+                 (keydown.enter)="!step.isLocked ? goToStep(step.index) : null"
+                 [attr.role]="step.isLocked ? null : 'link'"
+                 [attr.tabindex]="step.isLocked ? -1 : 0">
                 <span class="status-icon">
                   @if (step.isCompleted) {
                     <span class="checkmark">✓</span>

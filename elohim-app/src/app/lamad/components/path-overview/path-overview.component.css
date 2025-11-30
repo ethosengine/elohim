@@ -13,9 +13,7 @@
 
 /* Areas */
 .back-nav { grid-area: nav; margin-bottom: 1rem; }
-.path-header { grid-area: header; margin-bottom: 2rem; }
 .overview-main { grid-area: main; }
-.overview-sidebar { grid-area: sidebar; }
 
 /* Responsive: Stack on mobile */
 @media (max-width: 900px) {
@@ -43,6 +41,7 @@
 
 /* Sidebar Styling */
 .overview-sidebar {
+  grid-area: sidebar;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;

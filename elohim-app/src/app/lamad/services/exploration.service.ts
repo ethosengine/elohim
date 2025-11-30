@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
-import { map, switchMap, tap, catchError, take } from 'rxjs/operators';
+import { map, switchMap, catchError, take } from 'rxjs/operators';
 
 import { DataLoaderService } from './data-loader.service';
 import {
@@ -17,10 +17,8 @@ import {
   GraphEdge,
   PathResult,
   QueryCost,
-  ExplorationMetadata,
   RateLimitStatus,
   RateLimitTier,
-  RateLimitConfig,
   RATE_LIMIT_CONFIGS,
   DEPTH_ATTESTATION_REQUIREMENTS,
   AttestationCheck,
@@ -81,7 +79,7 @@ export class ExplorationService {
   public readonly rateLimitStatus$ = this.rateLimitStatusSubject.asObservable();
 
   constructor(
-    private dataLoader: DataLoaderService
+    private readonly dataLoader: DataLoaderService
   ) {}
 
   // =========================================================================
@@ -390,7 +388,7 @@ export class ExplorationService {
             const filters = Array.isArray(query.relationshipFilter)
               ? query.relationshipFilter
               : [query.relationshipFilter];
-            if (relationship && !filters.includes(relationship.relationshipType as ContentRelationshipType)) {
+            if (relationship && !filters.includes(relationship.relationshipType)) {
               continue;
             }
           }
@@ -638,7 +636,7 @@ export class ExplorationService {
         // Prefer relationships specified in query
         let adjustedWeight = weight;
         if (query.preferredRelationships && rel) {
-          if (query.preferredRelationships.includes(rel.relationshipType as ContentRelationshipType)) {
+          if (query.preferredRelationships.includes(rel.relationshipType)) {
             adjustedWeight *= 0.5; // Prefer these relationships
           }
         }

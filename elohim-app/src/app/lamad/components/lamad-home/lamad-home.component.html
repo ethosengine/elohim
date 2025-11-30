@@ -109,7 +109,7 @@
 
         <div class="paths-grid">
           @for (path of paths; track path.id) {
-            <article class="path-card" (click)="goToPath(path.id)">
+            <article class="path-card" (click)="goToPath(path.id)" (keydown.enter)="goToPath(path.id)" tabindex="0" role="button">
               @if (path.thumbnailUrl) {
                 <div class="path-thumbnail">
                   <img [src]="path.thumbnailUrl" [alt]="path.thumbnailAlt || path.title" loading="lazy">

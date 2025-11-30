@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
-import { map, switchMap, tap, catchError, delay } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 
 import { DataLoaderService } from './data-loader.service';
 import { ElohimAgentService } from './elohim-agent.service';
@@ -8,11 +8,9 @@ import {
   KnowledgeMap,
   KnowledgeMapType,
   KnowledgeNode,
-  KnowledgeSource,
   KnowledgeMapIndex,
   KnowledgeMapIndexEntry,
   KnowledgeMapUpdate,
-  MapMergeRequest,
   DomainKnowledgeMap,
   PersonKnowledgeMap,
   CollectiveKnowledgeMap,
@@ -51,8 +49,8 @@ export class KnowledgeMapService {
   private currentAgentId = 'demo-learner';
 
   constructor(
-    private dataLoader: DataLoaderService,
-    private elohimService: ElohimAgentService
+    private readonly dataLoader: DataLoaderService,
+    private readonly elohimService: ElohimAgentService
   ) {
     this.initializeDemoMaps();
   }
@@ -182,7 +180,7 @@ export class KnowledgeMapService {
     description?: string;
     visibility?: KnowledgeMap['visibility'];
   }): Observable<DomainKnowledgeMap> {
-    const mapId = `map-domain-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mapId = `map-domain-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const now = new Date().toISOString();
 
     const newMap: DomainKnowledgeMap = {
@@ -224,7 +222,7 @@ export class KnowledgeMapService {
     description?: string;
     visibility?: KnowledgeMap['visibility'];
   }): Observable<PersonKnowledgeMap> {
-    const mapId = `map-person-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mapId = `map-person-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const now = new Date().toISOString();
 
     const newMap: PersonKnowledgeMap = {
@@ -266,7 +264,7 @@ export class KnowledgeMapService {
     visibility?: KnowledgeMap['visibility'];
     governance?: CollectiveKnowledgeMap['governance'];
   }): Observable<CollectiveKnowledgeMap> {
-    const mapId = `map-collective-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mapId = `map-collective-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const now = new Date().toISOString();
 
     const newMap: CollectiveKnowledgeMap = {
@@ -326,7 +324,7 @@ export class KnowledgeMapService {
 
         const newNode: KnowledgeNode = {
           ...node,
-          id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
         };
 
         m.nodes.push(newNode);

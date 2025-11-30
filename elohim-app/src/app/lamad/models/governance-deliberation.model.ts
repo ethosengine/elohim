@@ -19,25 +19,17 @@
  */
 
 import {
-  GovernanceState,
-  GovernanceStatus,
   GovernanceLabel,
-  LabelType,
-  LabelSeverity,
   Challenge,
-  ChallengeState,
   Appeal,
   Precedent,
-  GovernanceVote,
   VotingMechanism,
-  ContentGovernanceHistory,
   DiscussionThread,
   DiscussionCategory,
   DiscussionMessage,
   VersionRecord,
   GovernanceEvent,
   GovernanceEventType,
-  ProtectionLevel,
   ContentGovernanceSummary,
   GovernableEntityType
 } from './governance-feedback.model';

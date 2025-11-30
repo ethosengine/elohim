@@ -80,8 +80,8 @@ const REACH_HIERARCHY: ContentReach[] = [
 @Injectable({ providedIn: 'root' })
 export class ContentService {
   constructor(
-    private dataLoader: DataLoaderService,
-    private agentService: AgentService
+    private readonly dataLoader: DataLoaderService,
+    private readonly agentService: AgentService
   ) {}
 
   /**
@@ -99,7 +99,7 @@ export class ContentService {
    */
   getRelatedResourceIds(resourceId: string): Observable<string[]> {
     return this.dataLoader.getContent(resourceId).pipe(
-      map(node => node.relatedNodeIds || [])
+      map(node => node.relatedNodeIds ?? [])
     );
   }
 
@@ -128,11 +128,11 @@ export class ContentService {
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
         if (!query || query.trim().length === 0) {
-          return index.nodes || [];
+          return index.nodes ?? [];
         }
 
         const lowerQuery = query.toLowerCase().trim();
-        return (index.nodes || []).filter((node: ContentIndexEntry) =>
+        return (index.nodes ?? []).filter((node: ContentIndexEntry) =>
           node.title.toLowerCase().includes(lowerQuery) ||
           node.description?.toLowerCase().includes(lowerQuery) ||
           node.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
@@ -147,7 +147,7 @@ export class ContentService {
   getContentByType(contentType: ContentType): Observable<ContentIndexEntry[]> {
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
-        return (index.nodes || []).filter(
+        return (index.nodes ?? []).filter(
           (node: ContentIndexEntry) => node.contentType === contentType
         );
       })
@@ -161,7 +161,7 @@ export class ContentService {
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
         const lowerTag = tag.toLowerCase();
-        return (index.nodes || []).filter((node: ContentIndexEntry) =>
+        return (index.nodes ?? []).filter((node: ContentIndexEntry) =>
           node.tags?.some((t: string) => t.toLowerCase() === lowerTag)
         );
       })
@@ -175,7 +175,7 @@ export class ContentService {
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
         const tagSet = new Set<string>();
-        (index.nodes || []).forEach((node: ContentIndexEntry) => {
+        (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           node.tags?.forEach((tag: string) => tagSet.add(tag));
         });
         return Array.from(tagSet).sort();
@@ -190,7 +190,7 @@ export class ContentService {
     return this.dataLoader.getContentIndex().pipe(
       map(index => {
         const typeSet = new Set<ContentType>();
-        (index.nodes || []).forEach((node: ContentIndexEntry) => {
+        (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           if (node.contentType) {
             typeSet.add(node.contentType);
           }
@@ -389,7 +389,7 @@ export class ContentService {
    */
   getContentPreviewsForCategory(category: string): Observable<ContentPreview[]> {
     return this.dataLoader.getContentIndex().pipe(
-      map(index => this.filterAndMapToPreview(index.nodes || [], category))
+      map(index => this.filterAndMapToPreview(index.nodes ?? [], category))
     );
   }
 
@@ -433,14 +433,14 @@ export class ContentService {
   getRelatedContentPreviews(resourceId: string): Observable<ContentPreview[]> {
     return this.dataLoader.getContent(resourceId).pipe(
       switchMap(node => {
-        const relatedIds = node.relatedNodeIds || [];
+        const relatedIds = node.relatedNodeIds ?? [];
         if (relatedIds.length === 0) {
           return of([]);
         }
 
         return this.dataLoader.getContentIndex().pipe(
           map(index => {
-            const nodes = index.nodes || [];
+            const nodes = index.nodes ?? [];
             return nodes
               .filter((n: any) => relatedIds.includes(n.id))
               .map((n: any) => this.mapIndexEntryToPreview(n));
@@ -488,7 +488,7 @@ export class ContentService {
         if (category === normalizedCategoryId) return true;
 
         // Match by tag (e.g., "governance", "category:governance")
-        const tags = node.tags || [];
+        const tags = node.tags ?? [];
         return tags.some((tag: string) => {
           const normalizedTag = tag.replace('epic:', '').replace('category:', '').replace('_', '-');
           return normalizedTag === normalizedCategoryId;
@@ -503,10 +503,10 @@ export class ContentService {
   private mapIndexEntryToPreview(entry: any): ContentPreview {
     const preview: ContentPreview = {
       id: entry.id,
-      title: entry.name || entry.title, // Prefer 'name' for display if available
-      description: entry.description || '',
+      title: entry.name ?? entry.title, // Prefer 'name' for display if available
+      description: entry.description ?? '',
       contentType: entry.contentType,
-      tags: entry.tags || [],
+      tags: entry.tags ?? [],
       url: entry.url,
       name: entry.name,
       publisher: entry.publisher,
@@ -571,9 +571,9 @@ export class ContentService {
    * });
    * ```
    */
-  getOpenGraphMetadata(resourceId: string): Observable<any | null> {
+  getOpenGraphMetadata(resourceId: string): Observable<Record<string, unknown> | null> {
     return this.dataLoader.getContent(resourceId).pipe(
-      map(content => content.openGraphMetadata || null),
+      map(content => content.openGraphMetadata ?? null),
       catchError(() => of(null))
     );
   }
@@ -597,7 +597,7 @@ export class ContentService {
    * });
    * ```
    */
-  getActivityPubObject(resourceId: string): Observable<any | null> {
+  getActivityPubObject(resourceId: string): Observable<Record<string, unknown> | null> {
     return this.dataLoader.getContent(resourceId).pipe(
       map(content => {
         if (!content.activityPubType) {
@@ -608,12 +608,12 @@ export class ContentService {
         const apObject: any = {
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: content.activityPubType,
-          id: content.did || `https://elohim-protocol.org/content/${content.id}`,
-          name: content.title || content.name,
+          id: content.did ?? `https://elohim-protocol.org/content/${content.id}`,
+          name: content.title ?? content.name,
           content: content.description,
           published: content.createdAt,
           updated: content.updatedAt,
-          url: content.url || `https://elohim-protocol.org/content/${content.id}`
+          url: content.url ?? `https://elohim-protocol.org/content/${content.id}`
         };
 
         // Add author if available
@@ -656,9 +656,9 @@ export class ContentService {
    * });
    * ```
    */
-  getJsonLd(resourceId: string): Observable<any | null> {
+  getJsonLd(resourceId: string): Observable<Record<string, unknown> | null> {
     return this.dataLoader.getContent(resourceId).pipe(
-      map(content => content.linkedData || null),
+      map(content => content.linkedData ?? null),
       catchError(() => of(null))
     );
   }
@@ -679,7 +679,7 @@ export class ContentService {
    */
   getDid(resourceId: string): Observable<string | null> {
     return this.dataLoader.getContent(resourceId).pipe(
-      map(content => content.did || null),
+      map(content => content.did ?? null),
       catchError(() => of(null))
     );
   }
@@ -701,11 +701,11 @@ export class ContentService {
   }> {
     return this.dataLoader.getContent(resourceId).pipe(
       map(content => ({
-        did: content.did || null,
-        activityPubType: content.activityPubType || null,
+        did: content.did ?? null,
+        activityPubType: content.activityPubType ?? null,
         activityPubObject: content.activityPubType ? this.buildActivityPubObject(content) : null,
-        openGraph: content.openGraphMetadata || null,
-        jsonLd: content.linkedData || null
+        openGraph: content.openGraphMetadata ?? null,
+        jsonLd: content.linkedData ?? null
       })),
       catchError(() => of({
         did: null,
@@ -725,12 +725,12 @@ export class ContentService {
     const apObject: any = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       type: content.activityPubType,
-      id: content.did || `https://elohim-protocol.org/content/${content.id}`,
-      name: content.title || content.name,
+      id: content.did ?? `https://elohim-protocol.org/content/${content.id}`,
+      name: content.title ?? content.name,
       content: content.description,
       published: content.createdAt,
       updated: content.updatedAt,
-      url: content.url || `https://elohim-protocol.org/content/${content.id}`
+      url: content.url ?? `https://elohim-protocol.org/content/${content.id}`
     };
 
     if (content.authorId) {

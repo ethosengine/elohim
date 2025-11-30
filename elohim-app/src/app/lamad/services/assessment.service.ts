@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, BehaviorSubject } from 'rxjs';
-import { map, tap, catchError, switchMap } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import {
   DataLoaderService,
   AssessmentIndex,
@@ -81,8 +81,8 @@ export class AssessmentService {
   private activeSession$ = new BehaviorSubject<AssessmentSession | null>(null);
 
   constructor(
-    private dataLoader: DataLoaderService,
-    private sessionUser: SessionHumanService
+    private readonly dataLoader: DataLoaderService,
+    private readonly sessionUser: SessionHumanService
   ) {}
 
   // =========================================================================
