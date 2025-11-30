@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-affinity-network-elder protected from health fraud in wellness network",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network-elder protected from health fraud in wellness network",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Elder protected from health fraud in wellness network",
+  "description": "Elder protected from health fraud in wellness network",
+  "content": "Scenario: Elder protected from health fraud in wellness network\n    Given Rose participates in a seniors wellness affinity network\n    When a scammer tries to promote miracle cure products\n    And they attempt to contact network members with fraudulent claims\n    Then the guardian agent detects the scam pattern\n    And the fraudulent messages are blocked before reaching Rose\n    And legitimate health information continues to flow\n    And wellness discussions remain safe and evidence-based\n    And Rose and peers are protected while maintaining autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:affinity_network",
+    "related_users:elder,content_creator,child",
+    "related_layers:neighborhood,community,cultural_linguistic",
+    "elohim_agents:guardian_agent,matching_agent,wisdom_preservation_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Elder protected from health fraud in wellness network",
+    "ogDescription": "Elder protected from health fraud in wellness network",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-affinity-network-elder protected from health fraud in wellness network",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder protected from health fraud in wellness network - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-affinity-network-elder protected from health fraud in wellness network",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:affinity-network-elder protected from health fraud in wellness network",
+    "name": "Elder protected from health fraud in wellness network",
+    "description": "Elder protected from health fraud in wellness network",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

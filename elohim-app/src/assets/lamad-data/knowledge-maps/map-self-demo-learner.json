@@ -1,0 +1,108 @@
+{
+  "id": "map-self-demo-learner",
+  "mapType": "self",
+  "ownerId": "demo-learner",
+  "title": "My Self-Knowledge Map",
+  "description": "A map of self-understanding built through assessments and reflection",
+  "createdAt": "2025-10-29T00:09:03.482329",
+  "updatedAt": "2025-11-28T00:09:03.482332",
+  "dimensions": {
+    "imagodei-core": {
+      "nodes": [
+        {
+          "id": "core-identity-1",
+          "label": "Curious learner",
+          "source": "self-reflection",
+          "addedAt": "2025-11-03T00:09:03.482334"
+        },
+        {
+          "id": "core-identity-2",
+          "label": "Values fairness",
+          "source": "assessment-values-hierarchy",
+          "addedAt": "2025-11-08T00:09:03.482335"
+        }
+      ]
+    },
+    "imagodei-experience": {
+      "lifeChapters": [
+        {
+          "id": "chapter-1",
+          "title": "Early Career",
+          "period": "2015-2020",
+          "themes": [
+            "exploration",
+            "skill-building"
+          ],
+          "addedAt": "2025-11-13T00:09:03.482337"
+        }
+      ]
+    },
+    "imagodei-gifts": {
+      "discoveredGifts": [
+        {
+          "id": "gift-1",
+          "name": "Curiosity",
+          "source": "assessment-strengths-finder",
+          "confidence": 0.85,
+          "addedAt": "2025-11-18T00:09:03.482339"
+        },
+        {
+          "id": "gift-2",
+          "name": "Kindness",
+          "source": "assessment-strengths-finder",
+          "confidence": 0.78,
+          "addedAt": "2025-11-18T00:09:03.482341"
+        }
+      ]
+    },
+    "imagodei-synthesis": {
+      "domainReflections": [
+        {
+          "id": "reflection-1",
+          "domainMapId": "map-domain-elohim-protocol",
+          "reflection": "Learning about governance revealed my value for fairness",
+          "addedAt": "2025-11-23T00:09:03.482345"
+        }
+      ]
+    }
+  },
+  "values": [
+    {
+      "id": "value-1",
+      "name": "Fairness",
+      "priority": 1,
+      "source": "assessment-values-hierarchy"
+    },
+    {
+      "id": "value-2",
+      "name": "Growth",
+      "priority": 2,
+      "source": "self-reflection"
+    }
+  ],
+  "shadowAreas": [
+    {
+      "id": "shadow-1",
+      "area": "Impatience with slow processes",
+      "insight": "Recognized through governance learning - desire for quick resolution",
+      "growthPlan": "Practice patience with deliberation processes",
+      "addedAt": "2025-11-21T00:09:03.482347"
+    }
+  ],
+  "assessmentResults": [
+    {
+      "assessmentId": "assessment-values-hierarchy",
+      "completedAt": "2025-11-08T00:09:03.482349",
+      "topResults": [
+        "fairness",
+        "growth",
+        "service"
+      ]
+    }
+  ],
+  "visibility": "private",
+  "metadata": {
+    "nodeCount": 8,
+    "lastAssessment": "2025-11-18T00:09:03.482350"
+  }
+}

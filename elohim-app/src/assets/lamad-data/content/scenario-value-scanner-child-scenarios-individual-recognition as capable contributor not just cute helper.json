@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-recognition as capable contributor not just cute helper",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-recognition as capable contributor not just cute helper",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Recognition as capable contributor not just cute helper",
+  "description": "Recognition as capable contributor not just cute helper",
+  "content": "Scenario: Recognition as capable contributor not just cute helper\n    Given Emma has made a budget-conscious choice\n    And she selected store brand cereal to save money\n    When the transaction is complete\n    Then the recognition should be specific and substantive\n    And her personal_agent should say \"Your choice saved $2, which helped the family stay within budget\"\n    And the feedback should acknowledge real impact\n    And Emma should not receive patronizing praise\n    And her contribution should be valued as genuine stewardship\n    And she should build identity as capable resource manager\n    And recognition should reflect that her work actually matters\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Recognition as capable contributor not just cute helper",
+    "ogDescription": "Recognition as capable contributor not just cute helper",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-recognition as capable contributor not just cute helper",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition as capable contributor not just cute helper - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-recognition as capable contributor not just cute helper",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-recognition as capable contributor not just cute helper",
+    "name": "Recognition as capable contributor not just cute helper",
+    "description": "Recognition as capable contributor not just cute helper",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

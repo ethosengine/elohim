@@ -1,0 +1,96 @@
+{
+  "id": "assessment-personal-values",
+  "contentType": "assessment",
+  "title": "Personal Values Reflection",
+  "description": "Reflect on what you value most in contributing to community",
+  "content": {
+    "instrumentType": "reflection",
+    "domain": "values",
+    "passingScore": 0,
+    "allowRetake": true,
+    "showCorrectAnswers": false,
+    "questions": [
+      {
+        "id": "pv-q1",
+        "type": "slider",
+        "text": "How important is recognition for your contributions?",
+        "scaleAnchors": {
+          "low": "Not Important",
+          "high": "Very Important"
+        },
+        "range": {
+          "min": 0,
+          "max": 100
+        },
+        "subscales": [
+          "recognition"
+        ]
+      },
+      {
+        "id": "pv-q2",
+        "type": "slider",
+        "text": "How much do you value helping others even when no one notices?",
+        "scaleAnchors": {
+          "low": "Rarely",
+          "high": "Always"
+        },
+        "range": {
+          "min": 0,
+          "max": 100
+        },
+        "subscales": [
+          "altruism"
+        ]
+      },
+      {
+        "id": "pv-q3",
+        "type": "multiple-select",
+        "text": "Which forms of contribution feel most meaningful to you?",
+        "options": [
+          {
+            "value": "caregiving",
+            "label": "Caring for family members"
+          },
+          {
+            "value": "mentoring",
+            "label": "Mentoring or teaching others"
+          },
+          {
+            "value": "creating",
+            "label": "Creating things that help people"
+          },
+          {
+            "value": "organizing",
+            "label": "Organizing community efforts"
+          },
+          {
+            "value": "listening",
+            "label": "Being present and listening to others"
+          }
+        ],
+        "subscales": [
+          "contribution-types"
+        ]
+      }
+    ]
+  },
+  "contentFormat": "assessment-json",
+  "tags": [
+    "assessment",
+    "values",
+    "reflection",
+    "value-scanner"
+  ],
+  "sourcePath": "generated/assessment-personal-values.json",
+  "relatedNodeIds": [
+    "value-scanner-journey"
+  ],
+  "metadata": {
+    "instrumentType": "reflection",
+    "domain": "values",
+    "estimatedTime": "10-15 minutes",
+    "attestationId": "values-explorer"
+  },
+  "createdAt": "2025-11-28T00:09:03.479960",
+  "updatedAt": "2025-11-28T00:09:03.479961"
+}

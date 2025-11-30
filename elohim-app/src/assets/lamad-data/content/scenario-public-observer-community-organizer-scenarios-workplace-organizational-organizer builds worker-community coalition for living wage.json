@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer builds worker-community coalition for living wage",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer builds worker-community coalition for living wage",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Organizer builds worker-community coalition for living wage",
+  "description": "Organizer builds worker-community coalition for living wage",
+  "content": "Scenario: Organizer builds worker-community coalition for living wage\n    Given workers can't afford housing in city where they work\n    And residents care about economic stability of their communities\n    When the organizer uses Observer to build coalition\n    Then they connect low-wage workers with community advocates\n    And show how poverty wages harm both workers and neighborhoods\n    And coordinate testimony combining worker lived experience and community impact\n    And facilitate coalition across four languages and multiple industries\n    And labor organizing becomes community economic justice campaign\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:workplace_organizational",
+    "related_users:activist,citizen,politician,journalist",
+    "related_layers:municipality,industry_sector,community",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Organizer builds worker-community coalition for living wage",
+    "ogDescription": "Organizer builds worker-community coalition for living wage",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer builds worker-community coalition for living wage",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer builds worker-community coalition for living wage - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-workplace-organizational-organizer builds worker-community coalition for living wage",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:workplace-organizational-organizer builds worker-community coalition for living wage",
+    "name": "Organizer builds worker-community coalition for living wage",
+    "description": "Organizer builds worker-community coalition for living wage",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

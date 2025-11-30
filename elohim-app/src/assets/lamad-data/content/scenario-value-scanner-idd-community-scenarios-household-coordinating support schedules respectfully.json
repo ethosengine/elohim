@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-coordinating support schedules respectfully",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-coordinating support schedules respectfully",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating support schedules respectfully",
+  "description": "Coordinating support schedules respectfully",
+  "content": "Scenario: Coordinating support schedules respectfully\n    Given the group home has support workers on rotating shifts\n    And each housemate has different support needs and preferences\n    When the household reviews the support schedule\n    Then Jordan can express preferences for support worker assignments\n    And the scheduling system honors Jordan's preferences when possible\n    And Jordan's input is weighted equally with other housemates\n    And the household_elohim coordinates fair schedule distribution\n    And Jordan experiences having voice in who supports them\n    And Jordan's preferences shape their daily life experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating support schedules respectfully",
+    "ogDescription": "Coordinating support schedules respectfully",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-coordinating support schedules respectfully",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating support schedules respectfully - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-coordinating support schedules respectfully",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-coordinating support schedules respectfully",
+    "name": "Coordinating support schedules respectfully",
+    "description": "Coordinating support schedules respectfully",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

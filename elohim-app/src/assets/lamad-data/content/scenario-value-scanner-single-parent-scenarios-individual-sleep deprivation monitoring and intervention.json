@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-individual-sleep deprivation monitoring and intervention",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-sleep deprivation monitoring and intervention",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Sleep deprivation monitoring and intervention",
+  "description": "Sleep deprivation monitoring and intervention",
+  "content": "Scenario: Sleep deprivation monitoring and intervention\n    Given Maria wakes at 5am and collapses near midnight daily\n    And chronic sleep deprivation damages health and capacity\n    When the personal_agent tracks Maria's sleep patterns\n    Then it should monitor for dangerous sleep deprivation\n    And it should advocate for more rest when possible\n    And it should help her find efficiency that creates sleep time\n    And it should alert her when sleep deprivation threatens her health\n    And Maria should have support for this basic but often impossible need\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:individual",
+    "related_users:parent,adult,worker,caregiver",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sleep deprivation monitoring and intervention",
+    "ogDescription": "Sleep deprivation monitoring and intervention",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-sleep deprivation monitoring and intervention",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sleep deprivation monitoring and intervention - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-sleep deprivation monitoring and intervention",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-sleep deprivation monitoring and intervention",
+    "name": "Sleep deprivation monitoring and intervention",
+    "description": "Sleep deprivation monitoring and intervention",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

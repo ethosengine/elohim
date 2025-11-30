@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-romans-12-2",
+  "contentType": "bible-verse",
+  "title": "Romans 12:2",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Romans 12:2",
+    "book": "Romans",
+    "chapter": 12,
+    "verseStart": 2,
+    "verseEnd": null,
+    "contextInModule": "Romans 12:2 \\- Be transformed by the renewing of your mind",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "romans",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T21:10:19.224730",
+  "updatedAt": "2025-11-28T21:10:19.224731",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Romans 12:2",
+    "ogDescription": "Scripture reference used in FCT Module 14",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-romans-12-2",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Romans 12:2 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-romans-12-2",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Romans 12:2",
+    "description": "Scripture reference used in FCT Module 14",
+    "dateCreated": "2025-11-28T21:10:19.224730",
+    "dateModified": "2025-11-28T21:10:19.224731",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

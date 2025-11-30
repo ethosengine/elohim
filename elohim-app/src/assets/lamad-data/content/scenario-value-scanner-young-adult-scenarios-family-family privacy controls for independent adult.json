@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-family privacy controls for independent adult",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-family privacy controls for independent adult",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family privacy controls for independent adult",
+  "description": "Family privacy controls for independent adult",
+  "content": "Scenario: Family privacy controls for independent adult\n    Given Aisha has adult autonomy\n    And she maintains some privacy from family\n    When Aisha configures family data sharing\n    Then she should control what family sees\n    And she should choose what care contributions to share\n    And her financial details should remain private unless she shares\n    And personal life decisions should be hers to disclose\n    And the system should support healthy adult family boundaries\n    And privacy should coexist with care economy participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family privacy controls for independent adult",
+    "ogDescription": "Family privacy controls for independent adult",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-family privacy controls for independent adult",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family privacy controls for independent adult - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-family privacy controls for independent adult",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-family privacy controls for independent adult",
+    "name": "Family privacy controls for independent adult",
+    "description": "Family privacy controls for independent adult",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

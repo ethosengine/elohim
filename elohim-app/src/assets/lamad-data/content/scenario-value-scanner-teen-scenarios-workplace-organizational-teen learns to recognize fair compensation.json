@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns to recognize fair compensation",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-teen learns to recognize fair compensation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teen learns to recognize fair compensation",
+  "description": "Teen learns to recognize fair compensation",
+  "content": "Scenario: Teen learns to recognize fair compensation\n    Given Jasmine earns $15/hour at her retail job\n    And the local living wage is $18/hour\n    When her personal_agent analyzes her compensation\n    Then it should help her understand whether pay is fair\n    And show how her wages compare to living wage standards\n    And help her calculate the real value of her labor\n    And teach her to recognize when work is undercompensated\n    And build her expectation that labor deserves fair compensation\n    And prepare her to advocate for fair wages as an adult worker\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:workplace_organizational",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:individual,community,educational",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teen learns to recognize fair compensation",
+    "ogDescription": "Teen learns to recognize fair compensation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns to recognize fair compensation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen learns to recognize fair compensation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-workplace-organizational-teen learns to recognize fair compensation",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:workplace-organizational-teen learns to recognize fair compensation",
+    "name": "Teen learns to recognize fair compensation",
+    "description": "Teen learns to recognize fair compensation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

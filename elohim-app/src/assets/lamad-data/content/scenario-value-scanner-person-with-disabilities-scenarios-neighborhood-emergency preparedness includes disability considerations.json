@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-emergency preparedness includes disability considerations",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-emergency preparedness includes disability considerations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Emergency preparedness includes disability considerations",
+  "description": "Emergency preparedness includes disability considerations",
+  "content": "Scenario: Emergency preparedness includes disability considerations\n    Given emergencies affect disabled people disproportionately\n    And Alex has specific emergency needs\n    When the neighborhood plans for emergencies\n    Then Alex should be included in emergency planning\n    And neighborhood should know about residents with access needs\n    And evacuation plans should accommodate wheelchair users\n    And the neighborhood_elohim should coordinate disability-inclusive preparedness\n    And Alex's expertise should shape neighborhood emergency protocols\n    And disabled neighbors should be protected, not forgotten\n    And inclusive planning should reduce vulnerability for all residents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:neighborhood",
+    "related_users:adult,elderly,parent,child,caregiver",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Emergency preparedness includes disability considerations",
+    "ogDescription": "Emergency preparedness includes disability considerations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-emergency preparedness includes disability considerations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Emergency preparedness includes disability considerations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-neighborhood-emergency preparedness includes disability considerations",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:neighborhood-emergency preparedness includes disability considerations",
+    "name": "Emergency preparedness includes disability considerations",
+    "description": "Emergency preparedness includes disability considerations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

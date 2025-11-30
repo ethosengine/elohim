@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-convention creates amendments from accumulated lived experience",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-convention creates amendments from accumulated lived experience",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Convention creates amendments from accumulated lived experience",
+  "description": "Convention creates amendments from accumulated lived experience",
+  "content": "Scenario: Convention creates amendments from accumulated lived experience\n    Given amendments emerge from decades of appeals and precedents\n    And each came from individual suffering or struggle\n    When we pass amendments informed by countless stories\n    Then Marcus's privacy appeal: shaped care-autonomy balance amendment\n    And Tommy's adolescent case: informed developing autonomy recognition\n    And Watershed conflict: influenced ecological standing provision\n    And Maria's loan denial: affected economic dignity standards\n    And my nursing: contributed to healthcare as constitutional right\n    And constitution evolves: from lived experience not abstract theory\n    And we demonstrate: how individual recourse informs collective wisdom\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Convention creates amendments from accumulated lived experience",
+    "ogDescription": "Convention creates amendments from accumulated lived experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-convention creates amendments from accumulated lived experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Convention creates amendments from accumulated lived experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-convention creates amendments from accumulated lived experience",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-convention creates amendments from accumulated lived experience",
+    "name": "Convention creates amendments from accumulated lived experience",
+    "description": "Convention creates amendments from accumulated lived experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

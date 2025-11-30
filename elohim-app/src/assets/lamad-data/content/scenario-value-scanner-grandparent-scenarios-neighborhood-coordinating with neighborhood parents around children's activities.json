@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating with neighborhood parents around children's activities",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-coordinating with neighborhood parents around children's activities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating with neighborhood parents around children's activities",
+  "description": "Coordinating with neighborhood parents around children's activities",
+  "content": "Scenario: Coordinating with neighborhood parents around children's activities\n    Given Margaret cares for grandchildren in neighborhood context\n    And she interacts with other children and parents\n    When Margaret participates in neighborhood child activities\n    Then the neighborhood_elohim should help coordinate with other parents\n    And it should facilitate communication about children's play and safety\n    And it should support collective neighborhood childcare\n    And Margaret should be recognized as part of neighborhood care network\n    And grandparents should be valued participants in children's community\n    And neighborhood should benefit from grandparent engagement\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating with neighborhood parents around children's activities",
+    "ogDescription": "Coordinating with neighborhood parents around children's activities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating with neighborhood parents around children's activities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating with neighborhood parents around children's activities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-coordinating with neighborhood parents around children's activities",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-coordinating with neighborhood parents around children's activities",
+    "name": "Coordinating with neighborhood parents around children's activities",
+    "description": "Coordinating with neighborhood parents around children's activities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

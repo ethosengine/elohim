@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-family-family decision-making about care arrangements and boundaries",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-family decision-making about care arrangements and boundaries",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family decision-making about care arrangements and boundaries",
+  "description": "Family decision-making about care arrangements and boundaries",
+  "content": "Scenario: Family decision-making about care arrangements and boundaries\n    Given care arrangements affect multiple family members\n    And boundaries need to be negotiated and maintained\n    When the family discusses care commitments and changes\n    Then the family_elohim should facilitate clear communication\n    And it should help family make decisions that respect all members\n    And Margaret's capacity and boundaries should be honored\n    And Sarah's parenting authority should be respected\n    And care arrangements should be mutually agreed upon\n    And family governance should be participatory and equitable\n    And decisions should serve the flourishing of all generations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:family",
+    "related_users:parent,child,elderly,adult,middle_aged",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family decision-making about care arrangements and boundaries",
+    "ogDescription": "Family decision-making about care arrangements and boundaries",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-family decision-making about care arrangements and boundaries",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family decision-making about care arrangements and boundaries - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-family-family decision-making about care arrangements and boundaries",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:family-family decision-making about care arrangements and boundaries",
+    "name": "Family decision-making about care arrangements and boundaries",
+    "description": "Family decision-making about care arrangements and boundaries",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

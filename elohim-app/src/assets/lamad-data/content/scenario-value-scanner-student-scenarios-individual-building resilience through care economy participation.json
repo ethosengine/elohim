@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-individual-building resilience through care economy participation",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-building resilience through care economy participation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building resilience through care economy participation",
+  "description": "Building resilience through care economy participation",
+  "content": "Scenario: Building resilience through care economy participation\n    Given Kenji faces significant stress and uncertainty\n    And he is geographically separated from family support networks\n    When the personal_agent supports Kenji's resilience development\n    Then it should recognize his participation in care economy as building connection\n    And it should show how his care contributions create community\n    And it should validate that resilience comes from reciprocal relationships\n    And the agent should help him build care networks in temporary community\n    And the system should teach that care economy creates security\n    And Kenji should learn that giving and receiving care builds resilience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building resilience through care economy participation",
+    "ogDescription": "Building resilience through care economy participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-building resilience through care economy participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building resilience through care economy participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-individual-building resilience through care economy participation",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual-building resilience through care economy participation",
+    "name": "Building resilience through care economy participation",
+    "description": "Building resilience through care economy participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

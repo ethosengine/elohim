@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-municipality-municipal policy informed by aggregated care economy data",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal policy informed by aggregated care economy data",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal policy informed by aggregated care economy data",
+  "description": "Municipal policy informed by aggregated care economy data",
+  "content": "Scenario: Municipal policy informed by aggregated care economy data\n    Given thousands of residents participate in care economy\n    And their care patterns generate valuable data\n    When municipal policy decisions are made\n    Then the municipal_elohim should provide aggregated care work data\n    And policy makers should see actual patterns of care labor\n    And invisible care work should be quantified at municipal scale\n    And policy should be informed by real care economy patterns\n    And data should reveal needs that traditional economics miss\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:municipality",
+    "related_users:parent,worker,caregiver,community_member,citizen",
+    "related_layers:community,neighborhood,household",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal policy informed by aggregated care economy data",
+    "ogDescription": "Municipal policy informed by aggregated care economy data",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal policy informed by aggregated care economy data",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal policy informed by aggregated care economy data - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-municipality-municipal policy informed by aggregated care economy data",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:municipality-municipal policy informed by aggregated care economy data",
+    "name": "Municipal policy informed by aggregated care economy data",
+    "description": "Municipal policy informed by aggregated care economy data",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

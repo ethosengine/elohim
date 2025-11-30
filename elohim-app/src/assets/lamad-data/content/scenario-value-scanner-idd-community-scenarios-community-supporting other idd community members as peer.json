@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-community-supporting other idd community members as peer",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-supporting other idd community members as peer",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Supporting other IDD community members as peer",
+  "description": "Supporting other IDD community members as peer",
+  "content": "Scenario: Supporting other IDD community members as peer\n    Given Jordan has learned strategies for various daily challenges\n    And a newer group home resident is struggling with similar issues\n    When Jordan offers peer support\n    Then Jordan shares what has helped them\n    And the new resident benefits from Jordan's lived experience wisdom\n    And Jordan's peer support is recognized as valuable care work\n    And Jordan accumulates care tokens for peer support contribution\n    And Jordan experiences being a care provider and mentor\n    And IDD peer support is recognized as essential care infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-community",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Supporting other IDD community members as peer",
+    "ogDescription": "Supporting other IDD community members as peer",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-supporting other idd community members as peer",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting other IDD community members as peer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-community-supporting other idd community members as peer",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:community-supporting other idd community members as peer",
+    "name": "Supporting other IDD community members as peer",
+    "description": "Supporting other IDD community members as peer",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

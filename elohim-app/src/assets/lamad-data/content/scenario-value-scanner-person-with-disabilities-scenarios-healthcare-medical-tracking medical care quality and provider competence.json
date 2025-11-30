@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-tracking medical care quality and provider competence",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-tracking medical care quality and provider competence",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Tracking medical care quality and provider competence",
+  "description": "Tracking medical care quality and provider competence",
+  "content": "Scenario: Tracking medical care quality and provider competence\n    Given medical providers vary widely in disability competence\n    And poor care from ableist providers causes harm\n    When Alex receives medical care\n    Then the personal_agent should help Alex track care quality\n    And it should document which providers respect Alex's autonomy\n    And it should identify patterns of ableist treatment\n    And Alex should be able to rate providers on disability competence\n    And quality tracking should help Alex find better providers\n    And the protocol should make provider accountability visible\n    And Alex should have data to advocate for better care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Tracking medical care quality and provider competence",
+    "ogDescription": "Tracking medical care quality and provider competence",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-tracking medical care quality and provider competence",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Tracking medical care quality and provider competence - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-tracking medical care quality and provider competence",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-tracking medical care quality and provider competence",
+    "name": "Tracking medical care quality and provider competence",
+    "description": "Tracking medical care quality and provider competence",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

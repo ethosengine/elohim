@@ -1,0 +1,62 @@
+{
+  "id": "quiz-care-economics",
+  "contentType": "assessment",
+  "title": "Care Economics",
+  "description": "Test your understanding of care work economics and recognition",
+  "content": {
+    "passingScore": 60,
+    "allowRetake": true,
+    "showCorrectAnswers": true,
+    "questions": [
+      {
+        "id": "ce-q1",
+        "type": "multiple-choice",
+        "question": "Why is most care work 'invisible' in traditional economics?",
+        "options": [
+          "It doesn't happen",
+          "It occurs outside market transactions",
+          "Caregivers prefer anonymity",
+          "Governments hide it"
+        ],
+        "correctAnswer": 1,
+        "explanation": "Care work often happens outside markets, making it invisible to GDP and traditional metrics."
+      },
+      {
+        "id": "ce-q2",
+        "type": "true-false",
+        "question": "The Value Scanner aims to monetize all care work.",
+        "correctAnswer": false,
+        "explanation": "The goal is recognition and valuation, not necessarily monetization of all care."
+      },
+      {
+        "id": "ce-q3",
+        "type": "multiple-choice",
+        "question": "What is REA in the context of value recognition?",
+        "options": [
+          "Real Estate Assessment",
+          "Resource-Event-Agent accounting model",
+          "Revenue Enhancement Algorithm",
+          "Reciprocal Exchange Agreement"
+        ],
+        "correctAnswer": 1,
+        "explanation": "REA (Resource-Event-Agent) is a semantic accounting model for tracking value flows."
+      }
+    ]
+  },
+  "contentFormat": "quiz-json",
+  "tags": [
+    "quiz",
+    "value-scanner",
+    "economics",
+    "care-work"
+  ],
+  "sourcePath": "generated/quiz-care-economics.json",
+  "relatedNodeIds": [
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner"
+  },
+  "createdAt": "2025-11-28T00:09:03.479358",
+  "updatedAt": "2025-11-28T00:09:03.479359"
+}

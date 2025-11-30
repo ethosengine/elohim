@@ -1,0 +1,61 @@
+{
+  "id": "feature-social-medium-displaced-person-scenarios-community",
+  "did": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Community Connection Across Displacement",
+  "description": "As a displaced_person in the social_medium system Operating at the community governance layer I want to maintain connections to my origin community while building new ones So that I can preserve relationships and identity while establishing new life",
+  "content": "@epic:social_medium\n@user_type:displaced_person\n@governance_layer:community\n@related_users:refugee,activist,community_moderator,elder\n@related_layers:family,district,affinity_network\n@elohim_agents:protection_agent,sanctuary_agent,connection_agent\n\nFeature: Community Connection Across Displacement\n  As a displaced_person in the social_medium system\n  Operating at the community governance layer\n  I want to maintain connections to my origin community while building new ones\n  So that I can preserve relationships and identity while establishing new life\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the displaced_person user is registered in the system\n    And the community governance context is active\n    And the displaced person is Maria, who fled domestic violence to a new city\n\n  Scenario: Displaced person maintains safe connection with home community\n    Given Maria left her hometown to escape an abusive partner\n    And she wants to stay connected with friends and family back home\n    When Maria configures her privacy settings for selective visibility\n    And she marks her abuser and his associates as blocked\n    Then she can communicate with trusted home community members\n    And her new location is never revealed to blocked individuals\n    And her abuser cannot find or contact her through the system\n    And she maintains important relationships while staying safe\n\n  Scenario: Displaced person builds connection in new community\n    Given Maria has relocated to a new city where she knows no one\n    When she joins her new neighborhood community space\n    And she participates in local mutual aid and support networks\n    Then she can gradually build trust in her new community\n    And neighbors help her find resources and employment\n    And she establishes new relationships while processing loss\n    And the new community welcomes her without requiring full disclosure\n\n  Scenario: Displaced person receives support from domestic violence network\n    Given Maria is recovering from domestic violence trauma\n    When she joins a domestic violence survivor support affinity network\n    And the network provides peer support and resources\n    Then she connects with others who understand her experience\n    And she receives practical support for rebuilding her life\n    And the network helps her access legal aid and counseling\n    And she finds strength and healing through community support\n    And her safety is maintained through privacy protections\n\n  Scenario: Displaced person's abuser attempts to locate her\n    Given Maria's abuser is trying to find her new location\n    When he attempts to contact her through the Elohim network\n    And he tries to contact her friends to get information\n    Then all his messages are blocked before reaching Maria\n    And her friends' connections don't leak location information\n    And the protection agent alerts relevant support networks\n    And Maria's sanctuary protocol remains secure\n    And she is protected without constant fear and vigilance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:displaced_person",
+    "governance_layer:community",
+    "related_users:refugee,activist,community_moderator,elder",
+    "related_layers:family,district,affinity_network",
+    "elohim_agents:protection_agent,sanctuary_agent,connection_agent",
+    "social-medium",
+    "feature"
+  ],
+  "sourcePath": "social_medium/displaced_person/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+    "scenario-social-medium-displaced-person-scenarios-community-displaced person builds connection in new community",
+    "scenario-social-medium-displaced-person-scenarios-community-displaced person receives support from domestic violence network",
+    "scenario-social-medium-displaced-person-scenarios-community-displaced person's abuser attempts to locate her",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "scenarioCount": 4
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community Connection Across Displacement",
+    "ogDescription": "As a displaced_person in the social_medium system Operating at the community governance layer I want to maintain connections to my origin community while building new ones So that I can preserve relat",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-displaced-person-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Connection Across Displacement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-displaced-person-scenarios-community",
+    "identifier": "did:web:elohim.host:content:social-medium:displaced-person:scenarios:community",
+    "name": "Community Connection Across Displacement",
+    "description": "As a displaced_person in the social_medium system Operating at the community governance layer I want to maintain connections to my origin community while building new ones So that I can preserve relationships and identity while establishing new life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

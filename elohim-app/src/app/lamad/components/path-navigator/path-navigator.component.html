@@ -1,0 +1,293 @@
+<div class="path-player-container" [class.sidebar-collapsed]="!sidebarOpen">
+
+  <!-- PATH TOOLING: Mobile Toggle -->
+  <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle Navigation">
+    <span class="icon">{{ sidebarOpen ? '✕' : '☰' }}</span>
+  </button>
+
+  <!-- Mobile Sidebar Backdrop - click to dismiss -->
+  @if (sidebarOpen) {
+    <div class="sidebar-backdrop" (click)="toggleSidebar()" (keydown.escape)="toggleSidebar()" tabindex="-1"></div>
+  }
+
+  <!-- PATH TOOLING: Sidebar -->
+  <aside class="path-sidebar">
+    <div class="sidebar-header">
+      <a [routerLink]="['/lamad/path', pathId]" class="back-link">
+        <span class="icon">←</span> Back to Overview
+      </a>
+      <div class="path-title-wrapper">
+        <h2 class="path-title">{{ path?.title }}</h2>
+        <span class="path-progress-text" [attr.aria-label]="getProgressPercentage() + '% Complete'">{{ getProgressPercentage() }}%</span>
+      </div>
+
+      <!-- Mobile Breadcrumbs (moved from main) -->
+      @if (stepView) {
+        <nav class="breadcrumbs sidebar-breadcrumbs">
+          <a routerLink="/lamad">Territory</a>
+          <span class="separator">/</span>
+          <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
+          @if (getCurrentChapterTitle()) {
+            <span class="separator">/</span>
+            <span class="crumb">{{ getCurrentChapterTitle() }}</span>
+          }
+          <span class="separator">/</span>
+          <span class="crumb current">{{ stepView.step.stepTitle }}</span>
+        </nav>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Chapter-based Navigation -->
+      @if (sidebarChapters.length > 0) {
+        <div class="chapter-list">
+          @for (chapter of sidebarChapters; track chapter.id) {
+            <div class="chapter-item" [class.expanded]="chapter.isExpanded">
+              <button class="chapter-header" (click)="toggleChapter(chapter.id)">
+                <span class="expand-icon">{{ chapter.isExpanded ? '▼' : '▶' }}</span>
+                <span class="chapter-title">{{ chapter.title }}</span>
+              </button>
+              
+              @if (chapter.isExpanded) {
+                <ul class="step-list">
+                  @for (step of chapter.steps; track step.index) {
+                    <li class="step-item"
+                        [class.current]="step.isCurrent"
+                        [class.completed]="step.isCompleted"
+                        [class.global-complete]="step.isGlobalCompletion"
+                        [class.locked]="step.isLocked">
+                      <a (click)="!step.isLocked ? goToStep(step.index) : null"
+                         (keydown.enter)="!step.isLocked ? goToStep(step.index) : null"
+                         [attr.role]="step.isLocked ? null : 'link'"
+                         [attr.tabindex]="step.isLocked ? -1 : 0">
+                        <span class="status-icon">
+                          @if (step.isCompleted) {
+                            <span class="checkmark">✓</span>
+                          } @else if (step.isGlobalCompletion) {
+                            <span class="checkmark global" title="Mastered in another journey">✓</span>
+                          } @else if (step.isLocked) {
+                            <span class="lock">🔒</span>
+                          } @else {
+                            <span class="circle">○</span>
+                          }
+                        </span>
+                        <span class="content-icon">{{ step.icon }}</span>
+                        <span class="step-label">{{ step.title }}</span>
+                      </a>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      } 
+      <!-- Flat Navigation -->
+      @else {
+        <ul class="step-list flat">
+          @for (step of flatSidebarSteps; track step.index) {
+            <li class="step-item"
+                [class.current]="step.isCurrent"
+                [class.completed]="step.isCompleted"
+                [class.global-complete]="step.isGlobalCompletion"
+                [class.locked]="step.isLocked">
+              <a (click)="!step.isLocked ? goToStep(step.index) : null"
+                 (keydown.enter)="!step.isLocked ? goToStep(step.index) : null"
+                 [attr.role]="step.isLocked ? null : 'link'"
+                 [attr.tabindex]="step.isLocked ? -1 : 0">
+                <span class="status-icon">
+                  @if (step.isCompleted) {
+                    <span class="checkmark">✓</span>
+                  } @else if (step.isGlobalCompletion) {
+                    <span class="checkmark global" title="Mastered in another journey">✓</span>
+                  } @else if (step.isLocked) {
+                    <span class="lock">🔒</span>
+                  } @else {
+                    <span class="circle">○</span>
+                  }
+                </span>
+                <span class="content-icon">{{ step.icon }}</span>
+                <span class="step-label">{{ step.title }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </nav>
+
+    <!-- Desktop collapse toggle -->
+    <button class="sidebar-collapse-btn" (click)="toggleSidebar()" aria-label="Collapse sidebar">
+      <span class="collapse-icon">«</span>
+    </button>
+  </aside>
+
+  <!-- Desktop expand toggle (shown when collapsed) -->
+  <button
+    class="sidebar-expand-btn"
+    *ngIf="!sidebarOpen"
+    (click)="toggleSidebar()"
+    aria-label="Expand sidebar">
+    <span class="expand-icon">»</span>
+  </button>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="main-content">
+    
+    <!-- Loading State -->
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading journey...</p>
+      </div>
+    }
+
+    <!-- Error State -->
+    @if (error) {
+      <div class="error-state">
+        <h2>Unable to load step</h2>
+        <p>{{ error }}</p>
+        <button class="btn btn-primary" (click)="goToPathOverview()">
+          Back to Path Overview
+        </button>
+      </div>
+    }
+
+    <!-- Content -->
+    @if (!isLoading && !error && stepView) {
+
+      <!-- PATH TOOLING: Breadcrumbs -->
+      <nav class="breadcrumbs main-breadcrumbs">
+        <a routerLink="/lamad">Territory</a>
+        <span class="separator">/</span>
+        <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
+        @if (getCurrentChapterTitle()) {
+          <span class="separator">/</span>
+          <span class="crumb">{{ getCurrentChapterTitle() }}</span>
+        }
+        <span class="separator">/</span>
+        <span class="crumb current">{{ stepView.step.stepTitle }}</span>
+      </nav>
+
+      <div class="content-scroll-container">
+
+        <!-- PATH TOOLING: Step context from the Journey -->
+        <header class="path-content-header">
+          <div class="path-content-header-inner">
+            <div class="content-meta">
+              <span class="content-type-badge">{{ stepView.content.contentType }}</span>
+              <a [routerLink]="['/lamad/resource', stepView.content.id]" class="view-resource-link">
+                View Resource Details <span class="icon">&#8599;</span>
+              </a>
+            </div>
+            <h1 class="content-title">{{ stepView.step.stepTitle }}</h1>
+            @if (stepView.step.stepNarrative) {
+              <p class="step-narrative">{{ stepView.step.stepNarrative }}</p>
+            }
+          </div>
+        </header>
+
+        <!-- CONTENT: Rendered via RendererRegistryService -->
+        <article class="content">
+          <div class="content-inner">
+            @if (stepView.nestedPath) {
+              <div class="nested-path-card">
+                <h3>Sub-Journey: {{ stepView.nestedPath.title }}</h3>
+                <p>{{ stepView.nestedPath.description }}</p>
+                <div class="nested-path-meta">
+                  <span class="badge">{{ stepView.nestedPath.steps.length }} Steps</span>
+                  <span class="badge">{{ stepView.nestedPath.estimatedDuration }}</span>
+                </div>
+                <button class="btn btn-primary" [routerLink]="['/lamad/path', stepView.nestedPath.id]">
+                  Start Sub-Journey
+                </button>
+              </div>
+            } @else {
+              <!-- Dynamic renderer host - always in DOM so ViewChild can find it -->
+              <ng-container #rendererHost></ng-container>
+
+              <!-- Fallback for unregistered content formats -->
+              @if (!hasRegisteredRenderer) {
+                <div class="generic-content">
+                  <pre>{{ getContentString() }}</pre>
+                </div>
+              }
+            }
+
+            <!-- Learning Objectives -->
+            @if (stepView.step.learningObjectives && stepView.step.learningObjectives.length > 0) {
+              <div class="learning-objectives">
+                <h3><strong>Goals:</strong></h3>
+                <ul>
+                  @for (objective of stepView.step.learningObjectives; track objective) {
+                    <li>{{ objective }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <!-- Reflection Prompts -->
+            @if (stepView.step.reflectionPrompts && stepView.step.reflectionPrompts.length > 0) {
+              <section class="reflection-prompts">
+                <h3>Reflection</h3>
+                <ul>
+                  @for (prompt of stepView.step.reflectionPrompts; track prompt) {
+                    <li>{{ prompt }}</li>
+                  }
+                </ul>
+              </section>
+            }
+          </div>
+        </article>
+
+        <!-- PATH TOOLING: Mastery tracking and step navigation -->
+        <footer class="path-content-footer">
+          <div class="path-content-footer-inner">
+            <!-- Completion Action -->
+            <div class="step-actions">
+              <button class="btn btn-bloom"
+                      [ngClass]="'bloom-' + currentBloomLevel"
+                      (click)="markComplete()">
+                <span class="bloom-content">
+                  <span class="bloom-icon">
+                    @if (currentBloomLevel === 'not_started') { ⭕ }
+                    @else if (currentBloomLevel === 'create') { 🌟 }
+                    @else { 🌱 }
+                  </span>
+                  <span class="bloom-text">
+                    @if (currentBloomLevel === 'not_started') {
+                      Mark as Started
+                    } @else {
+                      Mastery Level: <strong>{{ getBloomDisplay() }}</strong>
+                    }
+                  </span>
+                </span>
+                <span class="bloom-hint" *ngIf="currentBloomLevel !== 'create'">Tap to advance</span>
+              </button>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="step-navigation">
+              <button
+                class="btn btn-nav btn-prev"
+                [disabled]="!stepView.hasPrevious"
+                (click)="goToPrevious()"
+              >
+                <span class="icon">&#8592;</span>
+                Previous
+              </button>
+
+              <button
+                class="btn btn-nav btn-next"
+                [disabled]="!stepView.hasNext"
+                (click)="goToNext()"
+              >
+                Next
+                <span class="icon">&#8594;</span>
+              </button>
+            </nav>
+          </div>
+        </footer>
+      </div>
+    }
+  </main>
+</div>

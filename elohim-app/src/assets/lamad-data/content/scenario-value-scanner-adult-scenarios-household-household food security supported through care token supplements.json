@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-household-household food security supported through care token supplements",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-household food security supported through care token supplements",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household food security supported through care token supplements",
+  "description": "Household food security supported through care token supplements",
+  "content": "Scenario: Household food security supported through care token supplements\n    Given household income is $65k/year\n    And food costs are rising\n    When household's economic status qualifies for support\n    Then care token supplements should be available\n    And the Value Scanner should remain accessible\n    And household should not face food insecurity\n    And care economy should function as economic support system\n    And access should be dignified, not stigmatizing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:household",
+    "related_users:parent,partner,child,young_adult",
+    "related_layers:individual,family,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household food security supported through care token supplements",
+    "ogDescription": "Household food security supported through care token supplements",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-household food security supported through care token supplements",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household food security supported through care token supplements - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-household-household food security supported through care token supplements",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:household-household food security supported through care token supplements",
+    "name": "Household food security supported through care token supplements",
+    "description": "Household food security supported through care token supplements",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-community environmental projects and collective action",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-community environmental projects and collective action",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community environmental projects and collective action",
+  "description": "Community environmental projects and collective action",
+  "content": "Scenario: Community environmental projects and collective action\n    Given ecological challenges require collective response\n    And Sarah participates in community environmental initiatives\n    When the ecological_elohim tracks Sarah's environmental activism\n    Then it should recognize organizing as ecological care work\n    And it should value her participation in community environmental projects\n    And activism labor should accumulate care tokens\n    And the system should support parent environmental advocacy\n    And Sarah's work to build sustainable community should be recognized\n    And collective ecological action should be valued as care contribution\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community environmental projects and collective action",
+    "ogDescription": "Community environmental projects and collective action",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-community environmental projects and collective action",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community environmental projects and collective action - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-community environmental projects and collective action",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-community environmental projects and collective action",
+    "name": "Community environmental projects and collective action",
+    "description": "Community environmental projects and collective action",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,60 @@
+{
+  "id": "fct-media-13-book-from-the-garden-to-t",
+  "contentType": "book",
+  "title": "From the Garden to the City",
+  "description": "Book by John Dyer",
+  "content": {
+    "title": "From the Garden to the City",
+    "author": "John Dyer",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "mediaType": "book",
+    "author": "John Dyer"
+  },
+  "_contributor": "John Dyer",
+  "createdAt": "2025-11-28T21:10:19.224874",
+  "updatedAt": "2025-11-28T21:10:19.224876",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "From the Garden to the City",
+    "ogDescription": "Book by John Dyer",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-from-the-garden-to-t",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "From the Garden to the City - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-from-the-garden-to-t",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "From the Garden to the City",
+    "description": "Book by John Dyer",
+    "dateCreated": "2025-11-28T21:10:19.224874",
+    "dateModified": "2025-11-28T21:10:19.224876",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "John Dyer"
+    }
+  }
+}

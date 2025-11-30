@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-municipal parks and recreation optimized for senior use",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-municipal parks and recreation optimized for senior use",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal parks and recreation optimized for senior use",
+  "description": "Municipal parks and recreation optimized for senior use",
+  "content": "Scenario: Municipal parks and recreation optimized for senior use\n    Given Margaret needs physical activity for health\n    And public spaces should serve all ages\n    When the municipality_elohim provides recreation information\n    Then parks should have senior-appropriate amenities\n    And walking paths, benches, and accessibility should be prioritized\n    And recreation programs should include senior activities\n    And public space should support active aging\n    And municipal planning should consider senior needs\n    And Margaret should have access to health-supporting public resources\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal parks and recreation optimized for senior use",
+    "ogDescription": "Municipal parks and recreation optimized for senior use",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-municipal parks and recreation optimized for senior use",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal parks and recreation optimized for senior use - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-municipal parks and recreation optimized for senior use",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-municipal parks and recreation optimized for senior use",
+    "name": "Municipal parks and recreation optimized for senior use",
+    "description": "Municipal parks and recreation optimized for senior use",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

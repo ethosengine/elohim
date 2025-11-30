@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-neighborhood-participating in neighborhood emergency response",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-participating in neighborhood emergency response",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Participating in neighborhood emergency response",
+  "description": "Participating in neighborhood emergency response",
+  "content": "Scenario: Participating in neighborhood emergency response\n    Given neighborhoods need mutual aid during emergencies\n    When crisis occurs and I am not working\n    Then the protocol should help me contribute to emergency response\n    And coordinate with neighbors for mutual support\n    And recognize my contribution to neighborhood resilience\n    And ensure I can also access support during my emergencies\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-neighborhood",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Participating in neighborhood emergency response",
+    "ogDescription": "Participating in neighborhood emergency response",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-participating in neighborhood emergency response",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in neighborhood emergency response - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-neighborhood-participating in neighborhood emergency response",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:neighborhood-participating in neighborhood emergency response",
+    "name": "Participating in neighborhood emergency response",
+    "description": "Participating in neighborhood emergency response",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

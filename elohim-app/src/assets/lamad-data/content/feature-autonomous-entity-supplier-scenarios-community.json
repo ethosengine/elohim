@@ -1,0 +1,69 @@
+{
+  "id": "feature-autonomous-entity-supplier-scenarios-community",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Local Food Security and Community Agricultural Stewardship",
+  "description": "As a supplier in the autonomous_entity system Operating at the community governance layer I want farm to serve community food security and democratic participation So that agriculture becomes community institution, not private extraction",
+  "content": "@epic:autonomous_entity\n@user_type:supplier\n@governance_layer:community\n@related_users:[customer,worker,community_investor,small_business_owner]\n@related_layers:[workplace_organizational,industry_sector,ecological_bioregional]\n@elohim_agents:[community_elohim,workplace_elohim]\n\nFeature: Local Food Security and Community Agricultural Stewardship\n  As a supplier in the autonomous_entity system\n  Operating at the community governance layer\n  I want farm to serve community food security and democratic participation\n  So that agriculture becomes community institution, not private extraction\n\n  Background:\n    Given the Elohim Protocol is operational\n    And Johnson Farm is located within and serves local community\n    And the community governance context is active\n    And democratic conversion enables community participation in farm governance\n\n  Scenario: Farm transitions from private land to community food security institution\n    Given Johnson Farm was Tom's private property serving his individual livelihood\n    And community depended on farm but had no governance participation\n    When farm converts to democratic ownership with community investment\n    Then community investors gain stake in local food production\n    And farm governance includes community voice alongside farmworker control\n    And food security becomes community priority, not just individual profit\n    And farmland is protected from development through community commitment\n    And community_elohim facilitates community participation in farm governance\n\n  Scenario: Community investment enables farm democratic conversion and expansion\n    Given Tom wants to convert farm to worker ownership but farmworkers lack capital\n    And community members want to support local agriculture but lack pathway\n    When community investment pool funds farm acquisition and expansion\n    Then neighbors invest $2K-$20K each in democratic farm conversion\n    And investors receive fair return (5% annually) plus food security benefit\n    And farm gains capital for sustainable infrastructure and expansion\n    And community builds ownership stake in local food production\n    And community_elohim manages community investment in farm democratization\n\n  Scenario: Farm becomes community educational site for agricultural literacy\n    Given urban and suburban residents are disconnected from food production\n    And children don't understand where food comes from or how it's grown\n    When democratic farm opens to community for education\n    Then school groups visit farm learning about agriculture and ecology\n    And community members participate in volunteer farm days\n    And workshops teach home gardening, food preservation, and nutrition\n    And agricultural literacy increases throughout community\n    And community_elohim coordinates educational programming at democratic farm\n\n  Scenario: Community-supported agriculture (CSA) program provides affordable local food\n    Given fresh, organic produce is often unaffordable for low-income community members\n    And food access inequality creates health disparities\n    When democratic farm implements sliding-scale CSA program\n    Then weekly produce boxes are affordable across income levels\n    And payment flexibility (sliding scale, work-trade, subsidized) ensures access\n    And direct farm-to-community distribution reduces costs increasing affordability\n    And food access improves while supporting fair farmworker wages\n    And community_elohim manages CSA program ensuring equitable food access\n\n  Scenario: Farm protects green space and agricultural land from development pressure\n    Given farmland faces constant development pressure for housing or commercial use\n    And community loses agricultural land, green space, and food production capacity\n    When democratic ownership with community investment protects farmland\n    Then community investment ensures land remains in agricultural use\n    And development pressure is resisted through collective commitment\n    And green space is preserved for ecological, aesthetic, and food security benefits\n    And community gains protected agricultural land as permanent institution\n    And community_elohim coordinates land protection and community land trust options\n\n  Scenario: Local food access points expand through community distribution partnerships\n    Given farmers markets and farm visits are not accessible to all community members\n    And transportation and schedule barriers limit food access\n    When democratic farm partners with community organizations for distribution\n    Then produce is delivered to senior centers, community centers, and schools\n    And distribution partnerships increase food access for mobility-limited residents\n    And community institutions become food access points supporting local agriculture\n    And equitable distribution ensures farm benefits entire community\n    And community_elohim coordinates community distribution partnerships\n\n  Scenario: Farm employment provides community economic opportunity with dignity\n    Given local employment often means low-wage service jobs without advancement\n    And agricultural work is typically exploited and underpaid\n    When democratic farm offers dignified employment with ownership pathway\n    Then community members gain living-wage agricultural employment ($18/hour minimum)\n    And employment includes training, ownership potential, and democratic voice\n    And youth employment programs connect young people to agriculture\n    And farm becomes community economic development asset\n    And community_elohim tracks employment outcomes and community economic impact\n\n  Scenario: Community resilience increases through local food production capacity\n    Given communities dependent on global supply chains are vulnerable to disruption\n    And COVID-19 demonstrated fragility of corporate food system\n    When local democratic farm provides community food security\n    Then community is less vulnerable to supply chain disruptions\n    And local food production capacity serves as resilience infrastructure\n    And crisis response can prioritize community feeding over profit\n    And democratic governance ensures farm serves community needs during emergencies\n    And community_elohim coordinates community resilience and food security planning\n\n  Scenario: Farm hosts community events building social connection and food culture\n    Given community lacks gathering spaces for celebration and connection\n    And food is central to culture and community building\n    When democratic farm space is available for community use\n    Then harvest festivals celebrate seasonal abundance and agricultural labor\n    And farm dinners feature locally-sourced meals with community storytelling\n    And cultural food traditions are shared and preserved through farm programming\n    And farm becomes community social infrastructure beyond food production\n    And community_elohim facilitates community programming and events at farm\n\n  Scenario: Community oversight ensures environmental stewardship and sustainability\n    Given private ownership may prioritize short-term profit over environmental health\n    And community bears environmental impacts of farming practices\n    When community has governance voice in farm environmental practices\n    Then sustainable and regenerative agriculture is prioritized through community input\n    And environmental practices are transparent and accountable to community\n    And water quality, soil health, and biodiversity are protected as community values\n    And farm environmental stewardship benefits entire community ecosystem\n    And community_elohim monitors environmental practices and community accountability\n\n  Scenario: Farm supports community food sovereignty and cultural food preservation\n    Given corporate food system homogenizes diets and erases cultural food traditions\n    And immigrant and indigenous communities lose access to traditional foods\n    When democratic farm responds to community cultural food needs\n    Then farm grows culturally specific crops (Latino vegetables, Asian greens, indigenous varieties)\n    And traditional food knowledge is valued and incorporated into farm planning\n    And community food sovereignty increases through local diverse production\n    And cultural food preservation becomes farm mission alongside nutrition\n    And community_elohim documents and supports cultural food sovereignty initiatives\n\n  Scenario: Community celebrates farm as democratic institution and food security asset\n    Given agricultural institutions are typically invisible or taken for granted\n    And democratic farm conversion represents major community achievement\n    When farm reaches milestones in democratic governance and community service\n    Then community celebrates with public events honoring farmworkers and transformation\n    And farm story becomes source of community pride and inspiration\n    And successful democratic farm model encourages other agricultural conversions\n    And community recognizes farm as essential democratic institution\n    And community_elohim coordinates celebration events and community farm storytelling\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:community",
+    "related_users:[customer,worker,community_investor,small_business_owner]",
+    "related_layers:[workplace_organizational,industry_sector,ecological_bioregional]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "feature"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-autonomous-entity-supplier-scenarios-community-farm transitions from private land to community food security institution",
+    "scenario-autonomous-entity-supplier-scenarios-community-community investment enables farm democratic conversion and expansion",
+    "scenario-autonomous-entity-supplier-scenarios-community-farm becomes community educational site for agricultural literacy",
+    "scenario-autonomous-entity-supplier-scenarios-community-community-supported agriculture (csa) program provides affordable local food",
+    "scenario-autonomous-entity-supplier-scenarios-community-farm protects green space and agricultural land from development pressure",
+    "scenario-autonomous-entity-supplier-scenarios-community-local food access points expand through community distribution partnerships",
+    "scenario-autonomous-entity-supplier-scenarios-community-farm employment provides community economic opportunity with dignity",
+    "scenario-autonomous-entity-supplier-scenarios-community-community resilience increases through local food production capacity",
+    "scenario-autonomous-entity-supplier-scenarios-community-farm hosts community events building social connection and food culture",
+    "scenario-autonomous-entity-supplier-scenarios-community-community oversight ensures environmental stewardship and sustainability",
+    "scenario-autonomous-entity-supplier-scenarios-community-farm supports community food sovereignty and cultural food preservation",
+    "scenario-autonomous-entity-supplier-scenarios-community-community celebrates farm as democratic institution and food security asset",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "epic": "autonomous_entity",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Local Food Security and Community Agricultural Stewardship",
+    "ogDescription": "As a supplier in the autonomous_entity system Operating at the community governance layer I want farm to serve community food security and democratic participation So that agriculture becomes communit",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-autonomous-entity-supplier-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Local Food Security and Community Agricultural Stewardship - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-autonomous-entity-supplier-scenarios-community",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:community",
+    "name": "Local Food Security and Community Agricultural Stewardship",
+    "description": "As a supplier in the autonomous_entity system Operating at the community governance layer I want farm to serve community food security and democratic participation So that agriculture becomes community institution, not private extraction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

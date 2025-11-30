@@ -1,0 +1,60 @@
+{
+  "id": "fct-media-12-book-the-new-parish",
+  "contentType": "book",
+  "title": "The New Parish",
+  "description": "Book by Paul Sparks",
+  "content": {
+    "title": "The New Parish",
+    "author": "Paul Sparks",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 13 - Helping People Thrive - A Christian Definition .md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-13-helping-thrive"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-13-helping-thrive",
+    "mediaType": "book",
+    "author": "Paul Sparks"
+  },
+  "_contributor": "Paul Sparks",
+  "createdAt": "2025-11-28T21:10:19.224337",
+  "updatedAt": "2025-11-28T21:10:19.224338",
+  "did": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "The New Parish",
+    "ogDescription": "Book by Paul Sparks",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-12-book-the-new-parish",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "The New Parish - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-12-book-the-new-parish",
+    "identifier": "did:web:elohim.host:content:fct:module 13 - helping people thrive - a christian definition ",
+    "name": "The New Parish",
+    "description": "Book by Paul Sparks",
+    "dateCreated": "2025-11-28T21:10:19.224337",
+    "dateModified": "2025-11-28T21:10:19.224338",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Paul Sparks"
+    }
+  }
+}

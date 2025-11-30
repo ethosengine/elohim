@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-community-organizer-scenarios-district-organizer tracks accountability for special education commitments",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district-organizer tracks accountability for special education commitments",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Organizer tracks accountability for special education commitments",
+  "description": "Organizer tracks accountability for special education commitments",
+  "content": "Scenario: Organizer tracks accountability for special education commitments\n    Given district promised improved special education services\n    And the organizer's coalition of parents won the commitment\n    When the Observer tracks implementation progress\n    Then the organizer monitors hiring of promised support staff\n    And sees resource allocation to special education programs\n    And receives alerts when implementation lags behind timeline\n    And documents wins to show parents their advocacy worked\n    And district learns parent organizing demands follow-through\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:district",
+    "related_users:parent,citizen,activist,board_member",
+    "related_layers:municipality,educational,community",
+    "elohim_agents:public_observer,district_elohim,coalition_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-community-organizer-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-community-organizer-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Organizer tracks accountability for special education commitments",
+    "ogDescription": "Organizer tracks accountability for special education commitments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-district-organizer tracks accountability for special education commitments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Organizer tracks accountability for special education commitments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-community-organizer-scenarios-district-organizer tracks accountability for special education commitments",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district-organizer tracks accountability for special education commitments",
+    "name": "Organizer tracks accountability for special education commitments",
+    "description": "Organizer tracks accountability for special education commitments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-educational-school events and volunteer expectations account for single parent constraints",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-school events and volunteer expectations account for single parent constraints",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "School events and volunteer expectations account for single parent constraints",
+  "description": "School events and volunteer expectations account for single parent constraints",
+  "content": "Scenario: School events and volunteer expectations account for single parent constraints\n    Given schools often expect parent participation in events and volunteering\n    And Maria has severe time and energy constraints as solo working parent\n    When schools set participation expectations\n    Then the educational_elohim should make visible single parents' realistic capacity\n    And schools should not penalize children whose single parents cannot volunteer extensively\n    And limited participation should not reflect on children's family or parent's commitment\n    And schools should recognize some parents are managing heroically just to survive\n    And Maria's children should not suffer because she cannot match two-parent family participation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:educational",
+    "related_users:parent,child,young_child,preteen,teen,educator,school_administrator",
+    "related_layers:family,household,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "School events and volunteer expectations account for single parent constraints",
+    "ogDescription": "School events and volunteer expectations account for single parent constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-school events and volunteer expectations account for single parent constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "School events and volunteer expectations account for single parent constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-educational-school events and volunteer expectations account for single parent constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:educational-school events and volunteer expectations account for single parent constraints",
+    "name": "School events and volunteer expectations account for single parent constraints",
+    "description": "School events and volunteer expectations account for single parent constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,62 @@
+{
+  "id": "feature-public-observer-citizen-scenarios-community",
+  "did": "did:web:elohim.host:content:public-observer:citizen:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Community Civic Democracy for Citizen",
+  "description": "As a citizen in the public_observer system Operating at the community governance layer I want to participate in neighborhood decisions without overwhelming time commitment So that I can shape my community while managing work and family responsibilities",
+  "content": "@epic:public_observer\n@user_type:citizen\n@governance_layer:community\n@related_users:parent,activist,community_organizer,journalist\n@related_layers:municipality,neighborhood\n@elohim_agents:public_observer,community_elohim\n\nFeature: Community Civic Democracy for Citizen\n  As a citizen in the public_observer system\n  Operating at the community governance layer\n  I want to participate in neighborhood decisions without overwhelming time commitment\n  So that I can shape my community while managing work and family responsibilities\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the citizen user is registered in the system\n    And the community governance context is active\n\n  Scenario: Citizen receives time-efficient community meeting summary\n    Given a neighborhood council meeting occurred last night\n    And the citizen has indicated interest in local amenities\n    When the citizen checks their morning brief\n    Then they see a 3-minute summary of key decisions\n    And they see plain-language explanations of policy changes\n    And they are notified only about decisions affecting their stated interests\n    And they can submit async feedback on decisions\n    And their time commitment is under 15 minutes\n\n  Scenario: Citizen discovers coalition around shared community concern\n    Given 14 neighbors are concerned about playground safety\n    And the citizen has reported the same concern\n    When the Public Observer detects the alignment pattern\n    Then the citizen receives an opt-in coalition notification\n    And they can coordinate with other concerned residents\n    And they see aggregated data on playground conditions\n    And they can participate in coordinated advocacy\n    And isolation becomes collective action\n\n  Scenario: Citizen tracks accountability for neighborhood commitments\n    Given the community council promised playground repairs in 60 days\n    And the commitment was made during a public meeting\n    When 60 days pass\n    Then the Observer alerts the citizen about the deadline\n    And tracks whether repairs were completed\n    And provides evidence for accountability conversations\n    And prevents institutional forgetting of commitments\n    And democracy includes follow-through tracking\n\n  Scenario: Citizen accesses community resources without attending meetings\n    Given the citizen works evening shifts\n    And cannot attend 7 PM community meetings in person\n    When community decisions are being made\n    Then they can review asynchronous meeting summaries\n    And submit positions via the app during lunch break\n    And join key decision moments virtually\n    And participate meaningfully in 15 minutes vs 3 hours\n    And working-class participation barriers are reduced\n\n  Scenario: Citizen evaluates development proposal affecting neighborhood\n    Given a developer proposes new construction in their neighborhood\n    And claims it will \"bring community benefits\"\n    When the citizen reviews the Observer analysis\n    Then they see actual value flows (who benefits, who pays)\n    And view the developer's track record from past projects\n    And understand infrastructure impacts (traffic, services, green space)\n    And can challenge claims with evidence not just emotion\n    And make informed decisions about supporting or opposing\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:citizen",
+    "governance_layer:community",
+    "related_users:parent,activist,community_organizer,journalist",
+    "related_layers:municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/citizen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-citizen-scenarios-community-citizen receives time-efficient community meeting summary",
+    "scenario-public-observer-citizen-scenarios-community-citizen discovers coalition around shared community concern",
+    "scenario-public-observer-citizen-scenarios-community-citizen tracks accountability for neighborhood commitments",
+    "scenario-public-observer-citizen-scenarios-community-citizen accesses community resources without attending meetings",
+    "scenario-public-observer-citizen-scenarios-community-citizen evaluates development proposal affecting neighborhood",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community Civic Democracy for Citizen",
+    "ogDescription": "As a citizen in the public_observer system Operating at the community governance layer I want to participate in neighborhood decisions without overwhelming time commitment So that I can shape my commu",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-citizen-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Civic Democracy for Citizen - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-citizen-scenarios-community",
+    "identifier": "did:web:elohim.host:content:public-observer:citizen:scenarios:community",
+    "name": "Community Civic Democracy for Citizen",
+    "description": "As a citizen in the public_observer system Operating at the community governance layer I want to participate in neighborhood decisions without overwhelming time commitment So that I can shape my community while managing work and family responsibilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

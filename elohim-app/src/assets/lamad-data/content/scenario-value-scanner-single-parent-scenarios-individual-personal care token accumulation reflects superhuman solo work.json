@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-individual-personal care token accumulation reflects superhuman solo work",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-personal care token accumulation reflects superhuman solo work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Personal care token accumulation reflects superhuman solo work",
+  "description": "Personal care token accumulation reflects superhuman solo work",
+  "content": "Scenario: Personal care token accumulation reflects superhuman solo work\n    Given Maria performs the work of two parents plus household management plus breadwinning\n    And her care contributions are extraordinary\n    When Maria's care tokens are calculated\n    Then they should reflect that she's doing multiple full-time jobs\n    And solo parenting should be valued higher than partnered parenting\n    And her care tokens should accumulate at accelerated rate\n    And the protocol should make undeniable her superhuman care labor\n    And Maria should see quantified recognition of work society often dismisses\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:individual",
+    "related_users:parent,adult,worker,caregiver",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Personal care token accumulation reflects superhuman solo work",
+    "ogDescription": "Personal care token accumulation reflects superhuman solo work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-personal care token accumulation reflects superhuman solo work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal care token accumulation reflects superhuman solo work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-individual-personal care token accumulation reflects superhuman solo work",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:individual-personal care token accumulation reflects superhuman solo work",
+    "name": "Personal care token accumulation reflects superhuman solo work",
+    "description": "Personal care token accumulation reflects superhuman solo work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

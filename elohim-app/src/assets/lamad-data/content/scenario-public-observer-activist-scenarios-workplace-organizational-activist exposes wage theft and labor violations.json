@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-workplace-organizational-activist exposes wage theft and labor violations",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational-activist exposes wage theft and labor violations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist exposes wage theft and labor violations",
+  "description": "Activist exposes wage theft and labor violations",
+  "content": "Scenario: Activist exposes wage theft and labor violations\n    Given workers report widespread wage theft\n    And enforcement seems inadequate\n    When the Observer tracks labor violations and enforcement\n    Then the activist documents thousands of violations annually\n    And shows penalties are minimal and rarely collected\n    And identifies which employers are repeat offenders\n    And exposes regulatory capture of labor enforcement\n    And worker protection becomes political accountability issue\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,community_organizer,politician",
+    "related_layers:municipality,industry_sector,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist exposes wage theft and labor violations",
+    "ogDescription": "Activist exposes wage theft and labor violations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-workplace-organizational-activist exposes wage theft and labor violations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist exposes wage theft and labor violations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-workplace-organizational-activist exposes wage theft and labor violations",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational-activist exposes wage theft and labor violations",
+    "name": "Activist exposes wage theft and labor violations",
+    "description": "Activist exposes wage theft and labor violations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

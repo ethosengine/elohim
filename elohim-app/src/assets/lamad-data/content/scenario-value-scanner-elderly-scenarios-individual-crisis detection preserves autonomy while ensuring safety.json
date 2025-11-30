@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-crisis detection preserves autonomy while ensuring safety",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-crisis detection preserves autonomy while ensuring safety",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Crisis detection preserves autonomy while ensuring safety",
+  "description": "Crisis detection preserves autonomy while ensuring safety",
+  "content": "Scenario: Crisis detection preserves autonomy while ensuring safety\n    Given Helen lives alone with family and community support\n    And she is at risk for falls and medication errors\n    When the system detects potential crisis indicators\n    Then safety monitoring should occur without surveillance feeling\n    And alerts should go to Helen first when appropriate\n    And emergency contacts should be notified only when necessary\n    And intervention should preserve her agency: \"Helen, you haven't moved in a while. Are you okay?\"\n    And she should be consulted before family is contacted when possible\n    And safety should enhance autonomy, not replace it\n    And the system should balance protection with dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Crisis detection preserves autonomy while ensuring safety",
+    "ogDescription": "Crisis detection preserves autonomy while ensuring safety",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-crisis detection preserves autonomy while ensuring safety",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crisis detection preserves autonomy while ensuring safety - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-crisis detection preserves autonomy while ensuring safety",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-crisis detection preserves autonomy while ensuring safety",
+    "name": "Crisis detection preserves autonomy while ensuring safety",
+    "description": "Crisis detection preserves autonomy while ensuring safety",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

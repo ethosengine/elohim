@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-food sharing and collective cooking in student community",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:community-food sharing and collective cooking in student community",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Food sharing and collective cooking in student community",
+  "description": "Food sharing and collective cooking in student community",
+  "content": "Scenario: Food sharing and collective cooking in student community\n    Given many students face food insecurity\n    And collective meals reduce individual costs\n    When Kenji participates in community meal sharing\n    Then the community_elohim should recognize communal feeding as care work\n    And it should value both cooking for others and hosting shared meals\n    And it should track \"Kenji cooked dinner for 8 people in study group\"\n    And food sharing should be core care economy practice\n    And the system should make nutrition care visible and valued\n    And collective eating should build community bonds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Food sharing and collective cooking in student community",
+    "ogDescription": "Food sharing and collective cooking in student community",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-food sharing and collective cooking in student community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Food sharing and collective cooking in student community - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-food sharing and collective cooking in student community",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:community-food sharing and collective cooking in student community",
+    "name": "Food sharing and collective cooking in student community",
+    "description": "Food sharing and collective cooking in student community",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

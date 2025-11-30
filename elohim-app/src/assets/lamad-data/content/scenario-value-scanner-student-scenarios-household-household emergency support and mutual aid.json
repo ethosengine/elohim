@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-household emergency support and mutual aid",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-household emergency support and mutual aid",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household emergency support and mutual aid",
+  "description": "Household emergency support and mutual aid",
+  "content": "Scenario: Household emergency support and mutual aid\n    Given one roommate might face financial crisis or sudden need\n    And students often live very close to financial edge\n    When a household member experiences emergency\n    Then the household_elohim should facilitate mutual aid\n    And it should help coordinate support: \"Can roommates each contribute $20 to help Jordan?\"\n    And it should track emergency help as care tokens\n    And it should build culture of reciprocal support\n    And the system should recognize households as safety nets\n    And roommate mutual aid should be valued and visible\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household emergency support and mutual aid",
+    "ogDescription": "Household emergency support and mutual aid",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-household emergency support and mutual aid",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household emergency support and mutual aid - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-household emergency support and mutual aid",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-household emergency support and mutual aid",
+    "name": "Household emergency support and mutual aid",
+    "description": "Household emergency support and mutual aid",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

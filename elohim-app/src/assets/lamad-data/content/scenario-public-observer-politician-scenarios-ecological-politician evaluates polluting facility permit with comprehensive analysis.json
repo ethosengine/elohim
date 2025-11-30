@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-ecological-politician evaluates polluting facility permit with comprehensive analysis",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician evaluates polluting facility permit with comprehensive analysis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Politician evaluates polluting facility permit with comprehensive analysis",
+  "description": "Politician evaluates polluting facility permit with comprehensive analysis",
+  "content": "Scenario: Politician evaluates polluting facility permit with comprehensive analysis\n    Given company applies for permit to operate polluting facility\n    And promises economic benefits and claims minimal environmental impact\n    When the Observer analyzes facility proposal and company track record\n    Then they see company's violation history at other locations\n    And understand health impacts on nearby residential populations\n    And identify existing pollution burden in target neighborhood\n    And review economic claims against actual job creation in similar facilities\n    And make informed decision balancing economics with environmental protection\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:ecological",
+    "related_users:citizen,activist,scientist,community_organizer,developer_interests",
+    "related_layers:municipality,county_regional,provincial_state,ecological_bioregional",
+    "elohim_agents:public_observer,ecological_elohim,municipal_elohim,regional_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/ecological.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-ecological",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-ecological",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Politician evaluates polluting facility permit with comprehensive analysis",
+    "ogDescription": "Politician evaluates polluting facility permit with comprehensive analysis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician evaluates polluting facility permit with comprehensive analysis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician evaluates polluting facility permit with comprehensive analysis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-ecological-politician evaluates polluting facility permit with comprehensive analysis",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:ecological-politician evaluates polluting facility permit with comprehensive analysis",
+    "name": "Politician evaluates polluting facility permit with comprehensive analysis",
+    "description": "Politician evaluates polluting facility permit with comprehensive analysis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

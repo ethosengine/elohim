@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-community-investor-scenarios-municipality-municipal economic development metrics evolve to measure democratic ownership",
+  "did": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-municipal economic development metrics evolve to measure democratic ownership",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal economic development metrics evolve to measure democratic ownership",
+  "description": "Municipal economic development metrics evolve to measure democratic ownership",
+  "content": "Scenario: Municipal economic development metrics evolve to measure democratic ownership\n    Given cities measure economic development by job quantity, not quality\n    And Patricia's investments create high-quality jobs (living wages, ownership, voice)\n    When community investors demonstrate democratic ownership benefits\n    Then municipal metrics include: worker ownership rates, wage levels, democratic governance participation\n    And economic development success is measured by community wealth-building\n    And democratic conversions score highly on quality-focused metrics\n    And policy priorities shift toward job quality through investor advocacy\n    And municipality_elohim provides democratic economy measurement framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:community_investor",
+    "governance_layer:municipality",
+    "related_users:[worker,small_business_owner,franchise_operator,community_investor]",
+    "related_layers:[community,ecological_bioregional]",
+    "elohim_agents:[municipality_elohim,community_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/community_investor/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-community-investor-scenarios-municipality",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal economic development metrics evolve to measure democratic ownership",
+    "ogDescription": "Municipal economic development metrics evolve to measure democratic ownership",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-municipal economic development metrics evolve to measure democratic ownership",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal economic development metrics evolve to measure democratic ownership - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-community-investor-scenarios-municipality-municipal economic development metrics evolve to measure democratic ownership",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:community-investor:scenarios:municipality-municipal economic development metrics evolve to measure democratic ownership",
+    "name": "Municipal economic development metrics evolve to measure democratic ownership",
+    "description": "Municipal economic development metrics evolve to measure democratic ownership",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

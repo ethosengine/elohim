@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-workplace-organizational-activist fights for paid sick leave policy",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational-activist fights for paid sick leave policy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist fights for paid sick leave policy",
+  "description": "Activist fights for paid sick leave policy",
+  "content": "Scenario: Activist fights for paid sick leave policy\n    Given workers lack basic workplace protections\n    And the activist campaigns for paid sick leave ordinance\n    When the Observer shows public health and economic impacts\n    Then the activist demonstrates workers go to work sick\n    And spread illness because they can't afford to stay home\n    And public health costs of no sick leave\n    And presents evidence from cities with successful sick leave policies\n    And worker protection becomes public health imperative\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,community_organizer,politician",
+    "related_layers:municipality,industry_sector,provincial_state",
+    "elohim_agents:public_observer,workplace_elohim,economic_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist fights for paid sick leave policy",
+    "ogDescription": "Activist fights for paid sick leave policy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-workplace-organizational-activist fights for paid sick leave policy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist fights for paid sick leave policy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-workplace-organizational-activist fights for paid sick leave policy",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:workplace-organizational-activist fights for paid sick leave policy",
+    "name": "Activist fights for paid sick leave policy",
+    "description": "Activist fights for paid sick leave policy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

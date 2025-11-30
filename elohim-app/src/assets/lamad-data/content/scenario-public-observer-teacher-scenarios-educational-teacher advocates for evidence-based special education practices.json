@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-educational-teacher advocates for evidence-based special education practices",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational-teacher advocates for evidence-based special education practices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher advocates for evidence-based special education practices",
+  "description": "Teacher advocates for evidence-based special education practices",
+  "content": "Scenario: Teacher advocates for evidence-based special education practices\n    Given students with learning differences need specialized support\n    And current special education approach is compliance-focused not learning-focused\n    When teachers coordinate around special education reform through Observer\n    Then teachers document what actually helps students with diverse needs\n    And share successful inclusive practices across schools\n    And identify barriers to effective special education (caseloads, resources, training)\n    And build coalition with parents of students with disabilities\n    And special education becomes about student learning not just paperwork\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:educational",
+    "related_users:parent,board_member,student,administrator,community_organizer",
+    "related_layers:school,district,provincial_state",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher advocates for evidence-based special education practices",
+    "ogDescription": "Teacher advocates for evidence-based special education practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-educational-teacher advocates for evidence-based special education practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher advocates for evidence-based special education practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-educational-teacher advocates for evidence-based special education practices",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:educational-teacher advocates for evidence-based special education practices",
+    "name": "Teacher advocates for evidence-based special education practices",
+    "description": "Teacher advocates for evidence-based special education practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

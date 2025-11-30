@@ -1,19 +1,26 @@
 import { Routes } from '@angular/router';
 
 /**
- * Lamad routing strategy:
+ * Lamad routing strategy (spec-compliant):
  *
- * Hierarchical path-based navigation:
- * - /lamad                              → Home (epics list)
- * - /lamad/:epic                        → Epic view with features pane
- * - /lamad/:epic/:feature               → Feature view with scenarios pane
- * - /lamad/:epic/:feature/:scenario     → Scenario view
- * - Can go deeper as domain defines
+ * Path-centric navigation (PRIMARY):
+ * - /lamad                              → Home (path discovery, path-centric)
+ * - /lamad/path/:pathId                 → Path overview/landing page
+ * - /lamad/path/:pathId/step/:stepIndex → Step navigator (main learning UI)
  *
- * Special routes:
+ * Direct resource access (SECONDARY):
+ * - /lamad/resource/:resourceId         → Direct content viewing
+ *
+ * Agent context:
+ * - /lamad/me                           → Learner dashboard
+ *
+ * Research/exploration (TERTIARY):
+ * - /lamad/explore                      → Graph exploration (requires attestation)
  * - /lamad/map                          → Meaning map visualization
  * - /lamad/search                       → Search interface
- * - /lamad/content/:id                  → Direct content access (fallback)
+ *
+ * Legacy (deprecated):
+ * - /lamad/content/:id                  → Old direct access (redirects to resource)
  */
 export const LAMAD_ROUTES: Routes = [
   {
@@ -23,13 +30,66 @@ export const LAMAD_ROUTES: Routes = [
         m => m.LamadLayoutComponent
       ),
     children: [
+      // ============================================
+      // PATH-CENTRIC ROUTES (Primary User Experience)
+      // ============================================
+
+      // Path step navigation - the main learning interface
       {
-        path: '',
+        path: 'path/:pathId/step/:stepIndex',
         loadComponent: () =>
-          import('./components/lamad-home/lamad-home.component').then(
-            m => m.LamadHomeComponent
+          import('./components/path-navigator/path-navigator.component').then(
+            m => m.PathNavigatorComponent
           )
       },
+
+      // Path overview/landing page
+      {
+        path: 'path/:pathId',
+        loadComponent: () =>
+          import('./components/path-overview/path-overview.component').then(
+            m => m.PathOverviewComponent
+          )
+      },
+
+      // ============================================
+      // DIRECT RESOURCE ACCESS (Secondary)
+      // ============================================
+
+      {
+        path: 'resource/:resourceId',
+        loadComponent: () =>
+          import('./components/content-viewer/content-viewer.component').then(
+            m => m.ContentViewerComponent
+          )
+      },
+
+      // ============================================
+      // AGENT CONTEXT
+      // ============================================
+
+      {
+        path: 'me',
+        loadComponent: () =>
+          import('./components/learner-dashboard/learner-dashboard.component').then(
+            m => m.LearnerDashboardComponent
+          )
+      },
+
+      // ============================================
+      // EXPLORATION & RESEARCH (Tertiary)
+      // ============================================
+
+      // Graph explorer - visual knowledge map (Khan Academy style)
+      {
+        path: 'explore',
+        loadComponent: () =>
+          import('./components/graph-explorer/graph-explorer.component').then(
+            m => m.GraphExplorerComponent
+          )
+      },
+
+      // Meaning map - list/card view alternative
       {
         path: 'map',
         loadComponent: () =>
@@ -37,6 +97,7 @@ export const LAMAD_ROUTES: Routes = [
             m => m.MeaningMapComponent
           )
       },
+
       {
         path: 'search',
         loadComponent: () =>
@@ -44,17 +105,24 @@ export const LAMAD_ROUTES: Routes = [
             m => m.SearchComponent
           )
       },
+
+      // ============================================
+      // LEGACY ROUTES (Deprecated, for backwards compat)
+      // ============================================
+
+      // Old direct content access - redirect to new pattern
       {
         path: 'content/:id',
-        loadComponent: () =>
-          import('./components/content-viewer/content-viewer.component').then(
-            m => m.ContentViewerComponent
-          )
+        redirectTo: 'resource/:id',
+        pathMatch: 'full'
       },
-      // Hierarchical path navigation (catch-all for graph traversal)
-      // Uses LamadHomeComponent to maintain the 3-pane layout while navigating
+
+      // ============================================
+      // HOME (Path-centric landing)
+      // ============================================
+
       {
-        path: '**',
+        path: '',
         loadComponent: () =>
           import('./components/lamad-home/lamad-home.component').then(
             m => m.LamadHomeComponent

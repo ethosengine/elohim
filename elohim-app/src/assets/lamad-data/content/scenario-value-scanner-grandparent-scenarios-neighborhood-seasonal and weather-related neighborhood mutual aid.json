@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-seasonal and weather-related neighborhood mutual aid",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-seasonal and weather-related neighborhood mutual aid",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Seasonal and weather-related neighborhood mutual aid",
+  "description": "Seasonal and weather-related neighborhood mutual aid",
+  "content": "Scenario: Seasonal and weather-related neighborhood mutual aid\n    Given Margaret is often available during daytime\n    And neighborhood needs vary with seasons and weather\n    When the neighborhood coordinates seasonal care\n    Then the neighborhood_elohim should facilitate seasonal mutual aid\n    And Margaret might help with snow observation, mail collection, or storm preparation\n    And she should receive help with physical tasks she cannot do\n    And seasonal care should be reciprocal and community-building\n    And neighborhood resilience should increase through elder participation\n    And Margaret should contribute according to her capacity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Seasonal and weather-related neighborhood mutual aid",
+    "ogDescription": "Seasonal and weather-related neighborhood mutual aid",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-seasonal and weather-related neighborhood mutual aid",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Seasonal and weather-related neighborhood mutual aid - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-seasonal and weather-related neighborhood mutual aid",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-seasonal and weather-related neighborhood mutual aid",
+    "name": "Seasonal and weather-related neighborhood mutual aid",
+    "description": "Seasonal and weather-related neighborhood mutual aid",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

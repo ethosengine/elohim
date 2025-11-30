@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-community-school site council member advocates for resources from district",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-school site council member advocates for resources from district",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "School site council member advocates for resources from district",
+  "description": "School site council member advocates for resources from district",
+  "content": "Scenario: School site council member advocates for resources from district\n    Given school has aging facilities and overcrowded classrooms\n    And site council wants district to prioritize school for capital improvements\n    And needs to present compelling case competing with other schools\n    When the council member uses Observer to prepare advocacy\n    Then they receive documentation of facility conditions and capacity issues\n    And see comparison to other district schools showing relative needs\n    And access student outcome data linking conditions to learning impacts\n    And get examples of how district allocated capital funds in past\n    And evidence-based advocacy connects community needs to district decisions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,community_organizer,politician",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "School site council member advocates for resources from district",
+    "ogDescription": "School site council member advocates for resources from district",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-school site council member advocates for resources from district",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "School site council member advocates for resources from district - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-school site council member advocates for resources from district",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-school site council member advocates for resources from district",
+    "name": "School site council member advocates for resources from district",
+    "description": "School site council member advocates for resources from district",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

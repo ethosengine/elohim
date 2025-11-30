@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-household-accessing household support during crisis periods",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-accessing household support during crisis periods",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Accessing household support during crisis periods",
+  "description": "Accessing household support during crisis periods",
+  "content": "Scenario: Accessing household support during crisis periods\n    Given work demands sometimes become overwhelming\n    When I am working double shifts or experiencing crisis\n    Then the protocol should facilitate household mutual aid\n    And help roommates understand my temporary extra needs\n    And suggest how others can support me during difficult periods\n    And enable reciprocity when my situation improves\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-household",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Accessing household support during crisis periods",
+    "ogDescription": "Accessing household support during crisis periods",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-accessing household support during crisis periods",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing household support during crisis periods - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-household-accessing household support during crisis periods",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:household-accessing household support during crisis periods",
+    "name": "Accessing household support during crisis periods",
+    "description": "Accessing household support during crisis periods",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-neighborhood-neighborhood governance participation as new resident",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-neighborhood governance participation as new resident",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood governance participation as new resident",
+  "description": "Neighborhood governance participation as new resident",
+  "content": "Scenario: Neighborhood governance participation as new resident\n    Given the neighborhood makes collective decisions\n    And Aisha is a new resident\n    When neighborhood governance processes occur\n    Then the neighborhood_elohim should facilitate her participation\n    And newcomers should have voice proportional to care contributions\n    And she should learn how neighborhood decision-making works\n    And participation should be accessible to new residents\n    And the system should help her become active neighborhood citizen\n    And care economy should give her legitimate standing in governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:neighborhood",
+    "related_users:adult,worker,student,neighbor",
+    "related_layers:household,community,ecological_bioregional",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood governance participation as new resident",
+    "ogDescription": "Neighborhood governance participation as new resident",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-neighborhood governance participation as new resident",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood governance participation as new resident - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-neighborhood-neighborhood governance participation as new resident",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:neighborhood-neighborhood governance participation as new resident",
+    "name": "Neighborhood governance participation as new resident",
+    "description": "Neighborhood governance participation as new resident",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

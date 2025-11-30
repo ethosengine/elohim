@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-hearing testimony from mayor jamal about implementation reality",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-hearing testimony from mayor jamal about implementation reality",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Hearing testimony from Mayor Jamal about implementation reality",
+  "description": "Hearing testimony from Mayor Jamal about implementation reality",
+  "content": "Scenario: Hearing testimony from Mayor Jamal about implementation reality\n    Given I need ground truth about protocol in practice\n    And Riverside provides three years of experience\n    When Mayor Jamal testifies about community implementation\n    Then he shares: what works (community calibration, constitutional oversight)\n    And he describes: what struggles (elderly accessibility, controversy)\n    And he explains: factors predicting adoption success\n    And he provides: evidence countering corporate lobbyist claims\n    And his testimony: grounds policy in lived reality\n    And I learn: from practitioners not just theory\n    And community voices: inform state legislation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Hearing testimony from Mayor Jamal about implementation reality",
+    "ogDescription": "Hearing testimony from Mayor Jamal about implementation reality",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-hearing testimony from mayor jamal about implementation reality",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Hearing testimony from Mayor Jamal about implementation reality - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-hearing testimony from mayor jamal about implementation reality",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-hearing testimony from mayor jamal about implementation reality",
+    "name": "Hearing testimony from Mayor Jamal about implementation reality",
+    "description": "Hearing testimony from Mayor Jamal about implementation reality",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

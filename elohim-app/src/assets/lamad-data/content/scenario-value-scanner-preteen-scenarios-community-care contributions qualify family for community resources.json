@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-care contributions qualify family for community resources",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-care contributions qualify family for community resources",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Care contributions qualify family for community resources",
+  "description": "Care contributions qualify family for community resources",
+  "content": "Scenario: Care contributions qualify family for community resources\n    Given Marcus performs substantial household labor\n    And his care contributions are tracked and valued\n    When community resource allocation is determined\n    Then Marcus's demonstrated stewardship should qualify his family\n    And his care tokens should provide access to community support programs\n    And access should be based on care contributions, not means testing\n    And the framework should be reciprocity: he gives care, community gives care\n    And his household labor should be recognized as community contribution\n    And resource access should preserve dignity through reciprocity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Care contributions qualify family for community resources",
+    "ogDescription": "Care contributions qualify family for community resources",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-care contributions qualify family for community resources",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Care contributions qualify family for community resources - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-care contributions qualify family for community resources",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-care contributions qualify family for community resources",
+    "name": "Care contributions qualify family for community resources",
+    "description": "Care contributions qualify family for community resources",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-cultural representation challenges ableist narratives",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-cultural representation challenges ableist narratives",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Cultural representation challenges ableist narratives",
+  "description": "Cultural representation challenges ableist narratives",
+  "content": "Scenario: Cultural representation challenges ableist narratives\n    Given media representation of disability is often harmful\n    And Alex works to improve disability representation\n    When Alex engages in cultural advocacy (media, arts, education)\n    Then representation work should be recognized as care labor\n    And the community_elohim should value cultural transformation efforts\n    And challenging ableist narratives benefits entire disabled community\n    And Alex's cultural work should accumulate care tokens\n    And the protocol should recognize that culture shapes material conditions\n    And representation advocacy is sophisticated intellectual labor\n    And Alex's contributions shift what community believes about disability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Cultural representation challenges ableist narratives",
+    "ogDescription": "Cultural representation challenges ableist narratives",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-cultural representation challenges ableist narratives",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Cultural representation challenges ableist narratives - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-cultural representation challenges ableist narratives",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-cultural representation challenges ableist narratives",
+    "name": "Cultural representation challenges ableist narratives",
+    "description": "Cultural representation challenges ableist narratives",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

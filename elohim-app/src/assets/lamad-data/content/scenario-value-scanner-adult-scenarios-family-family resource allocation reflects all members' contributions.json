@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-family-family resource allocation reflects all members' contributions",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-family resource allocation reflects all members' contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family resource allocation reflects all members' contributions",
+  "description": "Family resource allocation reflects all members' contributions",
+  "content": "Scenario: Family resource allocation reflects all members' contributions\n    Given family makes decisions about major resource allocation\n    And multiple members contribute in different ways\n    When family decisions are made\n    Then all members' care contributions should be considered\n    And Sarah's care work should give her legitimate standing\n    And children's contributions should be recognized appropriately\n    And resource decisions should reflect visible care patterns\n    And family economics should honor care creates value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:family",
+    "related_users:young_child,child,parent,grandparent,partner",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family resource allocation reflects all members' contributions",
+    "ogDescription": "Family resource allocation reflects all members' contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-family resource allocation reflects all members' contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family resource allocation reflects all members' contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-family-family resource allocation reflects all members' contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:family-family resource allocation reflects all members' contributions",
+    "name": "Family resource allocation reflects all members' contributions",
+    "description": "Family resource allocation reflects all members' contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

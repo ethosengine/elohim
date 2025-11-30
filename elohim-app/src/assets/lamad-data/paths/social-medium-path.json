@@ -1,0 +1,57 @@
+{
+  "id": "social-medium-path",
+  "version": "1.0.0",
+  "title": "Social Medium: Digital Dignity",
+  "description": "Design communication spaces that honor human dignity",
+  "purpose": "Learn principles of human-centered digital communication",
+  "createdBy": "elohim-curriculum",
+  "contributors": [
+    "steward-curriculum"
+  ],
+  "createdAt": "2025-11-18T00:09:03.478458",
+  "updatedAt": "2025-11-28T00:09:03.478460",
+  "steps": [
+    {
+      "order": 0,
+      "resourceId": "social-medium-epic",
+      "stepTitle": "The Medium is the Message",
+      "stepNarrative": "Understand how platform design shapes human behavior",
+      "learningObjectives": [
+        "Understand attention economics",
+        "Learn virality-as-privilege principles"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Read social medium epic"
+      ],
+      "estimatedTime": "20-30 minutes"
+    },
+    {
+      "order": 1,
+      "resourceId": "quiz-digital-dignity",
+      "stepTitle": "Digital Dignity Check",
+      "stepNarrative": "Assess your understanding of dignity-preserving design",
+      "learningObjectives": [
+        "Understand dignity-preserving design patterns"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Complete assessment"
+      ],
+      "attestationGranted": "dignity-advocate",
+      "estimatedTime": "10-15 minutes"
+    }
+  ],
+  "tags": [
+    "social-medium",
+    "dignity",
+    "communication",
+    "design"
+  ],
+  "difficulty": "beginner",
+  "estimatedDuration": "1-1.5 hours",
+  "visibility": "public",
+  "attestationsGranted": [
+    "dignity-advocate"
+  ]
+}

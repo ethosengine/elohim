@@ -1,0 +1,62 @@
+{
+  "id": "feature-public-observer-community-organizer-scenarios-district",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "District-Level Education Organizing for Community Organizer",
+  "description": "As a community organizer in the public_observer system Operating at the district governance layer I want to build parent and student power for education justice So that school district decisions prioritize equity and community voice",
+  "content": "@epic:public_observer\n@user_type:community_organizer\n@governance_layer:district\n@related_users:parent,citizen,activist,board_member\n@related_layers:municipality,educational,community\n@elohim_agents:public_observer,district_elohim,coalition_elohim\n\nFeature: District-Level Education Organizing for Community Organizer\n  As a community organizer in the public_observer system\n  Operating at the district governance layer\n  I want to build parent and student power for education justice\n  So that school district decisions prioritize equity and community voice\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_organizer user is registered in the system\n    And the district governance context is active\n\n  Scenario: Organizer detects opportunity in school board budget priorities\n    Given school board will vote on budget reallocation next month\n    And proposal shifts resources away from Title I schools\n    When the Observer surfaces the organizing opportunity\n    Then the organizer sees equity impact analysis by school\n    And identifies which parent communities are affected\n    And gets breakdown of resource distribution changes\n    And receives alert early enough to organize parent response\n    And district budget becomes organizing opportunity for equity\n\n  Scenario: Organizer builds cross-school parent coalition for equity\n    Given parents at five underfunded schools face similar challenges\n    And most parents don't know the pattern is district-wide\n    When the organizer uses Observer to document resource inequities\n    Then they show per-pupil spending gaps across schools\n    And map distribution of enrichment programs and experienced teachers\n    And connect parents from different schools around shared interests\n    And facilitate coalition demanding equitable resource formula\n    And individual school struggles become district equity campaign\n\n  Scenario: Organizer develops parent leaders for school board testimony\n    Given a Spanish-speaking parent has never attended school board meeting\n    And they want to advocate for dual-language program expansion\n    When the organizer supports their leadership development via Observer\n    Then the parent receives accessible data on dual-language outcomes\n    And gets testimony template in Spanish they can personalize\n    And practices with common questions board members might ask\n    And sees other parents' successful testimony examples\n    And becomes powerful education advocate speaking from lived experience\n\n  Scenario: Organizer coordinates parent-teacher coalition for class size reduction\n    Given teachers union supports smaller class sizes\n    And parents see crowded classrooms affecting their children\n    When the organizer builds coalition using Observer coordination tools\n    Then teachers and parents access shared data on class size impacts\n    And coordinate testimony combining professional and family perspectives\n    And track which board members support class size reduction\n    And organize joint mobilization for board meeting\n    And teacher expertise combines with parent power for policy change\n\n  Scenario: Organizer tracks accountability for special education commitments\n    Given district promised improved special education services\n    And the organizer's coalition of parents won the commitment\n    When the Observer tracks implementation progress\n    Then the organizer monitors hiring of promised support staff\n    And sees resource allocation to special education programs\n    And receives alerts when implementation lags behind timeline\n    And documents wins to show parents their advocacy worked\n    And district learns parent organizing demands follow-through\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:district",
+    "related_users:parent,citizen,activist,board_member",
+    "related_layers:municipality,educational,community",
+    "elohim_agents:public_observer,district_elohim,coalition_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/district.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-community-organizer-scenarios-district-organizer detects opportunity in school board budget priorities",
+    "scenario-public-observer-community-organizer-scenarios-district-organizer builds cross-school parent coalition for equity",
+    "scenario-public-observer-community-organizer-scenarios-district-organizer develops parent leaders for school board testimony",
+    "scenario-public-observer-community-organizer-scenarios-district-organizer coordinates parent-teacher coalition for class size reduction",
+    "scenario-public-observer-community-organizer-scenarios-district-organizer tracks accountability for special education commitments",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "openGraphMetadata": {
+    "ogTitle": "District-Level Education Organizing for Community Organizer",
+    "ogDescription": "As a community organizer in the public_observer system Operating at the district governance layer I want to build parent and student power for education justice So that school district decisions prior",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-community-organizer-scenarios-district",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "District-Level Education Organizing for Community Organizer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-community-organizer-scenarios-district",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:district",
+    "name": "District-Level Education Organizing for Community Organizer",
+    "description": "As a community organizer in the public_observer system Operating at the district governance layer I want to build parent and student power for education justice So that school district decisions prioritize equity and community voice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

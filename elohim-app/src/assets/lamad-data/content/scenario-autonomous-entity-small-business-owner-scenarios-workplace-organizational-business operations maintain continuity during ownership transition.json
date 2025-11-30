@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-business operations maintain continuity during ownership transition",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-business operations maintain continuity during ownership transition",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Business operations maintain continuity during ownership transition",
+  "description": "Business operations maintain continuity during ownership transition",
+  "content": "Scenario: Business operations maintain continuity during ownership transition\n    Given customers depend on reliable auto repair service\n    And continuity protects both community institution and workers' livelihoods\n    When ownership structure transforms from individual to democratic\n    Then customer relationships are systematically introduced to workers as new decision-makers\n    And service quality remains consistent through documented procedures\n    And supplier relationships transfer with Rosa introducing workers personally\n    And equipment maintenance knowledge is shared and documented\n    And no disruption occurs to daily operations or customer service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Business operations maintain continuity during ownership transition",
+    "ogDescription": "Business operations maintain continuity during ownership transition",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-business operations maintain continuity during ownership transition",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Business operations maintain continuity during ownership transition - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-business operations maintain continuity during ownership transition",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-business operations maintain continuity during ownership transition",
+    "name": "Business operations maintain continuity during ownership transition",
+    "description": "Business operations maintain continuity during ownership transition",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

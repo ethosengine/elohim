@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-ephesians-4-15-16",
+  "contentType": "bible-verse",
+  "title": "Ephesians 4:15-16",
+  "description": "Scripture reference used in FCT Module 8",
+  "content": {
+    "reference": "Ephesians 4:15-16",
+    "book": "Ephesians",
+    "chapter": 4,
+    "verseStart": 15,
+    "verseEnd": 16,
+    "contextInModule": "Ephesians 4:15-16 \"Grow to Become in every respect the mature body of him who is the head, that is Christ.\"",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "ephesians",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-08-centering-love",
+    "thematicContext": "Centering Values: Love"
+  },
+  "createdAt": "2025-11-28T21:10:19.208349",
+  "updatedAt": "2025-11-28T21:10:19.208352",
+  "did": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Ephesians 4:15-16",
+    "ogDescription": "Scripture reference used in FCT Module 8",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-ephesians-4-15-16",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Ephesians 4:15-16 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-ephesians-4-15-16",
+    "identifier": "did:web:elohim.host:content:fct:module 8 - centering values - part 1, centering the greatest value, love",
+    "name": "Ephesians 4:15-16",
+    "description": "Scripture reference used in FCT Module 8",
+    "dateCreated": "2025-11-28T21:10:19.208349",
+    "dateModified": "2025-11-28T21:10:19.208352",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

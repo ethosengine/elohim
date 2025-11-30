@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-community-parent discovers coalition for school bus safety",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:community-parent discovers coalition for school bus safety",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent discovers coalition for school bus safety",
+  "description": "Parent discovers coalition for school bus safety",
+  "content": "Scenario: Parent discovers coalition for school bus safety\n    Given the parent's child rides Route 17 with chronic delays\n    And 13 other parents along Route 17 report the same safety concerns\n    When the Observer detects the alignment pattern\n    Then the parent receives opt-in coalition notification\n    And can see aggregated data on delay patterns and incidents\n    And can coordinate testimony with other affected parents\n    And isolated frustration becomes documented collective concern\n    And 14 coordinated parents change the transportation meeting outcome\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:community",
+    "related_users:citizen,teacher,community_organizer,activist",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent discovers coalition for school bus safety",
+    "ogDescription": "Parent discovers coalition for school bus safety",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-community-parent discovers coalition for school bus safety",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent discovers coalition for school bus safety - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-community-parent discovers coalition for school bus safety",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:community-parent discovers coalition for school bus safety",
+    "name": "Parent discovers coalition for school bus safety",
+    "description": "Parent discovers coalition for school bus safety",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-child-scenarios-neighborhood",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Neighborhood Layer Value Recognition for Child",
+  "description": "As a child in the value scanner system Operating at the neighborhood governance layer I want to understand how my choices connect to community patterns So that I learn care economy operates beyond just my family",
+  "content": "@epic:value_scanner\n@user_type:child\n@governance_layer:neighborhood\n@related_users:young_child,preteen,parent,student\n@related_layers:individual,family,educational\n@elohim_agents:personal_agent,family_elohim,neighborhood_elohim\n\nFeature: Neighborhood Layer Value Recognition for Child\n  As a child in the value scanner system\n  Operating at the neighborhood governance layer\n  I want to understand how my choices connect to community patterns\n  So that I learn care economy operates beyond just my family\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the child user \"Emma\" is registered in the system\n    And Emma is 8 years old\n    And the neighborhood governance context is active\n    And Emma's family participates in neighborhood care economy\n    And the neighborhood_elohim coordinates community patterns\n    And Emma is beginning to engage beyond family context\n\n  Scenario: Child learns individual choices aggregate to community patterns\n    Given Emma makes consistent purchasing choices\n    And other neighborhood families also use the Value Scanner\n    When Emma's personal_agent provides context about her choices\n    Then the agent should share age-appropriate community insights\n    And the agent should say \"Five other families bought this brand this week\u2014they're all trying to eat healthier\"\n    And Emma should learn her choices are part of larger patterns\n    And she should understand individual agency connects to collective outcomes\n    And community context should expand her economic understanding\n    And she should see herself as part of care economy ecosystem\n\n  Scenario: Neighborhood shopping patterns affect local product availability\n    Given Emma shops at local grocery store\n    And the store stocks products based on community demand\n    When Emma consistently chooses certain products\n    Then she should learn her choices influence what stores carry\n    And her personal_agent should explain \"When families buy local produce, stores stock more of it\"\n    And Emma should understand demand shapes supply at community level\n    And she should see connection between individual choice and collective power\n    And economic literacy should include understanding market dynamics\n    And she should learn communities shape local economies\n\n  Scenario: Child recognizes care labor in neighborhood economy\n    Given Emma interacts with store workers during shopping\n    And she is learning to see invisible care work\n    When Emma completes a transaction\n    Then her personal_agent should prompt recognition of care labor\n    And the agent should say \"Thank the checker for scanning your items\"\n    And Emma should learn to see stockers, checkers, farmers, truckers\n    And she should understand economy is made of people caring for each other\n    And awareness of care labor should extend beyond family\n    And she should be socialized into seeing economy as care relationships\n\n  Scenario: Neighborhood care economy connects families across community\n    Given multiple families in neighborhood participate in Value Scanner\n    And Emma's family is part of neighborhood network\n    When Emma makes care contributions through shopping\n    Then her contributions should feed into neighborhood care economy\n    And the neighborhood_elohim should track community care patterns\n    And Emma should learn care extends beyond her household\n    And she should see her family as part of larger community\n    And neighborhood-level recognition should be age-appropriate\n    And community belonging should be built through care visibility\n\n  Scenario: Child learns about local food systems through scanner\n    Given Emma's neighborhood has local farmers and producers\n    And the Value Scanner highlights local sourcing\n    When Emma scans locally-produced items\n    Then her personal_agent should explain local food systems\n    And the agent should say \"This was grown by farmers just 20 miles away\"\n    And Emma should learn about supply chains at concrete level\n    And she should understand connection between her food and local land\n    And regional care economies should be made visible\n    And she should develop sense of place-based economic relationships\n\n  Scenario: Community-level insights appropriate for child understanding\n    Given neighborhood_elohim aggregates community data\n    And Emma is old enough to understand patterns\n    When Emma receives neighborhood-level information\n    Then insights should be concrete and age-appropriate\n    And the agent should say \"Your neighborhood buys a lot of fresh vegetables\"\n    And abstract data should not be presented\n    And community patterns should be framed in care terms\n    And Emma should learn about collective behavior through simple examples\n    And complexity should be appropriately filtered for age 8\n\n  Scenario: Child's care contributions visible at neighborhood scale\n    Given Emma makes consistent stewardship choices\n    And neighborhood care economy tracks contributions\n    When Emma's patterns are recognized by neighborhood_elohim\n    Then her contributions should be visible at appropriate scale\n    And recognition should reflect community-level impact\n    And Emma should learn her care matters beyond just family\n    And she should understand she is contributing to neighborhood flourishing\n    And care visibility should extend across governance layers\n    And identity as community member should be forming\n\n  Scenario: Learning about different families' economic circumstances\n    Given Emma's family has $40k/year income\n    And neighborhood includes families with varied economic situations\n    When Emma learns about community economic diversity\n    Then teaching should be age-appropriate about economic difference\n    And the personal_agent should explain without judgment\n    And Emma should learn that families have different resources\n    And she should develop empathy about economic constraint\n    And class awareness should be taught with dignity for all\n    And care economy should serve families across income spectrum\n\n  Scenario: Neighborhood events integrate child into care economy\n    Given the neighborhood holds community gatherings or shared resources\n    And Emma participates in neighborhood activities\n    When Emma attends community events\n    Then her care contributions should carry across contexts\n    And neighborhood_elohim should coordinate recognition\n    And Emma should experience community as extension of family\n    And she should learn care economy scales beyond household\n    And community belonging should be built through participation\n    And she should see herself as valued neighborhood member\n\n  Scenario: Child understands privacy in community context\n    Given Emma's data contributes to neighborhood patterns\n    And she is learning about privacy concepts\n    When Emma's anonymized data is aggregated\n    Then she should understand her information is protected\n    And her personal_agent should explain community data carefully\n    And the agent should say \"Your choices help the neighborhood, but your privacy is protected\"\n    And she should learn about balance between community good and privacy\n    And data ethics education should be age-appropriate\n    And she should understand collective benefit need not compromise privacy\n\n  Scenario: Local environmental impact visible through neighborhood patterns\n    Given Emma is learning ecological care concepts\n    And neighborhood aggregate data shows environmental impact\n    When Emma makes choices with environmental dimensions\n    Then her personal_agent should share community environmental patterns\n    And the agent should say \"Your neighborhood has reduced plastic waste by choosing reusable bags\"\n    And she should see how individual choices aggregate to ecological impact\n    And environmental stewardship should be connected to care economy\n    And she should learn community can collectively care for local environment\n    And ecological literacy should develop at appropriate scale\n\n  Scenario: Child learns community economic power through collective action\n    Given neighborhood families make coordinated choices\n    And Emma participates in community economic patterns\n    When Emma sees collective neighborhood impact\n    Then she should learn about community economic agency\n    And her personal_agent should explain collective power age-appropriately\n    And the agent should say \"When families choose together, stores listen\"\n    And she should understand communities can shape markets\n    And care economy includes collective organizing dimension\n    And she should learn early about community economic power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:neighborhood",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,educational",
+    "elohim_agents:personal_agent,family_elohim,neighborhood_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-child-scenarios-neighborhood-child learns individual choices aggregate to community patterns",
+    "scenario-value-scanner-child-scenarios-neighborhood-neighborhood shopping patterns affect local product availability",
+    "scenario-value-scanner-child-scenarios-neighborhood-child recognizes care labor in neighborhood economy",
+    "scenario-value-scanner-child-scenarios-neighborhood-neighborhood care economy connects families across community",
+    "scenario-value-scanner-child-scenarios-neighborhood-child learns about local food systems through scanner",
+    "scenario-value-scanner-child-scenarios-neighborhood-community-level insights appropriate for child understanding",
+    "scenario-value-scanner-child-scenarios-neighborhood-child's care contributions visible at neighborhood scale",
+    "scenario-value-scanner-child-scenarios-neighborhood-learning about different families' economic circumstances",
+    "scenario-value-scanner-child-scenarios-neighborhood-neighborhood events integrate child into care economy",
+    "scenario-value-scanner-child-scenarios-neighborhood-child understands privacy in community context",
+    "scenario-value-scanner-child-scenarios-neighborhood-local environmental impact visible through neighborhood patterns",
+    "scenario-value-scanner-child-scenarios-neighborhood-child learns community economic power through collective action",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood Layer Value Recognition for Child",
+    "ogDescription": "As a child in the value scanner system Operating at the neighborhood governance layer I want to understand how my choices connect to community patterns So that I learn care economy operates beyond jus",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-child-scenarios-neighborhood",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Neighborhood Layer Value Recognition for Child - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-child-scenarios-neighborhood",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:neighborhood",
+    "name": "Neighborhood Layer Value Recognition for Child",
+    "description": "As a child in the value scanner system Operating at the neighborhood governance layer I want to understand how my choices connect to community patterns So that I learn care economy operates beyond just my family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

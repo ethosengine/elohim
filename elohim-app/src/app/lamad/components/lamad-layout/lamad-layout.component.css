@@ -74,6 +74,7 @@
 
 .back-link {
   opacity: 0.7;
+  white-space: nowrap;
 }
 
 /* Theme Toggle in Toolbar */
@@ -197,7 +198,6 @@
   max-width: 1400px;
   width: 100%;
   margin: 0 auto;
-  padding: 2rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -218,6 +218,342 @@
   color: var(--lamad-text-muted);
   font-size: 0.875rem;
 }
+
+.footer-link {
+  color: var(--lamad-text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-link:hover {
+  color: var(--lamad-accent-primary);
+}
+
+/* Session Human Info */
+.session-human-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.human-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.human-icon {
+  opacity: 0.7;
+}
+
+.human-name {
+  font-weight: 500;
+  color: var(--lamad-text-secondary);
+}
+
+.human-stats {
+  color: var(--lamad-text-muted);
+  font-size: 0.75rem;
+}
+
+.btn-join-network {
+  padding: 0.25rem 0.75rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-join-network:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Upgrade Banner */
+.upgrade-banner {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border-bottom: 1px solid var(--lamad-border);
+  padding: 0.5rem 1rem;
+}
+
+.upgrade-banner-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upgrade-icon {
+  font-size: 1.25rem;
+}
+
+.upgrade-text {
+  flex: 1;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.upgrade-text strong {
+  color: var(--lamad-accent-primary);
+}
+
+.upgrade-text span {
+  color: var(--lamad-text-secondary);
+}
+
+.upgrade-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-upgrade {
+  padding: 0.25rem 0.75rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-upgrade:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-dismiss {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.btn-dismiss:hover {
+  opacity: 1;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* Upgrade Modal */
+.upgrade-modal {
+  background: var(--lamad-surface);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--lamad-text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.modal-close:hover {
+  opacity: 1;
+}
+
+.modal-header {
+  padding: 2rem 2rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.modal-header h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  background: var(--lamad-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-subtitle {
+  margin: 0;
+  color: var(--lamad-text-secondary);
+  font-size: 0.9rem;
+}
+
+.modal-body {
+  padding: 1.5rem 2rem;
+}
+
+.upgrade-benefits h3,
+.upgrade-how h3,
+.session-summary h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--lamad-text-secondary);
+}
+
+.upgrade-benefits ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+
+.upgrade-benefits li {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--lamad-border);
+}
+
+.upgrade-benefits li:last-child {
+  border-bottom: none;
+}
+
+.benefit-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.upgrade-benefits strong {
+  display: block;
+  color: var(--lamad-text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.upgrade-benefits p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--lamad-text-muted);
+}
+
+.upgrade-how {
+  margin-bottom: 1.5rem;
+}
+
+.upgrade-how ol {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.upgrade-how li {
+  padding: 0.5rem 0;
+  color: var(--lamad-text-secondary);
+}
+
+.session-summary {
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--lamad-border);
+}
+
+.summary-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--lamad-accent-primary);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--lamad-text-muted);
+}
+
+.summary-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--lamad-text-muted);
+  font-style: italic;
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--lamad-border);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--lamad-border);
+  border-radius: 0.5rem;
+  color: var(--lamad-text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(99, 102, 241, 0.05);
+  border-color: var(--lamad-accent-primary);
+}
+
+.btn-primary {
+  padding: 0.5rem 1rem;
+  background: var(--lamad-accent-gradient);
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -254,6 +590,11 @@
     overflow-x: auto;
   }
 
+  /* Hide "by Elohim Protocol" link on mobile */
+  .back-link {
+    display: none;
+  }
+
   /* Hide search on mobile to save space */
   .search-container {
     display: none;
@@ -273,6 +614,77 @@
   }
 
   .lamad-main {
+    padding: 0;
+  }
+
+  /* Hide session human stats on mobile */
+  .human-stats {
+    display: none;
+  }
+
+  .session-human-info {
+    gap: 0.5rem;
+  }
+
+  .btn-join-network {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  /* Upgrade banner mobile */
+  .upgrade-banner {
+    padding: 0.5rem;
+  }
+
+  .upgrade-banner-content {
+    gap: 0.5rem;
+  }
+
+  .upgrade-icon {
+    font-size: 1rem;
+  }
+
+  .upgrade-text {
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  /* Modal mobile */
+  .modal-overlay {
     padding: 1rem;
+  }
+
+  .upgrade-modal {
+    border-radius: 0.75rem;
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 1rem;
+  }
+
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.5rem;
+  }
+
+  .summary-stats {
+    gap: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer button {
+    width: 100%;
   }
 }

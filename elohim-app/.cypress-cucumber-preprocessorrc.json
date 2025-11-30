@@ -11,7 +11,7 @@
     "output": "cypress/reports/cucumber-report.html"
   },
   "stepDefinitions": [
-    "cypress/e2e/step_definitions/**/*.js"
+    "cypress/e2e/step_definitions/**/*.{js,ts}"
   ],
   "filterSpecs": true,
   "omitFiltered": true

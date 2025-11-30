@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-educational-parent educational labor outside formal schooling hours",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent educational labor outside formal schooling hours",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent educational labor outside formal schooling hours",
+  "description": "Parent educational labor outside formal schooling hours",
+  "content": "Scenario: Parent educational labor outside formal schooling hours\n    Given Sarah teaches Tommy and Emma during evenings and weekends\n    And homework support, life skills, critical thinking happen at home\n    When the educational_elohim tracks Sarah's teaching time\n    Then it should quantify hours spent on educational labor\n    And it should recognize teaching homework as skilled instructional work\n    And it should value informal education alongside formal instruction\n    And Sarah's non-school teaching should accumulate care tokens\n    And the system should make invisible educational labor visible\n    And parent teaching should be recognized as professional-grade work\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent educational labor outside formal schooling hours",
+    "ogDescription": "Parent educational labor outside formal schooling hours",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent educational labor outside formal schooling hours",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent educational labor outside formal schooling hours - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-educational-parent educational labor outside formal schooling hours",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational-parent educational labor outside formal schooling hours",
+    "name": "Parent educational labor outside formal schooling hours",
+    "description": "Parent educational labor outside formal schooling hours",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

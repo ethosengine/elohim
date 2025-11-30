@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-urban food deserts as ecological and economic justice issue",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-urban food deserts as ecological and economic justice issue",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Urban food deserts as ecological and economic justice issue",
+  "description": "Urban food deserts as ecological and economic justice issue",
+  "content": "Scenario: Urban food deserts as ecological and economic justice issue\n    Given Marcus may live in urban food desert\n    And food access connects to land use and economic systems\n    When Marcus experiences difficulty accessing fresh food\n    Then he should understand food deserts as systemic failure\n    And the personal_agent should explain how urban planning affects food access\n    And he should learn that food justice requires ecological and economic change\n    And his lived experience should inform political consciousness\n    And care economy should include bioregional food sovereignty\n    And his struggles should fuel commitment to food system transformation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Urban food deserts as ecological and economic justice issue",
+    "ogDescription": "Urban food deserts as ecological and economic justice issue",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-urban food deserts as ecological and economic justice issue",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Urban food deserts as ecological and economic justice issue - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-urban food deserts as ecological and economic justice issue",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-urban food deserts as ecological and economic justice issue",
+    "name": "Urban food deserts as ecological and economic justice issue",
+    "description": "Urban food deserts as ecological and economic justice issue",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

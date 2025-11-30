@@ -1,0 +1,64 @@
+{
+  "id": "feature-public-observer-teacher-scenarios-district",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:district",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "District Governance and Resource Allocation for Teacher",
+  "description": "As a teacher in the public_observer system Operating at the district governance layer I want to inform board decisions with professional expertise So that district policies support effective teaching and student learning",
+  "content": "@epic:public_observer\n@user_type:teacher\n@governance_layer:district\n@related_users:parent,board_member,community_organizer,administrator\n@related_layers:school,municipality,provincial_state,educational\n@elohim_agents:public_observer,education_elohim,classroom_elohim\n\nFeature: District Governance and Resource Allocation for Teacher\n  As a teacher in the public_observer system\n  Operating at the district governance layer\n  I want to inform board decisions with professional expertise\n  So that district policies support effective teaching and student learning\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the teacher user is registered in the system\n    And the district governance context is active\n\n  Scenario: Teacher decodes school board agenda in morning brief\n    Given tonight's board meeting will vote on \"instructional efficiency optimization\"\n    And teachers have limited time to track board activities\n    When the teacher receives Observer morning brief\n    Then they learn this means increasing class sizes from 24 to 28\n    And see projected impact on teaching and individual attention\n    And get concrete advocacy pathway (testimony, email, coordination)\n    And can coordinate response with colleagues and parents during workday\n    And board jargon becomes actionable intelligence\n\n  Scenario: Teacher provides evidence on class size policy\n    Given the board is considering budget cuts increasing class sizes\n    And board claims research shows class size doesn't matter\n    When teachers coordinate evidence-based advocacy through Observer\n    Then they present district's own data showing outcomes decline as sizes increase\n    And cite research on class size effects by grade level\n    And show neighboring district has lower ratios and better results\n    And provide teacher professional judgment grounded in evidence\n    And board decision becomes informed by multiple evidence sources\n\n  Scenario: Teacher exposes resource distribution inequities\n    Given some schools have abundant materials while others lack basics\n    And district claims equitable allocation\n    When teachers document resources across schools through Observer\n    Then data reveals wealthy-area schools get $800/student discretionary\n    And high-poverty schools get $200/student discretionary\n    And teachers coordinate with parents in under-resourced schools\n    And bring evidence of systematic inequity to board\n    And resource distribution becomes equity accountability issue\n\n  Scenario: Teacher coalition challenges harmful curriculum mandate\n    Given district mandates scripted curriculum contradicting best practices\n    And individual teacher objections are dismissed as \"resistance\"\n    When 180 teachers coordinate through Observer platform\n    Then collective professional voice becomes undeniable\n    And teachers present research on curriculum approach\n    And document student engagement declining since mandate\n    And propose evidence-based alternative approaches\n    And collective expertise creates pressure for policy reconsideration\n\n  Scenario: Teacher tracks board member voting patterns\n    Given teachers need to identify genuine board allies\n    And can't easily track votes across meetings\n    When the Observer tracks and analyzes board member votes\n    Then teachers see which members consistently support teaching conditions\n    And identify which members prioritize administrative recommendations over teacher input\n    And can target advocacy to persuadable members\n    And recognize true allies for coalition building\n    And board accountability becomes visible and actionable\n\n  Scenario: Teacher evaluates budget priorities with evidence\n    Given the district approved $2M for new administration positions\n    But rejected $800K for reducing class sizes\n    When the Observer makes budget trade-offs transparent\n    Then teachers see value priorities (administration vs instruction)\n    And calculate that rejected proposal would fund 16 teaching positions\n    And document that administrative overhead increased 40% in five years\n    And organize parents and community around budget priorities\n    And fiscal policy becomes professional accountability issue\n\n  Scenario: Teacher monitors superintendent promise on evaluation reform\n    Given the superintendent promised to reduce evaluation paperwork burden\n    And teachers experience evaluation as compliance not professional growth\n    When the Observer tracks implementation over time\n    Then teachers document that paperwork actually increased\n    And evaluation time went from 8 hours to 12 hours annually\n    And no evidence of professional development benefit\n    And bring accountability data to board on broken promise\n    And administrative commitments become enforceable through transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-teacher-scenarios-district-teacher decodes school board agenda in morning brief",
+    "scenario-public-observer-teacher-scenarios-district-teacher provides evidence on class size policy",
+    "scenario-public-observer-teacher-scenarios-district-teacher exposes resource distribution inequities",
+    "scenario-public-observer-teacher-scenarios-district-teacher coalition challenges harmful curriculum mandate",
+    "scenario-public-observer-teacher-scenarios-district-teacher tracks board member voting patterns",
+    "scenario-public-observer-teacher-scenarios-district-teacher evaluates budget priorities with evidence",
+    "scenario-public-observer-teacher-scenarios-district-teacher monitors superintendent promise on evaluation reform",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 7
+  },
+  "openGraphMetadata": {
+    "ogTitle": "District Governance and Resource Allocation for Teacher",
+    "ogDescription": "As a teacher in the public_observer system Operating at the district governance layer I want to inform board decisions with professional expertise So that district policies support effective teaching ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-teacher-scenarios-district",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "District Governance and Resource Allocation for Teacher - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-teacher-scenarios-district",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:district",
+    "name": "District Governance and Resource Allocation for Teacher",
+    "description": "As a teacher in the public_observer system Operating at the district governance layer I want to inform board decisions with professional expertise So that district policies support effective teaching and student learning",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

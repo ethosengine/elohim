@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-preventing single parent burnout through community monitoring",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-preventing single parent burnout through community monitoring",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Preventing single parent burnout through community monitoring",
+  "description": "Preventing single parent burnout through community monitoring",
+  "content": "Scenario: Preventing single parent burnout through community monitoring\n    Given Maria operates at unsustainable intensity with no co-parent relief\n    And burnout is extremely common among solo parents\n    When the community_elohim monitors Maria's well-being\n    Then it should detect warning signs of approaching burnout\n    And it should proactively offer respite care and support\n    And it should coordinate community intervention before crisis occurs\n    And burnout prevention should be community responsibility\n    And Maria should have community safety net watching for her well-being\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Preventing single parent burnout through community monitoring",
+    "ogDescription": "Preventing single parent burnout through community monitoring",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-preventing single parent burnout through community monitoring",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing single parent burnout through community monitoring - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-preventing single parent burnout through community monitoring",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-preventing single parent burnout through community monitoring",
+    "name": "Preventing single parent burnout through community monitoring",
+    "description": "Preventing single parent burnout through community monitoring",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

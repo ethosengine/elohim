@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-maintaining regular family contact on own terms",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-maintaining regular family contact on own terms",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Maintaining regular family contact on own terms",
+  "description": "Maintaining regular family contact on own terms",
+  "content": "Scenario: Maintaining regular family contact on own terms\n    Given Jordan's parents want to stay connected\n    And Jordan values family relationships\n    When Jordan decides how often to communicate with family\n    Then the personal_agent helps Jordan set communication preferences\n    And the interface shows simple options (daily calls, weekly visits, etc.)\n    And Jordan's communication preferences are communicated to family\n    And the family_elohim helps family honor Jordan's boundaries\n    And Jordan experiences autonomy over family connection frequency\n    And Jordan's adult status is respected through choice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Maintaining regular family contact on own terms",
+    "ogDescription": "Maintaining regular family contact on own terms",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-maintaining regular family contact on own terms",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Maintaining regular family contact on own terms - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-maintaining regular family contact on own terms",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-maintaining regular family contact on own terms",
+    "name": "Maintaining regular family contact on own terms",
+    "description": "Maintaining regular family contact on own terms",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

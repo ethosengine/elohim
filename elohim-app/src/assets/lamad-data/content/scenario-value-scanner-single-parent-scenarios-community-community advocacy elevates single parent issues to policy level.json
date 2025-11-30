@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-community-community advocacy elevates single parent issues to policy level",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-community advocacy elevates single parent issues to policy level",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community advocacy elevates single parent issues to policy level",
+  "description": "Community advocacy elevates single parent issues to policy level",
+  "content": "Scenario: Community advocacy elevates single parent issues to policy level\n    Given single parents face systemic barriers and lack political visibility\n    And policy changes could dramatically improve their circumstances\n    When Maria participates in community advocacy\n    Then the community_elohim should amplify single parent voices\n    And it should provide care economy data showing scale of solo parent contributions\n    And it should help Maria advocate for single-parent-friendly policies\n    And community should recognize single parents as care economy heroes, not broken families\n    And advocacy should push for systemic changes in housing, childcare, wages, and support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:community",
+    "related_users:parent,single_parent,community_member,caregiver,worker",
+    "related_layers:neighborhood,family,municipality,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community advocacy elevates single parent issues to policy level",
+    "ogDescription": "Community advocacy elevates single parent issues to policy level",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-community advocacy elevates single parent issues to policy level",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community advocacy elevates single parent issues to policy level - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-community-community advocacy elevates single parent issues to policy level",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:community-community advocacy elevates single parent issues to policy level",
+    "name": "Community advocacy elevates single parent issues to policy level",
+    "description": "Community advocacy elevates single parent issues to policy level",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

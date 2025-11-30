@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-workplace-organizational-professional development coordinated with parenting constraints",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-professional development coordinated with parenting constraints",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Professional development coordinated with parenting constraints",
+  "description": "Professional development coordinated with parenting constraints",
+  "content": "Scenario: Professional development coordinated with parenting constraints\n    Given Sarah wants to pursue professional growth\n    And she has limited time due to parenting responsibilities\n    When Sarah considers professional development opportunities\n    Then the workplace_elohim should help her assess feasibility\n    And it should integrate family constraints into planning\n    And it should help her find development opportunities compatible with parenting\n    And professional growth should be possible despite parenting demands\n    And the system should support career development for working parents\n    And Sarah should not have to choose between career and family\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employer,colleague,child",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Professional development coordinated with parenting constraints",
+    "ogDescription": "Professional development coordinated with parenting constraints",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-professional development coordinated with parenting constraints",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional development coordinated with parenting constraints - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-workplace-organizational-professional development coordinated with parenting constraints",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:workplace-organizational-professional development coordinated with parenting constraints",
+    "name": "Professional development coordinated with parenting constraints",
+    "description": "Professional development coordinated with parenting constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

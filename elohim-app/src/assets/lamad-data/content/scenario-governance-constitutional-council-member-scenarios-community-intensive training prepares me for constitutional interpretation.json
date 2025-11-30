@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-community-intensive training prepares me for constitutional interpretation",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-intensive training prepares me for constitutional interpretation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Intensive training prepares me for constitutional interpretation",
+  "description": "Intensive training prepares me for constitutional interpretation",
+  "content": "Scenario: Intensive training prepares me for constitutional interpretation\n    Given I have accepted my Constitutional Council appointment\n    And I need to understand constitutional principles to judge agent decisions\n    When I complete 3-week training program\n    Then I learn: constitutional principles and their application\n    And I study: how agents reason and make decisions\n    And I practice: deliberation protocols and consensus building\n    And I review: historical precedents and case studies\n    And I am educated: without being indoctrinated about \"correct\" answers\n    And I develop: judgment capacity not just knowledge\n    And I feel: prepared to serve despite lack of formal expertise\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:community",
+    "related_users:appellant,technical_expert,community_leader,researcher",
+    "related_layers:provincial_state,family,individual",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Intensive training prepares me for constitutional interpretation",
+    "ogDescription": "Intensive training prepares me for constitutional interpretation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-intensive training prepares me for constitutional interpretation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Intensive training prepares me for constitutional interpretation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-community-intensive training prepares me for constitutional interpretation",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:community-intensive training prepares me for constitutional interpretation",
+    "name": "Intensive training prepares me for constitutional interpretation",
+    "description": "Intensive training prepares me for constitutional interpretation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

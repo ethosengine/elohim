@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-workers gradually assume democratic governance responsibilities",
+  "did": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-workers gradually assume democratic governance responsibilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workers gradually assume democratic governance responsibilities",
+  "description": "Workers gradually assume democratic governance responsibilities",
+  "content": "Scenario: Workers gradually assume democratic governance responsibilities\n    Given Rosa previously made all strategic business decisions alone\n    And workers need to develop governance capacity and confidence\n    When democratic transition timeline begins\n    Then early phase: Rosa proposes decisions, workers approve and learn rationale\n    And middle phase: workers propose decisions, Rosa advises and supports\n    And late phase: workers decide democratically, Rosa consults only when requested\n    And workplace_elohim tracks governance capacity growth over transition period\n    And power genuinely transfers without hierarchical recapture\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:small_business_owner",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,franchise_operator,supplier]",
+    "related_layers:[individual,community]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/small_business_owner/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-small-business-owner-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workers gradually assume democratic governance responsibilities",
+    "ogDescription": "Workers gradually assume democratic governance responsibilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-workers gradually assume democratic governance responsibilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workers gradually assume democratic governance responsibilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-small-business-owner-scenarios-workplace-organizational-workers gradually assume democratic governance responsibilities",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:small-business-owner:scenarios:workplace-organizational-workers gradually assume democratic governance responsibilities",
+    "name": "Workers gradually assume democratic governance responsibilities",
+    "description": "Workers gradually assume democratic governance responsibilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

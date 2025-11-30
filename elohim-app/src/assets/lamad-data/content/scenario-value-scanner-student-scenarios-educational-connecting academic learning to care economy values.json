@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-educational-connecting academic learning to care economy values",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-connecting academic learning to care economy values",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connecting academic learning to care economy values",
+  "description": "Connecting academic learning to care economy values",
+  "content": "Scenario: Connecting academic learning to care economy values\n    Given Kenji studies environmental science\n    And his field directly relates to planetary care economy\n    When the educational_elohim connects learning to care principles\n    Then it should help Kenji see environmental science as care work\n    And it should link his academic study to ecological stewardship\n    And it should show how his education prepares him for care contributions\n    And learning should be framed as developing capacity to serve flourishing\n    And the system should integrate academic work with care economy purpose\n    And Kenji should understand his education as care economy investment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:educational",
+    "related_users:educator,teacher,professor,peer_student",
+    "related_layers:individual,community,workplace_organizational",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connecting academic learning to care economy values",
+    "ogDescription": "Connecting academic learning to care economy values",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-connecting academic learning to care economy values",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting academic learning to care economy values - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-educational-connecting academic learning to care economy values",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:educational-connecting academic learning to care economy values",
+    "name": "Connecting academic learning to care economy values",
+    "description": "Connecting academic learning to care economy values",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

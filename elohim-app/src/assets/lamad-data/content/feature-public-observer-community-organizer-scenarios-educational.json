@@ -1,0 +1,62 @@
+{
+  "id": "feature-public-observer-community-organizer-scenarios-educational",
+  "did": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Education Justice Organizing for Community Organizer",
+  "description": "As a community organizer in the public_observer system Operating at the educational functional layer I want to organize communities for equitable education access and quality So that all students receive resources and opportunities regardless of neighborhood or background",
+  "content": "@epic:public_observer\n@user_type:community_organizer\n@governance_layer:educational\n@related_users:parent,activist,citizen,board_member\n@related_layers:district,municipality,community\n@elohim_agents:public_observer,education_elohim,coalition_elohim\n\nFeature: Education Justice Organizing for Community Organizer\n  As a community organizer in the public_observer system\n  Operating at the educational functional layer\n  I want to organize communities for equitable education access and quality\n  So that all students receive resources and opportunities regardless of neighborhood or background\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the community_organizer user is registered in the system\n    And the educational governance context is active\n\n  Scenario: Organizer documents opportunity gap for education equity campaign\n    Given gifted programs concentrate in predominantly white schools\n    And advanced placement courses lack availability in low-income schools\n    When the Observer provides education equity data\n    Then the organizer sees enrichment program distribution across district\n    And maps demographic patterns showing systematic disparities\n    And calculates opportunity gaps affecting thousands of students\n    And identifies organizing base of affected families\n    And educational inequality becomes documented basis for organizing\n\n  Scenario: Organizer creates accessible materials on school funding formula\n    Given parents don't understand why their school has fewer resources\n    And school funding formula is complex and opaque\n    When the organizer requests education materials from Observer\n    Then they receive plain-language explanation of funding sources\n    And see visual comparison of per-pupil spending across schools\n    And get breakdown of how formula creates inequities\n    And access talking points for advocating for funding changes\n    And technical education finance becomes accessible community knowledge\n\n  Scenario: Organizer builds coalition for culturally responsive curriculum\n    Given families want curriculum reflecting their communities' histories\n    And multiple cultural groups share this interest\n    When the organizer uses Observer to facilitate coalition building\n    Then they identify parents from different backgrounds with aligned goals\n    And coordinate around shared demands for curriculum inclusion\n    And help families develop specific proposals with supporting evidence\n    And organize testimony showcasing diverse community voices\n    And coalition transforms individual requests into collective power\n\n  Scenario: Organizer mobilizes parents against school closure targeting low-income neighborhoods\n    Given district proposes closing three schools in working-class areas\n    And claims it's necessary for \"efficiency\"\n    When the organizer uses Observer to analyze closure impacts\n    Then they show closures increase commute times for low-income families\n    And demonstrate stable enrollment contradicting district claims\n    And calculate cost of closure to affected communities\n    And organize parents to demand community-based solutions\n    And education organizing prevents harm to vulnerable students\n\n  Scenario: Organizer tracks implementation of restorative justice commitment\n    Given district adopted restorative justice to reduce suspensions\n    And the organizer's coalition of parents and students won the policy\n    When the Observer tracks implementation progress\n    Then the organizer monitors training of school staff\n    And sees suspension data by school, race, and disability status\n    And identifies schools not implementing restorative practices\n    And documents where implementation succeeds and changes outcomes\n    And policy victory leads to implementation accountability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:community_organizer",
+    "governance_layer:educational",
+    "related_users:parent,activist,citizen,board_member",
+    "related_layers:district,municipality,community",
+    "elohim_agents:public_observer,education_elohim,coalition_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/community_organizer/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-community-organizer-scenarios-educational-organizer documents opportunity gap for education equity campaign",
+    "scenario-public-observer-community-organizer-scenarios-educational-organizer creates accessible materials on school funding formula",
+    "scenario-public-observer-community-organizer-scenarios-educational-organizer builds coalition for culturally responsive curriculum",
+    "scenario-public-observer-community-organizer-scenarios-educational-organizer mobilizes parents against school closure targeting low-income neighborhoods",
+    "scenario-public-observer-community-organizer-scenarios-educational-organizer tracks implementation of restorative justice commitment",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 5
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Education Justice Organizing for Community Organizer",
+    "ogDescription": "As a community organizer in the public_observer system Operating at the educational functional layer I want to organize communities for equitable education access and quality So that all students rece",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-community-organizer-scenarios-educational",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Education Justice Organizing for Community Organizer - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-community-organizer-scenarios-educational",
+    "identifier": "did:web:elohim.host:content:public-observer:community-organizer:scenarios:educational",
+    "name": "Education Justice Organizing for Community Organizer",
+    "description": "As a community organizer in the public_observer system Operating at the educational functional layer I want to organize communities for equitable education access and quality So that all students receive resources and opportunities regardless of neighborhood or background",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-privacy controls honor teen's developing autonomy",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-privacy controls honor teen's developing autonomy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Privacy controls honor teen's developing autonomy",
+  "description": "Privacy controls honor teen's developing autonomy",
+  "content": "Scenario: Privacy controls honor teen's developing autonomy\n    Given Jasmine's care contributions are tracked across multiple contexts\n    And she has legitimate need for privacy from parents\n    When Jasmine configures her privacy settings\n    Then she should have granular control over what data is shared with whom\n    And parents should have access to family-relevant information only\n    And her personal data (friendships, personal purchases, private reflections) should be protected\n    And community resource coordinators should see care contributions but not private details\n    And employers should not access her family or school data\n    And Jasmine should actively learn to manage privacy boundaries\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Privacy controls honor teen's developing autonomy",
+    "ogDescription": "Privacy controls honor teen's developing autonomy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-privacy controls honor teen's developing autonomy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Privacy controls honor teen's developing autonomy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-privacy controls honor teen's developing autonomy",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-privacy controls honor teen's developing autonomy",
+    "name": "Privacy controls honor teen's developing autonomy",
+    "description": "Privacy controls honor teen's developing autonomy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -8,44 +8,17 @@
   <!-- Error state -->
   <div *ngIf="error && !isLoading" class="error-state">
     <h2>⚠️ {{ error }}</h2>
-    <button class="btn-primary" (click)="backToMap()">Back to Mission Map</button>
+    <button class="btn-primary" (click)="backToHome()">Back to Lamad</button>
   </div>
 
   <!-- Content -->
   <div *ngIf="node && !isLoading" class="content">
-    <!-- Breadcrumb Navigation -->
-    <nav *ngIf="isHierarchicalMode() && breadcrumbs.length > 0" class="breadcrumb-nav">
-      <ol class="breadcrumb">
-        <li *ngFor="let crumb of breadcrumbs; let last = last" class="breadcrumb-item">
-          <a
-            *ngIf="!last"
-            (click)="navigateToBreadcrumb(crumb.path)"
-            class="breadcrumb-link">
-            <span *ngIf="crumb.typeLabel" class="breadcrumb-type">{{ crumb.typeLabel }}:</span>
-            {{ crumb.label }}
-          </a>
-          <span *ngIf="last" class="breadcrumb-current">
-            <span *ngIf="crumb.typeLabel" class="breadcrumb-type">{{ crumb.typeLabel }}:</span>
-            {{ crumb.label }}
-          </span>
-          <span *ngIf="!last" class="breadcrumb-separator">/</span>
-        </li>
-      </ol>
-    </nav>
-
     <!-- Header -->
     <div class="content-header">
       <button
-        *ngIf="isHierarchicalMode()"
         class="back-button"
-        (click)="navigateUp()">
-        ← Back
-      </button>
-      <button
-        *ngIf="!isHierarchicalMode()"
-        class="back-button"
-        (click)="backToMap()">
-        ← Back to Map
+        (click)="backToHome()">
+        ← Back to Lamad
       </button>
 
       <div class="header-main">
@@ -71,6 +44,11 @@
 
         <div class="tags" *ngIf="node.tags.length > 0">
           <span *ngFor="let tag of node.tags" class="tag">#{{ tag }}</span>
+        </div>
+
+        <!-- Download button -->
+        <div class="content-actions">
+          <app-content-download [node]="node"></app-content-download>
         </div>
       </div>
 
@@ -111,81 +89,203 @@
       </div>
     </div>
 
-    <!-- Main content -->
-    <div class="content-body">
-      <!-- Markdown content -->
-      <div
-        *ngIf="node.contentFormat === 'markdown'"
-        class="markdown-content"
-        [innerHTML]="renderMarkdown(node.content)">
-      </div>
-
-      <!-- Gherkin content -->
-      <div
-        *ngIf="node.contentFormat === 'gherkin'"
-        class="gherkin-content">
-        <pre [innerHTML]="renderGherkin(node.content)"></pre>
-      </div>
-
-      <!-- Plain text content -->
-      <div
-        *ngIf="node.contentFormat === 'plaintext'"
-        class="plaintext-content">
-        <pre>{{ node.content }}</pre>
-      </div>
-
-      <!-- HTML content -->
-      <div
-        *ngIf="node.contentFormat === 'html'"
-        class="html-content"
-        [innerHTML]="node.content">
-      </div>
+    <!-- Tabs Navigation -->
+    <div class="viewer-tabs">
+      <button class="tab-btn" (click)="setActiveTab('content')" [class.active]="activeTab === 'content'">
+        Content
+      </button>
+      <button class="tab-btn" (click)="setActiveTab('trust')" [class.active]="activeTab === 'trust'">
+        Attestations
+      </button>
+      <button class="tab-btn" (click)="setActiveTab('governance')" [class.active]="activeTab === 'governance'">
+        Governance
+      </button>
+      <button class="tab-btn" (click)="setActiveTab('network')" [class.active]="activeTab === 'network'">
+        Network
+      </button>
     </div>
 
-    <!-- Children Panes (Hierarchical Navigation) -->
-    <div *ngIf="hasChildren()" class="children-section">
-      <h2>📂 Contents</h2>
-      <div class="children-grid">
-        <button
-          *ngFor="let child of children"
-          class="child-card"
-          (click)="navigateToChild(child)"
-          type="button">
-          <div class="child-header">
-            <span class="child-icon">{{ getContentTypeIcon() }}</span>
-            <span class="child-type">{{ child.contentType }}</span>
-          </div>
-          <h3 class="child-title">{{ child.title }}</h3>
-          <p class="child-description">{{ child.description }}</p>
-          <div class="child-meta">
-            <span class="child-affinity">
-              Affinity: {{ getRelatedNodeAffinity(child.id) }}%
-            </span>
-          </div>
-        </button>
-      </div>
-    </div>
+    <!-- Tab Content -->
+    <div [ngSwitch]="activeTab" class="tab-content">
+      
+      <!-- Content Tab -->
+      <section *ngSwitchCase="'content'">
+        <!-- Main content -->
+        <div class="content-body">
+          <!-- Dynamic renderer host - renders content via registered renderers -->
+          <ng-container #rendererHost></ng-container>
 
-    <!-- Related content -->
-    <div *ngIf="relatedNodes.length > 0" class="related-section">
-      <h2>🔗 Related Content</h2>
-      <div class="related-grid">
-        <button
-          *ngFor="let relatedNode of relatedNodes"
-          class="related-card"
-          (click)="viewRelatedContent(relatedNode)"
-          (keydown.enter)="viewRelatedContent(relatedNode)"
-          type="button">
-          <div class="related-header">
-            <span class="related-type">{{ relatedNode.contentType }}</span>
-            <span class="related-affinity">
-              {{ getRelatedNodeAffinity(relatedNode.id) }}%
-            </span>
+          <!-- Fallback: Plain text content (when no renderer registered) -->
+          <div
+            *ngIf="!hasRegisteredRenderer && node.contentFormat === 'plaintext'"
+            class="plaintext-content">
+            <pre>{{ getStringContent(node.content) }}</pre>
           </div>
-          <h3 class="related-title">{{ relatedNode.title }}</h3>
-          <p class="related-description">{{ relatedNode.description }}</p>
-        </button>
-      </div>
+
+          <!-- Fallback: HTML content (when no renderer registered) -->
+          <div
+            *ngIf="!hasRegisteredRenderer && node.contentFormat === 'html'"
+            class="html-content"
+            [innerHTML]="node.content">
+          </div>
+
+          <!-- Fallback: Unknown format -->
+          <div
+            *ngIf="!hasRegisteredRenderer && node.contentFormat !== 'plaintext' && node.contentFormat !== 'html'"
+            class="fallback-content">
+            <p class="fallback-notice">Content format: {{ node.contentFormat }}</p>
+            <pre>{{ getStringContent(node.content) }}</pre>
+          </div>
+        </div>
+
+        <!-- Appears in Paths (Wikipedia-style back-links) -->
+        <div *ngIf="containingPaths.length > 0 || loadingPaths" class="paths-section">
+          <h2>📚 Appears in Learning Paths</h2>
+          <p class="paths-description">This content is part of the following curated learning journeys:</p>
+
+          <div *ngIf="loadingPaths" class="paths-loading">
+            <span class="spinner-small"></span> Loading paths...
+          </div>
+
+          <div *ngIf="!loadingPaths && containingPaths.length > 0" class="paths-list">
+            <button
+              *ngFor="let pathRef of containingPaths"
+              class="path-card"
+              (click)="navigateToPath(pathRef.pathId, pathRef.stepIndex)"
+              type="button">
+              <div class="path-header">
+                <span class="path-icon">🗺️</span>
+                <span class="path-title">{{ pathRef.pathTitle }}</span>
+              </div>
+              <div class="path-meta">
+                <span class="path-step">Step {{ pathRef.stepIndex + 1 }}</span>
+                <span class="path-action">View in context →</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Related content -->
+        <div *ngIf="relatedNodes.length > 0" class="related-section">
+          <h2>🔗 Related Content</h2>
+          <div class="related-grid">
+            <button
+              *ngFor="let relatedNode of relatedNodes"
+              class="related-card"
+              (click)="viewRelatedContent(relatedNode)"
+              (keydown.enter)="viewRelatedContent(relatedNode)"
+              type="button">
+              <div class="related-header">
+                <span class="related-type">{{ relatedNode.contentType }}</span>
+                <span class="related-affinity">
+                  {{ getRelatedNodeAffinity(relatedNode.id) }}%
+                </span>
+              </div>
+              <h3 class="related-title">{{ relatedNode.title }}</h3>
+              <p class="related-description">{{ relatedNode.description }}</p>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Trust/Attestations Tab -->
+      <section *ngSwitchCase="'trust'">
+        <div *ngIf="isLoadingTrust" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading trust data...</p>
+        </div>
+
+        <div *ngIf="!isLoadingTrust && !trustBadge" class="error-state">
+          <p>Unable to load trust information.</p>
+        </div>
+
+        <div *ngIf="trustBadge" class="trust-tab-content">
+          <!-- Main Trust Card -->
+          <div class="trust-summary-card" [class]="'trust-' + trustBadge.trustLevel">
+            <div class="trust-header">
+              <div class="trust-score">
+                <span class="score-val">{{ trustBadge.trustPercentage }}%</span>
+                <span class="score-label">Trust Score</span>
+              </div>
+              <div class="trust-primary-badge">
+                <div class="badge-icon large">{{ trustBadge.primary.icon }}</div>
+                <div class="badge-details">
+                  <h3>{{ trustBadge.primary.label }}</h3>
+                  <p>{{ trustBadge.primary.description }}</p>
+                  <div class="badge-meta" *ngIf="trustBadge.primary.grantedBy">
+                    <span class="grantor">Verified by {{ trustBadge.primary.grantedBy }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="trust-reach">
+              <strong>Reach Level:</strong> {{ trustBadge.reachLabel | titlecase }}
+            </div>
+          </div>
+
+          <!-- Warnings -->
+          <div *ngIf="trustBadge.hasWarnings" class="trust-warnings">
+            <h3>⚠️ Content Warnings</h3>
+            <div class="warning-list">
+              <div *ngFor="let warning of trustBadge.warnings" class="warning-card">
+                <span class="warning-icon">{{ warning.icon }}</span>
+                <div class="warning-content">
+                  <h4>{{ warning.label }}</h4>
+                  <p>{{ warning.description }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary Badges -->
+          <div class="trust-badges-section" *ngIf="trustBadge.secondary.length > 0">
+            <h3>Verified Attributes</h3>
+            <div class="badges-grid">
+              <div *ngFor="let badge of trustBadge.secondary" class="badge-card" [class]="'badge-' + badge.color">
+                <div class="badge-icon">{{ badge.icon }}</div>
+                <div class="badge-info">
+                  <h4>{{ badge.label }}</h4>
+                  <p>{{ badge.description }}</p>
+                  <span class="badge-grantor" *ngIf="badge.grantedBy">
+                    {{ badge.grantedBy }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="trust-actions" *ngIf="trustBadge.actions?.length">
+            <h3>Available Actions</h3>
+            <div class="actions-list">
+              <button *ngFor="let action of trustBadge.actions" 
+                      class="btn-secondary"
+                      [disabled]="!action.available"
+                      (click)="handleAction(action)">
+                <span class="action-icon">{{ action.icon }}</span>
+                {{ action.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Governance Tab -->
+      <section *ngSwitchCase="'governance'">
+        <div class="placeholder-tab">
+          <h3>Governance History</h3>
+          <p>Change logs and discussions coming soon.</p>
+        </div>
+      </section>
+
+      <!-- Network Tab -->
+      <section *ngSwitchCase="'network'">
+        <div class="placeholder-tab">
+          <h3>Network Context</h3>
+          <p>Graph relationships visualization coming soon.</p>
+        </div>
+      </section>
+
     </div>
   </div>
 </div>

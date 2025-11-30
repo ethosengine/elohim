@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-safety and well-being observation for neighborhood children",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-safety and well-being observation for neighborhood children",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Safety and well-being observation for neighborhood children",
+  "description": "Safety and well-being observation for neighborhood children",
+  "content": "Scenario: Safety and well-being observation for neighborhood children\n    Given Margaret is often outside with grandchildren\n    And she observes neighborhood children's activities and safety\n    When the neighborhood_elohim tracks child safety contributions\n    Then it should recognize Margaret's informal supervision\n    And it should value her care for neighborhood children's well-being\n    And her presence should contribute to collective childcare\n    And neighborhood children should benefit from elder attention\n    And Margaret's observation should be recognized as care work\n    And neighborhood should be safer because of engaged elders\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Safety and well-being observation for neighborhood children",
+    "ogDescription": "Safety and well-being observation for neighborhood children",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-safety and well-being observation for neighborhood children",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Safety and well-being observation for neighborhood children - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-safety and well-being observation for neighborhood children",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-safety and well-being observation for neighborhood children",
+    "name": "Safety and well-being observation for neighborhood children",
+    "description": "Safety and well-being observation for neighborhood children",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional resilience built through local care economy networks",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-bioregional resilience built through local care economy networks",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Bioregional resilience built through local care economy networks",
+  "description": "Bioregional resilience built through local care economy networks",
+  "content": "Scenario: Bioregional resilience built through local care economy networks\n    Given climate change increases need for local resilience\n    And Sarah's bioregion needs to build adaptive capacity\n    When bioregional care economy develops\n    Then the bioregional_elohim should coordinate local resource networks\n    And it should strengthen connections between producers and consumers\n    And it should build bioregional food security\n    And local resilience should be created through care economy practices\n    And climate adaptation should be care economy project\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:parent,caregiver,consumer,community_member,young_child",
+    "related_layers:household,family,community,municipality",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Bioregional resilience built through local care economy networks",
+    "ogDescription": "Bioregional resilience built through local care economy networks",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional resilience built through local care economy networks",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Bioregional resilience built through local care economy networks - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-ecological-bioregional-bioregional resilience built through local care economy networks",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:ecological-bioregional-bioregional resilience built through local care economy networks",
+    "name": "Bioregional resilience built through local care economy networks",
+    "description": "Bioregional resilience built through local care economy networks",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

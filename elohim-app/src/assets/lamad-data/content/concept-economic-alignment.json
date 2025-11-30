@@ -1,0 +1,31 @@
+{
+  "id": "concept-economic-alignment",
+  "contentType": "concept",
+  "title": "Economic Alignment",
+  "description": "Systems that don't financially reward antisocial behavior. Cooperative ownership structures that support rather than exploit human connection.",
+  "content": "Systems that don't financially reward antisocial behavior. Cooperative ownership structures that support rather than exploit human connection.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/design-principles/concept-economic-alignment.json",
+  "tags": [
+    "economics",
+    "care-economy",
+    "cooperation",
+    "design-principle",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "economic-coordination-epic",
+    "value-scanner-epic",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "design-principles",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:56.999995",
+  "updatedAt": "2025-11-28T17:11:56.999995"
+}

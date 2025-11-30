@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children that environmental care is care work",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-teaching children that environmental care is care work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teaching children that environmental care is care work",
+  "description": "Teaching children that environmental care is care work",
+  "content": "Scenario: Teaching children that environmental care is care work\n    Given Sarah wants Tommy and Emma to understand ecological stewardship\n    And she's teaching them care economy principles\n    When Sarah teaches environmental practices\n    Then the ecological_elohim should recognize this as value literacy education\n    And teaching ecological care should accumulate care tokens\n    And children should learn that caring for environment is care work\n    And the system should value environmental education as parenting labor\n    And next generation should internalize ecological care as fundamental\n    And Sarah's environmental teaching should be recognized and valued\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,community_member,future_generations",
+    "related_layers:family,community,educational",
+    "elohim_agents:personal_agent,ecological_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teaching children that environmental care is care work",
+    "ogDescription": "Teaching children that environmental care is care work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children that environmental care is care work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching children that environmental care is care work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-ecological-bioregional-teaching children that environmental care is care work",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:ecological-bioregional-teaching children that environmental care is care work",
+    "name": "Teaching children that environmental care is care work",
+    "description": "Teaching children that environmental care is care work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

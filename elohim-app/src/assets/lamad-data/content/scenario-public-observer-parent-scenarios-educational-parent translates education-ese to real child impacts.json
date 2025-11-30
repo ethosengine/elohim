@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent translates education-ese to real child impacts",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent translates education-ese to real child impacts",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent translates education-ese to real child impacts",
+  "description": "Parent translates education-ese to real child impacts",
+  "content": "Scenario: Parent translates education-ese to real child impacts\n    Given the school board discusses \"instructional efficiency optimization\"\n    And the parent reviews meeting while child does homework\n    When the Observer translates the education jargon\n    Then the parent learns this means eliminating teaching assistants\n    And understands impact is class size increases from 24 to 32 students\n    And sees real effect on their child's individual attention\n    And can respond to actual impacts vs bureaucratic language\n    And education policy becomes accessible to working parents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent translates education-ese to real child impacts",
+    "ogDescription": "Parent translates education-ese to real child impacts",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent translates education-ese to real child impacts",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent translates education-ese to real child impacts - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent translates education-ese to real child impacts",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent translates education-ese to real child impacts",
+    "name": "Parent translates education-ese to real child impacts",
+    "description": "Parent translates education-ese to real child impacts",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

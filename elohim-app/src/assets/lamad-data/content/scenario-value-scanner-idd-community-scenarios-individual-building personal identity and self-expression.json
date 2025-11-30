@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-building personal identity and self-expression",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-building personal identity and self-expression",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building personal identity and self-expression",
+  "description": "Building personal identity and self-expression",
+  "content": "Scenario: Building personal identity and self-expression\n    Given Jordan is developing their sense of self\n    And Jordan has interests, values, and preferences\n    When Jordan uses the personal profile feature\n    Then the interface helps Jordan express who they are\n    And Jordan can select interests from visual options (music, sports, art)\n    And Jordan can share what matters to them using simple language support\n    And the system celebrates Jordan's unique identity\n    And Jordan's self-expression is honored, not corrected to fit norms\n    And Jordan experiences being seen as a full person\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building personal identity and self-expression",
+    "ogDescription": "Building personal identity and self-expression",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-building personal identity and self-expression",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building personal identity and self-expression - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-building personal identity and self-expression",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-building personal identity and self-expression",
+    "name": "Building personal identity and self-expression",
+    "description": "Building personal identity and self-expression",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

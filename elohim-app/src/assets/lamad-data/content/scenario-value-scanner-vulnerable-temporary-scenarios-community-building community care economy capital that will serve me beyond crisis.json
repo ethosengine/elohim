@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-building community care economy capital that will serve me beyond crisis",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-building community care economy capital that will serve me beyond crisis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building community care economy capital that will serve me beyond crisis",
+  "description": "Building community care economy capital that will serve me beyond crisis",
+  "content": "Scenario: Building community care economy capital that will serve me beyond crisis\n    Given my care contributions during crisis are tracked and recognized\n    And care economy capital could support me after crisis resolves\n    When I accumulate care tokens through ongoing care contributions\n    Then the Value Scanner tracks my comprehensive care economy participation\n    And recognizes parenting, peer support, mutual aid, knowledge sharing, and other contributions\n    And builds care economy standing that will endure beyond temporary vulnerability\n    And validates that my crisis period contributions are valuable\n    And creates basis for future community support if needed\n    And my personal_agent helps me understand my care economy capital\n    And documents that vulnerability doesn't erase contribution\n    And ensures my care work is recognized long-term\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building community care economy capital that will serve me beyond crisis",
+    "ogDescription": "Building community care economy capital that will serve me beyond crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-building community care economy capital that will serve me beyond crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building community care economy capital that will serve me beyond crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-building community care economy capital that will serve me beyond crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-building community care economy capital that will serve me beyond crisis",
+    "name": "Building community care economy capital that will serve me beyond crisis",
+    "description": "Building community care economy capital that will serve me beyond crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

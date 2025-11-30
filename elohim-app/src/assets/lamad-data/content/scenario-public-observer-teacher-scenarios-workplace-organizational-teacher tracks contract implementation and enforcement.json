@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher tracks contract implementation and enforcement",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher tracks contract implementation and enforcement",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher tracks contract implementation and enforcement",
+  "description": "Teacher tracks contract implementation and enforcement",
+  "content": "Scenario: Teacher tracks contract implementation and enforcement\n    Given union contract includes working condition provisions\n    But contract enforcement is inconsistent across schools\n    When the Observer monitors contract implementation\n    Then teachers document where contract is violated (planning time, class sizes, duties)\n    And patterns show which administrators ignore contract provisions\n    And union identifies systemic enforcement gaps vs isolated violations\n    And brings accountability data to district and grievance process\n    And contract becomes enforceable through transparency\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher tracks contract implementation and enforcement",
+    "ogDescription": "Teacher tracks contract implementation and enforcement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher tracks contract implementation and enforcement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher tracks contract implementation and enforcement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher tracks contract implementation and enforcement",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher tracks contract implementation and enforcement",
+    "name": "Teacher tracks contract implementation and enforcement",
+    "description": "Teacher tracks contract implementation and enforcement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

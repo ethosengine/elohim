@@ -1,0 +1,29 @@
+{
+  "id": "concept-path-forward-developers",
+  "contentType": "concept",
+  "title": "For Developers",
+  "description": "Build on distributed protocols. Implement privacy by default. Design for consent. Document power structures.",
+  "content": "Build on distributed protocols. Implement privacy by default. Design for consent. Document power structures.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/path-forward/concept-path-forward-developers.json",
+  "tags": [
+    "path-forward",
+    "development",
+    "implementation",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "lamad-reference-implementation",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "path-forward",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.002628",
+  "updatedAt": "2025-11-28T17:11:57.002628"
+}

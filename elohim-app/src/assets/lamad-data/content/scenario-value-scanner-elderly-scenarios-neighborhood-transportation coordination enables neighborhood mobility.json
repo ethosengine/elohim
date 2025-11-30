@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-transportation coordination enables neighborhood mobility",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-transportation coordination enables neighborhood mobility",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Transportation coordination enables neighborhood mobility",
+  "description": "Transportation coordination enables neighborhood mobility",
+  "content": "Scenario: Transportation coordination enables neighborhood mobility\n    Given Helen no longer drives\n    And public transit is limited or inaccessible\n    When Helen needs to get to local appointments or events\n    Then the neighborhood_elohim should coordinate rides with neighbors\n    And volunteer drivers should be matched based on schedule compatibility\n    And Helen should maintain ability to participate in neighborhood life\n    And transportation barriers should not cause isolation\n    And driver care work should be recognized\n    And the protocol should solve last-mile transportation through care economy\n    And neighborhood networks should provide mobility infrastructure\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Transportation coordination enables neighborhood mobility",
+    "ogDescription": "Transportation coordination enables neighborhood mobility",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-transportation coordination enables neighborhood mobility",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transportation coordination enables neighborhood mobility - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-transportation coordination enables neighborhood mobility",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-transportation coordination enables neighborhood mobility",
+    "name": "Transportation coordination enables neighborhood mobility",
+    "description": "Transportation coordination enables neighborhood mobility",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

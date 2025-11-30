@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-family privacy boundaries negotiated across generations",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-family privacy boundaries negotiated across generations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family privacy boundaries negotiated across generations",
+  "description": "Family privacy boundaries negotiated across generations",
+  "content": "Scenario: Family privacy boundaries negotiated across generations\n    Given family coordination requires information sharing\n    And family members have legitimate need for privacy\n    And Robert manages sensitive information about parents and children\n    When family_elohim manages privacy\n    Then it should enable coordination while protecting privacy\n    And Robert should control what information he shares about his household\n    And parents should maintain privacy about their health and finances\n    And adult children should control their own information sharing\n    And siblings should have access to parent care information\n    And family care coordination should not violate individual privacy\n    And privacy boundaries should be negotiable and respectful\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family privacy boundaries negotiated across generations",
+    "ogDescription": "Family privacy boundaries negotiated across generations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-family privacy boundaries negotiated across generations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family privacy boundaries negotiated across generations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-family privacy boundaries negotiated across generations",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-family privacy boundaries negotiated across generations",
+    "name": "Family privacy boundaries negotiated across generations",
+    "description": "Family privacy boundaries negotiated across generations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

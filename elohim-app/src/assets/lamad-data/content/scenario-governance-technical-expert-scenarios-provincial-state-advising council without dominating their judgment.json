@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-advising council without dominating their judgment",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-advising council without dominating their judgment",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advising council without dominating their judgment",
+  "description": "Advising council without dominating their judgment",
+  "content": "Scenario: Advising council without dominating their judgment\n    Given I have deep knowledge council lacks\n    And I could easily dominate deliberation if I pushed too hard\n    When I testify about technical implications of constitutional interpretations\n    Then I explain: what's technically possible and impossible\n    And I clarify: tradeoffs between different approaches\n    And I stop: before crossing into values judgment\n    And I respect: council's authority to choose among technically viable options\n    And I accept: when they choose values over optimization\n    And I honor: the boundary between expertise and democratic judgment\n    And I demonstrate: how expertise serves rather than replaces democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advising council without dominating their judgment",
+    "ogDescription": "Advising council without dominating their judgment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-advising council without dominating their judgment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advising council without dominating their judgment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-advising council without dominating their judgment",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-advising council without dominating their judgment",
+    "name": "Advising council without dominating their judgment",
+    "description": "Advising council without dominating their judgment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

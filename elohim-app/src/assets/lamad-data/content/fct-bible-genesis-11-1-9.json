@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-genesis-11-1-9",
+  "contentType": "bible-verse",
+  "title": "Genesis 11:1-9",
+  "description": "Scripture reference used in FCT Module 3",
+  "content": {
+    "reference": "Genesis 11:1-9",
+    "book": "Genesis",
+    "chapter": 11,
+    "verseStart": 1,
+    "verseEnd": 9,
+    "contextInModule": "Genesis 11:1-9 (The Tower of Babel): Illustrates the hubris of humanity in attempting to elevate themselves to the status of gods, only to be confounded by their own limitations. This story echoes Schmachtenberger's point about the need for wisdom and prudence to accompany power.\nThe Covenant and Moral Evolution:",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "genesis",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-03-problem-well-stated",
+    "thematicContext": "A Problem Well Stated"
+  },
+  "createdAt": "2025-11-28T21:10:19.195634",
+  "updatedAt": "2025-11-28T21:10:19.195636",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Genesis 11:1-9",
+    "ogDescription": "Scripture reference used in FCT Module 3",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-genesis-11-1-9",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Genesis 11:1-9 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-genesis-11-1-9",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "Genesis 11:1-9",
+    "description": "Scripture reference used in FCT Module 3",
+    "dateCreated": "2025-11-28T21:10:19.195634",
+    "dateModified": "2025-11-28T21:10:19.195636",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-customer-scenarios-individual-customer learns food sourcing story connecting to agricultural labor",
+  "did": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer learns food sourcing story connecting to agricultural labor",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Customer learns food sourcing story connecting to agricultural labor",
+  "description": "Customer learns food sourcing story connecting to agricultural labor",
+  "content": "Scenario: Customer learns food sourcing story connecting to agricultural labor\n    Given corporate food system obscures where food comes from and who grew it\n    And Ms. Johnson wants to know her food's origin but lacked information\n    When democratic supply chain provides sourcing transparency\n    Then she learns tomatoes come from Johnson Farm where Tom practices regenerative agriculture\n    And she can visit farm during open houses if interested\n    And farmworker conditions and wages are transparent\n    And food becomes connected to human labor and environmental stewardship, not faceless commodity\n    And community_elohim provides supply chain stories and farm connections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:customer",
+    "governance_layer:individual",
+    "related_users:[worker,manager,supplier,community_investor]",
+    "related_layers:[community]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/customer/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-customer-scenarios-individual",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-customer-scenarios-individual",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Customer learns food sourcing story connecting to agricultural labor",
+    "ogDescription": "Customer learns food sourcing story connecting to agricultural labor",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer learns food sourcing story connecting to agricultural labor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Customer learns food sourcing story connecting to agricultural labor - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-customer-scenarios-individual-customer learns food sourcing story connecting to agricultural labor",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:customer:scenarios:individual-customer learns food sourcing story connecting to agricultural labor",
+    "name": "Customer learns food sourcing story connecting to agricultural labor",
+    "description": "Customer learns food sourcing story connecting to agricultural labor",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-ecological-bioregional-climate change impacts on food systems understood concretely",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-climate change impacts on food systems understood concretely",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Climate change impacts on food systems understood concretely",
+  "description": "Climate change impacts on food systems understood concretely",
+  "content": "Scenario: Climate change impacts on food systems understood concretely\n    Given climate change affects food production and prices\n    And Marcus experiences food cost volatility\n    When Marcus encounters price fluctuations\n    Then the personal_agent should explain climate impacts on agriculture\n    And it should connect extreme weather to food availability\n    And climate education should be grounded in lived experience\n    And he should understand climate as care economy issue\n    And ecological crisis should be framed as requiring care-based response\n    And his generation should be prepared to steward through climate chaos\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:ecological_bioregional",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,community,educational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Climate change impacts on food systems understood concretely",
+    "ogDescription": "Climate change impacts on food systems understood concretely",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-climate change impacts on food systems understood concretely",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Climate change impacts on food systems understood concretely - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-ecological-bioregional-climate change impacts on food systems understood concretely",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:ecological-bioregional-climate change impacts on food systems understood concretely",
+    "name": "Climate change impacts on food systems understood concretely",
+    "description": "Climate change impacts on food systems understood concretely",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

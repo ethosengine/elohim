@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's learning at home amid crisis and instability",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-supporting children's learning at home amid crisis and instability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Supporting children's learning at home amid crisis and instability",
+  "description": "Supporting children's learning at home amid crisis and instability",
+  "content": "Scenario: Supporting children's learning at home amid crisis and instability\n    Given children need home learning support and homework help\n    And I am traumatized, stressed, and have limited time and energy\n    When I try to support children's learning despite constraints\n    Then the Value Scanner provides appropriate learning support strategies\n    And helps me access homework help resources (libraries, tutoring, online support)\n    And suggests realistic expectations for home learning support given my capacity\n    And validates that my limited bandwidth is reasonable given circumstances\n    And tracks children's learning progress and needs\n    And my personal_agent reminds me of important school deadlines and events\n    And recognizes home learning support as valuable educational labor\n    And celebrates my children's learning engagement despite crisis\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-educational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-educational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Supporting children's learning at home amid crisis and instability",
+    "ogDescription": "Supporting children's learning at home amid crisis and instability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's learning at home amid crisis and instability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting children's learning at home amid crisis and instability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-educational-supporting children's learning at home amid crisis and instability",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:educational-supporting children's learning at home amid crisis and instability",
+    "name": "Supporting children's learning at home amid crisis and instability",
+    "description": "Supporting children's learning at home amid crisis and instability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

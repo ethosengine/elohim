@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-managing complex medication regimens with cognitive support",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-managing complex medication regimens with cognitive support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Managing complex medication regimens with cognitive support",
+  "description": "Managing complex medication regimens with cognitive support",
+  "content": "Scenario: Managing complex medication regimens with cognitive support\n    Given Alex may have multiple medications with complex schedules\n    And medication management is cognitively demanding\n    When Alex manages medications\n    Then the personal_agent should provide medication reminders\n    And it should track medication schedules and adherence\n    And it should alert Alex to potential interactions\n    And it should help Alex communicate with prescribers\n    And cognitive support should reduce medication management burden\n    And the protocol should serve Alex's health goals\n    And Alex should maintain control over medication decisions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,elderly,caregiver,patient,chronic_illness",
+    "related_layers:individual,household,community,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Managing complex medication regimens with cognitive support",
+    "ogDescription": "Managing complex medication regimens with cognitive support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-managing complex medication regimens with cognitive support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing complex medication regimens with cognitive support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-healthcare-medical-managing complex medication regimens with cognitive support",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:healthcare-medical-managing complex medication regimens with cognitive support",
+    "name": "Managing complex medication regimens with cognitive support",
+    "description": "Managing complex medication regimens with cognitive support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

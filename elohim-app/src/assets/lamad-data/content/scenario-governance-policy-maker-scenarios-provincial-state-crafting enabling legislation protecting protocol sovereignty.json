@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-policy-maker-scenarios-provincial-state-crafting enabling legislation protecting protocol sovereignty",
+  "did": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-crafting enabling legislation protecting protocol sovereignty",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Crafting enabling legislation protecting protocol sovereignty",
+  "description": "Crafting enabling legislation protecting protocol sovereignty",
+  "content": "Scenario: Crafting enabling legislation protecting protocol sovereignty\n    Given I want to support democratic AI governance\n    And I must integrate protocol with existing state law\n    When I draft AI governance legislation\n    Then I create: legal recognition of Constitutional Council authority\n    And I establish: state funding for community protocol infrastructure\n    And I mandate: interoperability between government systems and protocol\n    And I protect: communities from corporate capture attempts\n    And I ensure: equitable access for poor communities\n    And my legislation: enables rather than controls protocol\n    And I empower: community sovereignty within legal framework\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:policy_maker",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,community_leader,technical_expert,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/policy_maker/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-policy-maker-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-policy-maker-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Crafting enabling legislation protecting protocol sovereignty",
+    "ogDescription": "Crafting enabling legislation protecting protocol sovereignty",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-crafting enabling legislation protecting protocol sovereignty",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Crafting enabling legislation protecting protocol sovereignty - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-policy-maker-scenarios-provincial-state-crafting enabling legislation protecting protocol sovereignty",
+    "identifier": "did:web:elohim.host:content:governance:policy-maker:scenarios:provincial-state-crafting enabling legislation protecting protocol sovereignty",
+    "name": "Crafting enabling legislation protecting protocol sovereignty",
+    "description": "Crafting enabling legislation protecting protocol sovereignty",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

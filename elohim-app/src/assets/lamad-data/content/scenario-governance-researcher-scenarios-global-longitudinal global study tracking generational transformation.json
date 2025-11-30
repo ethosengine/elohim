@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-global-longitudinal global study tracking generational transformation",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:global-longitudinal global study tracking generational transformation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Longitudinal global study tracking generational transformation",
+  "description": "Longitudinal global study tracking generational transformation",
+  "content": "Scenario: Longitudinal global study tracking generational transformation\n    Given I study whether protocol transforms civic culture across generations\n    And Tommy's generation is growing up with democratic AI governance\n    When I track generational cohorts over 20-30 years\n    Then I examine: civic capacities (constitutional literacy, deliberation skills)\n    And I assess: political participation and democratic engagement\n    And I measure: relationship to AI and technology\n    And I explore: whether growing up with protocol creates different citizenship\n    And I analyze: intergenerational transmission of democratic culture\n    And I investigate: whether protocol's effects compound across generations\n    And My research captures: civilizational transformation over human timescales\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:global",
+    "related_users:constitutional_council_member,policy_maker,technical_expert,researcher",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Longitudinal global study tracking generational transformation",
+    "ogDescription": "Longitudinal global study tracking generational transformation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-longitudinal global study tracking generational transformation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Longitudinal global study tracking generational transformation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-global-longitudinal global study tracking generational transformation",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:global-longitudinal global study tracking generational transformation",
+    "name": "Longitudinal global study tracking generational transformation",
+    "description": "Longitudinal global study tracking generational transformation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

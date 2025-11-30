@@ -1,45 +1,56 @@
-import { DocumentNode } from './document-node.model';
-
 /**
- * Generic content node model inspired by WordPress's post concept.
+ * ContentNode - The fundamental unit of content in the Territory.
  *
- * This flexible model can represent any type of content across domains:
+ * Holochain mapping:
+ * - Entry type: "content_node"
+ * - id becomes ActionHash
+ * - Published to DHT based on reach level (not automatic)
+ *
+ * This flexible model can represent any type of content:
  * - Documentation (epics, features, scenarios)
  * - Learning content (tutorials, exercises, assessments)
- * - Social content (posts, comments, discussions)
+ * - Media (videos, simulations, interactive apps)
  * - Any custom domain content
  *
- * The key is the graph-based structure with flexible metadata that allows
- * each domain to extend the base model without rigid type hierarchies.
+ * Trust Model:
+ * Content earns reach through attestations. New content starts at 'private'
+ * and can expand to 'commons' through steward approval, community endorsement,
+ * or governance ratification. See content-attestation.model.ts for details.
  */
 
-export interface ContentNode extends Omit<DocumentNode, 'type'> {
-  /** Unique identifier */
+import type { GeographicContext, Place } from './place.model';
+import { JsonLdMetadata } from './json-ld.model';
+
+export interface ContentNode {
+  /** Unique identifier (ActionHash in Holochain) */
   id: string;
 
-  /** Content type - domain-specific (e.g., 'epic', 'feature', 'scenario', 'tutorial') */
-  contentType: string;
-
-  /** Type property for compatibility with DocumentNode (same as contentType, but string) */
-  type?: string;
+  /** Content type - domain-specific semantic category */
+  contentType: ContentType;
 
   /** Display title */
   title: string;
 
+  /** Alternative name (used for videos, organizations, people - optional) */
+  name?: string;
+
   /** Brief description/summary */
   description: string;
 
-  /** Full content body (markdown, HTML, Gherkin, etc.) */
-  content: string;
+  /** External URL (for videos, websites, tools - optional) */
+  url?: string;
 
-  /** Content format for rendering ('markdown' | 'gherkin' | 'html' | 'plaintext') */
+  /** Full content body (markdown, HTML, URL, JSON, etc.) */
+  content: string | object;
+
+  /** Content format for rendering */
   contentFormat: ContentFormat;
 
   /** Tags for categorization and search */
   tags: string[];
 
-  /** Source file path */
-  sourcePath: string;
+  /** Source file path (for development/debugging) */
+  sourcePath?: string;
 
   /** Related node IDs (bidirectional relationships) */
   relatedNodeIds: string[];
@@ -47,14 +58,303 @@ export interface ContentNode extends Omit<DocumentNode, 'type'> {
   /** Flexible metadata for domain-specific data */
   metadata: ContentMetadata;
 
-  /** Creation timestamp */
-  createdAt?: Date;
+  // =========================================================================
+  // Trust & Reach (Bidirectional Attestation Model)
+  // =========================================================================
 
-  /** Last updated timestamp */
-  updatedAt?: Date;
+  /**
+   * Author/creator of this content (AgentPubKey).
+   * Required for trust model - anonymous content cannot earn reach beyond 'local'.
+   * Optional during migration; defaults to 'system' for legacy content.
+   */
+  authorId?: string;
+
+  /**
+   * Current reach level - determines who can discover/access this content.
+   * Computed from active attestations. See ContentReach type.
+   * Defaults to 'commons' for legacy content (existing content is public).
+   *
+   * - 'private': Only author
+   * - 'invited': Specific agents
+   * - 'local': Author's network
+   * - 'community': Community members
+   * - 'federated': Multiple communities
+   * - 'commons': Public/global
+   */
+  reach?: ContentReach;
+
+  /**
+   * Trust score (0.0 - 1.0) computed from attestation quality/quantity.
+   * Higher scores indicate more/stronger attestations.
+   * Defaults to 1.0 for legacy content.
+   */
+  trustScore?: number;
+
+  /**
+   * IDs of active attestations that grant this content's current reach.
+   * Full attestation details fetched separately.
+   * Empty array for legacy content.
+   */
+  activeAttestationIds?: string[];
+
+  /**
+   * Agents explicitly invited to access this content (when reach is 'invited').
+   */
+  invitedAgentIds?: string[];
+
+  /**
+   * Communities this content is shared with (when reach is 'community' or 'federated').
+   */
+  communityIds?: string[];
+
+  /**
+   * Active flags/warnings on this content (disputed, under-review, etc.).
+   * Content with certain flags may have restricted reach.
+   */
+  flags?: ContentFlag[];
+
+  // =========================================================================
+  // Feedback Profile (What engagement is permitted)
+  // =========================================================================
+
+  /**
+   * Feedback profile governing what engagement mechanisms are permitted.
+   * Orthogonal to reach (reach = WHERE, feedbackProfile = HOW).
+   * See feedback-profile.model.ts for details.
+   *
+   * "Virality is a privilege, not an entitlement."
+   */
+  feedbackProfileId?: string;
+
+  /**
+   * Denormalized permitted mechanisms for quick access.
+   * Full profile fetched separately when needed.
+   */
+  permittedFeedbackMechanisms?: string[];
+
+  // =========================================================================
+  // Geographic Context (Embodied Place Awareness)
+  // =========================================================================
+
+  /**
+   * Geographic context for this content (parallel to social reach).
+   *
+   * Social reach (ContentReach) determines WHO can access content.
+   * Geographic reach determines WHERE content is physically relevant.
+   * Elohim apply wisdom to align both dimensions with constitutional values.
+   *
+   * Example: A neighborhood newsletter might have:
+   * - reach: 'community' (social - community members)
+   * - geographicContext.reach: 'neighborhood' (spatial - only locally relevant)
+   *
+   * See place.model.ts for full geographic types.
+   */
+  geographicContext?: GeographicContext;
+
+  /**
+   * If this content IS a place (contentType: 'place').
+   * Places are first-class ContentNodes - they have attestations, reach, governance.
+   * Place names are Elohim-negotiated social constructs subject to deliberation.
+   *
+   * See place.model.ts for the full Place interface.
+   */
+  placeData?: Place;
+
+  // =========================================================================
+  // Linked Data / Semantic Web (JSON-LD)
+  // =========================================================================
+
+  /**
+   * Optional JSON-LD metadata for semantic web interoperability.
+   *
+   * When populated, enables this content to be serialized as Linked Data for:
+   * - Schema.org structured data (SEO, rich snippets)
+   * - RDF triple stores and SPARQL queries
+   * - Decentralized knowledge graphs
+   * - Interoperability with other semantic web systems
+   *
+   * Future: Schema.org types like Article, VideoObject, Course, etc.
+   * Prevents tech debt - when we need semantic web export, structure is ready.
+   */
+  linkedData?: JsonLdMetadata;
+
+  /**
+   * ActivityPub Object type for federated social web.
+   *
+   * Maps ContentType to ActivityStreams vocabulary:
+   * - contentType='video' → 'Video'
+   * - contentType='epic'/'feature' → 'Article'
+   * - contentType='book-chapter' → 'Document'
+   * - contentType='simulation' → 'Application'
+   * - contentType='assessment' → 'Question'
+   * - Default → 'Page' (generic web content)
+   *
+   * Reference: https://www.w3.org/TR/activitystreams-vocabulary/#object-types
+   */
+  activityPubType?: 'Note' | 'Article' | 'Video' | 'Document' | 'Page' | 'Question' | 'Application';
+
+  /**
+   * Decentralized Identifier (DID) for cryptographic identity.
+   *
+   * Separate from `id` to maintain human-friendly URLs and filenames.
+   * The `id` field remains the primary routing identifier.
+   *
+   * Example: "did:web:elohim.host:content:policy-maker-readme"
+   *
+   * Reference: https://www.w3.org/TR/did-core/
+   */
+  did?: string;
+
+  /**
+   * Open Graph metadata for social sharing.
+   *
+   * When populated, enables rich preview cards when content is shared on:
+   * - Social media (Facebook, Twitter, LinkedIn, etc.)
+   * - Messaging apps (Discord, Slack, etc.)
+   * - Link preview services
+   *
+   * Auto-generated by import scripts from content metadata and git history.
+   */
+  openGraphMetadata?: {
+    ogTitle: string;
+    ogDescription: string;
+    ogType: string;
+    ogUrl: string;
+    ogImage?: string;
+    ogSiteName?: string;
+    articleAuthor?: string;
+    articlePublishedTime?: string;
+    articleModifiedTime?: string;
+    articleTag?: string[];
+  };
+
+  // =========================================================================
+  // Timestamps
+  // =========================================================================
+
+  /** Creation timestamp (ISO 8601) */
+  createdAt?: string;
+
+  /** Last updated timestamp (ISO 8601) */
+  updatedAt?: string;
+
+  /** When trust profile was last computed */
+  trustComputedAt?: string;
 }
 
-export type ContentFormat = 'markdown' | 'gherkin' | 'html' | 'plaintext';
+/**
+ * ContentReach - The audience a piece of content can reach.
+ * Re-exported from content-attestation.model.ts for convenience.
+ */
+export type ContentReach =
+  | 'private'
+  | 'invited'
+  | 'local'
+  | 'community'
+  | 'federated'
+  | 'commons';
+
+/**
+ * ContentFlag - Warning/issue on content (denormalized from trust profile).
+ */
+export interface ContentFlag {
+  type: 'disputed' | 'outdated' | 'partial-revocation' | 'under-review' | 'appeal-pending';
+  reason: string;
+  flaggedAt: string;
+}
+
+/**
+ * ContentType - The semantic type of content in the Territory.
+ * Maps to different rendering strategies and metadata schemas.
+ */
+export type ContentType =
+  | 'epic'
+  | 'feature'
+  | 'scenario'
+  | 'concept'
+  | 'simulation'
+  | 'video'
+  | 'assessment'
+  | 'organization'
+  | 'book-chapter'
+  | 'tool';
+
+/**
+ * ContentFormat - How the content payload should be interpreted and rendered.
+ * Maps to specific renderer components via RendererRegistryService.
+ */
+export type ContentFormat =
+  | 'markdown'
+  | 'html5-app'
+  | 'video-embed'
+  | 'video-file'
+  | 'quiz-json'
+  | 'external-link'
+  | 'epub'
+  | 'gherkin'
+  | 'html'
+  | 'plaintext'
+  | 'assessment-json';
+
+/**
+ * ContentPreview - Lightweight preview data for listing/composing content.
+ *
+ * Used for:
+ * - Epic-level content listings (videos, orgs, books related to an epic)
+ * - Path step previews
+ * - Search results
+ * - Related content suggestions
+ *
+ * Contains enough data to render a preview card and link without loading full content.
+ */
+export interface ContentPreview {
+  /** Unique identifier */
+  id: string;
+
+  /** Display title */
+  title: string;
+
+  /** Short description (truncated to ~200 chars) */
+  description: string;
+
+  /** Content type for icon/styling */
+  contentType: ContentType;
+
+  /** Tags for filtering */
+  tags: string[];
+
+  // =========================================================================
+  // Rich Media Fields (from Keen data)
+  // =========================================================================
+
+  /** External URL for direct linking (YouTube, org website, etc.) */
+  url?: string;
+
+  /** Display name (may differ from title, e.g., "Climate Town") */
+  name?: string;
+
+  /** Publisher/source (YouTube, book publisher, etc.) */
+  publisher?: string;
+
+  /** Category for grouping content */
+  category?: string;
+
+  // =========================================================================
+  // Contributor & UI Rendering Hints
+  // =========================================================================
+
+  /** ContributorPresence ID for the creator/organization (if exists) */
+  contributorPresenceId?: string;
+
+  /** Whether this is playable media (video, audio) */
+  isPlayable?: boolean;
+
+  /** Thumbnail URL for preview (if available) */
+  thumbnailUrl?: string;
+
+  /** Estimated duration for media content */
+  duration?: string;
+}
 
 /**
  * Flexible metadata that can be extended per domain
@@ -66,6 +366,9 @@ export interface ContentMetadata {
   /** Authors/contributors */
   authors?: string[];
 
+  /** Primary author */
+  author?: string;
+
   /** Version number */
   version?: string;
 
@@ -74,6 +377,58 @@ export interface ContentMetadata {
 
   /** Priority or order */
   priority?: number;
+
+  /** Content source identifier */
+  source?: string;
+
+  /** Original source URL */
+  sourceUrl?: string;
+
+  /** Content license */
+  license?: string;
+
+  /** Estimated time to consume/complete */
+  estimatedTime?: string;
+
+  /** Embedding strategy for interactive content */
+  embedStrategy?: 'iframe' | 'native' | 'web-component';
+
+  /** Required browser/runtime capabilities */
+  requiredCapabilities?: string[];
+
+  /** Security policy for embedded content */
+  securityPolicy?: {
+    sandbox?: string[];
+    csp?: string;
+  };
+
+  // =========================================================================
+  // Social Graph / SEO Metadata (Open Graph protocol - platform-agnostic)
+  // =========================================================================
+
+  /** Thumbnail/preview image URL for social sharing (og:image) */
+  thumbnailUrl?: string;
+
+  /** Alt text for thumbnail image (accessibility + SEO) */
+  imageAlt?: string;
+
+  /** Canonical URL - authoritative location of this content (og:url) */
+  canonicalUrl?: string;
+
+  /** Content locale/language (og:locale, e.g., 'en_US', 'es_ES') */
+  locale?: string;
+
+  /** Original publication timestamp (article:published_time, ISO 8601) */
+  publishedTime?: string;
+
+  /** Last modification timestamp (article:modified_time, ISO 8601) */
+  modifiedTime?: string;
+
+  /** Content section/category for article metadata (article:section) */
+  section?: string;
+
+  /** Keywords for SEO and discoverability */
+  keywords?: string[];
 
   /** Custom domain-specific fields */
   [key: string]: any;
@@ -160,19 +515,11 @@ export interface ContentGraphMetadata {
   /** Total number of relationships */
   relationshipCount: number;
 
-  /** Last updated timestamp */
-  lastUpdated: Date;
+  /** Last updated timestamp (ISO 8601 string) */
+  lastUpdated: string;
 
   /** Version of the graph schema */
   version: string;
-}
-
-/**
- * Utility type for migrating from old DocumentNode to ContentNode
- */
-export interface DocumentNodeAdapter {
-  fromDocumentNode(documentNode: any): ContentNode;
-  toDocumentNode(contentNode: ContentNode): any;
 }
 
 // Alias for backward compatibility

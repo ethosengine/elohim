@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-provincial-state-activist tracks state legislation across session",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state-activist tracks state legislation across session",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist tracks state legislation across session",
+  "description": "Activist tracks state legislation across session",
+  "content": "Scenario: Activist tracks state legislation across session\n    Given hundreds of bills move through state legislature\n    And the activist cannot attend all hearings\n    When the Observer monitors state education legislation\n    Then the activist receives alerts on relevant bills\n    And sees analysis of policy impacts on students\n    And identifies opportunities for testimony\n    And tracks which legislators support or oppose\n    And statewide advocacy becomes sustainable\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:provincial_state",
+    "related_users:community_organizer,activist,politician,journalist",
+    "related_layers:municipality,nation_state,county_regional",
+    "elohim_agents:public_observer,regional_elohim,policy_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist tracks state legislation across session",
+    "ogDescription": "Activist tracks state legislation across session",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-provincial-state-activist tracks state legislation across session",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist tracks state legislation across session - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-provincial-state-activist tracks state legislation across session",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:provincial-state-activist tracks state legislation across session",
+    "name": "Activist tracks state legislation across session",
+    "description": "Activist tracks state legislation across session",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

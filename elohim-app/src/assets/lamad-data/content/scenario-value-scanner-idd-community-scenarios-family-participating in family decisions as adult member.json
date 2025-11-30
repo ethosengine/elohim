@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-participating in family decisions as adult member",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-participating in family decisions as adult member",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Participating in family decisions as adult member",
+  "description": "Participating in family decisions as adult member",
+  "content": "Scenario: Participating in family decisions as adult member\n    Given Jordan's family is planning a vacation together\n    And Jordan is invited to join the family trip\n    When the family discusses vacation options\n    Then Jordan participates in the planning with accessible support\n    And the personal_agent presents destination options visually\n    And Jordan can express preferences about activities and timing\n    And Jordan's vote counts in family decision-making\n    And the family treats Jordan as an adult participant, not a child\n    And Jordan experiences being a valued family member with voice\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Participating in family decisions as adult member",
+    "ogDescription": "Participating in family decisions as adult member",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-participating in family decisions as adult member",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in family decisions as adult member - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-participating in family decisions as adult member",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-participating in family decisions as adult member",
+    "name": "Participating in family decisions as adult member",
+    "description": "Participating in family decisions as adult member",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

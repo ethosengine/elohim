@@ -1,0 +1,65 @@
+{
+  "id": "feature-public-observer-journalist-scenarios-provincial-state",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "State Policy and Accountability Journalism for Journalist",
+  "description": "As a journalist in the public_observer system Operating at the provincial/state governance layer I want to connect state policy to local impacts So that policy journalism serves communities not just political insiders",
+  "content": "@epic:public_observer\n@user_type:journalist\n@governance_layer:provincial_state\n@related_users:journalist,politician,activist,citizen,teacher\n@related_layers:municipality,county_regional,national\n@elohim_agents:public_observer,state_elohim,pattern_elohim,research_elohim\n\nFeature: State Policy and Accountability Journalism for Journalist\n  As a journalist in the public_observer system\n  Operating at the provincial/state governance layer\n  I want to connect state policy to local impacts\n  So that policy journalism serves communities not just political insiders\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the journalist user is registered in the system\n    And the provincial_state governance context is active\n\n  Scenario: Journalist monitors multiple state agencies despite limited capacity\n    Given the journalist covers state government\n    And must track legislature, education department, environmental agency, and 8 others\n    When the Observer monitors all state agencies and legislative committees\n    Then the journalist reviews all consequential meetings and decisions\n    And receives alerts for newsworthy developments\n    And tracks legislation through committee process automatically\n    And comprehensive state surveillance becomes sustainable\n    And important policy changes don't escape coverage\n\n  Scenario: Journalist grounds state education policy in local school impacts\n    Given state legislature debates education funding formula\n    And the journalist covers state education policy\n    When the Observer shows local impacts across specific districts\n    Then the journalist sees how formula change affects 230 individual schools\n    And identifies which communities gain or lose funding\n    And contacts affected teachers, parents, and students in specific districts\n    And publishes story connecting state policy to lived local experiences\n    And policy journalism serves communities not just political class\n\n  Scenario: Journalist exposes lobbying influence on environmental regulation\n    Given state considers weakening pollution regulations\n    And the journalist investigates who benefits\n    When the Observer tracks lobbying activity and legislative relationships\n    Then the journalist sees industry lobbying expenditures of $4M\n    And documents campaign contributions to committee members\n    And identifies revolving door between industry and regulatory agency\n    And shows pattern of weakened enforcement benefiting donors\n    And publishes investigation exposing regulatory capture\n\n  Scenario: Journalist fact-checks governor's claims on economic record\n    Given the governor campaigns on economic success claims\n    And the journalist provides accountability coverage\n    When the Observer analyzes state economic data\n    Then the journalist verifies job growth claim (accurate but misleading framing)\n    And finds wage growth lags behind neighboring states\n    And shows poverty rate increased despite jobs claim\n    And identifies tax cut benefits concentrated in top income bracket\n    And publishes fact-check grounding rhetoric in evidence\n\n  Scenario: Journalist tracks state promises on infrastructure investment\n    Given state announced major infrastructure funding 2 years ago\n    And the journalist covered initial announcement\n    When the Observer alerts on promise implementation timeline\n    Then the journalist investigates actual spending and project completion\n    And finds only 18% of promised funding has been allocated\n    And sees projects concentrated in politically connected districts\n    And documents communities still waiting for promised improvements\n    And publishes accountability story on broken infrastructure commitments\n\n  Scenario: Journalist investigates state criminal justice disparities\n    Given the journalist covers criminal justice policy\n    And data suggests racial disparities in enforcement\n    When the Observer analyzes statewide criminal justice data\n    Then the journalist sees Black residents arrested at 4x rate for same offenses\n    And documents sentencing disparities for similar crimes\n    And tracks outcomes showing selective enforcement patterns\n    And identifies counties with extreme disparities\n    And publishes investigation exposing systemic racism\n    And pattern recognition reveals injustice at scale\n\n  Scenario: Journalist collaborates with local reporters on state policy impacts\n    Given state budget cuts affect services across all communities\n    And the journalist coordinates with local reporters statewide\n    When the Observer provides shared state surveillance infrastructure\n    Then all journalists access same comprehensive state policy data\n    And local reporters show impacts in their specific communities\n    And state reporter synthesizes statewide pattern\n    And collaborative investigation publishes simultaneously across outlets\n    And state policy accountability serves whole state not just capital\n\n  Scenario: Journalist develops whistleblower source in state agency\n    Given a state employee witnesses fraud in contract process\n    And fears career retaliation for exposing misconduct\n    When the Observer provides secure protected channel\n    Then the whistleblower shares evidence of fraudulent contracts\n    And journalist investigates without exposing source\n    And verifies claims through additional reporting and records\n    And publishes investigation leading to official inquiry\n    And source protection enables accountability journalism\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:provincial_state",
+    "related_users:journalist,politician,activist,citizen,teacher",
+    "related_layers:municipality,county_regional,national",
+    "elohim_agents:public_observer,state_elohim,pattern_elohim,research_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist monitors multiple state agencies despite limited capacity",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist grounds state education policy in local school impacts",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist exposes lobbying influence on environmental regulation",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist fact-checks governor's claims on economic record",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist tracks state promises on infrastructure investment",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist investigates state criminal justice disparities",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist collaborates with local reporters on state policy impacts",
+    "scenario-public-observer-journalist-scenarios-provincial-state-journalist develops whistleblower source in state agency",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 8
+  },
+  "openGraphMetadata": {
+    "ogTitle": "State Policy and Accountability Journalism for Journalist",
+    "ogDescription": "As a journalist in the public_observer system Operating at the provincial/state governance layer I want to connect state policy to local impacts So that policy journalism serves communities not just p",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-provincial-state",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "State Policy and Accountability Journalism for Journalist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-provincial-state",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:provincial-state",
+    "name": "State Policy and Accountability Journalism for Journalist",
+    "description": "As a journalist in the public_observer system Operating at the provincial/state governance layer I want to connect state policy to local impacts So that policy journalism serves communities not just political insiders",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

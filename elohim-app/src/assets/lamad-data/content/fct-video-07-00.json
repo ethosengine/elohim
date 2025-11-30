@@ -1,0 +1,30 @@
+{
+  "id": "fct-video-07-00",
+  "contentType": "video",
+  "title": ", justice, and mass incarceration in the United States. This could deeply challenge suburban views on law enforcement and systemic racism.",
+  "description": "Recommended video for Centering Values: Love",
+  "content": {
+    "platform": "youtube",
+    "videoId": "5v13wrVEQ2M",
+    "embedUrl": "https://www.youtube.com/embed/5v13wrVEQ2M",
+    "watchUrl": "https://www.youtube.com/watch?v=5v13wrVEQ2M"
+  },
+  "contentFormat": "video-embed",
+  "sourcePath": "fct/Module 8 - Centering Values - Part 1, Centering the greatest value, Love.md",
+  "tags": [
+    "video",
+    "fct",
+    "youtube",
+    "values"
+  ],
+  "relatedNodeIds": [
+    "fct-module-08-centering-love"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-08-centering-love",
+    "mediaType": "video"
+  },
+  "createdAt": "2025-11-28T02:47:31.019976",
+  "updatedAt": "2025-11-28T02:47:31.019977"
+}

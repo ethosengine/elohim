@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-household-household planning for both partners' future aging",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-household planning for both partners' future aging",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Household planning for both partners' future aging",
+  "description": "Household planning for both partners' future aging",
+  "content": "Scenario: Household planning for both partners' future aging\n    Given Robert and Jennifer are preparing for their own eventual aging\n    And they watch their parents navigate aging challenges\n    And they need to build resources for their own care\n    When household_elohim supports retirement and aging planning\n    Then it should help them plan for joint aging\n    And coordinate long-term care insurance, retirement housing, and care resources\n    And surface: \"Your parents' care patterns suggest you should plan for similar needs\"\n    And help them build care economy resources that will serve them later\n    And ensure they're preparing for aging with dignity\n    And support building care networks that will remain as they age\n    And prevent them from sacrificing their future for present demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:household",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:individual,family,neighborhood,community",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Household planning for both partners' future aging",
+    "ogDescription": "Household planning for both partners' future aging",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-household planning for both partners' future aging",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Household planning for both partners' future aging - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-household-household planning for both partners' future aging",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:household-household planning for both partners' future aging",
+    "name": "Household planning for both partners' future aging",
+    "description": "Household planning for both partners' future aging",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

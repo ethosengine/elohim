@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-neighborhood-neighborhood governance participation accessible to aging residents",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:neighborhood-neighborhood governance participation accessible to aging residents",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood governance participation accessible to aging residents",
+  "description": "Neighborhood governance participation accessible to aging residents",
+  "content": "Scenario: Neighborhood governance participation accessible to aging residents\n    Given Frank is aging and may have mobility or accessibility needs\n    And neighborhood governance should remain accessible\n    When Frank participates in neighborhood governance\n    Then meetings should be accessible (location, seating, acoustics)\n    And remote participation options should be available\n    And meeting materials should be provided in accessible formats\n    And the neighborhood_elohim should coordinate accessibility needs\n    And Frank should be able to participate fully despite aging\n    And governance access should be universal, not assuming youth\n    And his participation should be welcomed and supported\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:neighborhood",
+    "related_users:senior,neighbor,volunteer,elder,resident",
+    "related_layers:individual,household,community,municipality",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood governance participation accessible to aging residents",
+    "ogDescription": "Neighborhood governance participation accessible to aging residents",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-neighborhood-neighborhood governance participation accessible to aging residents",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood governance participation accessible to aging residents - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-neighborhood-neighborhood governance participation accessible to aging residents",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:neighborhood-neighborhood governance participation accessible to aging residents",
+    "name": "Neighborhood governance participation accessible to aging residents",
+    "description": "Neighborhood governance participation accessible to aging residents",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-neighborhood-retired grandparent presence strengthens neighborhood resilience",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-retired grandparent presence strengthens neighborhood resilience",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Retired grandparent presence strengthens neighborhood resilience",
+  "description": "Retired grandparent presence strengthens neighborhood resilience",
+  "content": "Scenario: Retired grandparent presence strengthens neighborhood resilience\n    Given Margaret is home during weekdays when many neighbors work\n    And her presence provides neighborhood stability and observation\n    When the neighborhood_elohim tracks resident engagement\n    Then it should recognize Margaret's daytime presence as valuable\n    And it should value retired residents' neighborhood stewardship\n    And it should recognize she provides informal neighborhood watch\n    And her availability strengthens neighborhood safety and connection\n    And retired elders should be seen as neighborhood assets\n    And presence and engagement should accumulate care tokens\n    And neighborhood benefits from Margaret's availability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:neighborhood",
+    "related_users:senior,retired,parent,child,neighbor",
+    "related_layers:individual,household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Retired grandparent presence strengthens neighborhood resilience",
+    "ogDescription": "Retired grandparent presence strengthens neighborhood resilience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-retired grandparent presence strengthens neighborhood resilience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Retired grandparent presence strengthens neighborhood resilience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-neighborhood-retired grandparent presence strengthens neighborhood resilience",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:neighborhood-retired grandparent presence strengthens neighborhood resilience",
+    "name": "Retired grandparent presence strengthens neighborhood resilience",
+    "description": "Retired grandparent presence strengthens neighborhood resilience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

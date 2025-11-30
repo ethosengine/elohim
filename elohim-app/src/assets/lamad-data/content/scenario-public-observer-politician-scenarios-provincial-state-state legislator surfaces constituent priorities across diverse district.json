@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-provincial-state-state legislator surfaces constituent priorities across diverse district",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator surfaces constituent priorities across diverse district",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "State legislator surfaces constituent priorities across diverse district",
+  "description": "State legislator surfaces constituent priorities across diverse district",
+  "content": "Scenario: State legislator surfaces constituent priorities across diverse district\n    Given the politician represents 200,000 residents across urban and rural areas\n    And hears disproportionately from organized lobbying campaigns\n    When the Observer aggregates constituent intelligence\n    Then they see healthcare affordability is top concern across demographics\n    And identify rural transportation barriers affecting economic opportunity\n    And learn working families struggle with childcare costs statewide\n    And understand constituent priorities beyond lobbying group demands\n    And align legislative agenda with actual community needs\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:provincial_state",
+    "related_users:citizen,activist,community_organizer,journalist,lobbyist",
+    "related_layers:municipality,district,county_regional,educational,ecological,workplace",
+    "elohim_agents:public_observer,regional_elohim,constituent_elohim,legislative_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "State legislator surfaces constituent priorities across diverse district",
+    "ogDescription": "State legislator surfaces constituent priorities across diverse district",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator surfaces constituent priorities across diverse district",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "State legislator surfaces constituent priorities across diverse district - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-provincial-state-state legislator surfaces constituent priorities across diverse district",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:provincial-state-state legislator surfaces constituent priorities across diverse district",
+    "name": "State legislator surfaces constituent priorities across diverse district",
+    "description": "State legislator surfaces constituent priorities across diverse district",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

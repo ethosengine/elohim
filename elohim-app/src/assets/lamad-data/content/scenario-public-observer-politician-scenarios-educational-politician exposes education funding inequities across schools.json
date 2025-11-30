@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-educational-politician exposes education funding inequities across schools",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician exposes education funding inequities across schools",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Politician exposes education funding inequities across schools",
+  "description": "Politician exposes education funding inequities across schools",
+  "content": "Scenario: Politician exposes education funding inequities across schools\n    Given the politician suspects resource distribution creates outcome gaps\n    When the Observer analyzes education funding patterns\n    Then they see experienced teachers concentrated in affluent schools\n    And identify per-student spending disparities within districts\n    And understand how funding formulas create systematic inequities\n    And calculate impact of equitable funding on underserved schools\n    And champion funding reforms with evidence of current harms\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:educational",
+    "related_users:parent,teacher,student,board_member,administrator,activist",
+    "related_layers:district,municipality,provincial_state,school",
+    "elohim_agents:public_observer,education_elohim,district_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Politician exposes education funding inequities across schools",
+    "ogDescription": "Politician exposes education funding inequities across schools",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician exposes education funding inequities across schools",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Politician exposes education funding inequities across schools - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-educational-politician exposes education funding inequities across schools",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:educational-politician exposes education funding inequities across schools",
+    "name": "Politician exposes education funding inequities across schools",
+    "description": "Politician exposes education funding inequities across schools",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

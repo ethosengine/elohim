@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-educational-learning value literacy, not just price comparison",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-learning value literacy, not just price comparison",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Learning value literacy, not just price comparison",
+  "description": "Learning value literacy, not just price comparison",
+  "content": "Scenario: Learning value literacy, not just price comparison\n    Given Emma is building complex understanding of value\n    And value extends far beyond simple price\n    When Emma uses the Value Scanner for education\n    Then she should learn to see multiple value dimensions\n    And nutritional value should be explored\n    And environmental impact should be age-appropriately introduced\n    And care labor embedded in production should be made visible\n    And community benefit should be considered\n    And she should learn to read complexity, not just price tags\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:educational",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Learning value literacy, not just price comparison",
+    "ogDescription": "Learning value literacy, not just price comparison",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-learning value literacy, not just price comparison",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Learning value literacy, not just price comparison - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-educational-learning value literacy, not just price comparison",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:educational-learning value literacy, not just price comparison",
+    "name": "Learning value literacy, not just price comparison",
+    "description": "Learning value literacy, not just price comparison",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

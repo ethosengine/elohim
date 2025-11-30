@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-family care token flows reflect alex's substantial contributions",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-family care token flows reflect alex's substantial contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family care token flows reflect Alex's substantial contributions",
+  "description": "Family care token flows reflect Alex's substantial contributions",
+  "content": "Scenario: Family care token flows reflect Alex's substantial contributions\n    Given Alex contributes significantly to family care economy\n    And traditional family roles often render disabled people's contributions invisible\n    When family care tokens are calculated\n    Then Alex's emotional labor should accumulate tokens appropriately\n    And Alex's advocacy improving accessibility benefits whole family\n    And Alex's peer support to other disabled family members should be valued\n    And care tokens should flow to Alex for contributions, not just from Alex as recipient\n    And family economics should recognize Alex's care work explicitly\n    And the data should challenge family narratives of Alex as burden\n    And Alex's economic standing within family should reflect actual contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family care token flows reflect Alex's substantial contributions",
+    "ogDescription": "Family care token flows reflect Alex's substantial contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-family care token flows reflect alex's substantial contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family care token flows reflect Alex's substantial contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-family care token flows reflect alex's substantial contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-family care token flows reflect alex's substantial contributions",
+    "name": "Family care token flows reflect Alex's substantial contributions",
+    "description": "Family care token flows reflect Alex's substantial contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

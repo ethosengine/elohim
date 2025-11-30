@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-valuing diverse ways of being extends to all life",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-valuing diverse ways of being extends to all life",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Valuing diverse ways of being extends to all life",
+  "description": "Valuing diverse ways of being extends to all life",
+  "content": "Scenario: Valuing diverse ways of being extends to all life\n    Given disability justice rejects hierarchy of human worth\n    And this principle extends to ecological relationships\n    When the bioregional_elohim represents ecological values\n    Then it should embody recognition of intrinsic worth across difference\n    And diversity should be valued, not just tolerated\n    And interdependence should be centered as strength\n    And disability justice frameworks should inform ecological ethics\n    And Alex's understanding of diversity as value should shape environmental thinking\n    And the protocol should learn from disability community wisdom\n    And respect for difference should extend from people to ecosystems\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,activist,indigenous,elder,youth",
+    "related_layers:community,neighborhood,municipality,individual",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Valuing diverse ways of being extends to all life",
+    "ogDescription": "Valuing diverse ways of being extends to all life",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-valuing diverse ways of being extends to all life",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Valuing diverse ways of being extends to all life - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-ecological-bioregional-valuing diverse ways of being extends to all life",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:ecological-bioregional-valuing diverse ways of being extends to all life",
+    "name": "Valuing diverse ways of being extends to all life",
+    "description": "Valuing diverse ways of being extends to all life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

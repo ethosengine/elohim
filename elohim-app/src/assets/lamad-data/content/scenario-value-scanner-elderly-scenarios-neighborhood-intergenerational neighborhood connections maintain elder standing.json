@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-intergenerational neighborhood connections maintain elder standing",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-intergenerational neighborhood connections maintain elder standing",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Intergenerational neighborhood connections maintain elder standing",
+  "description": "Intergenerational neighborhood connections maintain elder standing",
+  "content": "Scenario: Intergenerational neighborhood connections maintain elder standing\n    Given Helen interacts with neighbors of all ages\n    And longtime residents have neighborhood wisdom\n    When neighborhood governance decisions are made\n    Then Helen's voice should carry weight as longtime resident\n    And her knowledge of neighborhood history should inform decisions\n    And younger neighbors should be connected to Helen for wisdom\n    And intergenerational relationships should be facilitated\n    And the neighborhood_elohim should surface opportunities for elder mentoring\n    And Helen should experience continued relevance in neighborhood life\n    And the protocol should maintain elder standing in community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Intergenerational neighborhood connections maintain elder standing",
+    "ogDescription": "Intergenerational neighborhood connections maintain elder standing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-intergenerational neighborhood connections maintain elder standing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Intergenerational neighborhood connections maintain elder standing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-intergenerational neighborhood connections maintain elder standing",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-intergenerational neighborhood connections maintain elder standing",
+    "name": "Intergenerational neighborhood connections maintain elder standing",
+    "description": "Intergenerational neighborhood connections maintain elder standing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

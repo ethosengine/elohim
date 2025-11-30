@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical appointment coordination across multiple specialists",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medical appointment coordination across multiple specialists",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Medical appointment coordination across multiple specialists",
+  "description": "Medical appointment coordination across multiple specialists",
+  "content": "Scenario: Medical appointment coordination across multiple specialists\n    Given David requires regular appointments with multiple providers\n    And James must coordinate complex scheduling\n    When the healthcare_elohim manages appointments\n    Then it should maintain integrated calendar across providers\n    And it should remind James of upcoming appointments\n    And it should coordinate transportation and timing\n    And it should prepare James with information needed for each visit\n    And medical coordination burden should be reduced through system support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:healthcare_medical",
+    "related_users:adult,middle_aged,person_with_disabilities,elderly",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,healthcare_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/healthcare_medical.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-healthcare-medical",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Medical appointment coordination across multiple specialists",
+    "ogDescription": "Medical appointment coordination across multiple specialists",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical appointment coordination across multiple specialists",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Medical appointment coordination across multiple specialists - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-healthcare-medical-medical appointment coordination across multiple specialists",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:healthcare-medical-medical appointment coordination across multiple specialists",
+    "name": "Medical appointment coordination across multiple specialists",
+    "description": "Medical appointment coordination across multiple specialists",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

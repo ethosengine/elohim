@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-child-scenarios-family-family shopping as shared care experience",
+  "did": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family-family shopping as shared care experience",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family shopping as shared care experience",
+  "description": "Family shopping as shared care experience",
+  "content": "Scenario: Family shopping as shared care experience\n    Given Tommy is shopping with parent Sarah\n    And multiple family members have different needs\n    When they use the Value Scanner together\n    Then Tommy should be learning from Sarah's modeling\n    And Sarah should be teaching Tommy value literacy through action\n    And the family_elohim should coordinate their different roles\n    And Tommy's contributions should be recognized alongside Sarah's\n    And shopping should be experienced as family care work, not consumption\n    And care economy principles should be transmitted through relationship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_child",
+    "governance_layer:family",
+    "related_users:parent,child,grandparent",
+    "related_layers:individual,educational",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-child-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-child-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family shopping as shared care experience",
+    "ogDescription": "Family shopping as shared care experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-family-family shopping as shared care experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family shopping as shared care experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-child-scenarios-family-family shopping as shared care experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-child:scenarios:family-family shopping as shared care experience",
+    "name": "Family shopping as shared care experience",
+    "description": "Family shopping as shared care experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

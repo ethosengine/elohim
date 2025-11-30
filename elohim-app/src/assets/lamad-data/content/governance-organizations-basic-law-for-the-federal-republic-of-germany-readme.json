@@ -1,0 +1,62 @@
+{
+  "id": "governance-organizations-basic-law-for-the-federal-republic-of-germany-readme",
+  "did": "did:web:elohim.host:content:governance:organizations:basic-law-for-the-federal-republic-of-germany:readme",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "[Description to be added]",
+  "content": "---\nnode_type: organization\norg_id: basic_law_for_the_federal_republic_of_germany\nname: \"Basic Law for the Federal Republic of Germany\"\nurl: \"https://www.gesetze-im-internet.de/englisch_gg/englisch_gg.html\"\ngem_id: \"oXPquJSVak24dN7svGgZ\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Basic Law for the Federal Republic of Germany inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Basic Law for the Federal Republic of Germany\n\n## Description\n\n[Description to be added]\n\n**Publisher:** N/A\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Basic Law for the Federal Republic of Germany relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.gesetze-im-internet.de/englisch_gg/englisch_gg.html\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/basic_law_for_the_federal_republic_of_germany/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance",
+    "url": "https://www.gesetze-im-internet.de/englisch_gg/englisch_gg.html",
+    "name": "Basic Law for the Federal Republic of Germany",
+    "org_id": "basic_law_for_the_federal_republic_of_germany",
+    "gem_id": "oXPquJSVak24dN7svGgZ",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "N/A",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Basic Law for the Federal Republic of Germany inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "[Description to be added]",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-organizations-basic-law-for-the-federal-republic-of-germany-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/governance-organizations-basic-law-for-the-federal-republic-of-germany-readme",
+    "identifier": "did:web:elohim.host:content:governance:organizations:basic-law-for-the-federal-republic-of-germany:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "[Description to be added]",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

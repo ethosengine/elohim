@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-contributing to family care economy while managing own resources",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-contributing to family care economy while managing own resources",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Contributing to family care economy while managing own resources",
+  "description": "Contributing to family care economy while managing own resources",
+  "content": "Scenario: Contributing to family care economy while managing own resources\n    Given Aisha has limited financial resources\n    And she wants to support her family\n    When Aisha decides what care to contribute\n    Then the system should help her balance competing obligations\n    And it should recognize that her care capacity is limited\n    And it should validate both family support and self-care\n    And the family_elohim should not create unsustainable demands\n    And Aisha should maintain boundaries while remaining connected\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Contributing to family care economy while managing own resources",
+    "ogDescription": "Contributing to family care economy while managing own resources",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-contributing to family care economy while managing own resources",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing to family care economy while managing own resources - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-contributing to family care economy while managing own resources",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-contributing to family care economy while managing own resources",
+    "name": "Contributing to family care economy while managing own resources",
+    "description": "Contributing to family care economy while managing own resources",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

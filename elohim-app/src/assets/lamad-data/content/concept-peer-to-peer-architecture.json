@@ -1,0 +1,30 @@
+{
+  "id": "concept-peer-to-peer-architecture",
+  "contentType": "concept",
+  "title": "Peer-to-Peer Architecture",
+  "description": "Distributed infrastructure like Holochain removes single points of failure and control. Edge computing enables community sovereignty and hyper-local governance.",
+  "content": "Distributed infrastructure like Holochain removes single points of failure and control. Edge computing enables community sovereignty and hyper-local governance.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/design-principles/concept-peer-to-peer-architecture.json",
+  "tags": [
+    "architecture",
+    "distributed-systems",
+    "p2p",
+    "design-principle",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "governance-organizations-holochain-app-framework-with-p2p-networking-readme"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "design-principles",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:56.999606",
+  "updatedAt": "2025-11-28T17:11:56.999606"
+}

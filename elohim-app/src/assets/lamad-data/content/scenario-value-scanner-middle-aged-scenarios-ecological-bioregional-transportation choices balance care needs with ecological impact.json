@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-transportation choices balance care needs with ecological impact",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-transportation choices balance care needs with ecological impact",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Transportation choices balance care needs with ecological impact",
+  "description": "Transportation choices balance care needs with ecological impact",
+  "content": "Scenario: Transportation choices balance care needs with ecological impact\n    Given Robert travels for work, parent care, and family support\n    And transportation has substantial ecological impact\n    And care responsibilities create transportation needs\n    When bioregional_elohim analyzes transportation\n    Then it should track transportation ecological impact\n    And help Robert optimize travel to reduce impact while meeting care needs\n    And surface alternatives: \"Video call could replace 200-mile drive for parent check-in\"\n    And recognize when care needs require travel despite ecological cost\n    And support sustainable transportation choices where possible\n    And prevent guilt about necessary care-related travel\n    And build transportation patterns that balance care and ecology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,community,municipality,household",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Transportation choices balance care needs with ecological impact",
+    "ogDescription": "Transportation choices balance care needs with ecological impact",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-transportation choices balance care needs with ecological impact",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Transportation choices balance care needs with ecological impact - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-ecological-bioregional-transportation choices balance care needs with ecological impact",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:ecological-bioregional-transportation choices balance care needs with ecological impact",
+    "name": "Transportation choices balance care needs with ecological impact",
+    "description": "Transportation choices balance care needs with ecological impact",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-participating in neighborhood decision-making and collective action",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-participating in neighborhood decision-making and collective action",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Participating in neighborhood decision-making and collective action",
+  "description": "Participating in neighborhood decision-making and collective action",
+  "content": "Scenario: Participating in neighborhood decision-making and collective action\n    Given my neighborhood faces issues that affect residents\n    And I have stake in neighborhood decisions despite housing temporariness\n    When neighborhood collective action or decision-making occurs\n    Then the Value Scanner connects me to neighborhood organizing\n    And validates my right to participate in neighborhood governance\n    And helps me contribute despite time and energy constraints\n    And facilitates my voice in decisions affecting my household\n    And tracks neighborhood issues and actions\n    And my personal_agent surfaces opportunities matching my capacity\n    And recognizes community organizing as valuable civic labor\n    And supports my participation as full neighborhood member\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-neighborhood",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Participating in neighborhood decision-making and collective action",
+    "ogDescription": "Participating in neighborhood decision-making and collective action",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-participating in neighborhood decision-making and collective action",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in neighborhood decision-making and collective action - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-neighborhood-participating in neighborhood decision-making and collective action",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:neighborhood-participating in neighborhood decision-making and collective action",
+    "name": "Participating in neighborhood decision-making and collective action",
+    "description": "Participating in neighborhood decision-making and collective action",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

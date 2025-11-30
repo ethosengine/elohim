@@ -1,0 +1,54 @@
+{
+  "id": "fct-media-00-podcast-the-rise-and-fall-of",
+  "contentType": "podcast",
+  "title": "The Rise and Fall of Mars Hill",
+  "description": "Podcast recommended in FCT Module 1",
+  "content": {
+    "format": "podcast",
+    "title": "The Rise and Fall of Mars Hill"
+  },
+  "contentFormat": "audio",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "podcast",
+    "fct",
+    "audio",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "church-crisis",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "podcast"
+  },
+  "createdAt": "2025-11-28T21:10:19.182091",
+  "updatedAt": "2025-11-28T21:10:19.182094",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "AudioObject",
+  "openGraphMetadata": {
+    "ogTitle": "The Rise and Fall of Mars Hill",
+    "ogDescription": "Podcast recommended in FCT Module 1",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-podcast-the-rise-and-fall-of",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/podcast.jpg",
+    "ogImageAlt": "The Rise and Fall of Mars Hill - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "PodcastEpisode",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-podcast-the-rise-and-fall-of",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "The Rise and Fall of Mars Hill",
+    "description": "Podcast recommended in FCT Module 1",
+    "dateCreated": "2025-11-28T21:10:19.182091",
+    "dateModified": "2025-11-28T21:10:19.182094",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

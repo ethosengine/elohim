@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-end-of-life planning as family governance issue",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-end-of-life planning as family governance issue",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "End-of-life planning as family governance issue",
+  "description": "End-of-life planning as family governance issue",
+  "content": "Scenario: End-of-life planning as family governance issue\n    Given Helen is facing mortality consciously\n    And her death will affect entire family\n    When family discusses Helen's end-of-life wishes\n    Then the family_elohim should facilitate dignity-preserving conversations\n    And Helen's wishes should be documented and shared with family\n    And family should understand and commit to honoring her preferences\n    And emotional complexity should be supported\n    And Helen's voice should be authoritative about her own death\n    And family should be prepared to advocate for her wishes\n    And the protocol should support family through end-of-life planning\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "End-of-life planning as family governance issue",
+    "ogDescription": "End-of-life planning as family governance issue",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-end-of-life planning as family governance issue",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "End-of-life planning as family governance issue - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-end-of-life planning as family governance issue",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-end-of-life planning as family governance issue",
+    "name": "End-of-life planning as family governance issue",
+    "description": "End-of-life planning as family governance issue",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-educational-community education and skill-sharing workshops",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-community education and skill-sharing workshops",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community education and skill-sharing workshops",
+  "description": "Community education and skill-sharing workshops",
+  "content": "Scenario: Community education and skill-sharing workshops\n    Given Margaret has skills accumulated over lifetime\n    And community members could benefit from her knowledge\n    When the educational_elohim coordinates community education\n    Then Margaret should be able to teach workshops\n    And her teaching labor should be tracked as care contribution\n    And skills like cooking, budgeting, health literacy should be shared\n    And community capacity should grow through senior teaching\n    And Margaret's knowledge should strengthen community resilience\n    And teaching should be recognized as valuable community service\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:educational",
+    "related_users:middle_aged,elderly,retired,teacher,mentor,student,learner",
+    "related_layers:individual,family,community,neighborhood",
+    "elohim_agents:personal_agent,community_elohim,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community education and skill-sharing workshops",
+    "ogDescription": "Community education and skill-sharing workshops",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-community education and skill-sharing workshops",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community education and skill-sharing workshops - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-educational-community education and skill-sharing workshops",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:educational-community education and skill-sharing workshops",
+    "name": "Community education and skill-sharing workshops",
+    "description": "Community education and skill-sharing workshops",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-participating in family celebrations despite work",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-participating in family celebrations despite work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Participating in family celebrations despite work",
+  "description": "Participating in family celebrations despite work",
+  "content": "Scenario: Participating in family celebrations despite work\n    Given family gatherings and celebrations matter for connection\n    And my work schedule may conflict with family events\n    When family plans celebrations or important gatherings\n    Then the protocol should help me advocate for work schedule changes\n    And coordinate around my employment constraints when necessary\n    And help me participate meaningfully even if time is limited\n    And recognize that family care includes celebration and joy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Participating in family celebrations despite work",
+    "ogDescription": "Participating in family celebrations despite work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-participating in family celebrations despite work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Participating in family celebrations despite work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-participating in family celebrations despite work",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-participating in family celebrations despite work",
+    "name": "Participating in family celebrations despite work",
+    "description": "Participating in family celebrations despite work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

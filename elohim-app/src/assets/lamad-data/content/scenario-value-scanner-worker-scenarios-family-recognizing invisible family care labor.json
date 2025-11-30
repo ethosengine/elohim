@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-recognizing invisible family care labor",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-recognizing invisible family care labor",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Recognizing invisible family care labor",
+  "description": "Recognizing invisible family care labor",
+  "content": "Scenario: Recognizing invisible family care labor\n    Given I provide emotional support, communication, and coordination\n    Even when I cannot provide hands-on care\n    When family members track care contributions\n    Then the protocol should recognize all forms of care work\n    And make visible my emotional labor and communication work\n    And validate that staying connected is valuable care contribution\n    And ensure I am not invisibilized due to employment constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Recognizing invisible family care labor",
+    "ogDescription": "Recognizing invisible family care labor",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-recognizing invisible family care labor",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognizing invisible family care labor - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-recognizing invisible family care labor",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-recognizing invisible family care labor",
+    "name": "Recognizing invisible family care labor",
+    "description": "Recognizing invisible family care labor",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-workplace-organizational-accessing workplace accommodations for care needs",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-accessing workplace accommodations for care needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Accessing workplace accommodations for care needs",
+  "description": "Accessing workplace accommodations for care needs",
+  "content": "Scenario: Accessing workplace accommodations for care needs\n    Given I may need accommodations for health, family, or care responsibilities\n    When I need to request workplace accommodations\n    Then the workplace_elohim should help me understand my rights\n    And support me in making formal accommodation requests\n    And provide guidance on documentation and process\n    And advocate for my right to work conditions that don't destroy my capacity for care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Accessing workplace accommodations for care needs",
+    "ogDescription": "Accessing workplace accommodations for care needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-accessing workplace accommodations for care needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing workplace accommodations for care needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-workplace-organizational-accessing workplace accommodations for care needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:workplace-organizational-accessing workplace accommodations for care needs",
+    "name": "Accessing workplace accommodations for care needs",
+    "description": "Accessing workplace accommodations for care needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,53 @@
+{
+  "id": "fct-module-03-problem-well-stated-application",
+  "contentType": "practice",
+  "title": "Application: A Problem Well Stated",
+  "description": "Practical application and action steps",
+  "content": {
+    "instructions": "\\* Success cannot be defined by attention, high-production value worship \"experiences\", or programs. The \"Attractional Church\" model is largely a commercial success but a failure in that it has metastasized what is in lika a tumor or an autoimmune disease, in the development of a healthy body of Christianity. \n\n\\* The Messages we get on a Sunday are filtered through what we the audience want to hear, Preachers are subject to audience capture, conflict of interest, and bias. Consider balancing career-preaching with traveling ministers of the Word, who can have independence from our congregation to be honest with our community when we need to hear hard truths existentially important to our successful formation of a faith community.   What other models of faith community could we explore, to reduce the due influences of our culture on our epistemic community.",
+    "practiceType": "application"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 3 - A Problem Well Stated - Exponential Techonolgy, Our Divided Attention.md",
+  "tags": [
+    "application",
+    "practice",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-03-problem-well-stated"
+  ],
+  "metadata": {
+    "category": "fct-practice",
+    "sourceModule": "fct-module-03-problem-well-stated"
+  },
+  "createdAt": "2025-11-28T21:10:19.196190",
+  "updatedAt": "2025-11-28T21:10:19.196191",
+  "did": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Application: A Problem Well Stated",
+    "ogDescription": "Practical application and action steps",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-application",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/practice.jpg",
+    "ogImageAlt": "Application: A Problem Well Stated - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-03-problem-well-stated-application",
+    "identifier": "did:web:elohim.host:content:fct:module 3 - a problem well stated - exponential techonolgy, our divided attention",
+    "name": "Application: A Problem Well Stated",
+    "description": "Practical application and action steps",
+    "dateCreated": "2025-11-28T21:10:19.196190",
+    "dateModified": "2025-11-28T21:10:19.196191",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

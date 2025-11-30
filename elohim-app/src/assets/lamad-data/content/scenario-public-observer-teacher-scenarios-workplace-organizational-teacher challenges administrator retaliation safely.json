@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-workplace-organizational-teacher challenges administrator retaliation safely",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher challenges administrator retaliation safely",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher challenges administrator retaliation safely",
+  "description": "Teacher challenges administrator retaliation safely",
+  "content": "Scenario: Teacher challenges administrator retaliation safely\n    Given a principal retaliates against teachers who question decisions\n    And individual teachers fear speaking up\n    When teachers report concerns anonymously through Observer\n    Then patterns of retaliation become visible (negative evaluations after dissent)\n    And aggregated evidence protects individual teachers\n    And union files grievance based on documented pattern\n    And district addresses hostile administrator behavior\n    And anonymous reporting enables accountability without individual risk\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:workplace_organizational",
+    "related_users:union_representative,administrator,board_member,worker",
+    "related_layers:district,school,provincial_state",
+    "elohim_agents:public_observer,union_elohim,workplace_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-workplace-organizational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher challenges administrator retaliation safely",
+    "ogDescription": "Teacher challenges administrator retaliation safely",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher challenges administrator retaliation safely",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher challenges administrator retaliation safely - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-workplace-organizational-teacher challenges administrator retaliation safely",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:workplace-organizational-teacher challenges administrator retaliation safely",
+    "name": "Teacher challenges administrator retaliation safely",
+    "description": "Teacher challenges administrator retaliation safely",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

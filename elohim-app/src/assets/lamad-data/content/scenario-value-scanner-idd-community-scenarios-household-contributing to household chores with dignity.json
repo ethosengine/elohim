@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-household-contributing to household chores with dignity",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-contributing to household chores with dignity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Contributing to household chores with dignity",
+  "description": "Contributing to household chores with dignity",
+  "content": "Scenario: Contributing to household chores with dignity\n    Given Jordan is responsible for helping with dinner dishes\n    When Jordan completes their dishwashing task\n    Then the Value Scanner records Jordan's household contribution\n    And Jordan accumulates care tokens for their household labor\n    And the interface celebrates Jordan's contribution with positive feedback\n    And Jordan's work is valued equally to housemates' contributions\n    And the household labor distribution is visible to all housemates\n    And Jordan experiences being a valued household member, not a client\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-household"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-household",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Contributing to household chores with dignity",
+    "ogDescription": "Contributing to household chores with dignity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-contributing to household chores with dignity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing to household chores with dignity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-household-contributing to household chores with dignity",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:household-contributing to household chores with dignity",
+    "name": "Contributing to household chores with dignity",
+    "description": "Contributing to household chores with dignity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}
