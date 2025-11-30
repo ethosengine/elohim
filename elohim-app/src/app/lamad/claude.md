@@ -487,6 +487,18 @@ See `IMPLEMENTATION_PLAN.md` for detailed phase summaries.
 - Load "all content" or "all paths" anywhere
 - Use "user" terminology - use "human" instead
 - Use "creator" terminology - use "contributor" instead
+- Use `||` for defaults when `??` is intended (nullish coalescing)
+- Omit `readonly` on constructor dependencies
+- Leave unused imports in files
+
+### Code Quality
+SonarQube compliance is required. Key rules:
+- **S6606**: Use `??` instead of `||` for null/undefined defaults
+- **S2933**: Mark all constructor dependencies as `readonly`
+- **S1128**: Remove unused imports
+- **S1874**: Replace `.substr()` with `.substring()`
+
+See `common_mistakes.md` Section 10 for full SonarQube patterns and `services/claude.md` for service-specific examples.
 
 ---
 
