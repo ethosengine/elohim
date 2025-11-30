@@ -728,11 +728,21 @@
 
 
 @media (max-width: 768px) {
+  /* Allow normal document flow on mobile so footer appears at bottom of content */
+  .path-player-container {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
   .path-sidebar {
     position: absolute;
-    height: 100%;
+    height: 100vh;
     width: 100%; /* Full width on mobile */
     transform: translateX(0);
+    top: 0;
+    left: 0;
+    z-index: 100;
   }
 
   .path-player-container.sidebar-collapsed .path-sidebar {
@@ -741,6 +751,7 @@
 
   .main-content {
     width: 100%;
+    overflow: visible;
   }
 
   .breadcrumbs {
