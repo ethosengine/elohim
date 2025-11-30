@@ -267,7 +267,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     -Dsonar.tests=src \
                                     -Dsonar.test.inclusions=**/*.spec.ts \
                                     -Dsonar.typescript.lcov.reportPaths=coverage/elohim-app/lcov.info \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/elohim-app/lcov.info \
+                                    -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts
                                 '''
                             }
                             
