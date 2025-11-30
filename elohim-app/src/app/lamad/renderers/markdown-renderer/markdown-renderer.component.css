@@ -1,29 +1,605 @@
-.markdown-content {
-  padding: 1rem;
+/* =============================================================================
+   Markdown Renderer Styles - GitHub-like Typography
+   ============================================================================= */
+
+.markdown-wrapper {
+  position: relative;
+  display: flex;
+  gap: 2rem;
+  width: 100%; /* Ensure wrapper doesn't overflow */
 }
+
+/* =============================================================================
+   Table of Contents
+   ============================================================================= */
+
+.toc-toggle {
+  position: fixed;
+  bottom: 5rem;
+  right: 1.5rem;
+  z-index: 1000;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--lamad-accent-primary, #6366f1);
+  color: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toc-toggle:hover {
+  transform: scale(1.1);
+  background: var(--lamad-accent-secondary, #4f46e5);
+}
+
+.toc-toggle.toc-open {
+  background: var(--lamad-text-secondary, #64748b);
+}
+
+.toc-icon {
+  font-size: 1.25rem;
+}
+
+.toc-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  cursor: pointer;
+}
+
+.toc-sidebar {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 300px;
+  height: 100vh;
+  background: var(--lamad-bg-primary, #ffffff);
+  border-left: 1px solid var(--lamad-border, #d0d7de);
+  padding: 1.5rem;
+  overflow-y: auto;
+  transition: right 0.3s ease;
+  z-index: 1001;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+}
+
+.toc-sidebar.toc-visible {
+  right: 0;
+}
+
+.toc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--lamad-border, #d0d7de);
+  font-weight: 600;
+  color: var(--lamad-text-primary, #1f2328);
+}
+
+.toc-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--lamad-text-secondary, #656d76);
+  padding: 0;
+  line-height: 1;
+}
+
+.toc-close:hover {
+  color: var(--lamad-text-primary, #1f2328);
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-list li {
+  margin: 0.25rem 0;
+}
+
+.toc-list a {
+  display: block;
+  padding: 0.375rem 0.5rem;
+  color: var(--lamad-text-secondary, #656d76);
+  text-decoration: none;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.toc-list a:hover {
+  color: var(--lamad-accent-primary, #0969da);
+  background: var(--lamad-bg-secondary, #f6f8fa);
+}
+
+.toc-active a {
+  color: var(--lamad-accent-primary, #0969da);
+  background: var(--lamad-bg-tertiary, #ddf4ff);
+  font-weight: 500;
+}
+
+/* TOC indentation by heading level */
+.toc-level-1 { padding-left: 0; }
+.toc-level-2 { padding-left: 0.75rem; }
+.toc-level-3 { padding-left: 1.5rem; }
+.toc-level-4 { padding-left: 2.25rem; }
+.toc-level-5 { padding-left: 3rem; }
+.toc-level-6 { padding-left: 3.75rem; }
+
+/* Desktop: show TOC as sidebar (Standard Mode Only) */
+@media (min-width: 1280px) {
+  .markdown-wrapper:not(.embedded) .toc-toggle {
+    display: none;
+  }
+
+  .markdown-wrapper:not(.embedded) .toc-sidebar {
+    position: sticky;
+    top: 1rem;
+    right: auto;
+    height: calc(100vh - 2rem);
+    flex-shrink: 0;
+    box-shadow: none;
+    border-left: none;
+    border-right: 1px solid var(--lamad-border, #d0d7de);
+    order: -1;
+  }
+
+  .markdown-wrapper:not(.embedded) .toc-close {
+    display: none;
+  }
+
+  .markdown-wrapper:not(.embedded) .markdown-content.has-toc {
+    max-width: calc(100% - 320px);
+  }
+}
+
+/* =============================================================================
+   Main Content Area
+   ============================================================================= */
+
+.markdown-content {
+  flex: 1;
+  min-width: 0;
+  padding: 1rem;
+  max-width: 75ch;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--lamad-text-primary, #1f2328);
+  
+  /* Text Wrapping */
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+/* =============================================================================
+   Embedded Mode
+   ============================================================================= */
+
+.markdown-wrapper.embedded {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+}
+
+.markdown-wrapper.embedded .markdown-content {
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+/* Explicitly force TOC toggle and sidebar as overlay in embedded mode */
+.markdown-wrapper.embedded .toc-toggle {
+  display: flex !important;
+}
+
+.markdown-wrapper.embedded .toc-sidebar {
+  position: fixed !important;
+  top: 0;
+  right: -320px;
+  height: 100vh;
+  width: 300px;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+  border-left: 1px solid var(--lamad-border, #d0d7de);
+  border-right: none;
+  order: unset;
+  z-index: 1100;
+  transition: right 0.3s ease;
+}
+
+.markdown-wrapper.embedded .toc-sidebar.toc-visible {
+  right: 0;
+}
+
+.markdown-wrapper.embedded .toc-close {
+  display: block !important;
+}
+
+/* =============================================================================
+   Typography - GitHub Style
+   ============================================================================= */
 
 .markdown-content h1,
 .markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 1.5em; /* 24px */
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--lamad-text-primary, #1f2328);
+}
+
+.markdown-content h1 {
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--lamad-border, #d0d7de);
+  margin-top: 0; /* No top margin for first header */
+}
+
+.markdown-content h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--lamad-border, #d0d7de);
+}
+
 .markdown-content h3 {
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  font-size: 1.25em;
 }
 
-.markdown-content code {
-  background: var(--code-bg, #f4f4f4);
+.markdown-content h4 {
+  font-size: 1em;
+}
+
+.markdown-content h5 {
+  font-size: 0.875em;
+}
+
+.markdown-content h6 {
+  font-size: 0.85em;
+  color: var(--lamad-text-secondary, #656d76);
+}
+
+.markdown-content p {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-content a {
+  color: var(--lamad-accent-primary, #0969da);
+  text-decoration: none;
+  background-color: transparent;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   Heading Anchors
+   ============================================================================= */
+
+.heading-anchor {
+  position: relative;
+  scroll-margin-top: 2rem;
+}
+
+.heading-anchor .anchor-link {
+  position: absolute;
+  left: -1.25em;
+  opacity: 0;
+  color: var(--lamad-text-tertiary, #656d76);
+  font-weight: 400;
+  text-decoration: none;
+  border: none;
+  padding-right: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.heading-anchor:hover .anchor-link {
+  opacity: 1;
+}
+
+.heading-anchor .anchor-link:hover {
+  color: var(--lamad-accent-primary, #0969da);
+  text-decoration: none;
+}
+
+/* =============================================================================
+   Lists
+   ============================================================================= */
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-left: 2em;
+}
+
+.markdown-content li {
+  word-wrap: break-word;
+}
+
+/* Spacing between list items if they contain blocks */
+.markdown-content li + li {
+  margin-top: 0.25em;
+}
+
+.markdown-content li > p {
+  margin-top: 0.5em;
+}
+
+.markdown-content li > ul,
+.markdown-content li > ol {
+  margin-top: 0.25em;
+  margin-bottom: 0;
+}
+
+/* =============================================================================
+   Blockquotes
+   ============================================================================= */
+
+.markdown-content blockquote {
+  padding: 0 1em;
+  color: var(--lamad-text-secondary, #656d76);
+  border-left: 0.25em solid var(--lamad-border, #d0d7de);
+  margin: 0 0 16px 0;
+}
+
+.markdown-content blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* =============================================================================
+   Code
+   ============================================================================= */
+
+/* Inline code */
+.markdown-content code,
+.markdown-content kbd,
+.markdown-content samp {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 85%;
+}
+
+.markdown-content :not(pre) > code {
   padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-size: 0.9em;
+  margin: 0;
+  font-size: 85%;
+  white-space: break-spaces;
+  background-color: var(--lamad-bg-tertiary, rgba(175, 184, 193, 0.2));
+  border-radius: 6px;
+  color: var(--lamad-text-primary, #1f2328);
 }
 
+/* Code blocks */
 .markdown-content pre {
-  background: var(--code-bg, #f4f4f4);
-  padding: 1rem;
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa;
   border-radius: 6px;
-  overflow-x: auto;
+  margin-top: 0;
+  margin-bottom: 16px;
 }
 
 .markdown-content pre code {
-  background: none;
+  display: inline;
+  max-width: auto;
   padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+  color: inherit;
+  font-size: 100%;
+  white-space: pre;
+}
+
+/* Dark mode code blocks (since we use highlight.js normally) */
+.markdown-content pre {
+    background-color: #1e293b; /* Dark slate for contrast */
+}
+
+.markdown-content pre code {
+    color: #e2e8f0;
+}
+
+/* =============================================================================
+   Tables
+   ============================================================================= */
+
+.markdown-content table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin-top: 0;
+  margin-bottom: 16px;
+  width: 100%;
+  overflow: block; /* For responsive scrolling wrapper */
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 6px 13px;
+  border: 1px solid var(--lamad-border, #d0d7de);
+}
+
+.markdown-content th {
+  font-weight: 600;
+  background-color: var(--lamad-bg-secondary, #f6f8fa);
+}
+
+.markdown-content tr {
+  background-color: var(--lamad-bg-primary, #ffffff);
+  border-top: 1px solid var(--lamad-border, #d0d7de);
+}
+
+.markdown-content tr:nth-child(2n) {
+  background-color: var(--lamad-bg-secondary, #f6f8fa);
+}
+
+/* =============================================================================
+   Horizontal Rules
+   ============================================================================= */
+
+.markdown-content hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: var(--lamad-border, #d0d7de);
+  border: 0;
+}
+
+/* =============================================================================
+   Images
+   ============================================================================= */
+
+.markdown-content img {
+  max-width: 100%;
+  box-sizing: content-box;
+  background-color: var(--lamad-bg-primary, #ffffff);
+}
+
+/* =============================================================================
+   Back to Top Button
+   ============================================================================= */
+
+.back-to-top {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 100;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--lamad-bg-secondary, #f6f8fa);
+  color: var(--lamad-text-primary, #1f2328);
+  border: 1px solid var(--lamad-border, #d0d7de);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-to-top:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: white;
+}
+
+/* =============================================================================
+   Dark Mode Support
+   ============================================================================= */
+
+@media (prefers-color-scheme: dark) {
+  .toc-sidebar {
+    background: var(--lamad-bg-primary, #0d1117);
+    border-color: #30363d;
+  }
+  
+  .toc-header {
+    color: #e6edf3;
+    border-bottom-color: #30363d;
+  }
+  
+  .toc-list a {
+    color: #e6edf3;
+  }
+  
+  .toc-list a:hover {
+    color: #58a6ff;
+    background: #161b22;
+  }
+  
+  .toc-active a {
+    color: #58a6ff;
+    background: rgba(56, 139, 253, 0.15);
+  }
+
+  /* Content */
+  .markdown-content {
+    color: #e6edf3;
+  }
+  
+  .markdown-content h1,
+  .markdown-content h2,
+  .markdown-content h3,
+  .markdown-content h4,
+  .markdown-content h5,
+  .markdown-content h6 {
+    color: #e6edf3;
+    border-bottom-color: #21262d;
+  }
+  
+  .markdown-content a {
+    color: #4493f8;
+  }
+
+  .markdown-content blockquote {
+    color: #8b949e;
+    border-left-color: #30363d;
+  }
+  
+  .markdown-content :not(pre) > code {
+    background-color: rgba(110, 118, 129, 0.4);
+    color: #e6edf3;
+  }
+  
+  .markdown-content table th,
+  .markdown-content table td {
+    border-color: #30363d;
+  }
+  
+  .markdown-content table th {
+    background-color: #161b22;
+  }
+  
+  .markdown-content table tr {
+    background-color: #0d1117;
+  }
+  
+  .markdown-content table tr:nth-child(2n) {
+    background-color: #161b22;
+  }
+  
+  .markdown-content hr {
+    background-color: #30363d;
+  }
+
+  .back-to-top {
+    background: #21262d;
+    border-color: #30363d;
+    color: #c9d1d9;
+  }
 }

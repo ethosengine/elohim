@@ -1,13 +1,15 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ViewContainerRef, ComponentRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { Subject } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PathService } from '../../services/path.service';
 import { AgentService } from '../../services/agent.service';
 import { PathStepView, LearningPath, PathChapter } from '../../models/learning-path.model';
 import { AgentProgress } from '../../models/agent.model';
 import { BLOOM_LEVEL_VALUES, BloomMasteryLevel } from '../../models/content-mastery.model';
+import { RendererRegistryService, ContentRenderer } from '../../renderers/renderer-registry.service';
+import { ContentNode } from '../../models/content-node.model';
 
 interface SidebarStep {
   index: number;
@@ -74,13 +76,24 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   error: string | null = null;
   sidebarOpen = true; // Mobile toggle
 
+  // Dynamic renderer hosting
+  @ViewChild('rendererHost', { read: ViewContainerRef, static: false })
+  rendererHost!: ViewContainerRef;
+  private rendererRef: ComponentRef<ContentRenderer> | null = null;
+  private rendererSubscription: Subscription | null = null;
+
+  /** Whether we have a registered renderer for the current content format */
+  hasRegisteredRenderer = false;
+
   private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly pathService: PathService,
-    private readonly agentService: AgentService
+    private readonly agentService: AgentService,
+    private readonly rendererRegistry: RendererRegistryService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -95,6 +108,58 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.destroyRenderer();
+  }
+
+  /**
+   * Clean up the current renderer instance
+   */
+  private destroyRenderer(): void {
+    if (this.rendererSubscription) {
+      this.rendererSubscription.unsubscribe();
+      this.rendererSubscription = null;
+    }
+    if (this.rendererRef) {
+      this.rendererRef.destroy();
+      this.rendererRef = null;
+    }
+  }
+
+  /**
+   * Dynamically instantiate the appropriate renderer for the current content.
+   * Called after the step is loaded and the view is ready.
+   */
+  private loadRenderer(): void {
+    if (!this.stepView?.content || !this.rendererHost) {
+      this.hasRegisteredRenderer = false;
+      return;
+    }
+
+    // Clean up previous renderer
+    this.destroyRenderer();
+    this.rendererHost.clear();
+
+    // Get the renderer component for this content format
+    const rendererComponent = this.rendererRegistry.getRenderer(this.stepView.content);
+
+    if (!rendererComponent) {
+      this.hasRegisteredRenderer = false;
+      return;
+    }
+
+    this.hasRegisteredRenderer = true;
+
+    // Create the renderer component
+    this.rendererRef = this.rendererHost.createComponent(rendererComponent);
+
+    // Set the node input using setInput to trigger ngOnChanges
+    this.rendererRef.setInput('node', this.stepView.content);
+
+    // Set embedded mode if the renderer supports it (e.g., markdown renderer)
+    // This tells the renderer to adapt to the container rather than imposing its own layout
+    if ('embedded' in this.rendererRef.instance) {
+      this.rendererRef.setInput('embedded', true);
+    }
   }
 
   /**
@@ -130,6 +195,12 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
 
               this.determineCurrentChapter();
               this.isLoading = false;
+
+              // Ensure view updates so @if blocks resolve and rendererHost is available
+              this.cdr.detectChanges();
+
+              // Load the appropriate renderer for this content format
+              this.loadRenderer();
             },
             error: (err) => this.handleError(err)
           });
@@ -319,8 +390,4 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
     return this.stepView?.content?.contentFormat === 'gherkin';
   }
 
-  renderMarkdown(content: string): string {
-    // Basic shim - in production this uses the RendererRegistry
-    return content; 
-  }
 }

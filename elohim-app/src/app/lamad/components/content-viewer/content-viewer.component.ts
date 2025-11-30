@@ -23,10 +23,13 @@ import {
 import { TrustBadgeService } from '../../services/trust-badge.service';
 import { TrustBadge } from '../../models/trust-badge.model';
 
+// Content I/O for download functionality
+import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
+
 @Component({
   selector: 'app-content-viewer',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, ContentDownloadComponent],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
 })
@@ -136,8 +139,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy {
     // Create the renderer component
     this.rendererRef = this.rendererHost.createComponent(rendererComponent);
 
-    // Set the node input
-    this.rendererRef.instance.node = this.node;
+    // Set the node input using setInput to trigger ngOnChanges
+    this.rendererRef.setInput('node', this.node);
 
     // Subscribe to completion events if the renderer supports them
     const instance = this.rendererRef.instance as any;

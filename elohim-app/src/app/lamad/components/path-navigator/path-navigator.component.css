@@ -1,4 +1,29 @@
-/* Layout Container */
+/* =============================================================================
+   Path Navigator Styles
+   =============================================================================
+
+   VISUAL HIERARCHY - Separation of Concerns:
+
+   1. PATH TOOLING (--lamad-bg-secondary: gray)
+      These elements provide navigation and context for the learning path:
+      - .path-sidebar         : Left sidebar with chapter/step navigation
+      - .breadcrumbs          : Location breadcrumbs
+      - .content-header       : Step title, narrative, metadata
+      - .content-footer       : Mastery tracking, prev/next navigation
+
+   2. CONTENT (--lamad-bg-primary: white)
+      The actual territory content being learned:
+      - .content-body         : Rendered content from RendererRegistryService
+
+   This visual distinction helps users understand what is path-specific
+   context (Journey layer) vs the underlying content resource (Territory layer).
+
+   ============================================================================= */
+
+/* =============================================================================
+   Layout Container
+   ============================================================================= */
+
 .path-player-container {
   display: flex;
   height: calc(100vh - 64px); /* Adjust based on global header height */
@@ -7,7 +32,11 @@
   position: relative;
 }
 
-/* Sidebar Styling */
+/* =============================================================================
+   PATH TOOLING: Sidebar
+   Left sidebar with path navigation, chapters, and progress
+   ============================================================================= */
+
 .path-sidebar {
   width: 320px;
   background-color: var(--lamad-bg-secondary, #f8f9fa);
@@ -15,7 +44,7 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: transform 0.3s ease;
+  transition: width 0.3s ease, transform 0.3s ease;
   z-index: 20;
 }
 
@@ -244,53 +273,31 @@
 .content-scroll-container {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
 
-/* Content Card */
-.content-card {
-  width: 100%;
-  max-width: 800px;
-  background: var(--lamad-surface, #ffffff);
-  /* Optional: Box shadow if we want card look, or flat if integrating seamlessly */
-  /* box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); */
-  /* border-radius: 0.5rem; */
-  padding-bottom: 2rem;
-}
+/* =============================================================================
+   PATH TOOLING: Content Header
+   Step context from the Journey - full width gray background
+   ============================================================================= */
 
-.step-header {
-  width: 100%;
-  max-width: 800px;
-  margin-bottom: 2rem;
-}
-
-.step-title {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--lamad-text-primary, #111827);
-  margin-bottom: 1rem;
-  line-height: 1.2;
-}
-
-.step-narrative {
-  font-size: 1.125rem;
-  line-height: 1.7;
-  color: var(--lamad-text-secondary, #4b5563);
-  padding-left: 1rem;
-  border-left: 4px solid var(--lamad-accent-light, #e0e7ff);
-}
-
-/* Content Header */
-.content-header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
+.path-content-header {
+  background-color: var(--lamad-bg-secondary, #f8f9fa);
   border-bottom: 1px solid var(--lamad-border, #e5e7eb);
+  padding: 1.25rem 2rem;
+}
+
+.path-content-header-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.content-meta {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
 }
 
 .content-type-badge {
@@ -302,32 +309,36 @@
   background: var(--lamad-bg-secondary, #f9fafb);
   color: var(--lamad-text-secondary, #6b7280);
   border-radius: 4px;
-  margin-bottom: 0.5rem;
 }
 
 .content-title {
-  font-size: 1.25rem;
+  font-size: 1.75rem;
   font-weight: 600;
-  margin: 0;
+  margin: 0 0 0.5rem 0;
   color: var(--lamad-text-primary, #111827);
+}
+
+.step-narrative {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: var(--lamad-text-secondary, #4b5563);
+  margin: 0;
 }
 
 .view-resource-link {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--lamad-accent-primary, #6366f1);
   text-decoration: none;
-  margin-top: 0.75rem; /* Space from title */
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   transition: all 0.2s;
-  background-color: transparent;
 }
 
 .view-resource-link:hover {
-  background-color: rgba(99, 102, 241, 0.1); /* Subtle hover background */
+  background-color: rgba(99, 102, 241, 0.1);
   text-decoration: underline;
 }
 
@@ -336,12 +347,22 @@
   line-height: 1;
 }
 
-/* Content Body */
-.content-body {
-  font-size: 1rem;
-  line-height: 1.75;
-  color: var(--lamad-text-primary, #374151);
-  margin-bottom: 2.5rem;
+/* =============================================================================
+   CONTENT: The actual resource content
+   White background distinguishes from path-* tooling
+   ============================================================================= */
+
+.content {
+  flex: 1;
+  padding: 2rem;
+  background: var(--lamad-bg-primary, #ffffff);
+}
+
+.content-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  line-height: 1.7;
+  color: var(--lamad-text-secondary, #374151);
 }
 
 /* Nested Path Card */
@@ -401,40 +422,33 @@
   margin-bottom: 0.5rem;
 }
 
-/* Interaction Area */
-.interaction-area {
-  width: 100%;
-  max-width: 800px;
-  margin-top: 2rem;
-  padding-top: 2rem;
+/* =============================================================================
+   PATH TOOLING: Content Footer
+   Mastery tracking and navigation - full width gray background
+   ============================================================================= */
+
+.path-content-footer {
+  background-color: var(--lamad-bg-secondary, #f8f9fa);
   border-top: 1px solid var(--lamad-border, #e5e7eb);
+  padding: 1.25rem 2rem;
+}
+
+.path-content-footer-inner {
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .step-actions {
   display: flex;
   justify-content: center;
-  margin-top: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-.btn-complete-small {
-  padding: 0.5rem 1rem; /* Smaller padding */
-  font-size: 0.9rem; /* Smaller font size */
-  font-weight: 600;
-}
-
-/* Footer Navigation */
-.step-footer {
-  width: 100%;
-  max-width: 800px;
-  padding: 1rem 0;
+/* Step Navigation */
+.step-navigation {
   display: flex;
   justify-content: space-between;
-  position: sticky; /* Make it sticky */
-  bottom: 0; /* Stick to the bottom */
-  background-color: var(--lamad-surface, #ffffff); /* Ensure it has a background */
-  border-top: 1px solid var(--lamad-border, #e5e7eb);
-  z-index: 10; /* Ensure it's above other content */
-  margin-top: 2rem; /* Reduce margin-top as it's sticky */
+  gap: 1rem;
 }
 
 .btn-nav {
@@ -576,9 +590,13 @@
   transform: translateY(0);
 }
 
-/* Sidebar Toggle (Mobile) */
+/* =============================================================================
+   Sidebar Toggle Controls
+   ============================================================================= */
+
+/* Mobile toggle (hamburger menu) */
 .sidebar-toggle {
-  display: none; /* Hidden on desktop */
+  display: none;
   position: absolute;
   top: 1rem;
   left: 1rem;
@@ -591,20 +609,102 @@
   color: var(--lamad-text-primary, #374151);
 }
 
-/* Responsive */
+/* Desktop collapse button (inside sidebar) */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--lamad-border, #e5e7eb);
+  cursor: pointer;
+  color: var(--lamad-text-secondary, #6b7280);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-collapse-btn:hover {
+  background-color: var(--lamad-bg-tertiary, #f3f4f6);
+  color: var(--lamad-text-primary, #374151);
+}
+
+.collapse-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* Desktop expand button (shown when sidebar collapsed) */
+.sidebar-expand-btn {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 25;
+  padding: 1rem 0.5rem;
+  background: var(--lamad-bg-secondary, #f8f9fa);
+  border: 1px solid var(--lamad-border, #e5e7eb);
+  border-left: none;
+  border-radius: 0 0.375rem 0.375rem 0;
+  cursor: pointer;
+  color: var(--lamad-text-secondary, #6b7280);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-expand-btn:hover {
+  background-color: var(--lamad-surface, #ffffff);
+  color: var(--lamad-text-primary, #374151);
+}
+
+.expand-icon {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* Desktop collapsed state */
+.path-player-container.sidebar-collapsed .path-sidebar {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+.path-player-container.sidebar-collapsed .sidebar-expand-btn {
+  display: flex;
+}
+
+/* =============================================================================
+   Responsive - Tablet & Mobile
+   ============================================================================= */
+
 @media (max-width: 1024px) {
+  /* Hide desktop collapse button on tablet/mobile */
+  .sidebar-collapse-btn {
+    display: none;
+  }
+
+  .sidebar-expand-btn {
+    display: none !important;
+  }
+
+  /* Use mobile toggle instead */
+  .sidebar-toggle {
+    display: flex;
+  }
+
   .path-player-container.sidebar-collapsed .path-sidebar {
     transform: translateX(-100%);
     position: absolute;
+    width: 320px;
     height: 100%;
-  }
-  
-  .path-player-container.sidebar-collapsed .main-content {
-    width: 100%;
+    padding: 0;
+    overflow: visible;
   }
 
-  .sidebar-toggle {
-    display: flex;
+  .path-player-container:not(.sidebar-collapsed) .path-sidebar {
+    width: 320px;
+    padding: 0;
   }
 }
 
@@ -616,7 +716,7 @@
     width: 100%; /* Full width on mobile */
     transform: translateX(0);
   }
-  
+
   .path-player-container.sidebar-collapsed .path-sidebar {
     transform: translateX(-100%);
   }
@@ -630,31 +730,23 @@
     font-size: 0.75rem;
   }
 
-  .content-scroll-container {
-    padding: 1.5rem 1rem;
+  .path-content-header,
+  .path-content-footer {
+    padding: 1rem;
   }
 
-  .step-title {
+  .content {
+    padding: 1rem;
+  }
+
+  .content-title {
     font-size: 1.5rem;
   }
-  
-  .step-header {
-    margin-bottom: 1.5rem;
-  }
-  
-  .content-card {
-    padding-bottom: 1rem;
-  }
-  
-  .step-footer {
+
+  .step-navigation {
     flex-direction: column;
-    gap: 1rem;
   }
-  
-  .nav-left, .nav-right {
-    width: 100%;
-  }
-  
+
   .btn-nav {
     width: 100%;
     justify-content: center;

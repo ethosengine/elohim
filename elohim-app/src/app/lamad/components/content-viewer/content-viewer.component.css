@@ -180,6 +180,14 @@
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
+/* Content actions (download, etc.) */
+.content-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 /* Affinity panel */
 .affinity-panel {
   background: linear-gradient(135deg, var(--lamad-bg-secondary) 0%, var(--lamad-bg-tertiary) 100%);
@@ -375,49 +383,8 @@
   color: var(--lamad-text-secondary);
 }
 
-/* Markdown content */
-.markdown-content h1 {
-  font-size: 2rem;
-  margin: 2rem 0 1rem;
-  color: var(--lamad-text-primary);
-}
-
-.markdown-content h2 {
-  font-size: 1.6rem;
-  margin: 1.5rem 0 0.75rem;
-  color: var(--lamad-text-primary);
-}
-
-.markdown-content h3 {
-  font-size: 1.3rem;
-  margin: 1.25rem 0 0.5rem;
-  color: var(--lamad-text-primary);
-}
-
-.markdown-content code {
-  background: var(--lamad-bg-tertiary);
-  color: var(--lamad-text-primary);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9em;
-}
-
-.markdown-content pre {
-  background: #1e293b; /* Keep dark background for code blocks even in light mode for contrast */
-  color: #f1f5f9;
-  padding: 1.5rem;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin: 1rem 0;
-  border: 1px solid var(--lamad-border);
-}
-
-.markdown-content pre code {
-  background: none;
-  padding: 0;
-  color: inherit;
-}
+/* Markdown content styling is now handled by the MarkdownRendererComponent
+   with ViewEncapsulation.None for consistent rendering across all contexts */
 
 /* Gherkin content */
 .gherkin-content {

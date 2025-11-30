@@ -1,11 +1,11 @@
 <div class="path-player-container" [class.sidebar-collapsed]="!sidebarOpen">
-  
-  <!-- Mobile/Tablet Toggle -->
+
+  <!-- PATH TOOLING: Mobile Toggle -->
   <button class="sidebar-toggle" (click)="toggleSidebar()" aria-label="Toggle Navigation">
     <span class="icon">{{ sidebarOpen ? '✕' : '☰' }}</span>
   </button>
 
-  <!-- Left Sidebar: Context & Navigation -->
+  <!-- PATH TOOLING: Sidebar -->
   <aside class="path-sidebar">
     <div class="sidebar-header">
       <a [routerLink]="['/lamad/path', pathId]" class="back-link">
@@ -105,9 +105,23 @@
         </ul>
       }
     </nav>
+
+    <!-- Desktop collapse toggle -->
+    <button class="sidebar-collapse-btn" (click)="toggleSidebar()" aria-label="Collapse sidebar">
+      <span class="collapse-icon">«</span>
+    </button>
   </aside>
 
-  <!-- Main Content Area -->
+  <!-- Desktop expand toggle (shown when collapsed) -->
+  <button
+    class="sidebar-expand-btn"
+    *ngIf="!sidebarOpen"
+    (click)="toggleSidebar()"
+    aria-label="Expand sidebar">
+    <span class="expand-icon">»</span>
+  </button>
+
+  <!-- MAIN CONTENT AREA -->
   <main class="main-content">
     
     <!-- Loading State -->
@@ -131,8 +145,8 @@
 
     <!-- Content -->
     @if (!isLoading && !error && stepView) {
-      
-      <!-- Top Breadcrumbs -->
+
+      <!-- PATH TOOLING: Breadcrumbs -->
       <nav class="breadcrumbs main-breadcrumbs">
         <a routerLink="/lamad">Territory</a>
         <span class="separator">/</span>
@@ -146,29 +160,26 @@
       </nav>
 
       <div class="content-scroll-container">
-        <!-- Step Context (Journey layer) -->
-        <header class="step-header">
-          <h1 class="step-title">{{ stepView.step.stepTitle }}</h1>
-          @if (stepView.step.stepNarrative) {
-            <div class="step-narrative">
-              <p>{{ stepView.step.stepNarrative }}</p>
+
+        <!-- PATH TOOLING: Step context from the Journey -->
+        <header class="path-content-header">
+          <div class="path-content-header-inner">
+            <div class="content-meta">
+              <span class="content-type-badge">{{ stepView.content.contentType }}</span>
+              <a [routerLink]="['/lamad/resource', stepView.content.id]" class="view-resource-link">
+                View Resource Details <span class="icon">&#8599;</span>
+              </a>
             </div>
-          }
+            <h1 class="content-title">{{ stepView.step.stepTitle }}</h1>
+            @if (stepView.step.stepNarrative) {
+              <p class="step-narrative">{{ stepView.step.stepNarrative }}</p>
+            }
+          </div>
         </header>
 
-        <!-- The Territory Resource (Content) -->
-        <article class="content-card">
-          <!-- Content Header -->
-          <div class="content-header">
-            <span class="content-type-badge">{{ stepView.content.contentType }}</span>
-            <h2 class="content-title">{{ stepView.content.title }}</h2>
-            <a [routerLink]="['/lamad/resource', stepView.content.id]" class="view-resource-link">
-              View Resource Details <span class="icon">&#8599;</span>
-            </a>
-          </div>
-
-          <!-- Rendered Content -->
-          <div class="content-body">
+        <!-- CONTENT: Rendered via RendererRegistryService -->
+        <article class="content">
+          <div class="content-inner">
             @if (stepView.nestedPath) {
               <div class="nested-path-card">
                 <h3>Sub-Journey: {{ stepView.nestedPath.title }}</h3>
@@ -181,99 +192,90 @@
                   Start Sub-Journey
                 </button>
               </div>
-            } @else if (isMarkdown()) {
-              <div class="markdown-content" [innerHTML]="renderMarkdown(getContentString())"></div>
-            } @else if (isQuiz()) {
-              <div class="quiz-content">
-                <p class="quiz-placeholder">
-                  <strong>Quiz: {{ stepView.content.title }}</strong>
-                </p>
-                <p>{{ stepView.content.description }}</p>
-                <p class="coming-soon">Interactive quiz component coming soon...</p>
-              </div>
-            } @else if (isGherkin()) {
-              <div class="gherkin-content">
-                <pre><code>{{ getContentString() }}</code></pre>
-              </div>
             } @else {
-              <div class="generic-content">
-                <pre>{{ getContentString() }}</pre>
+              <!-- Dynamic renderer host - always in DOM so ViewChild can find it -->
+              <ng-container #rendererHost></ng-container>
+
+              <!-- Fallback for unregistered content formats -->
+              @if (!hasRegisteredRenderer) {
+                <div class="generic-content">
+                  <pre>{{ getContentString() }}</pre>
+                </div>
+              }
+            }
+
+            <!-- Learning Objectives -->
+            @if (stepView.step.learningObjectives && stepView.step.learningObjectives.length > 0) {
+              <div class="learning-objectives">
+                <h3><strong>Goals:</strong></h3>
+                <ul>
+                  @for (objective of stepView.step.learningObjectives; track objective) {
+                    <li>{{ objective }}</li>
+                  }
+                </ul>
               </div>
             }
-          </div>
 
-          <!-- Learning Objectives (moved below content for flow) -->
-          @if (stepView.step.learningObjectives && stepView.step.learningObjectives.length > 0) {
-            <div class="learning-objectives">
-              <h3><strong>Goals:</strong></h3>
-              <ul>
-                @for (objective of stepView.step.learningObjectives; track objective) {
-                  <li>{{ objective }}</li>
-                }
-              </ul>
-            </div>
-          }
+            <!-- Reflection Prompts -->
+            @if (stepView.step.reflectionPrompts && stepView.step.reflectionPrompts.length > 0) {
+              <section class="reflection-prompts">
+                <h3>Reflection</h3>
+                <ul>
+                  @for (prompt of stepView.step.reflectionPrompts; track prompt) {
+                    <li>{{ prompt }}</li>
+                  }
+                </ul>
+              </section>
+            }
+          </div>
         </article>
 
-        <!-- Reflection & Actions -->
-        <div class="interaction-area">
-          @if (stepView.step.reflectionPrompts && stepView.step.reflectionPrompts.length > 0) {
-            <section class="reflection-prompts">
-              <h3>Reflection</h3>
-              <ul>
-                @for (prompt of stepView.step.reflectionPrompts; track prompt) {
-                  <li>{{ prompt }}</li>
-                }
-              </ul>
-            </section>
-          }
-
-          <!-- Completion Action -->
-          <div class="step-actions">
-            <button class="btn btn-bloom" 
-                    [ngClass]="'bloom-' + currentBloomLevel"
-                    (click)="markComplete()">
-              <span class="bloom-content">
-                <span class="bloom-icon">
-                  @if (currentBloomLevel === 'not_started') { ⭕ }
-                  @else if (currentBloomLevel === 'create') { 🌟 }
-                  @else { 🌱 }
+        <!-- PATH TOOLING: Mastery tracking and step navigation -->
+        <footer class="path-content-footer">
+          <div class="path-content-footer-inner">
+            <!-- Completion Action -->
+            <div class="step-actions">
+              <button class="btn btn-bloom"
+                      [ngClass]="'bloom-' + currentBloomLevel"
+                      (click)="markComplete()">
+                <span class="bloom-content">
+                  <span class="bloom-icon">
+                    @if (currentBloomLevel === 'not_started') { ⭕ }
+                    @else if (currentBloomLevel === 'create') { 🌟 }
+                    @else { 🌱 }
+                  </span>
+                  <span class="bloom-text">
+                    @if (currentBloomLevel === 'not_started') {
+                      Mark as Started
+                    } @else {
+                      Mastery Level: <strong>{{ getBloomDisplay() }}</strong>
+                    }
+                  </span>
                 </span>
-                <span class="bloom-text">
-                  @if (currentBloomLevel === 'not_started') {
-                    Mark as Started
-                  } @else {
-                    Mastery Level: <strong>{{ getBloomDisplay() }}</strong>
-                  }
-                </span>
-              </span>
-              <span class="bloom-hint" *ngIf="currentBloomLevel !== 'create'">Tap to advance</span>
-            </button>
-          </div>
-        </div>
+                <span class="bloom-hint" *ngIf="currentBloomLevel !== 'create'">Tap to advance</span>
+              </button>
+            </div>
 
-        <!-- Footer Navigation -->
-        <footer class="step-footer">
-          <div class="nav-left">
-            <button
-              class="btn btn-nav btn-prev"
-              [disabled]="!stepView.hasPrevious"
-              (click)="goToPrevious()"
-            >
-              <span class="icon">&#8592;</span>
-              Previous
-            </button>
-          </div>
-          
-          <div class="nav-right">
-            <button
-              class="btn btn-nav btn-next"
-              [disabled]="!stepView.hasNext"
-              (click)="goToNext()"
-            >
-              Next
-              <span class="icon">&#8594;</span>
-            </button>
+            <!-- Navigation -->
+            <nav class="step-navigation">
+              <button
+                class="btn btn-nav btn-prev"
+                [disabled]="!stepView.hasPrevious"
+                (click)="goToPrevious()"
+              >
+                <span class="icon">&#8592;</span>
+                Previous
+              </button>
+
+              <button
+                class="btn btn-nav btn-next"
+                [disabled]="!stepView.hasNext"
+                (click)="goToNext()"
+              >
+                Next
+                <span class="icon">&#8594;</span>
+              </button>
+            </nav>
           </div>
         </footer>
       </div>

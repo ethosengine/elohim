@@ -45,6 +45,11 @@
         <div class="tags" *ngIf="node.tags.length > 0">
           <span *ngFor="let tag of node.tags" class="tag">#{{ tag }}</span>
         </div>
+
+        <!-- Download button -->
+        <div class="content-actions">
+          <app-content-download [node]="node"></app-content-download>
+        </div>
       </div>
 
       <!-- Affinity controls -->
