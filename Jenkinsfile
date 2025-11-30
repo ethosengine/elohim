@@ -251,8 +251,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                     branch 'main'
                     branch 'staging'
                     // Run on PRs targeting staging or main (regardless of source branch)
-                    expression { return env.CHANGE_TARGET == 'staging' }
-                    expression { return env.CHANGE_TARGET == 'main' }
+                    changeRequest target: 'staging'
+                    changeRequest target: 'main'
                 }
             }
             steps {
