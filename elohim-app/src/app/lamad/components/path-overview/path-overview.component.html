@@ -105,11 +105,14 @@
               <!-- Chapter Steps -->
               <ul class="chapter-step-list">
                 @for (s of item.steps; track s.step.order) {
-                  <li class="chapter-step-item" 
+                  <li class="chapter-step-item"
                       [class.completed]="s.isCompleted"
                       [class.global-complete]="s.isGlobalCompletion"
                       [class.locked]="s.isLocked"
-                      (click)="!s.isLocked ? goToStep(s.step.order) : null">
+                      (click)="!s.isLocked ? goToStep(s.step.order) : null"
+                      (keydown.enter)="!s.isLocked ? goToStep(s.step.order) : null"
+                      [attr.role]="s.isLocked ? null : 'button'"
+                      [attr.tabindex]="s.isLocked ? -1 : 0">
                     <span class="step-status-icon">
                       @if (s.isCompleted) {
                         <span class="checkmark">✓</span>
@@ -145,7 +148,11 @@
               [class.completed]="s.isCompleted"
               [class.global-complete]="s.isGlobalCompletion"
               [class.locked]="s.isLocked"
+              [class.accessible]="!s.isLocked"
               (click)="!s.isLocked ? goToStep(s.step.order) : null"
+              (keydown.enter)="!s.isLocked ? goToStep(s.step.order) : null"
+              [attr.role]="s.isLocked ? null : 'button'"
+              [attr.tabindex]="s.isLocked ? -1 : 0"
             >
               <div class="step-indicator">
                 @if (s.isCompleted) {

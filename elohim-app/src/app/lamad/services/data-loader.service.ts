@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, forkJoin } from 'rxjs';
-import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
+import { catchError, map, shareReplay } from 'rxjs/operators';
 import { LearningPath, PathIndex } from '../models/learning-path.model';
 import { ContentNode, ContentGraph, ContentGraphMetadata } from '../models/content-node.model';
 import { Agent, AgentProgress } from '../models/agent.model';
@@ -485,7 +485,7 @@ export class DataLoaderService {
 
     // Build nodes map from index
     for (const node of contentIndex.nodes || []) {
-      nodes.set(node.id, node as ContentNode);
+      nodes.set(node.id, node);
 
       // Track by type
       if (!nodesByType.has(node.contentType)) {

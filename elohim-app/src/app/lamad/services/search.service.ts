@@ -57,8 +57,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SearchService {
   constructor(
-    private dataLoader: DataLoaderService,
-    private trustBadgeService: TrustBadgeService
+    private readonly dataLoader: DataLoaderService,
+    private readonly trustBadgeService: TrustBadgeService
   ) {}
 
   /**

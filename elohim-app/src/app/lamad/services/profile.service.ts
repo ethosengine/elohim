@@ -17,14 +17,12 @@ import {
   TimelineEventType,
   ContentEngagement,
   NoteWithContext,
-  NoteContext,
   ResumePoint,
   PathWithProgress,
   PathsOverview,
   ProfileSummaryCompact,
 } from '../models/profile.model';
 import { SessionPathProgress, SessionActivity } from '../models/session-human.model';
-import { PathIndexEntry } from '../models/learning-path.model';
 
 /**
  * ProfileService - Human-Centered Identity View
@@ -46,11 +44,11 @@ import { PathIndexEntry } from '../models/learning-path.model';
 @Injectable({ providedIn: 'root' })
 export class ProfileService {
   constructor(
-    private dataLoader: DataLoaderService,
-    private pathService: PathService,
-    private affinityService: AffinityTrackingService,
-    private agentService: AgentService,
-    @Optional() private sessionHumanService: SessionHumanService | null
+    private readonly dataLoader: DataLoaderService,
+    private readonly pathService: PathService,
+    private readonly affinityService: AffinityTrackingService,
+    private readonly agentService: AgentService,
+    @Optional() private readonly sessionHumanService: SessionHumanService | null
   ) {}
 
   // =========================================================================
@@ -72,11 +70,11 @@ export class ProfileService {
         const agent = this.agentService.getAgent();
 
         return {
-          id: session?.sessionId || agent?.id || 'unknown',
-          displayName: session?.displayName || agent?.displayName || 'Traveler',
+          id: session?.sessionId ?? agent?.id ?? 'unknown',
+          displayName: session?.displayName ?? agent?.displayName ?? 'Traveler',
           isSessionBased: !!session,
-          journeyStartedAt: session?.createdAt || agent?.createdAt || new Date().toISOString(),
-          lastActiveAt: session?.lastActiveAt || agent?.updatedAt || new Date().toISOString(),
+          journeyStartedAt: session?.createdAt ?? agent?.createdAt ?? new Date().toISOString(),
+          lastActiveAt: session?.lastActiveAt ?? agent?.updatedAt ?? new Date().toISOString(),
           journeyStats,
           currentFocus,
           developedCapabilities,
@@ -168,7 +166,7 @@ export class ProfileService {
    * Sorted by most recent activity.
    */
   getCurrentFocus(): Observable<CurrentFocus[]> {
-    const pathProgress = this.sessionHumanService?.getAllPathProgress() || [];
+    const pathProgress = this.sessionHumanService?.getAllPathProgress() ?? [];
 
     if (pathProgress.length === 0) {
       return of([]);
@@ -249,7 +247,7 @@ export class ProfileService {
    * These are transformation points, not just activity logs.
    */
   getTimeline(limit: number = 50): Observable<TimelineEvent[]> {
-    const activities = this.sessionHumanService?.getActivityHistory() || [];
+    const activities = this.sessionHumanService?.getActivityHistory() ?? [];
 
     // Transform activities into timeline events
     const events: TimelineEvent[] = activities
@@ -306,7 +304,7 @@ export class ProfileService {
 
       case 'affinity':
         // Only create event for meaningful affinity (> 0.5)
-        if ((activity.metadata?.['value'] as number) > 0.5) {
+        if ((activity.metadata?.['value']) > 0.5) {
           return {
             id: `${activity.type}-${resourceId}-${timestamp}`,
             type: 'meaningful_encounter' as TimelineEventType,
@@ -383,12 +381,12 @@ export class ProfileService {
    * Notes are meaning-making artifacts.
    */
   getAllNotes(): Observable<NoteWithContext[]> {
-    const pathProgress = this.sessionHumanService?.getAllPathProgress() || [];
+    const pathProgress = this.sessionHumanService?.getAllPathProgress() ?? [];
     const notes: NoteWithContext[] = [];
 
     // Collect notes from path progress
     pathProgress.forEach(progress => {
-      Object.entries(progress.stepNotes || {}).forEach(([stepIndex, content]) => {
+      Object.entries(progress.stepNotes ?? {}).forEach(([stepIndex, content]) => {
         if (content) {
           notes.push({
             id: `${progress.pathId}-step-${stepIndex}`,
@@ -481,7 +479,7 @@ export class ProfileService {
   getPathsOverview(): Observable<PathsOverview> {
     return this.dataLoader.getPathIndex().pipe(
       switchMap(index => {
-        const pathProgress = this.sessionHumanService?.getAllPathProgress() || [];
+        const pathProgress = this.sessionHumanService?.getAllPathProgress() ?? [];
         const progressMap = new Map<string, SessionPathProgress>();
         pathProgress.forEach(p => progressMap.set(p.pathId, p));
 
@@ -550,7 +548,7 @@ export class ProfileService {
     progress: SessionPathProgress | null
   ): PathWithProgress {
     const totalSteps = path.steps.length;
-    const completedSteps = progress?.completedStepIndices.length || 0;
+    const completedSteps = progress?.completedStepIndices.length ?? 0;
 
     return {
       pathId: path.id,
@@ -559,7 +557,7 @@ export class ProfileService {
       difficulty: path.difficulty,
       totalSteps,
       completedSteps,
-      currentStepIndex: progress?.currentStepIndex || 0,
+      currentStepIndex: progress?.currentStepIndex ?? 0,
       progressPercent: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
       startedAt: progress?.startedAt,
       completedAt: progress?.completedAt,

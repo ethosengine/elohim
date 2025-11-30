@@ -200,7 +200,7 @@ export class GherkinParser {
       metadata: {},
       featureId,
       epicIds,
-      scenarioType: scenarioType as 'scenario' | 'scenario_outline',
+      scenarioType,
       steps,
       examples
     };

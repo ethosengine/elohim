@@ -317,7 +317,7 @@ export class SessionHumanService {
   private incrementStat(stat: keyof SessionStats): void {
     const session = this.sessionSubject.value;
     if (session && typeof session.stats[stat] === 'number') {
-      (session.stats[stat] as number)++;
+      session.stats[stat]++;
       this.saveSession(session);
       this.sessionSubject.next({ ...session });
     }

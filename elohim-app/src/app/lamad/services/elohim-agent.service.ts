@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { Observable, of, throwError, timer } from 'rxjs';
-import { map, delay, switchMap } from 'rxjs/operators';
+import { Observable, of, timer } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 import { DataLoaderService } from './data-loader.service';
 import {
   ElohimAgent,
@@ -14,8 +14,7 @@ import {
   ContentReviewParams,
   ContentReviewResult,
   AttestationRecommendationParams,
-  AttestationRecommendation,
-  ELOHIM_LAYER_HIERARCHY
+  AttestationRecommendation
 } from '../models/elohim-agent.model';
 
 /**
@@ -42,7 +41,7 @@ export class ElohimAgentService {
   private elohimCache: Map<string, ElohimAgent> = new Map();
   private requestLog: ElohimRequest[] = [];
 
-  constructor(private dataLoader: DataLoaderService) {}
+  constructor(private readonly dataLoader: DataLoaderService) {}
 
   // =========================================================================
   // Elohim Discovery
@@ -363,7 +362,7 @@ export class ElohimAgentService {
   // =========================================================================
 
   private generateRequestId(): string {
-    return `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `req-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private estimateProcessingTime(capability: ElohimCapability): number {

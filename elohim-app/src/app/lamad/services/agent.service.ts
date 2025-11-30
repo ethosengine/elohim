@@ -35,8 +35,8 @@ export class AgentService {
   private attestations = new Set<string>();
 
   constructor(
-    private dataLoader: DataLoaderService,
-    @Optional() private sessionHumanService: SessionHumanService | null
+    private readonly dataLoader: DataLoaderService,
+    @Optional() private readonly sessionHumanService: SessionHumanService | null
   ) {
     this.initializeAgent();
   }

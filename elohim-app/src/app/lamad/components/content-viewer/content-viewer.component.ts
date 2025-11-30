@@ -9,7 +9,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
-import { takeUntil, switchMap, catchError } from 'rxjs/operators';
+import { takeUntil, catchError } from 'rxjs/operators';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
 import { ContentService } from '../../services/content.service';
 import { DataLoaderService } from '../../services/data-loader.service';

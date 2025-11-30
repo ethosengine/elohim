@@ -21,8 +21,7 @@ import {
   CollaborationType,
   CollaboratorRole,
   PathProposal,
-  ProposedChange,
-  CollaborationActivity
+  ProposedChange
 } from '../models/path-extension.model';
 
 /**
@@ -58,7 +57,7 @@ export class PathExtensionService {
   // Current agent ID
   private currentAgentId = 'demo-learner';
 
-  constructor(private pathService: PathService) {
+  constructor(private readonly pathService: PathService) {
     this.initializeDemoExtensions();
   }
 
@@ -150,7 +149,7 @@ export class PathExtensionService {
           return throwError(() => ({ code: 'NOT_FOUND', message: 'Base path not found' }));
         }
 
-        const extensionId = `ext-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const extensionId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         const now = new Date().toISOString();
 
         const newExtension: PathExtension = {
@@ -190,7 +189,7 @@ export class PathExtensionService {
           return throwError(() => ({ code: 'NOT_FOUND', message: 'Extension not found' }));
         }
 
-        const forkedId = `ext-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const forkedId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         const now = new Date().toISOString();
 
         const forkedExtension: PathExtension = {
@@ -209,12 +208,12 @@ export class PathExtensionService {
         };
 
         // Update original's forks list
-        ext.forks = ext.forks || [];
+        ext.forks = ext.forks ?? [];
         ext.forks.push(forkedId);
 
         // Update stats
         if (ext.stats) {
-          ext.stats.forkCount = (ext.stats.forkCount || 0) + 1;
+          ext.stats.forkCount = (ext.stats.forkCount ?? 0) + 1;
         }
 
         this.extensions.set(forkedId, forkedExtension);
@@ -249,7 +248,7 @@ export class PathExtensionService {
         }
 
         const insertion: PathStepInsertion = {
-          id: `ins-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `ins-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           afterStepIndex,
           steps,
           rationale,
@@ -293,7 +292,7 @@ export class PathExtensionService {
         }
 
         const annotation: PathStepAnnotation = {
-          id: `ann-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `ann-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           stepIndex,
           type,
           content,
@@ -332,7 +331,7 @@ export class PathExtensionService {
         }
 
         const reorder: PathStepReorder = {
-          id: `reo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `reo-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           fromIndex,
           toIndex,
           rationale
@@ -367,7 +366,7 @@ export class PathExtensionService {
         }
 
         const exclusion: PathStepExclusion = {
-          id: `exc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `exc-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           stepIndex,
           reason,
           notes
@@ -567,7 +566,7 @@ export class PathExtensionService {
       // Find the effective index for this annotation's step
       for (const [effectiveIdx, baseRef] of indexMapping.entries()) {
         if (baseRef === `base-${annotation.stepIndex}`) {
-          const existing = annotationsMap.get(effectiveIdx) || [];
+          const existing = annotationsMap.get(effectiveIdx) ?? [];
           existing.push(annotation);
           annotationsMap.set(effectiveIdx, existing);
           break;
@@ -739,7 +738,7 @@ export class PathExtensionService {
         }
 
         const proposal: PathProposal = {
-          id: `prop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `prop-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           proposedBy: this.currentAgentId,
           changeType,
           change,
