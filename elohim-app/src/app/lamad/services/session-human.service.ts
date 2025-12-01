@@ -119,7 +119,7 @@ export class SessionHumanService {
    */
   private generateSessionId(): string {
     const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
+    const random = Math.random().toString(36).substring(2, 10); // NOSONAR - Non-cryptographic session ID generation
     return `session-${timestamp}-${random}`;
   }
 

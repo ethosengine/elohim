@@ -248,10 +248,10 @@ export class ElohimAgentService {
       elohimId: elohim.id,
       respondedAt: new Date().toISOString(),
       cost: {
-        tokensProcessed: Math.floor(Math.random() * 1000) + 500,
+        tokensProcessed: Math.floor(Math.random() * 1000) + 500, // NOSONAR - Demo data generation
         timeMs: this.estimateProcessingTime(request.capability),
-        constitutionalChecks: Math.floor(Math.random() * 5) + 1,
-        precedentLookups: Math.floor(Math.random() * 3)
+        constitutionalChecks: Math.floor(Math.random() * 5) + 1, // NOSONAR - Demo data generation
+        precedentLookups: Math.floor(Math.random() * 3) // NOSONAR - Demo data generation
       }
     };
 
@@ -281,7 +281,7 @@ export class ElohimAgentService {
     const params = request.params as ContentReviewParams;
 
     // Simulate content review (in production: actual AI analysis)
-    const approved = Math.random() > 0.1; // 90% approval for demo
+    const approved = Math.random() > 0.1; // NOSONAR - Demo data generation (90% approval for demo)
     const issues = approved ? [] : [{
       severity: 'warning' as const,
       category: 'clarity',
@@ -324,7 +324,7 @@ export class ElohimAgentService {
     const params = request.params as AttestationRecommendationParams;
 
     // Simulate attestation decision (in production: actual AI analysis)
-    const recommend = Math.random() > 0.2 ? 'grant' : 'defer';
+    const recommend = Math.random() > 0.2 ? 'grant' : 'defer'; // NOSONAR - Demo data generation
 
     const payload: AttestationRecommendation = {
       type: 'attestation-recommendation',
@@ -362,7 +362,7 @@ export class ElohimAgentService {
   // =========================================================================
 
   private generateRequestId(): string {
-    return `req-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    return `req-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic request ID generation
   }
 
   private estimateProcessingTime(capability: ElohimCapability): number {

@@ -149,7 +149,7 @@ export class PathExtensionService {
           return throwError(() => ({ code: 'NOT_FOUND', message: 'Base path not found' }));
         }
 
-        const extensionId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        const extensionId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic extension ID generation
         const now = new Date().toISOString();
 
         const newExtension: PathExtension = {
@@ -189,7 +189,7 @@ export class PathExtensionService {
           return throwError(() => ({ code: 'NOT_FOUND', message: 'Extension not found' }));
         }
 
-        const forkedId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        const forkedId = `ext-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic extension ID generation
         const now = new Date().toISOString();
 
         const forkedExtension: PathExtension = {
@@ -248,7 +248,7 @@ export class PathExtensionService {
         }
 
         const insertion: PathStepInsertion = {
-          id: `ins-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+          id: `ins-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic insertion ID generation
           afterStepIndex,
           steps,
           rationale,
@@ -292,7 +292,7 @@ export class PathExtensionService {
         }
 
         const annotation: PathStepAnnotation = {
-          id: `ann-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+          id: `ann-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic annotation ID generation
           stepIndex,
           type,
           content,
@@ -331,7 +331,7 @@ export class PathExtensionService {
         }
 
         const reorder: PathStepReorder = {
-          id: `reo-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+          id: `reo-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic reorder ID generation
           fromIndex,
           toIndex,
           rationale
@@ -366,7 +366,7 @@ export class PathExtensionService {
         }
 
         const exclusion: PathStepExclusion = {
-          id: `exc-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+          id: `exc-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic exclusion ID generation
           stepIndex,
           reason,
           notes
@@ -738,7 +738,7 @@ export class PathExtensionService {
         }
 
         const proposal: PathProposal = {
-          id: `prop-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+          id: `prop-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`, // NOSONAR - Non-cryptographic proposal ID generation
           proposedBy: this.currentAgentId,
           changeType,
           change,

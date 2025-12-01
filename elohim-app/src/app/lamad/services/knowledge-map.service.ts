@@ -180,7 +180,7 @@ export class KnowledgeMapService {
     description?: string;
     visibility?: KnowledgeMap['visibility'];
   }): Observable<DomainKnowledgeMap> {
-    const mapId = `map-domain-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const mapId = `map-domain-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic map ID generation
     const now = new Date().toISOString();
 
     const newMap: DomainKnowledgeMap = {
@@ -222,7 +222,7 @@ export class KnowledgeMapService {
     description?: string;
     visibility?: KnowledgeMap['visibility'];
   }): Observable<PersonKnowledgeMap> {
-    const mapId = `map-person-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const mapId = `map-person-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic map ID generation
     const now = new Date().toISOString();
 
     const newMap: PersonKnowledgeMap = {
@@ -264,7 +264,7 @@ export class KnowledgeMapService {
     visibility?: KnowledgeMap['visibility'];
     governance?: CollectiveKnowledgeMap['governance'];
   }): Observable<CollectiveKnowledgeMap> {
-    const mapId = `map-collective-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const mapId = `map-collective-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`; // NOSONAR - Non-cryptographic map ID generation
     const now = new Date().toISOString();
 
     const newMap: CollectiveKnowledgeMap = {
@@ -324,7 +324,7 @@ export class KnowledgeMapService {
 
         const newNode: KnowledgeNode = {
           ...node,
-          id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+          id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}` // NOSONAR - Non-cryptographic node ID generation
         };
 
         m.nodes.push(newNode);
