@@ -46,12 +46,12 @@ import {
 @Injectable({ providedIn: 'root' })
 export class PathExtensionService {
   // In-memory storage (prototype - production uses Holochain)
-  private extensions: Map<string, PathExtension> = new Map();
-  private collaborativePaths: Map<string, CollaborativePath> = new Map();
+  private readonly extensions: Map<string, PathExtension> = new Map();
+  private readonly collaborativePaths: Map<string, CollaborativePath> = new Map();
   private extensionIndex: PathExtensionIndex | null = null;
 
   // Current agent's extensions
-  private myExtensionsSubject = new BehaviorSubject<PathExtensionIndexEntry[]>([]);
+  private readonly myExtensionsSubject = new BehaviorSubject<PathExtensionIndexEntry[]>([]);
   public readonly myExtensions$ = this.myExtensionsSubject.asObservable();
 
   // Current agent ID

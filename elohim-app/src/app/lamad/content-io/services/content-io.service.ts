@@ -300,7 +300,7 @@ export class ContentIOService {
     formatId?: string
   ): Promise<void> {
     for (const node of nodes) {
-      const targetFormat = formatId || node.contentFormat;
+      const targetFormat = formatId ?? node.contentFormat;
       if (this.registry.getPlugin(targetFormat)?.canExport) {
         await this.downloadAsFormat(node, targetFormat);
       }
@@ -315,7 +315,7 @@ export class ContentIOService {
     node: ContentIOExportInput,
     formatId?: string
   ): Promise<{ content: string; filename: string; mimeType: string } | null> {
-    const targetFormat = formatId || node.contentFormat;
+    const targetFormat = formatId ?? node.contentFormat;
     const plugin = this.registry.getPlugin(targetFormat);
 
     if (!plugin?.canExport) {
@@ -349,7 +349,7 @@ export class ContentIOService {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
+      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read blob'));
       reader.readAsText(blob);
     });
   }

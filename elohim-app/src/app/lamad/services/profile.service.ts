@@ -302,7 +302,7 @@ export class ProfileService {
           significance: 'progress',
         };
 
-      case 'affinity':
+      case 'affinity': {
         // Only create event for meaningful affinity (> 0.5)
         const affinityValue = activity.metadata?.['value'];
         if (typeof affinityValue === 'number' && affinityValue > 0.5) {
@@ -317,6 +317,7 @@ export class ProfileService {
           };
         }
         return null;
+      }
 
       case 'view':
         // First view is significant

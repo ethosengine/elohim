@@ -23,7 +23,7 @@
 
       <!-- Mobile Breadcrumbs (moved from main) -->
       @if (stepView) {
-        <nav class="breadcrumbs sidebar-breadcrumbs">
+        <nav class="breadcrumbs sidebar-breadcrumbs" aria-label="Breadcrumb navigation">
           <a routerLink="/lamad">Territory</a>
           <span class="separator">/</span>
           <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
@@ -37,7 +37,7 @@
       }
     </div>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Path navigation">
       <!-- Chapter-based Navigation -->
       @if (sidebarChapters.length > 0) {
         <div class="chapter-list">
@@ -156,7 +156,7 @@
     @if (!isLoading && !error && stepView) {
 
       <!-- PATH TOOLING: Breadcrumbs -->
-      <nav class="breadcrumbs main-breadcrumbs">
+      <nav class="breadcrumbs main-breadcrumbs" aria-label="Breadcrumb navigation">
         <a routerLink="/lamad">Territory</a>
         <span class="separator">/</span>
         <a [routerLink]="['/lamad/path', pathId]">{{ path?.title }}</a>
@@ -266,7 +266,7 @@
             </div>
 
             <!-- Navigation -->
-            <nav class="step-navigation">
+            <nav class="step-navigation" aria-label="Step navigation">
               <button
                 class="btn btn-nav btn-prev"
                 [disabled]="!stepView.hasPrevious"

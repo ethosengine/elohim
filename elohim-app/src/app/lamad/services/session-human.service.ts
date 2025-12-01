@@ -733,8 +733,6 @@ export class SessionHumanService {
     }
 
     // Session humans cannot access gated or protected content
-    const accessLevel = this.getAccessLevel();
-
     if (accessMetadata.accessLevel === 'gated') {
       return {
         canAccess: false,

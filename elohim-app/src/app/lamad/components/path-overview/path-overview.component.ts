@@ -157,7 +157,7 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
         this.isLoading = false;
       },
       error: err => {
-        this.error = err.message || 'Failed to load path';
+        this.error = err.message ?? 'Failed to load path';
         this.isLoading = false;
         console.error('[PathOverview] Failed to load path:', err);
       }

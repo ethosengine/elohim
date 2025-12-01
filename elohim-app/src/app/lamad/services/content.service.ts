@@ -517,7 +517,7 @@ export class ContentService {
     };
 
     // Generate YouTube thumbnail if URL is a YouTube link
-    if (entry.url && entry.url.includes('youtube.com')) {
+    if (entry.url?.includes('youtube.com')) {
       const videoId = this.extractYouTubeId(entry.url);
       if (videoId) {
         preview.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;

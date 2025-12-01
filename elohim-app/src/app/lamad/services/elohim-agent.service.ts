@@ -38,7 +38,7 @@ import {
  */
 @Injectable({ providedIn: 'root' })
 export class ElohimAgentService {
-  private elohimCache: Map<string, ElohimAgent> = new Map();
+  private readonly elohimCache: Map<string, ElohimAgent> = new Map();
   private requestLog: ElohimRequest[] = [];
 
   constructor(private readonly dataLoader: DataLoaderService) {}
@@ -82,9 +82,9 @@ export class ElohimAgentService {
           id: agent.id,
           displayName: agent.displayName,
           layer: agent.layer as ElohimLayer,
-          bio: agent.bio || '',
-          attestations: agent.attestations || [],
-          capabilities: (agent.capabilities || []) as ElohimCapability[],
+          bio: agent.bio ?? '',
+          attestations: agent.attestations ?? [],
+          capabilities: (agent.capabilities ?? []) as ElohimCapability[],
           visibility: agent.visibility as 'public' | 'private',
           familyId: agent.familyId,
           createdAt: agent.createdAt,
@@ -375,7 +375,7 @@ export class ElohimAgentService {
       'spiral-detection': 800,
       'path-analysis': 2500
     };
-    return times[capability] || 1000;
+    return times[capability] ?? 1000;
   }
 
   private createDeclinedResponse(

@@ -19,9 +19,9 @@ import { FormatMetadata } from '../interfaces/format-metadata.interface';
   providedIn: 'root'
 })
 export class ContentIORegistryService {
-  private plugins = new Map<string, ContentIOPlugin>();
-  private extensionMap = new Map<string, string[]>(); // extension → formatIds
-  private mimeTypeMap = new Map<string, string[]>(); // mimeType → formatIds
+  private readonly plugins = new Map<string, ContentIOPlugin>();
+  private readonly extensionMap = new Map<string, string[]>(); // extension → formatIds
+  private readonly mimeTypeMap = new Map<string, string[]>(); // mimeType → formatIds
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Plugin Registration
@@ -145,7 +145,7 @@ export class ContentIORegistryService {
     return this.getAllPlugins()
       .filter(p => p.canImport)
       .map(p => p.getFormatMetadata())
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }
 
   /**
@@ -155,7 +155,7 @@ export class ContentIORegistryService {
     return this.getAllPlugins()
       .filter(p => p.canExport)
       .map(p => p.getFormatMetadata())
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }
 
   /**
@@ -226,7 +226,7 @@ export class ContentIORegistryService {
       }
     }
 
-    return bestMatch?.formatId || null;
+    return bestMatch?.formatId ?? null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export class ContentIORegistryService {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
+      reader.onerror = () => reject(new Error(reader.error?.message ?? 'Failed to read file'));
       reader.readAsText(file);
     });
   }

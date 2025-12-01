@@ -304,7 +304,7 @@ export class DataLoaderService {
       this.attestationCache$ = this.http.get<{ attestations: ContentAttestation[] }>(
         `${this.basePath}/attestations/index.json`
       ).pipe(
-        map(response => response.attestations || []),
+        map(response => response.attestations ?? []),
         shareReplay(1),
         catchError(err => {
           console.error('[DataLoaderService] Failed to load attestations', err);
@@ -502,7 +502,7 @@ export class DataLoaderService {
       }
 
       // Track by category
-      const category = (node.metadata as any)?.category || 'uncategorized';
+      const category = (node.metadata as any)?.category ?? 'uncategorized';
       if (!nodesByCategory.has(category)) {
         nodesByCategory.set(category, new Set());
       }

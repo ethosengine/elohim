@@ -12,8 +12,20 @@
 }
 
 /* Areas */
-.back-nav { grid-area: nav; margin-bottom: 1rem; }
-.overview-main { grid-area: main; }
+.back-nav {
+  grid-area: nav;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--lamad-border, #e5e7eb);
+  display: flex;
+  align-items: center;
+}
+.overview-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
 
 /* Responsive: Stack on mobile */
 @media (max-width: 900px) {
@@ -45,13 +57,6 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-
-/* Main Content Styling */
-.overview-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
 }
 
 /* Adjustments for layout */
@@ -86,15 +91,6 @@
   border-radius: 8px;
   color: #ef4444;
   padding: 3rem;
-}
-
-/* Back Nav */
-.back-nav {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--lamad-border, #e5e7eb);
-  display: flex;
-  align-items: center;
 }
 
 .btn-back {

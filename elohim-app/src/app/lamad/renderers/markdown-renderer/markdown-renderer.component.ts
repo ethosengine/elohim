@@ -93,11 +93,11 @@ export class MarkdownRendererComponent implements OnChanges, AfterViewInit, OnDe
   activeHeadingId = '';
   showBackToTop = false;
 
-  private marked: Marked;
+  private readonly marked: Marked;
   private scrollListener?: () => void;
   private headingElements: HTMLElement[] = [];
 
-  constructor(private sanitizer: DomSanitizer) {
+  constructor(private readonly sanitizer: DomSanitizer) {
     // Configure marked with syntax highlighting
     this.marked = new Marked(
       markedHighlight({

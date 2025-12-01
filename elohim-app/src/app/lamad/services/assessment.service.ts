@@ -283,19 +283,19 @@ export class AssessmentService {
     const scores: Record<string, number> = {};
 
     // Simple scoring: aggregate by subscale
-    const sections = content.sections || [];
-    const questions = content.questions || [];
+    const sections = content.sections ?? [];
+    const questions = content.questions ?? [];
 
     const allQuestions = [
       ...questions,
-      ...sections.flatMap((s: any) => s.questions || [])
+      ...sections.flatMap((s: any) => s.questions ?? [])
     ];
 
     for (const question of allQuestions) {
       const response = responses[question.id];
       if (!response) continue;
 
-      const subscales = question.subscales || [];
+      const subscales = question.subscales ?? [];
       const value = typeof response.value === 'number' ? response.value : 0;
       const actualValue = question.reverseScored ? (8 - value) : value; // Assume 7-point scale
 

@@ -25,14 +25,14 @@ import { AccessLevel, ContentAccessMetadata, AccessCheckResult } from '../models
  */
 @Injectable({ providedIn: 'root' })
 export class AgentService {
-  private agentSubject = new BehaviorSubject<Agent | null>(null);
+  private readonly agentSubject = new BehaviorSubject<Agent | null>(null);
   readonly agent$ = this.agentSubject.asObservable();
 
   // Progress cache (keyed by pathId)
-  private progressCache = new Map<string, AgentProgress>();
+  private readonly progressCache = new Map<string, AgentProgress>();
 
   // Attestations set
-  private attestations = new Set<string>();
+  private readonly attestations = new Set<string>();
 
   constructor(
     private readonly dataLoader: DataLoaderService,
@@ -367,7 +367,7 @@ export class AgentService {
    * @param agentId Optional agent ID (defaults to current agent)
    */
   completeContentNode(contentId: string, agentId?: string): Observable<void> {
-    const targetAgentId = agentId || this.getCurrentAgentId();
+    const targetAgentId = agentId ?? this.getCurrentAgentId();
 
     return this.getProgressForPath('__global__').pipe(
       switchMap(existingProgress => {
@@ -408,12 +408,11 @@ export class AgentService {
    * @param contentId The resourceId to check
    * @param agentId Optional agent ID (defaults to current agent)
    */
-  isContentCompleted(contentId: string, agentId?: string): Observable<boolean> {
-    const targetAgentId = agentId || this.getCurrentAgentId();
-
+  isContentCompleted(contentId: string, _agentId?: string): Observable<boolean> {
+    // Note: agentId parameter is for future multi-agent support
     return this.getProgressForPath('__global__').pipe(
       map(progress => {
-        if (!progress || !progress.completedContentIds) {
+        if (!progress?.completedContentIds) {
           return false;
         }
         return progress.completedContentIds.includes(contentId);
@@ -428,12 +427,11 @@ export class AgentService {
    *
    * @param agentId Optional agent ID (defaults to current agent)
    */
-  getCompletedContentIds(agentId?: string): Observable<Set<string>> {
-    const targetAgentId = agentId || this.getCurrentAgentId();
-
+  getCompletedContentIds(_agentId?: string): Observable<Set<string>> {
+    // Note: agentId parameter is for future multi-agent support
     return this.getProgressForPath('__global__').pipe(
       map(progress => {
-        if (!progress || !progress.completedContentIds) {
+        if (!progress?.completedContentIds) {
           return new Set<string>();
         }
         return new Set(progress.completedContentIds);
