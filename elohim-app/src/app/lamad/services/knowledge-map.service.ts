@@ -38,11 +38,11 @@ import {
 @Injectable({ providedIn: 'root' })
 export class KnowledgeMapService {
   // In-memory map storage (prototype - production uses Holochain)
-  private maps: Map<string, KnowledgeMap> = new Map();
+  private readonly maps: Map<string, KnowledgeMap> = new Map();
   private mapIndex: KnowledgeMapIndex | null = null;
 
   // Current agent's maps
-  private myMapsSubject = new BehaviorSubject<KnowledgeMapIndexEntry[]>([]);
+  private readonly myMapsSubject = new BehaviorSubject<KnowledgeMapIndexEntry[]>([]);
   public readonly myMaps$ = this.myMapsSubject.asObservable();
 
   // Current agent ID (from auth service in production)

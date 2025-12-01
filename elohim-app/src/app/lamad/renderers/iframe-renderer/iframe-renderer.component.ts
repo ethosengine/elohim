@@ -25,7 +25,7 @@ export class IframeRendererComponent implements OnChanges {
   safeUrl: SafeResourceUrl | null = null;
   sandboxAttr: string = 'allow-scripts allow-same-origin';
 
-  constructor(private sanitizer: DomSanitizer) {}
+  constructor(private readonly sanitizer: DomSanitizer) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['node'] && this.node) {

@@ -209,7 +209,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
   }
 
   private handleError(err: any): void {
-    this.error = err.message || 'Failed to load learning path';
+    this.error = err.message ?? 'Failed to load learning path';
     this.isLoading = false;
     console.error('[PathNavigator] Error:', err);
   }

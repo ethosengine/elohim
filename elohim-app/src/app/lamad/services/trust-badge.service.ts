@@ -16,7 +16,6 @@ import {
   BadgeDisplay,
   BadgeWarning,
   BadgeAction,
-  TrustLevel,
   TrustIndicator,
   TrustIndicatorSet,
   ATTESTATION_BADGE_CONFIG,

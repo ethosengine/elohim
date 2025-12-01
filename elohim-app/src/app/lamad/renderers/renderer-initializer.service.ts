@@ -7,7 +7,7 @@ import { GherkinRendererComponent } from './gherkin-renderer/gherkin-renderer.co
 
 @Injectable({ providedIn: 'root' })
 export class RendererInitializerService {
-  constructor(private registry: RendererRegistryService) {
+  constructor(private readonly registry: RendererRegistryService) {
     this.registerBuiltInRenderers();
   }
 

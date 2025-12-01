@@ -310,8 +310,8 @@ export function createEmptyResults(query: SearchQuery): SearchResults {
     query,
     results: [],
     totalCount: 0,
-    page: query.page || 1,
-    pageSize: query.pageSize || DEFAULT_SEARCH_CONFIG.pageSize,
+    page: query.page ?? 1,
+    pageSize: query.pageSize ?? DEFAULT_SEARCH_CONFIG.pageSize,
     totalPages: 0,
     hasMore: false,
     facets: {

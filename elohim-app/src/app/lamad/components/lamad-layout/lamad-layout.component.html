@@ -77,12 +77,12 @@
   </footer>
 
   <!-- Upgrade Modal -->
-  <div *ngIf="showUpgradeModal" class="modal-overlay" (click)="closeUpgradeModal()" (keydown.escape)="closeUpgradeModal()" tabindex="-1">
-    <div class="upgrade-modal" (click)="$event.stopPropagation()">
+  <div *ngIf="showUpgradeModal" class="modal-overlay" (click)="closeUpgradeModal()" (keydown.escape)="closeUpgradeModal()" (keydown.enter)="closeUpgradeModal()" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+    <div class="upgrade-modal" (click)="$event.stopPropagation()" role="document">
       <button class="modal-close" (click)="closeUpgradeModal()">✕</button>
 
       <div class="modal-header">
-        <h2>Join the Elohim Network</h2>
+        <h2 id="upgrade-modal-title">Join the Elohim Network</h2>
         <p class="modal-subtitle">Save your progress permanently and connect with other learners</p>
       </div>
 

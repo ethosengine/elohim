@@ -1,4 +1,4 @@
-import { ContentNode, ContentType } from '../models/content-node.model';
+import { ContentNode } from '../models/content-node.model';
 
 /**
  * Gherkin step (Given/When/Then/And/But)

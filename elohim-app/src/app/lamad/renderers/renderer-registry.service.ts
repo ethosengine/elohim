@@ -58,7 +58,7 @@ interface RendererEntry {
  */
 @Injectable({ providedIn: 'root' })
 export class RendererRegistryService {
-  private renderers: RendererEntry[] = [];
+  private readonly renderers: RendererEntry[] = [];
 
   /**
    * Register a renderer component for specific formats.

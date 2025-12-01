@@ -240,8 +240,6 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       state = 'proficient';
     } else if (affinityScore > 0.33) {
       state = 'in-progress';
-    } else if (affinityScore > 0) {
-      state = 'unseen';
     }
 
     // Mark recommended nodes (manifesto is always recommended for new users)
@@ -254,8 +252,8 @@ export class GraphExplorerComponent implements OnInit, OnDestroy, AfterViewInit 
       state,
       affinityScore,
       expanded: false,
-      x: node.position?.x || 0,
-      y: node.position?.y || 0
+      x: node.position?.x ?? 0,
+      y: node.position?.y ?? 0
     };
   }
 

@@ -6,8 +6,7 @@ import { DataLoaderService } from './data-loader.service';
 import {
   ContentNode,
   ContentGraph,
-  ContentRelationship,
-  ContentRelationshipType
+  ContentRelationship
 } from '../models/content-node.model';
 import {
   GraphExplorationQuery,
@@ -65,7 +64,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ExplorationService {
   // Rate limit tracking per agent
-  private rateLimits: Map<string, AgentRateLimitState> = new Map();
+  private readonly rateLimits: Map<string, AgentRateLimitState> = new Map();
 
   // Event log for analytics/audit
   private eventLog: ExplorationEvent[] = [];
@@ -75,7 +74,7 @@ export class ExplorationService {
   private currentAgentId = 'demo-learner';
 
   // Observable for rate limit status updates
-  private rateLimitStatusSubject = new BehaviorSubject<RateLimitStatus | null>(null);
+  private readonly rateLimitStatusSubject = new BehaviorSubject<RateLimitStatus | null>(null);
   public readonly rateLimitStatus$ = this.rateLimitStatusSubject.asObservable();
 
   constructor(
@@ -252,7 +251,7 @@ export class ExplorationService {
 
         if (operation === 'exploreNeighborhood') {
           const query = params as Partial<GraphExplorationQuery>;
-          const depth = query.depth || 1;
+          const depth = query.depth ?? 1;
 
           // Estimate based on average node degree
           const avgDegree = this.estimateAverageDegree(graph);
@@ -268,7 +267,7 @@ export class ExplorationService {
             estimatedNodes: Math.min(estimatedNodes, graph.nodes.size),
             estimatedTimeMs,
             resourceCredits: this.calculateCredits(depth, estimatedNodes),
-            attestationRequired: requiredAttestation || undefined,
+            attestationRequired: requiredAttestation ?? undefined,
             rateLimitImpact: `${agentStatus.explorationRemaining} of ${agentStatus.explorationLimit} queries remaining this hour`,
             canExecute: canAfford,
             blockedReason: !canAfford
@@ -312,8 +311,8 @@ export class ExplorationService {
    * Get current rate limit status for an agent.
    */
   getRateLimitStatus(agentId?: string): Observable<RateLimitStatus> {
-    return this.checkAttestations(agentId || this.currentAgentId, 0).pipe(
-      map(attestation => this.getRateLimitStatusSync(agentId || this.currentAgentId, attestation.tier))
+    return this.checkAttestations(agentId ?? this.currentAgentId, 0).pipe(
+      map(attestation => this.getRateLimitStatusSync(agentId ?? this.currentAgentId, attestation.tier))
     );
   }
 
@@ -322,7 +321,7 @@ export class ExplorationService {
    */
   private getRateLimitStatusSync(agentId: string, tier?: RateLimitTier): RateLimitStatus {
     const state = this.getOrCreateRateLimitState(agentId);
-    const effectiveTier = tier || state.tier;
+    const effectiveTier = tier ?? state.tier;
     const config = RATE_LIMIT_CONFIGS[effectiveTier];
     const now = Date.now();
     const resetsAt = new Date(state.windowStart + config.resetIntervalMs);
@@ -458,7 +457,6 @@ export class ExplorationService {
    */
   private findRelationship(graph: ContentGraph, sourceId: string, targetId: string): ContentRelationship | null {
     // Try direct relationship
-    const directId = `${sourceId}_${targetId}`;
     for (const [, rel] of graph.relationships) {
       if (rel.sourceNodeId === sourceId && rel.targetNodeId === targetId) {
         return rel;
@@ -675,7 +673,7 @@ export class ExplorationService {
     const computeTimeMs = Date.now() - startTime;
 
     // Calculate semantic score (lower is better, invert for display)
-    const totalDistance = distances.get(query.to) || Infinity;
+    const totalDistance = distances.get(query.to) ?? Infinity;
     const semanticScore = totalDistance < Infinity ? 1 / totalDistance : 0;
 
     return {
@@ -744,7 +742,7 @@ export class ExplorationService {
           allowed,
           maxAllowedDepth: maxDepth,
           tier,
-          requiredAttestation: requiredAttestation || undefined,
+          requiredAttestation: requiredAttestation ?? undefined,
           reason: allowed ? undefined : `Depth ${requestedDepth} requires ${requiredAttestation} attestation`
         };
       }),
@@ -851,7 +849,7 @@ export class ExplorationService {
 
     return {
       code,
-      message: message || messages[code],
+      message: message ?? messages[code],
       details
     };
   }

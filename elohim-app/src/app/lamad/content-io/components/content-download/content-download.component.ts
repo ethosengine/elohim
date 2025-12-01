@@ -87,7 +87,7 @@ export class ContentDownloadComponent {
   get formatLabel(): string {
     if (!this.node?.contentFormat) return '';
     const plugin = this.registry.getPlugin(this.node.contentFormat);
-    return plugin?.displayName || this.node.contentFormat;
+    return plugin?.displayName ?? this.node.contentFormat;
   }
 
   /**
