@@ -120,14 +120,12 @@ export class PathService {
           reason: 'Complete previous steps first'
         };
       }
-    } else {
+    } else if (stepIndex > 0) {
       // No progress: can only access step 0
-      if (stepIndex > 0) {
-        return {
-          accessible: false,
-          reason: 'Start from the beginning'
-        };
-      }
+      return {
+        accessible: false,
+        reason: 'Start from the beginning'
+      };
     }
 
     return { accessible: true };

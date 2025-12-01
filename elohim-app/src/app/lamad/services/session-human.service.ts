@@ -738,7 +738,7 @@ export class SessionHumanService {
         canAccess: false,
         reason: 'not-authenticated',
         actionRequired: this.createInstallAction(
-          accessMetadata.restrictionReason || 'This content requires joining the Elohim network.'
+          accessMetadata.restrictionReason ?? 'This content requires joining the Elohim network.'
         ),
       };
     }

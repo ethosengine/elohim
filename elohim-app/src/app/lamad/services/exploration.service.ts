@@ -271,7 +271,7 @@ export class ExplorationService {
             rateLimitImpact: `${agentStatus.explorationRemaining} of ${agentStatus.explorationLimit} queries remaining this hour`,
             canExecute: canAfford,
             blockedReason: !canAfford
-              ? (depth > agentStatus.maxDepth ? 'insufficient-attestation' as const : 'rate-limit-exceeded' as const)
+              ? this.getBlockedReason(depth, agentStatus.maxDepth)
               : undefined
           };
         }
@@ -820,6 +820,10 @@ export class ExplorationService {
   private calculateCredits(depth: number, nodeCount: number): number {
     // Simple credit calculation: depth^2 * log(nodes)
     return Math.ceil(Math.pow(depth + 1, 2) * Math.log2(nodeCount + 1));
+  }
+
+  private getBlockedReason(depth: number, maxDepth: number): 'insufficient-attestation' | 'rate-limit-exceeded' {
+    return depth > maxDepth ? 'insufficient-attestation' : 'rate-limit-exceeded';
   }
 
   private estimateAverageDegree(graph: ContentGraph): number {

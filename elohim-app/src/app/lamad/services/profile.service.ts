@@ -448,12 +448,15 @@ export class ProfileService {
             (Date.now() - new Date(mostRecent.lastActiveAt).getTime()) / (1000 * 60 * 60 * 24)
           );
 
+          const dayLabel = daysSince === 1 ? 'day' : 'days';
+          const reason = daysSince === 0
+            ? 'Pick up where you left off'
+            : `Return to your journey after ${daysSince} ${dayLabel}`;
+
           return {
             type: 'continue_path' as const,
             title: `Continue: ${mostRecent.pathTitle}`,
-            reason: daysSince === 0
-              ? 'Pick up where you left off'
-              : `Return to your journey after ${daysSince} day${daysSince === 1 ? '' : 's'}`,
+            reason,
             pathId: mostRecent.pathId,
             stepIndex: mostRecent.currentStepIndex,
             daysSinceActive: daysSince,

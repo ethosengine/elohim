@@ -566,13 +566,15 @@ export function generateTrustSummary(
     return `${reachConfig.label} content with no attestations yet.`;
   }
 
-  const topAttestation = attestationTypes.includes('governance-ratified')
-    ? 'governance-ratified'
-    : attestationTypes.includes('peer-reviewed')
-    ? 'peer-reviewed'
-    : attestationTypes.includes('steward-approved')
-    ? 'steward-approved'
-    : attestationTypes[0];
+  // Determine top attestation by priority
+  let topAttestation = attestationTypes[0];
+  if (attestationTypes.includes('governance-ratified')) {
+    topAttestation = 'governance-ratified';
+  } else if (attestationTypes.includes('peer-reviewed')) {
+    topAttestation = 'peer-reviewed';
+  } else if (attestationTypes.includes('steward-approved')) {
+    topAttestation = 'steward-approved';
+  }
 
   const topBadge = ATTESTATION_BADGE_CONFIG[topAttestation];
 
