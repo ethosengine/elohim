@@ -28,11 +28,11 @@
 
       <!-- Session Human Info -->
       <div class="session-human-info" *ngIf="session">
-        <div class="human-display">
+        <a routerLink="/lamad/human" class="human-display human-display-link" title="View your profile">
           <span class="human-icon">👤</span>
           <span class="human-name">{{ getDisplayName() }}</span>
           <span class="human-stats">{{ getStatsSummary() }}</span>
-        </div>
+        </a>
         <button class="btn-join-network" (click)="onJoinNetwork()" title="Save your progress permanently">
           Join Network
         </button>

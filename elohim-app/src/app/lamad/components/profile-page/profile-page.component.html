@@ -1,0 +1,415 @@
+<div class="profile-page">
+  <!-- Header -->
+  <header class="profile-header">
+    <div class="profile-avatar">
+      @if (session?.avatarUrl) {
+        <img [src]="session!.avatarUrl" [alt]="session!.displayName" class="avatar-image" />
+      } @else {
+        <div class="avatar-placeholder">
+          {{ session?.displayName?.charAt(0) ?? 'T' }}
+        </div>
+      }
+    </div>
+
+    <div class="profile-info">
+      <h1 class="profile-name">{{ session?.displayName ?? 'Traveler' }}</h1>
+      <div class="profile-badge">
+        <span class="badge-icon">local_activity</span>
+        <span class="badge-text">Session Visitor</span>
+      </div>
+      @if (session?.bio) {
+        <p class="profile-bio">{{ session!.bio }}</p>
+      }
+      @if (session?.interests && session!.interests!.length > 0) {
+        <div class="profile-interests">
+          @for (interest of session!.interests!; track interest) {
+            <span class="interest-tag">{{ interest }}</span>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="profile-actions">
+      <button class="btn-secondary" (click)="setActiveTab('settings')">
+        <span class="btn-icon">settings</span>
+        Edit Profile
+      </button>
+    </div>
+  </header>
+
+  <!-- Upgrade Banner -->
+  <div class="upgrade-banner">
+    <div class="upgrade-content">
+      <span class="upgrade-icon">cloud_sync</span>
+      <div class="upgrade-text">
+        <strong>Your progress is stored locally</strong>
+        <p>Install the Elohim app to save your progress permanently and sync across devices.</p>
+      </div>
+      <button class="btn-primary">Join Network</button>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <nav class="tab-nav">
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'overview'"
+      (click)="setActiveTab('overview')"
+    >
+      Overview
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'paths'"
+      (click)="setActiveTab('paths')"
+    >
+      Paths
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'timeline'"
+      (click)="setActiveTab('timeline')"
+    >
+      Timeline
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab === 'settings'"
+      (click)="setActiveTab('settings')"
+    >
+      Settings
+    </button>
+  </nav>
+
+  <!-- Tab Content -->
+  <div class="tab-content">
+    <!-- Overview Tab -->
+    @if (activeTab === 'overview') {
+      <div class="tab-panel overview-panel">
+        <!-- Quick Stats -->
+        <section class="stats-section">
+          <h2 class="section-title">Journey Stats</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-value">{{ session?.stats?.nodesViewed ?? 0 }}</span>
+              <span class="stat-label">Content Viewed</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">{{ session?.stats?.pathsStarted ?? 0 }}</span>
+              <span class="stat-label">Paths Started</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">{{ session?.stats?.pathsCompleted ?? 0 }}</span>
+              <span class="stat-label">Paths Completed</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">{{ session?.stats?.stepsCompleted ?? 0 }}</span>
+              <span class="stat-label">Steps Completed</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">{{ getSessionDuration() }}</span>
+              <span class="stat-label">Journey Duration</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value">{{ session?.stats?.sessionCount ?? 1 }}</span>
+              <span class="stat-label">Sessions</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Mastery Overview -->
+        @if (masteryStats && masteryStats.totalMasteredNodes > 0) {
+          <section class="mastery-section">
+            <h2 class="section-title">Mastery Progress</h2>
+            <div class="mastery-summary">
+              <div class="mastery-total">
+                <span class="mastery-number">{{ masteryStats.totalMasteredNodes }}</span>
+                <span class="mastery-label">Content Nodes Mastered</span>
+              </div>
+              <div class="mastery-gate">
+                <span class="gate-number">{{ masteryStats.nodesAboveGate }}</span>
+                <span class="gate-label">Above Attestation Gate</span>
+              </div>
+            </div>
+
+            @if (masteryByLevel.length > 0) {
+              <div class="mastery-breakdown">
+                <h3>By Level</h3>
+                <div class="level-bars">
+                  @for (item of masteryByLevel; track item.level) {
+                    <div class="level-bar">
+                      <span class="level-label">{{ item.label }}</span>
+                      <div class="level-track">
+                        <div
+                          class="level-fill"
+                          [style.width.%]="(item.count / masteryStats.totalMasteredNodes) * 100"
+                          [style.backgroundColor]="getMasteryLevelColor(item.level)"
+                        ></div>
+                      </div>
+                      <span class="level-count">{{ item.count }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </section>
+        }
+
+        <!-- Recent Activity -->
+        @if (activityHistory.length > 0) {
+          <section class="recent-activity">
+            <h2 class="section-title">Recent Activity</h2>
+            <div class="activity-list">
+              @for (activity of activityHistory.slice(-5).reverse(); track activity.timestamp) {
+                <div class="activity-item">
+                  <span class="activity-icon material-icons">{{ getActivityIcon(activity.type) }}</span>
+                  <span class="activity-text">{{ getActivityLabel(activity.type) }}: {{ activity.resourceId }}</span>
+                  <span class="activity-time">{{ formatTimestamp(activity.timestamp) }}</span>
+                </div>
+              }
+            </div>
+            <button class="btn-link" (click)="setActiveTab('timeline')">View Full Timeline</button>
+          </section>
+        }
+      </div>
+    }
+
+    <!-- Paths Tab -->
+    @if (activeTab === 'paths') {
+      <div class="tab-panel paths-panel">
+        @if (pathProgressList.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon material-icons">route</span>
+            <h3>No paths started yet</h3>
+            <p>Start a learning path to track your progress here.</p>
+            <a routerLink="/lamad" class="btn-primary">Browse Paths</a>
+          </div>
+        } @else {
+          <div class="path-list">
+            @for (progress of pathProgressList; track progress.pathId) {
+              <div class="path-card">
+                <div class="path-info">
+                  <h3 class="path-title">{{ progress.pathId }}</h3>
+                  <div class="path-meta">
+                    <span>Step {{ progress.currentStepIndex + 1 }}</span>
+                    <span>{{ progress.completedStepIndices.length }} completed</span>
+                  </div>
+                </div>
+                <div class="path-progress">
+                  <div class="progress-bar">
+                    <div
+                      class="progress-fill"
+                      [style.width.%]="getPathProgressPercentage(progress)"
+                    ></div>
+                  </div>
+                </div>
+                <div class="path-actions">
+                  <a
+                    [routerLink]="['/lamad/path', progress.pathId, 'step', progress.currentStepIndex]"
+                    class="btn-secondary"
+                  >
+                    Continue
+                  </a>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Timeline Tab -->
+    @if (activeTab === 'timeline') {
+      <div class="tab-panel timeline-panel">
+        <!-- Filter -->
+        <div class="timeline-filter">
+          <button
+            class="filter-btn"
+            [class.active]="activityFilter === 'all'"
+            (click)="setActivityFilter('all')"
+          >All</button>
+          <button
+            class="filter-btn"
+            [class.active]="activityFilter === 'view'"
+            (click)="setActivityFilter('view')"
+          >Views</button>
+          <button
+            class="filter-btn"
+            [class.active]="activityFilter === 'affinity'"
+            (click)="setActivityFilter('affinity')"
+          >Affinity</button>
+          <button
+            class="filter-btn"
+            [class.active]="activityFilter === 'path-start'"
+            (click)="setActivityFilter('path-start')"
+          >Path Starts</button>
+          <button
+            class="filter-btn"
+            [class.active]="activityFilter === 'step-complete'"
+            (click)="setActivityFilter('step-complete')"
+          >Steps</button>
+        </div>
+
+        @if (filteredActivities.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon material-icons">history</span>
+            <h3>No activity yet</h3>
+            <p>Your learning activity will appear here.</p>
+          </div>
+        } @else {
+          <div class="timeline-list">
+            @for (activity of filteredActivities; track activity.timestamp) {
+              <div class="timeline-item">
+                <div class="timeline-marker">
+                  <span class="material-icons">{{ getActivityIcon(activity.type) }}</span>
+                </div>
+                <div class="timeline-content">
+                  <span class="timeline-action">{{ getActivityLabel(activity.type) }}</span>
+                  <span class="timeline-resource">{{ activity.resourceId }}</span>
+                  @if (activity.metadata) {
+                    <span class="timeline-meta">{{ activity.metadata | json }}</span>
+                  }
+                </div>
+                <div class="timeline-time">{{ formatTimestamp(activity.timestamp) }}</div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Settings Tab -->
+    @if (activeTab === 'settings') {
+      <div class="tab-panel settings-panel">
+        <!-- Profile Edit -->
+        <section class="settings-section">
+          <h2 class="section-title">Profile Information</h2>
+
+          @if (!isEditing) {
+            <div class="profile-display">
+              <div class="field-row">
+                <span class="field-label">Display Name</span>
+                <span class="field-value">{{ session?.displayName ?? 'Traveler' }}</span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">Avatar URL</span>
+                <span class="field-value">{{ session?.avatarUrl || '(not set)' }}</span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">Bio</span>
+                <span class="field-value">{{ session?.bio || '(not set)' }}</span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">Locale</span>
+                <span class="field-value">{{ session?.locale || '(not set)' }}</span>
+              </div>
+              <div class="field-row">
+                <span class="field-label">Interests</span>
+                <span class="field-value">{{ session?.interests?.join(', ') || '(not set)' }}</span>
+              </div>
+              <button class="btn-primary" (click)="startEditing()">Edit Profile</button>
+            </div>
+          } @else {
+            <form class="profile-form" (submit)="saveProfile(); $event.preventDefault()">
+              <div class="form-group">
+                <label for="displayName">Display Name</label>
+                <input
+                  id="displayName"
+                  type="text"
+                  [(ngModel)]="editForm.displayName"
+                  name="displayName"
+                  placeholder="Your name"
+                />
+              </div>
+              <div class="form-group">
+                <label for="avatarUrl">Avatar URL</label>
+                <input
+                  id="avatarUrl"
+                  type="url"
+                  [(ngModel)]="editForm.avatarUrl"
+                  name="avatarUrl"
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </div>
+              <div class="form-group">
+                <label for="bio">Bio</label>
+                <textarea
+                  id="bio"
+                  [(ngModel)]="editForm.bio"
+                  name="bio"
+                  rows="3"
+                  placeholder="Tell us about yourself..."
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label for="locale">Locale</label>
+                <input
+                  id="locale"
+                  type="text"
+                  [(ngModel)]="editForm.locale"
+                  name="locale"
+                  placeholder="en_US"
+                />
+              </div>
+              <div class="form-group">
+                <label for="interests">Interests (comma-separated)</label>
+                <input
+                  id="interests"
+                  type="text"
+                  [(ngModel)]="editForm.interests"
+                  name="interests"
+                  placeholder="faith, technology, ethics"
+                />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Save Changes</button>
+                <button type="button" class="btn-secondary" (click)="cancelEditing()">Cancel</button>
+              </div>
+            </form>
+          }
+        </section>
+
+        <!-- Data Management -->
+        <section class="settings-section">
+          <h2 class="section-title">Data Management</h2>
+          <p class="section-description">
+            Your session data is stored locally in your browser. Export it to save a backup or transfer to another device.
+          </p>
+          <div class="settings-actions">
+            <button class="btn-secondary" (click)="exportData()">
+              <span class="btn-icon">download</span>
+              Export Data
+            </button>
+            <button class="btn-danger" (click)="resetSession()">
+              <span class="btn-icon">delete</span>
+              Reset Session
+            </button>
+          </div>
+        </section>
+
+        <!-- Session Info -->
+        <section class="settings-section">
+          <h2 class="section-title">Session Information</h2>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="info-label">Session ID</span>
+              <code class="info-value">{{ session?.sessionId ?? 'N/A' }}</code>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Created</span>
+              <span class="info-value">{{ session?.createdAt ? formatTimestamp(session!.createdAt) : 'N/A' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Last Active</span>
+              <span class="info-value">{{ session?.lastActiveAt ? formatTimestamp(session!.lastActiveAt) : 'N/A' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Access Level</span>
+              <span class="info-value">{{ session?.accessLevel ?? 'visitor' }}</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    }
+  </div>
+</div>

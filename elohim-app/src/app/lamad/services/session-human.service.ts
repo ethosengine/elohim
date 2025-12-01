@@ -158,6 +158,77 @@ export class SessionHumanService {
   }
 
   /**
+   * Update the avatar URL.
+   */
+  setAvatarUrl(url: string): void {
+    const session = this.sessionSubject.value;
+    if (session) {
+      session.avatarUrl = url.trim() || undefined;
+      session.lastActiveAt = new Date().toISOString();
+      this.saveSession(session);
+      this.sessionSubject.next({ ...session });
+    }
+  }
+
+  /**
+   * Update the bio/description.
+   */
+  setBio(bio: string): void {
+    const session = this.sessionSubject.value;
+    if (session) {
+      session.bio = bio.trim() || undefined;
+      session.lastActiveAt = new Date().toISOString();
+      this.saveSession(session);
+      this.sessionSubject.next({ ...session });
+    }
+  }
+
+  /**
+   * Update the locale preference.
+   */
+  setLocale(locale: string): void {
+    const session = this.sessionSubject.value;
+    if (session) {
+      session.locale = locale.trim() || undefined;
+      session.lastActiveAt = new Date().toISOString();
+      this.saveSession(session);
+      this.sessionSubject.next({ ...session });
+    }
+  }
+
+  /**
+   * Update interests/keywords.
+   */
+  setInterests(interests: string[]): void {
+    const session = this.sessionSubject.value;
+    if (session) {
+      // Filter empty strings and trim each interest
+      session.interests = interests
+        .map(i => i.trim())
+        .filter(i => i.length > 0);
+
+      if (session.interests.length === 0) {
+        session.interests = undefined;
+      }
+
+      session.lastActiveAt = new Date().toISOString();
+      this.saveSession(session);
+      this.sessionSubject.next({ ...session });
+    }
+  }
+
+  /**
+   * Get storage key prefix for namespacing session-scoped data.
+   * Used by other services (e.g., ContentMasteryService) to namespace their storage.
+   */
+  getStorageKeyPrefix(): string {
+    const session = this.sessionSubject.value;
+    return session
+      ? `lamad-session-${session.sessionId}`
+      : 'lamad-session-anonymous';
+  }
+
+  /**
    * Update session activity timestamp.
    */
   touch(): void {

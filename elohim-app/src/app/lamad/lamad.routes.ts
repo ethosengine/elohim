@@ -76,6 +76,15 @@ export const LAMAD_ROUTES: Routes = [
           )
       },
 
+      // Profile page - session human profile management
+      {
+        path: 'human',
+        loadComponent: () =>
+          import('./components/profile-page/profile-page.component').then(
+            m => m.ProfilePageComponent
+          )
+      },
+
       // ============================================
       // EXPLORATION & RESEARCH (Tertiary)
       // ============================================

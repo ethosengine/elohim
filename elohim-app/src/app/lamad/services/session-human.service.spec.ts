@@ -122,6 +122,96 @@ describe('SessionHumanService', () => {
     });
   });
 
+  describe('Profile Management', () => {
+    it('should set avatar URL', () => {
+      service.setAvatarUrl('https://example.com/avatar.jpg');
+      const session = service.getSession();
+      expect(session?.avatarUrl).toBe('https://example.com/avatar.jpg');
+    });
+
+    it('should trim avatar URL', () => {
+      service.setAvatarUrl('  https://example.com/avatar.jpg  ');
+      const session = service.getSession();
+      expect(session?.avatarUrl).toBe('https://example.com/avatar.jpg');
+    });
+
+    it('should clear avatar URL when empty', () => {
+      service.setAvatarUrl('https://example.com/avatar.jpg');
+      service.setAvatarUrl('');
+      const session = service.getSession();
+      expect(session?.avatarUrl).toBeUndefined();
+    });
+
+    it('should set bio', () => {
+      service.setBio('A curious learner');
+      const session = service.getSession();
+      expect(session?.bio).toBe('A curious learner');
+    });
+
+    it('should trim bio', () => {
+      service.setBio('  Spaced bio  ');
+      const session = service.getSession();
+      expect(session?.bio).toBe('Spaced bio');
+    });
+
+    it('should clear bio when empty', () => {
+      service.setBio('Some bio');
+      service.setBio('');
+      const session = service.getSession();
+      expect(session?.bio).toBeUndefined();
+    });
+
+    it('should set locale', () => {
+      service.setLocale('es_ES');
+      const session = service.getSession();
+      expect(session?.locale).toBe('es_ES');
+    });
+
+    it('should trim locale', () => {
+      service.setLocale('  en_US  ');
+      const session = service.getSession();
+      expect(session?.locale).toBe('en_US');
+    });
+
+    it('should clear locale when empty', () => {
+      service.setLocale('en_US');
+      service.setLocale('');
+      const session = service.getSession();
+      expect(session?.locale).toBeUndefined();
+    });
+
+    it('should set interests', () => {
+      service.setInterests(['faith', 'technology', 'ethics']);
+      const session = service.getSession();
+      expect(session?.interests).toEqual(['faith', 'technology', 'ethics']);
+    });
+
+    it('should trim interests', () => {
+      service.setInterests(['  faith  ', '  tech  ']);
+      const session = service.getSession();
+      expect(session?.interests).toEqual(['faith', 'tech']);
+    });
+
+    it('should filter empty interests', () => {
+      service.setInterests(['faith', '', '  ', 'ethics']);
+      const session = service.getSession();
+      expect(session?.interests).toEqual(['faith', 'ethics']);
+    });
+
+    it('should clear interests when all empty', () => {
+      service.setInterests(['faith']);
+      service.setInterests(['', '  ']);
+      const session = service.getSession();
+      expect(session?.interests).toBeUndefined();
+    });
+
+    it('should get storage key prefix', () => {
+      const prefix = service.getStorageKeyPrefix();
+      expect(prefix).toContain('lamad-session-');
+      expect(prefix).toContain(service.getSessionId());
+    });
+  });
+
   describe('Activity Tracking', () => {
     it('should record content view', () => {
       service.recordContentView('node-1');

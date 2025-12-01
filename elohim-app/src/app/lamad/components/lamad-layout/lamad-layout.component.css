@@ -243,6 +243,17 @@
   font-size: 0.8rem;
 }
 
+.human-display-link {
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: background 0.2s;
+}
+
+.human-display-link:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
 .human-icon {
   opacity: 0.7;
 }
