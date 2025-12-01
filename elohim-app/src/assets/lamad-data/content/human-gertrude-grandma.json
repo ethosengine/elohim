@@ -1,0 +1,86 @@
+{
+  "id": "human-gertrude-grandma",
+  "did": "did:web:elohim.host:human:gertrude-grandma",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Gertrude",
+  "description": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
+  "content": {
+    "displayName": "Gertrude",
+    "bio": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
+    "profileReach": "network",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "neighborhood",
+      "displayName": "Sunset Acres",
+      "reach": "community"
+    },
+    "communities": [
+      "community-garden-club",
+      "community-local-church"
+    ],
+    "publicAffinities": [
+      "gardening",
+      "family-history",
+      "cooking",
+      "faith"
+    ],
+    "accessibilityNeeds": [
+      "large-text",
+      "simple-navigation"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/gertrude-grandma/profile.json",
+  "tags": [
+    "faith",
+    "core-family",
+    "family-history",
+    "gardening",
+    "cooking",
+    "reach-network",
+    "layer-neighborhood",
+    "human-graph",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "core-family",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "neighborhood",
+      "community"
+    ],
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Gertrude",
+    "ogDescription": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-gertrude-grandma",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-gertrude-grandma.jpg",
+    "ogImageAlt": "Gertrude's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-gertrude-grandma",
+    "identifier": "did:web:elohim.host:human:gertrude-grandma",
+    "name": "Gertrude",
+    "description": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Sunset Acres",
+      "description": "neighborhood"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328370",
+  "updatedAt": "2025-12-01T20:08:11.328371"
+}

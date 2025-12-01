@@ -1,0 +1,66 @@
+{
+  "id": "human-mary-miner",
+  "displayName": "Mary",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Working the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.",
+  "avatarUrl": "assets/avatars/human-mary-miner.jpg",
+  "primaryLocation": {
+    "layer": "county_regional",
+    "displayName": "Mining County",
+    "reach": "community",
+    "type": "county_regional"
+  },
+  "organizationIds": [
+    "org-consolidated-mining",
+    "org-miners-union-local-347"
+  ],
+  "communityIds": [
+    "community-mining-town"
+  ],
+  "affinityGroupIds": [
+    "affinity-labor-rights",
+    "affinity-union-organizing",
+    "affinity-just-transition",
+    "affinity-community-resilience",
+    "affinity-automation-impacts"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-labor-rights",
+    "concept-union-organizing",
+    "concept-just-transition",
+    "concept-community-resilience",
+    "concept-automation-impacts"
+  ],
+  "publicAttestationIds": [
+    "attestation-mine-safety-certified",
+    "attestation-union-steward"
+  ],
+  "relationshipIds": [
+    "rel-0014"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "local-economy",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "county_regional"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

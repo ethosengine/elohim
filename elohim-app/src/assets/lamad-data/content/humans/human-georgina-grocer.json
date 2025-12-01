@@ -1,0 +1,61 @@
+{
+  "id": "human-georgina-grocer",
+  "displayName": "Georgina",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Owner of Valley Market, the local grocery store. Connecting farmers to families for 15 years.",
+  "avatarUrl": "assets/avatars/human-georgina-grocer.jpg",
+  "primaryLocation": {
+    "layer": "municipality",
+    "displayName": "Valley Town",
+    "reach": "community",
+    "type": "municipality"
+  },
+  "organizationIds": [
+    "org-valley-market"
+  ],
+  "communityIds": [
+    "community-local-business",
+    "community-farmers-market"
+  ],
+  "affinityGroupIds": [
+    "affinity-local-food",
+    "affinity-small-business",
+    "affinity-supply-chain",
+    "affinity-community-economics"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-local-food",
+    "concept-small-business",
+    "concept-supply-chain",
+    "concept-community-economics"
+  ],
+  "relationshipIds": [
+    "rel-0010",
+    "rel-0021"
+  ],
+  "trustedConnectionCount": 1,
+  "_metadata": {
+    "category": "local-economy",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "municipality"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

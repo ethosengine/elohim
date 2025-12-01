@@ -1,0 +1,63 @@
+{
+  "id": "human-meriadoc-moneybags",
+  "displayName": "Meriadoc",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "network",
+  "acceptingConnections": true,
+  "bio": "Community investor and philanthropist. Interested in funding projects that build genuine community wealth.",
+  "avatarUrl": "assets/avatars/human-meriadoc-moneybags.jpg",
+  "primaryLocation": {
+    "layer": "county_regional",
+    "displayName": "Valley Region",
+    "reach": "community",
+    "type": "county_regional"
+  },
+  "organizationIds": [
+    "org-community-foundation"
+  ],
+  "communityIds": [
+    "community-impact-investors",
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-impact-investing",
+    "affinity-community-economics",
+    "affinity-regenerative-finance",
+    "affinity-social-enterprise",
+    "affinity-rea-economics"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-impact-investing",
+    "concept-community-economics",
+    "concept-regenerative-finance",
+    "concept-social-enterprise",
+    "concept-rea-economics"
+  ],
+  "relationshipIds": [
+    "rel-0019",
+    "rel-0020"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "affinity",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "county_regional"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": "Represents community investor archetype from Elohim Protocol governance docs."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

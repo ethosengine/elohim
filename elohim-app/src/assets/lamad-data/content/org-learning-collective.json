@@ -1,0 +1,33 @@
+{
+  "id": "org-learning-collective",
+  "did": "did:web:elohim.host:org:learning-collective",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Valley Learning Collective",
+  "description": "Organization with 1 members",
+  "content": {
+    "name": "Valley Learning Collective",
+    "memberCount": 1,
+    "members": [
+      {
+        "humanId": "human-timothy-tutor",
+        "role": "facilitator"
+      }
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "organization",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-timothy-tutor"
+  ],
+  "metadata": {
+    "category": "organization",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

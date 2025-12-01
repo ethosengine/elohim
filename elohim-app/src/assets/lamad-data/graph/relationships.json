@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-28T21:10:19.553805",
-  "totalCount": 3170,
+  "lastUpdated": "2025-12-01T20:08:11.384596",
+  "totalCount": 3193,
   "relationships": [
     {
       "id": "rel-0",
@@ -28556,6 +28556,330 @@
       "type": "PRECEDES",
       "metadata": {
         "course": "fct"
+      }
+    },
+    {
+      "id": "rel-3170",
+      "source": "human-matthew-manager",
+      "target": "human-susan-spouse",
+      "type": "SPOUSE",
+      "metadata": {
+        "relationshipType": "spouse",
+        "intimacyLevel": "intimate",
+        "governanceLayer": "family",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3171",
+      "source": "human-matthew-manager",
+      "target": "human-sammy-son",
+      "type": "PARENT",
+      "metadata": {
+        "relationshipType": "parent",
+        "intimacyLevel": "intimate",
+        "governanceLayer": "family",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3172",
+      "source": "human-susan-spouse",
+      "target": "human-sammy-son",
+      "type": "PARENT",
+      "metadata": {
+        "relationshipType": "parent",
+        "intimacyLevel": "intimate",
+        "governanceLayer": "family",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3173",
+      "source": "human-gertrude-grandma",
+      "target": "human-matthew-manager",
+      "type": "GRANDPARENT",
+      "metadata": {
+        "relationshipType": "grandparent",
+        "intimacyLevel": "trusted",
+        "governanceLayer": "family",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3174",
+      "source": "human-gertrude-grandma",
+      "target": "human-sammy-son",
+      "type": "GRANDPARENT",
+      "metadata": {
+        "relationshipType": "grandparent",
+        "intimacyLevel": "trusted",
+        "governanceLayer": "family",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3175",
+      "source": "human-matthew-manager",
+      "target": "human-dan-developer",
+      "type": "COWORKER",
+      "metadata": {
+        "relationshipType": "coworker",
+        "intimacyLevel": "connection",
+        "governanceLayer": "workplace",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human",
+        "context": "org-ethosengine"
+      }
+    },
+    {
+      "id": "rel-3176",
+      "source": "human-matthew-manager",
+      "target": "human-nancy-neighbor",
+      "type": "NEIGHBOR",
+      "metadata": {
+        "relationshipType": "neighbor",
+        "intimacyLevel": "connection",
+        "governanceLayer": "neighborhood",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3177",
+      "source": "human-matthew-manager",
+      "target": "human-pete-pastor",
+      "type": "CONGREGATION_MEMBER",
+      "metadata": {
+        "relationshipType": "congregation_member",
+        "intimacyLevel": "trusted",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3178",
+      "source": "human-susan-spouse",
+      "target": "human-timothy-tutor",
+      "type": "LEARNING_PARTNER",
+      "metadata": {
+        "relationshipType": "learning_partner",
+        "intimacyLevel": "connection",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3179",
+      "source": "human-sammy-son",
+      "target": "human-timothy-tutor",
+      "type": "MENTEE",
+      "metadata": {
+        "relationshipType": "mentee",
+        "intimacyLevel": "connection",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3180",
+      "source": "human-frank-farmer",
+      "target": "human-georgina-grocer",
+      "type": "BUSINESS_PARTNER",
+      "metadata": {
+        "relationshipType": "business_partner",
+        "intimacyLevel": "trusted",
+        "governanceLayer": "economy",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3181",
+      "source": "human-bub-builder",
+      "target": "human-manny-manufacturer",
+      "type": "BUSINESS_PARTNER",
+      "metadata": {
+        "relationshipType": "business_partner",
+        "intimacyLevel": "trusted",
+        "governanceLayer": "economy",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3182",
+      "source": "human-bub-builder",
+      "target": "human-frank-farmer",
+      "type": "BUSINESS_PARTNER",
+      "metadata": {
+        "relationshipType": "business_partner",
+        "intimacyLevel": "connection",
+        "governanceLayer": "economy",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3183",
+      "source": "human-lenny-lineworker",
+      "target": "human-bub-builder",
+      "type": "ACQUAINTANCE",
+      "metadata": {
+        "relationshipType": "acquaintance",
+        "intimacyLevel": "connection",
+        "governanceLayer": "community",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3184",
+      "source": "human-mary-miner",
+      "target": "human-ginny-gigworker",
+      "type": "NETWORK_CONNECTION",
+      "metadata": {
+        "relationshipType": "network_connection",
+        "intimacyLevel": "connection",
+        "governanceLayer": "network",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3185",
+      "source": "human-bub-builder",
+      "target": "human-pete-pastor",
+      "type": "CONGREGATION_MEMBER",
+      "metadata": {
+        "relationshipType": "congregation_member",
+        "intimacyLevel": "trusted",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3186",
+      "source": "human-lenny-lineworker",
+      "target": "human-pete-pastor",
+      "type": "CONGREGATION_MEMBER",
+      "metadata": {
+        "relationshipType": "congregation_member",
+        "intimacyLevel": "connection",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3187",
+      "source": "human-pam-polarized",
+      "target": "human-pete-pastor",
+      "type": "CONGREGATION_MEMBER",
+      "metadata": {
+        "relationshipType": "congregation_member",
+        "intimacyLevel": "connection",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3188",
+      "source": "human-pam-polarized",
+      "target": "human-nancy-neighbor",
+      "type": "NEIGHBOR",
+      "metadata": {
+        "relationshipType": "neighbor",
+        "intimacyLevel": "connection",
+        "governanceLayer": "neighborhood",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3189",
+      "source": "human-meriadoc-moneybags",
+      "target": "human-matthew-manager",
+      "type": "NETWORK_CONNECTION",
+      "metadata": {
+        "relationshipType": "network_connection",
+        "intimacyLevel": "connection",
+        "governanceLayer": "network",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3190",
+      "source": "human-meriadoc-moneybags",
+      "target": "human-pete-pastor",
+      "type": "CONGREGATION_MEMBER",
+      "metadata": {
+        "relationshipType": "congregation_member",
+        "intimacyLevel": "connection",
+        "governanceLayer": "affinity",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3191",
+      "source": "human-georgina-grocer",
+      "target": "human-susan-spouse",
+      "type": "COMMUNITY_MEMBER",
+      "metadata": {
+        "relationshipType": "community_member",
+        "intimacyLevel": "recognition",
+        "governanceLayer": "community",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human"
+      }
+    },
+    {
+      "id": "rel-3192",
+      "source": "human-tommy-teacher",
+      "target": "human-janice-janitor",
+      "type": "COWORKER",
+      "metadata": {
+        "relationshipType": "coworker",
+        "intimacyLevel": "connection",
+        "governanceLayer": "workplace",
+        "isReciprocated": true,
+        "consentStatus": "mutual",
+        "graphLayer": "human",
+        "context": "org-valley-school-district"
       }
     }
   ],

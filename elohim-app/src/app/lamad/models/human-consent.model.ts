@@ -10,9 +10,16 @@
  * - ConsentState: Explicit consent lifecycle
  * - Attestation Integration: Relationship attestations gate access
  *
- * This is NOT a graph edge - humans don't become nodes. Instead, consent
- * governs visibility and negotiation permissions for shared resources
- * (paths, content, negotiations).
+ * Two Graph Layers:
+ * Humans ARE graph nodes, but in a different layer than content:
+ * - Content Graph: What you learn about (ContentNodes)
+ * - Human Graph: Who you learn with/from, who you relate to (HumanNodes)
+ *
+ * HumanConsent governs the PERMISSION layer - whether relationships can
+ * exist and at what depth. HumanRelationship (in human-node.model.ts)
+ * captures the SEMANTIC layer - what KIND of relationship it is.
+ *
+ * See human-node.model.ts for HumanNode and HumanRelationship types.
  *
  * Example: "I attest I am married to X" + "I attest I am married to Y"
  * enables X and Y to have their Elohim agents craft a love map path.
@@ -84,14 +91,14 @@ export type ConsentState =
 // =========================================================================
 
 /**
- * HumanConsent - A consent-based relationship between two humans.
+ * HumanConsent - The permission layer for human-to-human relationships.
  *
- * This is NOT a graph edge - humans don't become nodes in the knowledge graph.
- * Instead, this record governs:
+ * This governs WHETHER a relationship can exist and at what depth:
  * - What visibility levels each human has to the other's content
  * - Whether agent-to-agent negotiation is permitted
  * - What attestation-gated resources they can access together
  *
+ * Paired with HumanRelationship which captures WHAT KIND of relationship.
  * Stored on both humans' private source chains for sovereignty.
  */
 export interface HumanConsent {

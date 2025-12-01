@@ -1,0 +1,66 @@
+{
+  "id": "human-dan-developer",
+  "displayName": "Dan",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "public",
+  "acceptingConnections": true,
+  "bio": "Software developer at EthosEngine. Passionate about open source, distributed systems, and building tools that respect users.",
+  "avatarUrl": "assets/avatars/human-dan-developer.jpg",
+  "primaryLocation": {
+    "layer": "municipality",
+    "displayName": "Metro City",
+    "reach": "community",
+    "type": "municipality"
+  },
+  "organizationIds": [
+    "org-ethosengine"
+  ],
+  "communityIds": [
+    "community-rust-meetup",
+    "community-holochain-devs"
+  ],
+  "affinityGroupIds": [
+    "affinity-holochain",
+    "affinity-rust",
+    "affinity-distributed-systems",
+    "affinity-open-source",
+    "affinity-privacy"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-holochain",
+    "concept-rust",
+    "concept-distributed-systems",
+    "concept-open-source",
+    "concept-privacy"
+  ],
+  "publicAttestationIds": [
+    "attestation-rust-developer",
+    "attestation-holochain-basics"
+  ],
+  "relationshipIds": [
+    "rel-0005"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "workplace",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "municipality"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

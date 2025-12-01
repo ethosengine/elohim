@@ -1,0 +1,60 @@
+{
+  "id": "human-janice-janitor",
+  "displayName": "Janice",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "network",
+  "acceptingConnections": true,
+  "bio": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
+  "avatarUrl": "assets/avatars/human-janice-janitor.jpg",
+  "primaryLocation": {
+    "layer": "municipality",
+    "displayName": "Valley Town",
+    "reach": "community",
+    "type": "municipality"
+  },
+  "organizationIds": [
+    "org-valley-school-district"
+  ],
+  "communityIds": [
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-practical-skills",
+    "affinity-community-service",
+    "affinity-family"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-practical-skills",
+    "concept-community-service",
+    "concept-family"
+  ],
+  "relationshipIds": [
+    "rel-0022"
+  ],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "edge-case",
+    "governanceLayers": [
+      "community",
+      "workplace",
+      "municipality"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": [
+      "limited-screen-time",
+      "simple-interface"
+    ],
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": "Low-tech-engagement user. Important for demonstrating reach/trust works for casual users."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

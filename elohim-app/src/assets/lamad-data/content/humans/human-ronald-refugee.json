@@ -1,0 +1,66 @@
+{
+  "id": "human-ronald-refugee",
+  "displayName": "Ronald",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+  "avatarUrl": "assets/avatars/human-ronald-refugee.jpg",
+  "primaryLocation": {
+    "layer": "municipality",
+    "displayName": "Metro City",
+    "reach": "community",
+    "type": "municipality"
+  },
+  "communityIds": [
+    "community-refugee-resettlement",
+    "community-engineers-network"
+  ],
+  "affinityGroupIds": [
+    "affinity-engineering",
+    "affinity-refugee-rights",
+    "affinity-professional-recertification",
+    "affinity-community-building"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-engineering",
+    "concept-refugee-rights",
+    "concept-professional-recertification",
+    "concept-community-building"
+  ],
+  "relationshipIds": [],
+  "trustedConnectionCount": 0,
+  "_metadata": {
+    "category": "newcomer",
+    "governanceLayers": [
+      "community",
+      "municipality"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": [
+      "translation-support"
+    ],
+    "languagePreferences": {
+      "primary": "ar",
+      "secondary": "en",
+      "learningLevel": "advanced"
+    },
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": [
+      {
+        "type": "degree",
+        "name": "Bachelor of Engineering - Civil",
+        "status": "pending-equivalency"
+      }
+    ],
+    "designNotes": "Represents legitimate foreign credentials pending verification (contrast with dolittle-doctor fraud)."
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

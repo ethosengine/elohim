@@ -1,0 +1,55 @@
+{
+  "id": "human-sammy-son",
+  "displayName": "Sammy",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "network",
+  "acceptingConnections": true,
+  "bio": "Learning about the world. Interested in games, building things, and asking questions.",
+  "avatarUrl": "assets/avatars/human-sammy-son.jpg",
+  "communityIds": [
+    "community-homeschool-coop"
+  ],
+  "affinityGroupIds": [
+    "affinity-games",
+    "affinity-building",
+    "affinity-science",
+    "affinity-animals"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-games",
+    "concept-building",
+    "concept-science",
+    "concept-animals"
+  ],
+  "relationshipIds": [
+    "rel-0001",
+    "rel-0002",
+    "rel-0004",
+    "rel-0009"
+  ],
+  "trustedConnectionCount": 3,
+  "_metadata": {
+    "category": "core-family",
+    "governanceLayers": [
+      "community",
+      "family"
+    ],
+    "ageCategory": "minor",
+    "guardianIds": [
+      "human-matthew-manager",
+      "human-susan-spouse"
+    ],
+    "hasGuardian": true,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

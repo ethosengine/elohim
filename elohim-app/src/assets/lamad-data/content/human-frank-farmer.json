@@ -1,0 +1,101 @@
+{
+  "id": "human-frank-farmer",
+  "did": "did:web:elohim.host:human:frank-farmer",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Frank",
+  "description": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+  "content": {
+    "displayName": "Frank",
+    "bio": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+    "profileReach": "community",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "county_regional",
+      "displayName": "Valley County",
+      "reach": "community"
+    },
+    "organizations": [
+      {
+        "id": "org-franks-farm",
+        "name": "Frank's Family Farm",
+        "role": "owner"
+      }
+    ],
+    "communities": [
+      "community-farmers-market",
+      "community-regen-ag-network"
+    ],
+    "publicAffinities": [
+      "regenerative-agriculture",
+      "local-food",
+      "soil-health",
+      "traditional-farming",
+      "sustainability"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/frank-farmer/profile.json",
+  "tags": [
+    "layer-county_regional",
+    "role-owner",
+    "regenerative-agriculture",
+    "local-food",
+    "sustainability",
+    "local-economy",
+    "soil-health",
+    "human-graph",
+    "traditional-farming",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "local-economy",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "county_regional"
+    ],
+    "organizationCount": 1,
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Frank",
+    "ogDescription": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-frank-farmer",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-frank-farmer.jpg",
+    "ogImageAlt": "Frank's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-frank-farmer",
+    "identifier": "did:web:elohim.host:human:frank-farmer",
+    "name": "Frank",
+    "description": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley County",
+      "description": "county_regional"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Frank's Family Farm",
+        "@id": "org-franks-farm"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328488",
+  "updatedAt": "2025-12-01T20:08:11.328489"
+}

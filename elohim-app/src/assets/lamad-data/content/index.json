@@ -54479,8 +54479,976 @@
         "action"
       ],
       "category": "fct-practice"
+    },
+    {
+      "id": "human-matthew-manager",
+      "title": "Matthew",
+      "description": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
+      "contentType": "human",
+      "tags": [
+        "holochain",
+        "governance",
+        "core-family",
+        "christian-theology",
+        "ai-ethics",
+        "family-systems",
+        "role-founder",
+        "layer-neighborhood",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "core-family"
+    },
+    {
+      "id": "human-susan-spouse",
+      "title": "Susan",
+      "description": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
+      "contentType": "human",
+      "tags": [
+        "community-building",
+        "core-family",
+        "family-systems",
+        "reach-network",
+        "health-wellness",
+        "education",
+        "layer-neighborhood",
+        "human-graph",
+        "human"
+      ],
+      "category": "core-family"
+    },
+    {
+      "id": "human-sammy-son",
+      "title": "Sammy",
+      "description": "Learning about the world. Interested in games, building things, and asking questions.",
+      "contentType": "human",
+      "tags": [
+        "core-family",
+        "animals",
+        "games",
+        "minor",
+        "reach-network",
+        "science",
+        "building",
+        "human-graph",
+        "human"
+      ],
+      "category": "core-family"
+    },
+    {
+      "id": "human-gertrude-grandma",
+      "title": "Gertrude",
+      "description": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
+      "contentType": "human",
+      "tags": [
+        "faith",
+        "core-family",
+        "family-history",
+        "gardening",
+        "cooking",
+        "reach-network",
+        "layer-neighborhood",
+        "human-graph",
+        "human"
+      ],
+      "category": "core-family"
+    },
+    {
+      "id": "human-dan-developer",
+      "title": "Dan",
+      "description": "Software developer at EthosEngine. Passionate about open source, distributed systems, and building tools that respect users.",
+      "contentType": "human",
+      "tags": [
+        "holochain",
+        "workplace",
+        "open-source",
+        "human",
+        "reach-public",
+        "privacy",
+        "distributed-systems",
+        "rust",
+        "human-graph",
+        "role-developer",
+        "layer-municipality"
+      ],
+      "category": "workplace"
+    },
+    {
+      "id": "human-nancy-neighbor",
+      "title": "Nancy",
+      "description": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
+      "contentType": "human",
+      "tags": [
+        "mutual-aid",
+        "neighborhood-safety",
+        "community",
+        "community-organizing",
+        "local-government",
+        "layer-neighborhood",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "human-pam-polarized",
+      "title": "Pam",
+      "description": "Passionate about truth. Tired of being manipulated by media. Looking for authentic community and honest conversation.",
+      "contentType": "human",
+      "tags": [
+        "faith",
+        "politics",
+        "community",
+        "reach-network",
+        "truth-seeking",
+        "layer-neighborhood",
+        "human-graph",
+        "media-literacy",
+        "human"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "human-janice-janitor",
+      "title": "Janice",
+      "description": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
+      "contentType": "human",
+      "tags": [
+        "role-custodian",
+        "human",
+        "community-service",
+        "reach-network",
+        "edge-case",
+        "practical-skills",
+        "family",
+        "human-graph",
+        "layer-municipality"
+      ],
+      "category": "edge-case"
+    },
+    {
+      "id": "human-pete-pastor",
+      "title": "Pastor Pete",
+      "description": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
+      "contentType": "human",
+      "tags": [
+        "christian-theology",
+        "faith-and-technology",
+        "role-pastor",
+        "layer-community",
+        "human-graph",
+        "pastoral-care",
+        "community-building",
+        "affinity",
+        "discipleship",
+        "reach-community",
+        "human"
+      ],
+      "category": "affinity"
+    },
+    {
+      "id": "human-timothy-tutor",
+      "title": "Timothy",
+      "description": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
+      "contentType": "human",
+      "tags": [
+        "youth-development",
+        "faith-formation",
+        "role-facilitator",
+        "layer-community",
+        "human-graph",
+        "education",
+        "mastery-learning",
+        "learning-science",
+        "affinity",
+        "reach-community",
+        "human"
+      ],
+      "category": "affinity"
+    },
+    {
+      "id": "human-tommy-teacher",
+      "title": "Tommy",
+      "description": "Public school teacher. 20 years in the classroom. Trying to help every kid find their potential.",
+      "contentType": "human",
+      "tags": [
+        "role-teacher",
+        "youth-development",
+        "differentiated-learning",
+        "human",
+        "public-schools",
+        "teacher-advocacy",
+        "role-building-rep",
+        "human-graph",
+        "education",
+        "affinity",
+        "reach-community",
+        "layer-municipality"
+      ],
+      "category": "affinity"
+    },
+    {
+      "id": "human-meriadoc-moneybags",
+      "title": "Meriadoc",
+      "description": "Community investor and philanthropist. Interested in funding projects that build genuine community wealth.",
+      "contentType": "human",
+      "tags": [
+        "regenerative-finance",
+        "layer-county_regional",
+        "impact-investing",
+        "community-economics",
+        "reach-network",
+        "social-enterprise",
+        "rea-economics",
+        "human-graph",
+        "role-board-member",
+        "affinity",
+        "human"
+      ],
+      "category": "affinity"
+    },
+    {
+      "id": "human-frank-farmer",
+      "title": "Frank",
+      "description": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+      "contentType": "human",
+      "tags": [
+        "layer-county_regional",
+        "role-owner",
+        "regenerative-agriculture",
+        "local-food",
+        "sustainability",
+        "local-economy",
+        "soil-health",
+        "human-graph",
+        "traditional-farming",
+        "reach-community",
+        "human"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-georgina-grocer",
+      "title": "Georgina",
+      "description": "Owner of Valley Market, the local grocery store. Connecting farmers to families for 15 years.",
+      "contentType": "human",
+      "tags": [
+        "human",
+        "role-owner",
+        "community-economics",
+        "local-food",
+        "small-business",
+        "local-economy",
+        "supply-chain",
+        "human-graph",
+        "reach-community",
+        "layer-municipality"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-manny-manufacturer",
+      "title": "Manny",
+      "description": "Third-generation manufacturer. Running our family's machine shop, adapting to the new economy.",
+      "contentType": "human",
+      "tags": [
+        "manufacturing",
+        "layer-county_regional",
+        "skilled-trades",
+        "role-owner",
+        "local-economy",
+        "worker-ownership",
+        "supply-chain",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-bub-builder",
+      "title": "Bub",
+      "description": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+      "contentType": "human",
+      "tags": [
+        "layer-county_regional",
+        "sustainable-building",
+        "skilled-trades",
+        "role-owner",
+        "quality-craftsmanship",
+        "local-economy",
+        "construction",
+        "apprenticeship",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-ginny-gigworker",
+      "title": "Ginny",
+      "description": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+      "contentType": "human",
+      "tags": [
+        "human",
+        "worker-rights",
+        "fair-wages",
+        "platform-cooperatives",
+        "portable-benefits",
+        "local-economy",
+        "gig-economy",
+        "human-graph",
+        "reach-community",
+        "layer-municipality"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-mary-miner",
+      "title": "Mary",
+      "description": "Working the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.",
+      "contentType": "human",
+      "tags": [
+        "role-steward",
+        "layer-county_regional",
+        "just-transition",
+        "community-resilience",
+        "automation-impacts",
+        "local-economy",
+        "labor-rights",
+        "role-worker",
+        "human-graph",
+        "union-organizing",
+        "reach-community",
+        "human"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-lenny-lineworker",
+      "title": "Lenny",
+      "description": "Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.",
+      "contentType": "human",
+      "tags": [
+        "union-labor",
+        "layer-county_regional",
+        "infrastructure",
+        "role-member",
+        "grid-resilience",
+        "role-journeyman-lineman",
+        "local-economy",
+        "electrical-work",
+        "public-safety",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "local-economy"
+    },
+    {
+      "id": "human-mary-migrant",
+      "title": "Maria",
+      "description": "Came here for a better life. Working hard, learning the language, trying to build a future for my family.",
+      "contentType": "human",
+      "tags": [
+        "faith",
+        "family",
+        "newcomer",
+        "reach-network",
+        "community-integration",
+        "language-learning",
+        "layer-neighborhood",
+        "human-graph",
+        "human"
+      ],
+      "category": "newcomer"
+    },
+    {
+      "id": "human-ronald-refugee",
+      "title": "Ronald",
+      "description": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+      "contentType": "human",
+      "tags": [
+        "newcomer",
+        "human",
+        "refugee-rights",
+        "engineering",
+        "professional-recertification",
+        "community-building",
+        "human-graph",
+        "reach-community",
+        "layer-municipality"
+      ],
+      "category": "newcomer"
+    },
+    {
+      "id": "human-traveler",
+      "title": "Traveler",
+      "description": "Anonymous explorer. Just passing through, learning about this place.",
+      "contentType": "human",
+      "tags": [
+        "pseudonymous",
+        "visitor",
+        "reach-hidden",
+        "human-graph",
+        "human"
+      ],
+      "category": "visitor"
+    },
+    {
+      "id": "human-charlie-challenged",
+      "title": "Charlie",
+      "description": "Truth-seeker. The mainstream doesn't want you to know what I know.",
+      "contentType": "human",
+      "tags": [
+        "anti-establishment",
+        "flagged",
+        "red-team",
+        "alternative-medicine",
+        "viral-content",
+        "conspiracy-theories",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "red-team"
+    },
+    {
+      "id": "human-sam-shipper",
+      "title": "Sam",
+      "description": "Entrepreneur. Building the future of commerce. DM me for opportunities!",
+      "contentType": "human",
+      "tags": [
+        "flagged",
+        "reach-public",
+        "dropshipping",
+        "red-team",
+        "passive-income",
+        "hustle-culture",
+        "crypto",
+        "human-graph",
+        "human"
+      ],
+      "category": "red-team"
+    },
+    {
+      "id": "human-renold-regent",
+      "title": "Renold",
+      "description": "Community leader. Protecting our values and way of life. If you're not with us, you're against us.",
+      "contentType": "human",
+      "tags": [
+        "flagged",
+        "group-loyalty",
+        "red-team",
+        "role-president",
+        "traditional-values",
+        "community-purity",
+        "exclusivity",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "red-team"
+    },
+    {
+      "id": "human-dolittle-doctor",
+      "title": "Dr. Dolittle",
+      "description": "Medical professional. 30 years experience. I know things they don't teach in schools anymore.",
+      "contentType": "human",
+      "tags": [
+        "medical-freedom",
+        "flagged",
+        "natural-health",
+        "red-team",
+        "alternative-medicine",
+        "wellness",
+        "human-graph",
+        "reach-community",
+        "human"
+      ],
+      "category": "red-team"
+    },
+    {
+      "id": "human-tiffany-teen",
+      "title": "Tiffany",
+      "description": "Just vibing. Follow for follow?",
+      "contentType": "human",
+      "tags": [
+        "social-media",
+        "flagged",
+        "trends",
+        "fashion",
+        "minor",
+        "music",
+        "reach-network",
+        "red-team",
+        "unguarded-minor",
+        "layer-neighborhood",
+        "human-graph",
+        "human"
+      ],
+      "category": "red-team"
+    },
+    {
+      "id": "org-ethosengine",
+      "title": "EthosEngine",
+      "description": "Organization with 2 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-valley-school-district",
+      "title": "Valley School District",
+      "description": "Organization with 2 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-community-church",
+      "title": "Community Church",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-learning-collective",
+      "title": "Valley Learning Collective",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-teachers-union",
+      "title": "Valley Teachers Union",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-community-foundation",
+      "title": "Valley Community Foundation",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-franks-farm",
+      "title": "Frank's Family Farm",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-valley-market",
+      "title": "Valley Market",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-valley-machine-works",
+      "title": "Valley Machine Works",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-bub-construction",
+      "title": "Bub's Construction",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-consolidated-mining",
+      "title": "Consolidated Mining Corp",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-miners-union-local-347",
+      "title": "Miners Union Local 347",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-valley-power-electric",
+      "title": "Valley Power & Electric",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-ibew-local-123",
+      "title": "IBEW Local 123",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "org-pure-valley-association",
+      "title": "Pure Valley Community Association",
+      "description": "Organization with 1 members",
+      "contentType": "organization",
+      "tags": [
+        "organization",
+        "human-graph",
+        "governance"
+      ],
+      "category": "organization"
+    },
+    {
+      "id": "community-local-church",
+      "title": "Local Church",
+      "description": "Community with 13 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-homeschool-coop",
+      "title": "Homeschool Coop",
+      "description": "Community with 3 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-garden-club",
+      "title": "Garden Club",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-rust-meetup",
+      "title": "Rust Meetup",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-holochain-devs",
+      "title": "Holochain Devs",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-neighborhood-association",
+      "title": "Neighborhood Association",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-pastoral-network",
+      "title": "Pastoral Network",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-educators-network",
+      "title": "Educators Network",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-impact-investors",
+      "title": "Impact Investors",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-farmers-market",
+      "title": "Farmers Market",
+      "description": "Community with 2 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-regen-ag-network",
+      "title": "Regen Ag Network",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-local-business",
+      "title": "Local Business",
+      "description": "Community with 2 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-manufacturers-guild",
+      "title": "Manufacturers Guild",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-builders-guild",
+      "title": "Builders Guild",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-apprenticeship-program",
+      "title": "Apprenticeship Program",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-gig-workers-alliance",
+      "title": "Gig Workers Alliance",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-rideshare-drivers",
+      "title": "Rideshare Drivers",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-mining-town",
+      "title": "Mining Town",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-utility-workers",
+      "title": "Utility Workers",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-immigrant-support",
+      "title": "Immigrant Support",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-esl-program",
+      "title": "Esl Program",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-refugee-resettlement",
+      "title": "Refugee Resettlement",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
+    },
+    {
+      "id": "community-engineers-network",
+      "title": "Engineers Network",
+      "description": "Community with 1 members",
+      "contentType": "community",
+      "tags": [
+        "community",
+        "human-graph",
+        "governance"
+      ],
+      "category": "community"
     }
   ],
-  "lastUpdated": "2025-11-28T21:10:19.507813",
-  "totalCount": 3403
+  "lastUpdated": "2025-12-01T20:29:49.320609Z",
+  "totalCount": 3468
 }

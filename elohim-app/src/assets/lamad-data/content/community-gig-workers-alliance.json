@@ -1,0 +1,30 @@
+{
+  "id": "community-gig-workers-alliance",
+  "did": "did:web:elohim.host:community:gig-workers-alliance",
+  "contentType": "organization",
+  "activityPubType": "Group",
+  "title": "Gig Workers Alliance",
+  "description": "Community with 1 members",
+  "content": {
+    "name": "Gig Workers Alliance",
+    "memberCount": 1,
+    "memberIds": [
+      "human-ginny-gigworker"
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "community",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-ginny-gigworker"
+  ],
+  "metadata": {
+    "category": "community",
+    "memberCount": 1
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}
