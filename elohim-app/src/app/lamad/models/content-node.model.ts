@@ -160,6 +160,15 @@ export interface ContentNode {
    */
   placeData?: Place;
 
+  /**
+   * If this content IS a role (contentType: 'role').
+   * Roles are capability attestation targets - knowledge/skill sets that humans
+   * can demonstrate mastery of and earn attestations for.
+   *
+   * Examples: "TypeScript Developer", "FCT Facilitator", "Holochain Contributor"
+   */
+  roleMetadata?: RoleMetadata;
+
   // =========================================================================
   // Linked Data / Semantic Web (JSON-LD)
   // =========================================================================
@@ -277,7 +286,82 @@ export type ContentType =
   | 'assessment'
   | 'organization'
   | 'book-chapter'
-  | 'tool';
+  | 'tool'
+  | 'role'; // Capability attestation target (e.g., "TypeScript Developer", "FCT Facilitator")
+
+/**
+ * RoleMetadata - Extended metadata for role-type ContentNodes.
+ *
+ * Roles are capability attestation targets - knowledge/skill sets that humans
+ * can demonstrate mastery of and earn attestations for.
+ *
+ * Examples:
+ * - "TypeScript Developer" - demonstrates TS proficiency through path completion
+ * - "FCT Facilitator" - earns facilitator role through FCT mastery path
+ * - "Holochain Contributor" - recognized contributor to Holochain ecosystem
+ *
+ * Roles connect the knowledge graph to real-world capabilities and value creation.
+ */
+export interface RoleMetadata {
+  /** Display title for the role */
+  title: string;
+
+  /** Description of what this role represents */
+  description: string;
+
+  /**
+   * Category of role for grouping/filtering.
+   *
+   * - 'technical': Programming, engineering, technical skills
+   * - 'facilitation': Teaching, mentoring, community leadership
+   * - 'creative': Design, writing, content creation
+   * - 'leadership': Governance, management, strategic roles
+   * - 'domain': Domain-specific expertise (e.g., economics, ecology)
+   * - 'other': Uncategorized roles
+   */
+  category: 'technical' | 'facilitation' | 'creative' | 'leadership' | 'domain' | 'other';
+
+  /**
+   * Learning paths that lead to this role attestation.
+   * Completing any of these paths qualifies for role attestation.
+   */
+  attestationPathIds: string[];
+
+  /**
+   * Minimum mastery level required across the attestation path.
+   * Default is 'apply' (attestation gate) - demonstrates practical application.
+   */
+  requiredMasteryLevel: import('./agent.model').BloomMasteryLevel;
+
+  /**
+   * Skills/competencies this role encompasses.
+   * Links to concept nodes that form the skill graph.
+   */
+  skillConceptIds?: string[];
+
+  /**
+   * Prerequisites - other roles that should be attested first.
+   */
+  prerequisiteRoleIds?: string[];
+
+  /**
+   * Organizations that recognize this role.
+   * Useful for professional credentials/endorsements.
+   */
+  recognizedByOrgIds?: string[];
+
+  /**
+   * Is this role actively being used for attestations?
+   * Roles can be deprecated but kept for historical attestations.
+   */
+  isActive: boolean;
+
+  /**
+   * How many humans currently hold this role attestation?
+   * Denormalized for display purposes, updated periodically.
+   */
+  attestedCount?: number;
+}
 
 /**
  * ContentFormat - How the content payload should be interpreted and rendered.

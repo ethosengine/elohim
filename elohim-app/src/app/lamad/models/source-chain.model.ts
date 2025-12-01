@@ -108,7 +108,13 @@ export type LamadEntryType =
   // Governance entries
   | 'governance-vote'         // Vote on a proposal
   | 'challenge-filed'         // Challenge to content
-  | 'review-submitted';       // Review of content
+  | 'review-submitted'        // Review of content
+
+  // Consent & Relationship entries
+  | 'human-consent'           // Consent relationship between two humans
+  | 'consent-state-change'    // Record of consent state transition
+  | 'path-negotiation'        // Love map negotiation session
+  | 'negotiation-message';    // Message in a negotiation
 
 // =============================================================================
 // LINK TYPES
@@ -197,7 +203,13 @@ export type LamadLinkType =
 
   // Correction links
   | 'correction-of'           // New entry → corrected entry
-  | 'supersedes';             // New entry → superseded entry
+  | 'supersedes'              // New entry → superseded entry
+
+  // Consent & Relationship links
+  | 'consent-with-human'      // Human → consent relationship with another human
+  | 'consent-from-human'      // Human → consent relationship FROM another human
+  | 'negotiation-for-consent' // Consent → negotiation session
+  | 'path-from-negotiation';  // Negotiation → generated path
 
 // =============================================================================
 // QUERY TYPES
@@ -363,4 +375,98 @@ export interface ChainMigrationPackage {
 
   /** Migration status */
   status: 'pending' | 'in-progress' | 'completed' | 'failed';
+}
+
+// =============================================================================
+// CONSENT & RELATIONSHIP CONTENT TYPES
+// =============================================================================
+
+/**
+ * Content structure for 'human-consent' entry.
+ */
+export interface HumanConsentContent {
+  /** Consent relationship ID */
+  consentId: string;
+
+  /** Human who initiated the relationship */
+  initiatorId: string;
+
+  /** Human who received the request */
+  participantId: string;
+
+  /** Current intimacy level */
+  intimacyLevel: 'recognition' | 'connection' | 'trusted' | 'intimate';
+
+  /** State of consent */
+  consentState: 'not_required' | 'pending' | 'accepted' | 'declined' | 'revoked';
+
+  /** When consent state was last updated */
+  updatedAt: string;
+
+  /** When consent was given (if accepted) */
+  consentedAt?: string;
+
+  /** Request message */
+  requestMessage?: string;
+
+  /** Response message */
+  responseMessage?: string;
+
+  /** Attestation IDs validating this relationship */
+  validatingAttestationIds?: string[];
+
+  /** Required attestation type */
+  requiredAttestationType?: string;
+}
+
+/**
+ * Content structure for 'path-negotiation' entry.
+ */
+export interface PathNegotiationContent {
+  /** Negotiation ID */
+  negotiationId: string;
+
+  /** Initiator human ID */
+  initiatorId: string;
+
+  /** Participant human ID */
+  participantId: string;
+
+  /** Negotiation status */
+  status: 'proposed' | 'analyzing' | 'negotiating' | 'accepted' | 'declined' | 'failed' | 'expired';
+
+  /** Consent ID authorizing this negotiation */
+  consentId: string;
+
+  /** Shared affinity node IDs */
+  sharedAffinityNodes: string[];
+
+  /** Bridging strategy */
+  bridgingStrategy?: 'shortest_path' | 'maximum_overlap' | 'complementary' | 'exploration' | 'custom';
+
+  /** Generated path ID */
+  generatedPathId?: string;
+
+  /** When negotiation was resolved */
+  resolvedAt?: string;
+}
+
+/**
+ * Content structure for 'negotiation-message' entry.
+ */
+export interface NegotiationMessageContent {
+  /** Negotiation ID this message belongs to */
+  negotiationId: string;
+
+  /** Message author ID */
+  authorId: string;
+
+  /** Message type */
+  type: 'proposal' | 'counter' | 'accept' | 'decline' | 'question' | 'comment' | 'system' | 'agent';
+
+  /** Message content */
+  content: string;
+
+  /** Structured metadata */
+  metadata?: Record<string, unknown>;
 }

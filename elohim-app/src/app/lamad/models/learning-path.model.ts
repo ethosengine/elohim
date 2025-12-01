@@ -56,8 +56,71 @@ export interface LearningPath {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   estimatedDuration: string;
 
-  // Access control
-  visibility: 'public' | 'organization' | 'private';
+  // =========================================================================
+  // Visibility & Consent (Graduated Intimacy Model)
+  // =========================================================================
+
+  /**
+   * Path visibility level - determines who can discover and access this path.
+   *
+   * Graduated intimacy model (matching human consent levels):
+   * - 'public': Anyone can discover and follow
+   * - 'connections': Only mutual connections can see
+   * - 'trusted': Only trusted circle can see
+   * - 'intimate': Only love-map participants (emergent paths)
+   *
+   * Legacy values still supported:
+   * - 'organization': Maps to 'connections' (deprecated)
+   * - 'private': Maps to creator-only (no participants)
+   */
+  visibility: PathVisibility;
+
+  /**
+   * For intimate/shared paths - human IDs who can access this path.
+   * Empty or undefined means only the creator can see (private).
+   */
+  participantIds?: string[];
+
+  /**
+   * Is this path emergent (generated from affinity analysis)?
+   *
+   * Emergent paths are created by comparing two humans' affinity patterns
+   * and generating a bridging path that connects their shared interests.
+   * These are "love map" paths - personalized journeys toward understanding.
+   */
+  isEmergent?: boolean;
+
+  /**
+   * For emergent paths - the negotiation that created this path.
+   * Links to PathNegotiation record for provenance.
+   */
+  negotiationId?: string;
+
+  /**
+   * Required attestations to access this path.
+   *
+   * Attestation-gated visibility enables consent-verified access:
+   * - "I attest I am married to X" + "I attest I am married to Y"
+   * - Only X and Y (with mutual attestations) can access their love map
+   *
+   * This is more powerful than participantIds because:
+   * - Attestations can be revoked (divorce)
+   * - Attestations carry semantic meaning (not just "who" but "relationship")
+   * - Attestations can be verified by others if needed
+   *
+   * Format: Array of attestation type IDs that are required.
+   * All required attestations must be present for access.
+   */
+  requiredAttestations?: string[];
+
+  /**
+   * For mutual attestation requirements (love maps).
+   *
+   * When true, the path requires BOTH participants to have
+   * attested the relationship (e.g., mutual marriage attestation).
+   * The attestation must reference the other participant.
+   */
+  requiresMutualAttestation?: boolean;
 
   // Prerequisites and outcomes
   prerequisitePaths?: string[];
@@ -347,4 +410,54 @@ export interface PathIndex {
   lastUpdated: string;
   totalCount: number;
   paths: PathIndexEntry[];
+}
+
+// =========================================================================
+// Path Visibility (Graduated Intimacy Model)
+// =========================================================================
+
+/**
+ * PathVisibility - Graduated intimacy levels for path access.
+ *
+ * Mirrors human consent levels to ensure paths can only be seen
+ * by those with appropriate relationship consent.
+ *
+ * - 'public': Anyone can discover and follow (commons)
+ * - 'connections': Mutual connections only (friend-level)
+ * - 'trusted': Trusted circle only (elevated trust)
+ * - 'intimate': Love-map participants only (attestation-gated)
+ *
+ * Legacy values (deprecated but supported):
+ * - 'organization': Maps to 'connections'
+ * - 'private': Creator-only (no participants)
+ */
+export type PathVisibility =
+  | 'public'
+  | 'connections'
+  | 'trusted'
+  | 'intimate'
+  // Legacy values (deprecated)
+  | 'organization'
+  | 'private';
+
+/**
+ * Maps legacy visibility values to graduated intimacy levels.
+ */
+export const VISIBILITY_MIGRATION: Record<string, PathVisibility> = {
+  organization: 'connections',
+  private: 'intimate', // Private paths become intimate (creator is only participant)
+};
+
+/**
+ * Checks if a visibility level requires consent verification.
+ */
+export function requiresConsent(visibility: PathVisibility): boolean {
+  return visibility !== 'public';
+}
+
+/**
+ * Checks if a visibility level requires attestation verification.
+ */
+export function requiresAttestation(visibility: PathVisibility): boolean {
+  return visibility === 'intimate';
 }
