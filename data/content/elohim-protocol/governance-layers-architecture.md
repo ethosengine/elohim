@@ -127,11 +127,11 @@ This directory structure serves as the organizational framework for:
 
 ## Related Documentation
 
-- `/docs/manifesto.md` - Complete constitutional architecture
+- `/data/content/elohim-protocol/manifesto.md` - Complete constitutional architecture
 - `/governance/elohim-governance-story.md` - Narrative explanation of governance system
-- `/value_scanner/` - Care economy implementation at family/community layers
-- `/public_observer/` - Civic transparency and democratic participation
-- `/autonomous_entity/` - Workplace transformation and organizational governance
+- `/data/content/elohim-protocol/value_scanner/` - Care economy implementation at family/community layers
+- `/data/content/elohim-protocol/public_observer/` - Civic transparency and democratic participation
+- `/data/content/elohim-protocol/autonomous_entity/` - Workplace transformation and organizational governance
 
 ---
 

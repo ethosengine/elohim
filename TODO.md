@@ -254,8 +254,8 @@ Cross-cutting governance domains:
 
 ## Resources
 
-- Main documentation: `/docs/`
-- Governance architecture: `/docs/elohim-governance-layers-architecture.md`
+- Main documentation: `/data/content/elohim-protocol/`
+- Governance architecture: `/data/content/elohim-protocol/governance-layers-architecture.md`
 - Governance reference: `/governance_layers/`
 - Generation script: `/generate_user_templates.py`
 

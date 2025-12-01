@@ -95,7 +95,7 @@ Top organizations with multiple epic relationships:
 ## Directory Structure
 
 ```
-elohim/docs/
+elohim/data/content/elohim-protocol/
 ├── value_scanner/organizations/        (18 orgs)
 │   ├── b_lab_global_site/
 │   │   └── README.md

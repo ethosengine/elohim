@@ -41,7 +41,7 @@ from datetime import datetime
 from typing import Optional
 
 # Paths
-FCT_SOURCE_DIR = Path("/projects/elohim/fct")
+FCT_SOURCE_DIR = Path("/projects/elohim/data/content/fct")
 OUTPUT_DIR = Path("src/assets/lamad-data")
 CONTENT_DIR = OUTPUT_DIR / "content"
 PATHS_DIR = OUTPUT_DIR / "paths"

@@ -497,7 +497,7 @@ This is the foundation for **intelligent content synthesis**—where an Elohim a
 Lamad is open source and welcomes contributions that align with Elohim Protocol principles:
 
 - **GitHub**: [Repository Link]
-- **Documentation**: This document and `/fct/claude.md`
+- **Documentation**: This document and `/data/content/fct/claude.md`
 - **Community**: [Community Link]
 
 Build something that serves human flourishing. Exit with Elohim.

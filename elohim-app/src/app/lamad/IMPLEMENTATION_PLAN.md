@@ -7,7 +7,7 @@ This document tracks the implementation status of the Lamad learning platform MV
 **Related Documents:**
 - [API Specification](./LAMAD_API_SPECIFICATION_v1.0.md) - Route patterns, data models, service contracts
 - [Imago Dei Framework](./Imago%20Dei_%20A%20Framework%20for%20Human-Centered%20Digital%20Identity.md) - Human-centered identity principles
-- [Economic Epic](../../docs/economic_coordination/epic.md) - REA at family scale, contributor stewardship
+- [Economic Epic](../../../../../data/content/elohim-protocol/economic_coordination/epic.md) - REA at family scale, contributor stewardship
 
 ---
 
