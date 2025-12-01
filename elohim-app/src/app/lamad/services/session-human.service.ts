@@ -150,7 +150,7 @@ export class SessionHumanService {
   setDisplayName(name: string): void {
     const session = this.sessionSubject.value;
     if (session) {
-      session.displayName = name.trim() ?? 'Traveler';
+      session.displayName = name.trim() || 'Traveler';
       session.lastActiveAt = new Date().toISOString();
       this.saveSession(session);
       this.sessionSubject.next({ ...session });
