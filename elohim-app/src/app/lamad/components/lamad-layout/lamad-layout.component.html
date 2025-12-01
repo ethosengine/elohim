@@ -77,8 +77,8 @@
   </footer>
 
   <!-- Upgrade Modal -->
-  <div *ngIf="showUpgradeModal" class="modal-overlay" (click)="closeUpgradeModal()" (keydown.escape)="closeUpgradeModal()" (keydown.enter)="closeUpgradeModal()" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
-    <div class="upgrade-modal" (click)="$event.stopPropagation()" role="document">
+  <dialog *ngIf="showUpgradeModal" class="modal-overlay" (click)="closeUpgradeModal()" (keydown.escape)="closeUpgradeModal()" (keydown.enter)="closeUpgradeModal()" open aria-labelledby="upgrade-modal-title">
+    <div class="upgrade-modal" (click)="$event.stopPropagation()">
       <button class="modal-close" (click)="closeUpgradeModal()">✕</button>
 
       <div class="modal-header">
@@ -164,5 +164,5 @@
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 </div>

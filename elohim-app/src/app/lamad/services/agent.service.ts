@@ -388,9 +388,7 @@ export class AgentService {
         };
 
         // Add to completed content (avoid duplicates)
-        if (!progress.completedContentIds) {
-          progress.completedContentIds = [];
-        }
+        progress.completedContentIds ??= [];
         if (!progress.completedContentIds.includes(contentId)) {
           progress.completedContentIds.push(contentId);
         }
@@ -592,7 +590,8 @@ export class AgentService {
         // Most recent path
         const mostRecentPathId = pathProgress.length > 0
           ? pathProgress.reduce((latest, p) =>
-              new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest
+              new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest,
+              pathProgress[0]
             ).pathId
           : null;
 

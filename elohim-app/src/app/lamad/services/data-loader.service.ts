@@ -300,18 +300,16 @@ export class DataLoaderService {
    * Returns the full attestation index.
    */
   getAttestations(): Observable<ContentAttestation[]> {
-    if (!this.attestationCache$) {
-      this.attestationCache$ = this.http.get<{ attestations: ContentAttestation[] }>(
-        `${this.basePath}/attestations/index.json`
-      ).pipe(
-        map(response => response.attestations ?? []),
-        shareReplay(1),
-        catchError(err => {
-          console.error('[DataLoaderService] Failed to load attestations', err);
-          return of([]);
-        })
-      );
-    }
+    this.attestationCache$ ??= this.http.get<{ attestations: ContentAttestation[] }>(
+      `${this.basePath}/attestations/index.json`
+    ).pipe(
+      map(response => response.attestations ?? []),
+      shareReplay(1),
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load attestations', err);
+        return of([]);
+      })
+    );
     return this.attestationCache$;
   }
 
@@ -448,22 +446,20 @@ export class DataLoaderService {
    * Use only for graph exploration features.
    */
   getGraph(): Observable<ContentGraph> {
-    if (!this.graphCache$) {
-      this.graphCache$ = forkJoin({
-        overview: this.http.get<ContentGraphMetadata>(`${this.basePath}/graph/overview.json`),
-        index: this.getContentIndex(),
-        relationships: this.http.get<{ relationships: Array<{ id: string; source: string; target: string; type: string }> }>(
-          `${this.basePath}/graph/relationships.json`
-        )
-      }).pipe(
-        map(({ overview, index, relationships }) => this.buildContentGraph(overview, index, relationships)),
-        shareReplay(1),
-        catchError(err => {
-          console.error('[DataLoaderService] Failed to load graph', err);
-          return of(this.createEmptyGraph());
-        })
-      );
-    }
+    this.graphCache$ ??= forkJoin({
+      overview: this.http.get<ContentGraphMetadata>(`${this.basePath}/graph/overview.json`),
+      index: this.getContentIndex(),
+      relationships: this.http.get<{ relationships: Array<{ id: string; source: string; target: string; type: string }> }>(
+        `${this.basePath}/graph/relationships.json`
+      )
+    }).pipe(
+      map(({ overview, index, relationships }) => this.buildContentGraph(overview, index, relationships)),
+      shareReplay(1),
+      catchError(err => {
+        console.error('[DataLoaderService] Failed to load graph', err);
+        return of(this.createEmptyGraph());
+      })
+    );
     return this.graphCache$;
   }
 

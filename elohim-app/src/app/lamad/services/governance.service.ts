@@ -189,11 +189,9 @@ export class GovernanceService {
    * Get all challenges.
    */
   getChallenges(): Observable<ChallengeRecord[]> {
-    if (!this.challengesCache$) {
-      this.challengesCache$ = this.dataLoader.getChallenges().pipe(
-        shareReplay(1)
-      );
-    }
+    this.challengesCache$ ??= this.dataLoader.getChallenges().pipe(
+      shareReplay(1)
+    );
     return this.challengesCache$;
   }
 
@@ -264,11 +262,9 @@ export class GovernanceService {
    * Get all proposals.
    */
   getProposals(): Observable<ProposalRecord[]> {
-    if (!this.proposalsCache$) {
-      this.proposalsCache$ = this.dataLoader.getProposals().pipe(
-        shareReplay(1)
-      );
-    }
+    this.proposalsCache$ ??= this.dataLoader.getProposals().pipe(
+      shareReplay(1)
+    );
     return this.proposalsCache$;
   }
 
@@ -365,11 +361,9 @@ export class GovernanceService {
    * Get all precedents.
    */
   getPrecedents(): Observable<PrecedentRecord[]> {
-    if (!this.precedentsCache$) {
-      this.precedentsCache$ = this.dataLoader.getPrecedents().pipe(
-        shareReplay(1)
-      );
-    }
+    this.precedentsCache$ ??= this.dataLoader.getPrecedents().pipe(
+      shareReplay(1)
+    );
     return this.precedentsCache$;
   }
 

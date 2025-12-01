@@ -181,9 +181,9 @@ export class TrustBadgeService {
   ): TrustIndicatorSet {
     const activeAttestations = attestations.filter(a => a.status === 'active');
     const attestationTypes = activeAttestations.map(a => a.attestationType);
-    const reach = content.reach || 'commons';
+    const reach = content.reach ?? 'commons';
     const trustScore = content.trustScore ?? this.computeTrustScore(activeAttestations);
-    const flags = content.flags || [];
+    const flags = content.flags ?? [];
     const hasWarnings = flags.length > 0;
 
     const trustLevel = calculateTrustLevel(reach, attestationTypes, hasWarnings);
@@ -269,9 +269,9 @@ export class TrustBadgeService {
   private computeBadge(content: ContentNode, attestations: ContentAttestation[]): TrustBadge {
     const activeAttestations = attestations.filter(a => a.status === 'active');
     const attestationTypes = activeAttestations.map(a => a.attestationType);
-    const reach = content.reach || 'commons';
+    const reach = content.reach ?? 'commons';
     const trustScore = content.trustScore ?? this.computeTrustScore(activeAttestations);
-    const flags = content.flags || [];
+    const flags = content.flags ?? [];
     const hasWarnings = flags.length > 0;
 
     const trustLevel = calculateTrustLevel(reach, attestationTypes, hasWarnings);

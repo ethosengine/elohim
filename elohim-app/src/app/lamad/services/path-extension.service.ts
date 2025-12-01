@@ -163,7 +163,7 @@ export class PathExtensionService {
           annotations: [],
           reorderings: [],
           exclusions: [],
-          visibility: params.visibility || 'private',
+          visibility: params.visibility ?? 'private',
           createdAt: now,
           updatedAt: now
         };
@@ -196,8 +196,8 @@ export class PathExtensionService {
           ...ext,
           id: forkedId,
           extendedBy: this.currentAgentId,
-          title: params?.title || `${ext.title} (fork)`,
-          description: params?.description || ext.description,
+          title: params?.title ?? `${ext.title} (fork)`,
+          description: params?.description ?? ext.description,
           forkedFrom: extensionId,
           forks: [],
           upstreamProposal: undefined,
@@ -428,7 +428,7 @@ export class PathExtensionService {
         return this.pathService.getPath(ext.basePathId).pipe(
           map(path => {
             if (!path) {
-              throw { code: 'NOT_FOUND', message: 'Base path not found' };
+              throw new Error('Base path not found');
             }
 
             return this.resolveExtension(path, ext);

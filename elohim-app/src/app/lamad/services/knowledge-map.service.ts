@@ -194,7 +194,7 @@ export class KnowledgeMapService {
       ownerId: this.currentAgentId,
       title: params.title,
       description: params.description,
-      visibility: params.visibility || 'private',
+      visibility: params.visibility ?? 'private',
       nodes: [],
       pathIds: [],
       overallAffinity: 0,
@@ -236,7 +236,7 @@ export class KnowledgeMapService {
       ownerId: this.currentAgentId,
       title: params.title,
       description: params.description,
-      visibility: params.visibility || 'private',
+      visibility: params.visibility ?? 'private',
       nodes: [],
       pathIds: [],
       overallAffinity: 0,
@@ -278,7 +278,7 @@ export class KnowledgeMapService {
       ownerId: this.currentAgentId,
       title: params.title,
       description: params.description,
-      visibility: params.visibility || 'shared',
+      visibility: params.visibility ?? 'shared',
       nodes: [],
       pathIds: [],
       overallAffinity: 0,
@@ -288,7 +288,7 @@ export class KnowledgeMapService {
         joinedAt: now,
         contributionCount: 0
       }],
-      governance: params.governance || {
+      governance: params.governance ?? {
         approvalModel: 'steward-only',
         membershipControl: 'steward-only'
       },
