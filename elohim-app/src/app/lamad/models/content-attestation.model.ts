@@ -10,6 +10,10 @@
  * - Agents need attestations to ACCESS certain content
  * - Content needs attestations to REACH certain audiences
  *
+ * Protocol Core Integration:
+ * - Uses ContentReach from content-node.model (aliased from ReachLevel)
+ * - Uses REACH_LEVEL_VALUES from protocol-core for numeric ordering
+ *
  * Holochain mapping:
  * - Entry type: "content_attestation"
  * - Links: content_node → content_attestation (one-to-many)
@@ -17,40 +21,23 @@
  * - Revocation: creates new entry with revoked status, doesn't delete
  */
 
+import { REACH_LEVEL_VALUES } from './protocol-core.model';
+import type { ContentReach } from './content-node.model';
+
+// Re-export ContentReach for backward compatibility
+export type { ContentReach } from './content-node.model';
+
 // ============================================================================
 // Content Reach Levels
 // ============================================================================
 
 /**
- * ContentReach - The audience a piece of content can reach.
+ * ContentReachLevel - Numeric ordering for comparison.
  *
- * Content starts at 'private' and earns broader reach through attestation.
- * This is the content equivalent of Agent.visibility.
- *
- * Inspired by:
- * - Mastodon's post visibility (public, unlisted, followers-only, direct)
- * - Academic peer review (preprint → reviewed → published)
- * - Content moderation trust levels
+ * Maps to REACH_LEVEL_VALUES from protocol-core.
+ * Kept for backward compatibility with existing code.
  */
-export type ContentReach =
-  | 'private'      // Only the author can see/access
-  | 'invited'      // Specific agents explicitly granted access
-  | 'local'        // Author's direct connections/network
-  | 'community'    // Members of specific communities/organizations
-  | 'federated'    // Multiple communities that have agreed to share
-  | 'commons';     // Public - available to all agents in the system
-
-/**
- * ContentReachLevel - Numeric ordering for comparison
- */
-export const CONTENT_REACH_LEVELS: Record<ContentReach, number> = {
-  'private': 0,
-  'invited': 1,
-  'local': 2,
-  'community': 3,
-  'federated': 4,
-  'commons': 5
-};
+export const CONTENT_REACH_LEVELS: Record<ContentReach, number> = REACH_LEVEL_VALUES;
 
 // ============================================================================
 // Content Attestation Types
@@ -81,14 +68,14 @@ export type ContentAttestationType =
  */
 export const DEFAULT_ATTESTATION_REACH_GRANTS: Record<ContentAttestationType, ContentReach> = {
   'author-verified': 'local',
-  'steward-approved': 'community',
-  'community-endorsed': 'community',
-  'peer-reviewed': 'federated',
+  'steward-approved': 'municipal',
+  'community-endorsed': 'neighborhood',
+  'peer-reviewed': 'bioregional',
   'governance-ratified': 'commons',
   'curriculum-canonical': 'commons',
-  'safety-reviewed': 'federated',
-  'accuracy-verified': 'federated',
-  'accessibility-checked': 'community',
+  'safety-reviewed': 'regional',
+  'accuracy-verified': 'regional',
+  'accessibility-checked': 'municipal',
   'license-cleared': 'commons'
 };
 
@@ -334,13 +321,24 @@ export const DEFAULT_REACH_REQUIREMENTS: Record<ContentReach, ContentReachRequir
     requiredAttestations: ['author-verified'],
     minimumTrustScore: 0.2,
   },
-  'community': {
-    reach: 'community',
+  'neighborhood': {
+    reach: 'neighborhood',
+    requiredAttestations: ['author-verified', 'community-endorsed'],
+    minimumTrustScore: 0.3,
+  },
+  'municipal': {
+    reach: 'municipal',
     requiredAttestations: ['steward-approved', 'community-endorsed', 'safety-reviewed'],
     minimumTrustScore: 0.4,
   },
-  'federated': {
-    reach: 'federated',
+  'bioregional': {
+    reach: 'bioregional',
+    requiredAttestations: ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
+    minimumTrustScore: 0.5,
+    noFlags: ['disputed'],
+  },
+  'regional': {
+    reach: 'regional',
     requiredAttestations: ['peer-reviewed', 'governance-ratified'],
     minimumTrustScore: 0.6,
     noFlags: ['disputed', 'under-review'],

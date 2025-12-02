@@ -454,19 +454,31 @@ export const REACH_BADGE_CONFIG: Record<ContentReach, { icon: string; label: str
     icon: '🏠',
     label: 'Local',
     color: 'gray',
-    description: 'Visible to author\'s network'
+    description: 'Visible to household'
   },
-  'community': {
+  'neighborhood': {
     icon: '🏘️',
-    label: 'Community',
-    color: 'green',
-    description: 'Available to community members'
+    label: 'Neighborhood',
+    color: 'gray',
+    description: 'Visible to immediate area'
   },
-  'federated': {
-    icon: '🌐',
-    label: 'Federated',
+  'municipal': {
+    icon: '🏛️',
+    label: 'Municipal',
+    color: 'green',
+    description: 'Available to city/town'
+  },
+  'bioregional': {
+    icon: '🌿',
+    label: 'Bioregional',
+    color: 'green',
+    description: 'Available to watershed/ecosystem'
+  },
+  'regional': {
+    icon: '🗺️',
+    label: 'Regional',
     color: 'blue',
-    description: 'Shared across communities'
+    description: 'Available to state/province'
   },
   'commons': {
     icon: '🌍',

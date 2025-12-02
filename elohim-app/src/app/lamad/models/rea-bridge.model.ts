@@ -1,17 +1,28 @@
 /**
- * REA Bridge Models - ValueFlows Ontology for Lamad
+ * REA Bridge Models - ValueFlows Ontology for Economic Coordination
  *
- * This module bridges Lamad's learning platform to the hREA (Holochain REA)
- * economic coordination framework. These types establish contracts that will
- * be fulfilled by Holochain integration while supporting the current prototype.
+ * Part of the economic layer of the Elohim Protocol.
+ * Provides the economic substrate - how value flows.
+ *
+ * This module bridges the content graph and human graph to the
+ * hREA (Holochain REA) economic coordination framework. These types establish
+ * contracts that will be fulfilled by Holochain integration while supporting
+ * the current prototype.
  *
  * ValueFlows Core Concepts:
  * - Agent: Who participates (humans, orgs, Elohim, creator presences)
- * - Resource: What flows (content, attention, recognition, credentials)
+ * - Resource: What flows (content, attention, recognition, credentials, tokens)
  * - Event: What happened (view, appreciate, cite, transfer, claim)
  * - Process: Transformation (learning paths as value-creating processes)
  *
- * Key Insight from Economic Epic:
+ * Economic Model:
+ * - Value-aware accounting (every token carries its origin story)
+ * - Constitutional governance of value flows
+ * - Token types: care, time, learning, steward, creator, infrastructure
+ * - Demurrage on hoarding (value decays back to commons)
+ * - Attribution persistence (contributions remembered even when offline)
+ *
+ * Key Insight:
  * "REA doesn't ask 'how much money?' It asks 'what actually happened?'"
  *
  * Holochain mapping:
@@ -19,11 +30,27 @@
  * - IDs become ActionHashes in production
  * - Events form the immutable audit trail on agent source chains
  *
+ * Protocol Core Integration:
+ * - Uses TokenType from protocol-core for token categories
+ * - Uses GovernanceLayer from protocol-core for flow governance
+ * - Uses Attestation patterns from protocol-core
+ * - Uses ProtocolAgent as base for REAAgent
+ *
  * References:
  * - ValueFlows: https://www.valueflo.ws
  * - hREA: https://github.com/h-REA/hREA
  * - hREA Docs: https://docs.hrea.io
  */
+
+import {
+  type TokenType,
+  type TokenDecayRate,
+  type GovernanceLayer,
+  type Attestation,
+  type AttestationStatus,
+  type ProtocolAgent,
+  type AgentType,
+} from './protocol-core.model';
 
 // ============================================================================
 // ValueFlows Action Vocabulary
@@ -124,9 +151,11 @@ export interface ResourceSpecification {
 /**
  * ResourceClassification - Categories for resource types.
  *
- * These map to Lamad's value domains.
+ * These map to Lamad's value domains and Shefa token types.
+ * See protocol-core.model.ts TokenType for the canonical token categories.
  */
 export type ResourceClassification =
+  // Lamad content classifications
   | 'content'           // Learning content (epics, features, scenarios)
   | 'attention'         // Human attention/engagement
   | 'recognition'       // Attestation of value/contribution
@@ -136,7 +165,29 @@ export type ResourceClassification =
   | 'stewardship'       // Care/maintenance of presences
   | 'membership'        // Network participation rights
   | 'compute'           // Computational resources (for Elohim)
-  | 'currency';         // Mutual credit (Unyt/HoloFuel integration)
+  | 'currency'          // Mutual credit (Unyt/HoloFuel integration)
+
+  // Shefa token classifications (from whitepaper)
+  | 'care-token'        // Witnessed caregiving acts
+  | 'time-token'        // Hours contributed to community
+  | 'learning-token'    // Skills developed and taught
+  | 'steward-token'     // Environmental/resource protection
+  | 'creator-token'     // Content that helps others
+  | 'infrastructure-token'; // Network maintenance contribution
+
+/**
+ * Maps ResourceClassification to TokenType from protocol-core.
+ * Used for bridging between REA vocabulary and Shefa token system.
+ */
+export const CLASSIFICATION_TO_TOKEN_TYPE: Partial<Record<ResourceClassification, TokenType>> = {
+  'care-token': 'care',
+  'time-token': 'time',
+  'learning-token': 'learning',
+  'steward-token': 'steward',
+  'creator-token': 'creator',
+  'infrastructure-token': 'infrastructure',
+  'recognition': 'recognition',
+};
 
 /**
  * Unit - Measurement units for quantities.
@@ -801,3 +852,268 @@ export const LAMAD_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
     substitutable: true,
   },
 };
+
+// ============================================================================
+// Token Resources
+// ============================================================================
+
+/**
+ * Token resource specifications for multi-dimensional value tracking.
+ *
+ * - Care tokens: Witnessed caregiving acts
+ * - Time tokens: Hours contributed to community
+ * - Learning tokens: Skills developed and taught
+ * - Steward tokens: Environmental/resource protection
+ * - Creator tokens: Content that helps others
+ * - Infrastructure tokens: Network maintenance contribution
+ */
+export const TOKEN_RESOURCE_SPECS: Record<string, ResourceSpecification> = {
+  'care-token': {
+    id: 'spec-care-token',
+    name: 'Care Token',
+    note: 'Generated by witnessed caregiving acts. Circulates for services, goods, recognition.',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['care-token'],
+    substitutable: true,
+  },
+  'time-token': {
+    id: 'spec-time-token',
+    name: 'Time Token',
+    note: 'Generated by hours contributed to community. Circulates for coordination, services.',
+    defaultUnitOfResource: LAMAD_UNITS.minute,
+    resourceClassifiedAs: ['time-token'],
+    substitutable: true,
+  },
+  'learning-token': {
+    id: 'spec-learning-token',
+    name: 'Learning Token',
+    note: 'Generated by skills developed and taught. Circulates for education, mentorship. Does not decay.',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['learning-token'],
+    substitutable: false,
+  },
+  'steward-token': {
+    id: 'spec-steward-token',
+    name: 'Steward Token',
+    note: 'Generated by environmental/resource protection. Circulates for sustainable goods, restoration.',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['steward-token'],
+    substitutable: true,
+  },
+  'creator-token': {
+    id: 'spec-creator-token',
+    name: 'Creator Token',
+    note: 'Generated by content that helps others. Circulates for derivative rights, recognition. Does not decay.',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['creator-token'],
+    substitutable: false,
+  },
+  'infrastructure-token': {
+    id: 'spec-infrastructure-token',
+    name: 'Infrastructure Token',
+    note: 'Generated by network maintenance contribution. Circulates for protocol services. High decay rate.',
+    defaultUnitOfResource: LAMAD_UNITS.each,
+    resourceClassifiedAs: ['infrastructure-token'],
+    substitutable: true,
+  },
+};
+
+// ============================================================================
+// Constitutional Flow Control
+// ============================================================================
+
+/**
+ * ConstitutionalLayer - The four-layer governance for value flows.
+ *
+ * These layers define constitutional constraints on value flow:
+ * 1. Dignity Floor - Basic needs, care labor recognition, cannot be extracted
+ * 2. Attribution - Value flows to creators, accumulates in trust for absent contributors
+ * 3. Circulation - Tokens must circulate, demurrage on hoarding
+ * 4. Sustainability - Portion flows to next community liberation
+ */
+export type ConstitutionalLayer =
+  | 'dignity_floor'    // Layer 1: Existential minimums
+  | 'attribution'      // Layer 2: Contribution recognition
+  | 'circulation'      // Layer 3: Community velocity
+  | 'sustainability';  // Layer 4: Network development
+
+/**
+ * ConstitutionalConstraint - Inviolable constraints on value flow.
+ *
+ * Core constraints:
+ * - No accumulation without responsibility
+ * - Graduated claiming
+ * - Demurrage on hoarding
+ * - Attribution persistence
+ * - Anti-capture
+ */
+export interface ConstitutionalConstraint {
+  /** Unique identifier */
+  id: string;
+
+  /** Which constitutional layer this constraint belongs to */
+  layer: ConstitutionalLayer;
+
+  /** Human-readable name */
+  name: string;
+
+  /** Description of the constraint */
+  description: string;
+
+  /** Is this constraint currently active? */
+  isActive: boolean;
+
+  /**
+   * Constraint parameters.
+   * Examples:
+   * - dignityThreshold: minimum tokens before decay
+   * - maxAccumulation: maximum tokens before redistribution
+   * - demurrageRate: decay rate per period
+   * - claimingThreshold: identity attestation required for claim size
+   */
+  parameters: Record<string, number | string | boolean>;
+
+  /** Governance layer that can modify this constraint */
+  governedBy: GovernanceLayer;
+}
+
+/**
+ * CommonsPool - Collective value pool stewarded by Elohim.
+ *
+ * Network-generated value accumulates in trust for attributed contributors,
+ * claimable when they present attested identity.
+ */
+export interface CommonsPool {
+  /** Unique identifier */
+  id: string;
+
+  /** Human-readable name */
+  name: string;
+
+  /** Description */
+  note?: string;
+
+  /** Token type held in this pool */
+  tokenType: TokenType;
+
+  /** Current balance */
+  balance: Measure;
+
+  /** Total attributed but unclaimed */
+  attributedUnclaimed: Measure;
+
+  /** Constitutional layer this pool serves */
+  constitutionalLayer: ConstitutionalLayer;
+
+  /** Governance layer that manages this pool */
+  governedBy: GovernanceLayer;
+
+  /** When this pool was created */
+  createdAt: string;
+
+  /** Last activity timestamp */
+  lastActivityAt: string;
+}
+
+/**
+ * ValueAttribution - Attribution of value to a contributor.
+ *
+ * Tracks value attributed to an agent (even when offline) that can be
+ * claimed when they present attested identity.
+ */
+export interface ValueAttribution {
+  /** Unique identifier */
+  id: string;
+
+  /** Agent ID this attribution belongs to */
+  agentId: string;
+
+  /** Token type attributed */
+  tokenType: TokenType;
+
+  /** Amount attributed */
+  amount: Measure;
+
+  /** Source event(s) that generated this attribution */
+  sourceEventIds: string[];
+
+  /** Commons pool this attribution draws from */
+  commonsPoolId: string;
+
+  /** Has this been claimed? */
+  claimed: boolean;
+
+  /** When claimed (if applicable) */
+  claimedAt?: string;
+
+  /** Claiming event ID (if applicable) */
+  claimEventId?: string;
+
+  /** When this attribution was created */
+  createdAt: string;
+
+  /** When this attribution expires (for time-bound attributions) */
+  expiresAt?: string;
+}
+
+/**
+ * AttributionClaim - A claim against attributed value.
+ *
+ * Extends the base Claim type with identity and responsibility requirements:
+ * - Identity attestation level required
+ * - Responsibility threshold verification
+ * - Constitutional constraint compliance
+ */
+export interface AttributionClaim {
+  /** Unique identifier */
+  id: string;
+
+  /** Attribution being claimed */
+  attributionId: string;
+
+  /** Agent making the claim */
+  claimantId: string;
+
+  /** Amount being claimed */
+  amount: Measure;
+
+  /** Required identity attestation level (graduated claiming) */
+  requiredAttestationLevel: 'basic' | 'relationship' | 'biometric' | 'full';
+
+  /** Has identity attestation been verified? */
+  identityVerified: boolean;
+
+  /** Identity attestation ID used for verification */
+  identityAttestationId?: string;
+
+  /** Has responsibility threshold been met? */
+  responsibilityVerified: boolean;
+
+  /** Current claim state */
+  state: ClaimState;
+
+  /** When claim was submitted */
+  submittedAt: string;
+
+  /** When claim was processed (approved/rejected) */
+  processedAt?: string;
+
+  /** Processing notes */
+  processingNote?: string;
+}
+
+/**
+ * ClaimState - Lifecycle of an attribution claim.
+ */
+export type ClaimState =
+  | 'pending_identity'      // Awaiting identity attestation
+  | 'pending_responsibility' // Awaiting responsibility verification
+  | 'pending_review'        // Under Elohim review
+  | 'approved'              // Claim approved
+  | 'rejected'              // Claim rejected
+  | 'withdrawn';            // Claimant withdrew
+
+/**
+ * Re-export Shefa-related types from protocol-core for convenience.
+ */
+export type { TokenType, TokenDecayRate } from './protocol-core.model';

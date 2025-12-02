@@ -55,8 +55,10 @@ const REACH_HIERARCHY: ContentReach[] = [
   'private',
   'invited',
   'local',
-  'community',
-  'federated',
+  'neighborhood',
+  'municipal',
+  'bioregional',
+  'regional',
   'commons'
 ];
 
@@ -286,15 +288,21 @@ export class ContentService {
   private getAgentReachLevel(): ContentReach {
     const attestations = this.agentService.getAttestations();
 
-    // Check attestations to determine reach level
+    // Check attestations to determine reach level (geographic scope)
     if (attestations.includes('commons-contributor') || attestations.includes('governance-ratifier')) {
       return 'commons';
     }
-    if (attestations.includes('federated-member') || attestations.includes('peer-reviewer')) {
-      return 'federated';
+    if (attestations.includes('regional-member') || attestations.includes('peer-reviewer')) {
+      return 'regional';
     }
-    if (attestations.includes('community-member') || attestations.includes('path-completion:elohim-protocol')) {
-      return 'community';
+    if (attestations.includes('bioregional-member')) {
+      return 'bioregional';
+    }
+    if (attestations.includes('municipal-member') || attestations.includes('path-completion:elohim-protocol')) {
+      return 'municipal';
+    }
+    if (attestations.includes('neighborhood-member')) {
+      return 'neighborhood';
     }
     if (attestations.includes('local-member')) {
       return 'local';
@@ -303,7 +311,7 @@ export class ContentService {
     // Default: authenticated but no special attestations
     const currentAgent = this.agentService.getCurrentAgentId();
     if (currentAgent) {
-      return 'community'; // Authenticated users get community access by default
+      return 'municipal'; // Authenticated users get municipal access by default
     }
 
     return 'private'; // Unauthenticated

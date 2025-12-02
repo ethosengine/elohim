@@ -549,7 +549,7 @@ export class TrustBadgeService {
    * Get the next reach level (for "earn more trust" UI hints).
    */
   getNextReachLevel(currentReach: ContentReach): ContentReach | null {
-    const levels: ContentReach[] = ['private', 'invited', 'local', 'community', 'federated', 'commons'];
+    const levels: ContentReach[] = ['private', 'invited', 'local', 'neighborhood', 'municipal', 'bioregional', 'regional', 'commons'];
     const currentIndex = levels.indexOf(currentReach);
     if (currentIndex < levels.length - 1) {
       return levels[currentIndex + 1];
@@ -574,8 +574,10 @@ export class TrustBadgeService {
       'private': [],
       'invited': ['author-verified'],
       'local': ['author-verified'],
-      'community': ['steward-approved', 'community-endorsed', 'safety-reviewed'],
-      'federated': ['peer-reviewed', 'safety-reviewed'],
+      'neighborhood': ['author-verified', 'community-endorsed'],
+      'municipal': ['steward-approved', 'community-endorsed', 'safety-reviewed'],
+      'bioregional': ['steward-approved', 'peer-reviewed', 'safety-reviewed'],
+      'regional': ['peer-reviewed', 'governance-ratified'],
       'commons': ['governance-ratified', 'safety-reviewed', 'license-cleared']
     };
 

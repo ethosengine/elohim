@@ -488,7 +488,7 @@ export class SearchService {
    * Convert reach level to numeric for sorting.
    */
   private reachToNumber(reach: ContentReach): number {
-    const levels: ContentReach[] = ['private', 'invited', 'local', 'community', 'federated', 'commons'];
+    const levels: ContentReach[] = ['private', 'invited', 'local', 'neighborhood', 'municipal', 'bioregional', 'regional', 'commons'];
     return levels.indexOf(reach);
   }
 

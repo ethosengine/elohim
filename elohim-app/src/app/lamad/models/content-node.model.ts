@@ -1,6 +1,9 @@
 /**
  * ContentNode - The fundamental unit of content in the Territory.
  *
+ * Part of the Lamad (למד) pillar of the Elohim Protocol.
+ * Lamad provides the content graph - what you're learning/becoming.
+ *
  * Holochain mapping:
  * - Entry type: "content_node"
  * - id becomes ActionHash
@@ -16,10 +19,29 @@
  * Content earns reach through attestations. New content starts at 'private'
  * and can expand to 'commons' through steward approval, community endorsement,
  * or governance ratification. See content-attestation.model.ts for details.
+ *
+ * Protocol Core Integration:
+ * - Uses ReachLevel from protocol-core (aliased as ContentReach for compatibility)
+ * - Uses GovernanceLayer from protocol-core
+ * - Uses GeographicContext from protocol-core
+ * - Uses Attestation patterns from protocol-core
  */
 
-import type { GeographicContext, Place } from './place.model';
+import {
+  type ReachLevel,
+  type GovernanceLayer,
+  type GeographicContext,
+  type Attestation,
+  type AttestationStatus,
+  type Timestamps,
+  type Identifiable,
+  REACH_LEVEL_VALUES,
+} from './protocol-core.model';
+import type { Place } from './place.model';
 import { JsonLdMetadata } from './json-ld.model';
+
+// Re-export GeographicContext for backward compatibility
+export type { GeographicContext } from './protocol-core.model';
 
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
@@ -252,16 +274,25 @@ export interface ContentNode {
 }
 
 /**
- * ContentReach - The audience a piece of content can reach.
- * Re-exported from content-attestation.model.ts for convenience.
+ * ContentReach - Geographic scope of content visibility.
+ *
+ * This is an alias for ReachLevel from protocol-core, maintaining
+ * backward compatibility while unifying the reach concept across pillars.
+ *
+ * Geographic levels (concentric circles):
+ * - 'private' → Only author
+ * - 'invited' → Specific agents (regardless of location)
+ * - 'local' → Household/immediate dwelling
+ * - 'neighborhood' → Block/building/immediate area
+ * - 'municipal' → City/town
+ * - 'bioregional' → Watershed/ecosystem boundary
+ * - 'regional' → State/province level
+ * - 'commons' → Globally public
+ *
+ * Note: For interest-based filtering (professional, faith, etc.),
+ * see AffinityScope in protocol-core.model.ts
  */
-export type ContentReach =
-  | 'private'
-  | 'invited'
-  | 'local'
-  | 'community'
-  | 'federated'
-  | 'commons';
+export type ContentReach = ReachLevel;
 
 /**
  * ContentFlag - Warning/issue on content (denormalized from trust profile).

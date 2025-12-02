@@ -1,6 +1,9 @@
 /**
  * HumanNode - Humans as graph objects for relationship networks.
  *
+ * Part of the Qahal (קהל) pillar of the Elohim Protocol.
+ * Qahal provides the human relationship layer - who you're with.
+ *
  * Evolution of Understanding:
  * Initially, we said "humans don't become nodes in the knowledge graph."
  * This was correct for CONTENT - humans aren't things you learn ABOUT.
@@ -10,8 +13,8 @@
  * - But with agency, consent requirements, bidirectional relationships
  *
  * Two Graph Layers:
- * 1. Content Graph: What you learn about (ContentNodes)
- * 2. Human Graph: Who you learn with/from (HumanNodes)
+ * 1. Content Graph (Lamad): What you learn about (ContentNodes)
+ * 2. Human Graph (Qahal): Who you learn with/from (HumanNodes)
  *
  * The same governance layers apply:
  * - Family layer → spouse, children, parents
@@ -22,6 +25,13 @@
  * Reach is mediated for humans too - you can discover new connections
  * but intimacy requires explicit consent.
  *
+ * Protocol Core Integration:
+ * - Uses ReachLevel from protocol-core (mapped to HumanReach)
+ * - Uses IntimacyLevel from protocol-core
+ * - Uses GovernanceLayer from protocol-core
+ * - Uses ConsentState from protocol-core
+ * - Uses GeographicContext from protocol-core
+ *
  * Holochain mapping:
  * - Entry type: "human_node"
  * - AgentPubKey as primary identifier
@@ -29,8 +39,22 @@
  * - DHT for public profile if shared
  */
 
-import type { IntimacyLevel, ConsentState } from './human-consent.model';
-import type { GeographicContext } from './place.model';
+import {
+  type IntimacyLevel,
+  type ConsentState,
+  type GovernanceLayer,
+  type ReachLevel,
+  type GeographicContext,
+  type ProtocolAgent,
+  type Attestation,
+  type Timestamps,
+  type Identifiable,
+  INTIMACY_LEVEL_VALUES,
+  hasMinimumIntimacy,
+} from './protocol-core.model';
+
+// Re-export core types for convenience
+export type { IntimacyLevel, ConsentState, GovernanceLayer, ReachLevel, GeographicContext };
 
 // =========================================================================
 // Relationship Types
@@ -79,22 +103,23 @@ export type RelationshipType =
 
 /**
  * Relationship type to governance layer mapping.
+ * Uses GovernanceLayer from protocol-core.
  */
-export const RELATIONSHIP_LAYER_MAP: Record<RelationshipType, string> = {
-  // Family
-  spouse: 'family',
-  parent: 'family',
-  child: 'family',
-  sibling: 'family',
-  grandparent: 'family',
-  grandchild: 'family',
-  extended_family: 'family',
-  guardian: 'family',
+export const RELATIONSHIP_LAYER_MAP: Record<RelationshipType, GovernanceLayer> = {
+  // Family (household/extended_family layers)
+  spouse: 'household',
+  parent: 'household',
+  child: 'household',
+  sibling: 'household',
+  grandparent: 'extended_family',
+  grandchild: 'extended_family',
+  extended_family: 'extended_family',
+  guardian: 'household',
 
-  // Community
+  // Community (neighborhood/municipality layers)
   neighbor: 'neighborhood',
-  community_member: 'community',
-  local_friend: 'community',
+  community_member: 'municipality',
+  local_friend: 'neighborhood',
 
   // Workplace
   coworker: 'workplace',
@@ -105,15 +130,15 @@ export const RELATIONSHIP_LAYER_MAP: Record<RelationshipType, string> = {
   business_partner: 'workplace',
 
   // Affinity
-  congregation_member: 'affinity_network',
+  congregation_member: 'faith_community',
   interest_group_member: 'affinity_network',
   learning_partner: 'affinity_network',
   network_connection: 'affinity_network',
 
-  // General
-  friend: 'community',
-  acquaintance: 'community',
-  other: 'community',
+  // General (defaults to municipality)
+  friend: 'affinity_network',
+  acquaintance: 'municipality',
+  other: 'municipality',
 };
 
 /**
@@ -398,7 +423,7 @@ export interface HumanRelationship {
 /**
  * Get the governance layer for a relationship type.
  */
-export function getRelationshipLayer(type: RelationshipType): string {
+export function getRelationshipLayer(type: RelationshipType): GovernanceLayer {
   return RELATIONSHIP_LAYER_MAP[type];
 }
 
@@ -410,10 +435,11 @@ export function getDefaultIntimacy(type: RelationshipType): IntimacyLevel {
 }
 
 /**
- * Check if a relationship type is in the family layer.
+ * Check if a relationship type is in the family layer (household or extended_family).
  */
 export function isFamilyRelationship(type: RelationshipType): boolean {
-  return RELATIONSHIP_LAYER_MAP[type] === 'family';
+  const layer = RELATIONSHIP_LAYER_MAP[type];
+  return layer === 'household' || layer === 'extended_family';
 }
 
 /**
