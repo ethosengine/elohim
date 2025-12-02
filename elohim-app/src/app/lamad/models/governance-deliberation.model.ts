@@ -485,7 +485,7 @@ export interface DivisiveStatement {
   text: string;
   variance: number;  
 
-  // How each cluster feels
+  //==== how it feels
   clusterPositions: Array<{
     clusterId: string;
     position: number;  // Range: -1 to 1
