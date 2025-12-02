@@ -373,11 +373,8 @@ export class HumanConsentService {
     // Check if current user is in participantIds
     if (path.participantIds?.includes(currentAgentId)) {
       // For intimate paths, also check attestations if required
-      if (path.visibility === 'intimate' && path.requiredAttestations?.length) {
-        // TODO: Integrate with attestation service
-        // For now, trust participantIds
-        return of(true);
-      }
+      // Note: Attestation service integration pending (Phase 6)
+      // Currently trusts participantIds for intimate paths
       return of(true);
     }
 

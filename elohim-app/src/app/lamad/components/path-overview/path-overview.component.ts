@@ -214,15 +214,14 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Check if user has completed this path
+   * Check if user has completed this path.
+   * Uses territory completion (100% content mastered) when available,
+   * otherwise falls back to step completion logic.
    */
   isCompleted(): boolean {
-    // Prefer territory completion if available (100% content mastered)
     if (this.pathCompletion && this.pathCompletion.contentCompletionPercentage === 100) {
       return true;
     }
-    
-    // Fallback to step completion logic
     if (!this.path || !this.progress) return false;
     const requiredSteps = this.path.steps.filter(s => !s.optional);
     return requiredSteps.length > 0 && requiredSteps.every(step =>
@@ -292,5 +291,13 @@ export class PathOverviewComponent implements OnInit, OnDestroy {
       'advanced': 'Advanced'
     };
     return displays[this.path?.difficulty ?? ''] ?? this.path?.difficulty ?? '';
+  }
+
+  /**
+   * Handle image load error by hiding the element
+   */
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.style.display = 'none';
   }
 }

@@ -475,7 +475,7 @@ export class PathExtensionService {
 
   /** Process exclusions and return excluded indices */
   private processExclusions(
-    exclusions: StepExclusion[],
+    exclusions: PathStepExclusion[],
     stepCount: number,
     warnings: ExtensionWarning[]
   ): Set<number> {
@@ -497,7 +497,7 @@ export class PathExtensionService {
   /** Apply step reorderings */
   private applyReorderings(
     steps: PathStep[],
-    reorderings: StepReorder[],
+    reorderings: PathStepReorder[],
     indexMapping: Map<number, string>,
     warnings: ExtensionWarning[]
   ): PathStep[] {
@@ -547,7 +547,7 @@ export class PathExtensionService {
   /** Apply step insertions */
   private applyInsertions(
     steps: PathStep[],
-    insertions: StepInsertion[],
+    insertions: PathStepInsertion[],
     indexMapping: Map<number, string>,
     warnings: ExtensionWarning[]
   ): PathStep[] {

@@ -256,15 +256,18 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
   private generateFrontmatter(node: ContentIOExportInput): string | null {
     const fields: string[] = [];
 
-    // Core fields
+    this.addCoreFields(fields, node);
+    this.addMetadataFields(fields, node.metadata);
+
+    return fields.length > 0 ? fields.join('\n') : null;
+  }
+
+  private addCoreFields(fields: string[], node: ContentIOExportInput): void {
     if (node.title) {
       fields.push(`title: "${node.title.replace(/"/g, '\\"')}"`);
     }
     if (node.description) {
-      // Truncate long descriptions in frontmatter
-      const desc = node.description.length > 200
-        ? node.description.substring(0, 197) + '...'
-        : node.description;
+      const desc = this.truncateDescription(node.description, 200);
       fields.push(`description: "${desc.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`);
     }
     if (node.contentType) {
@@ -273,27 +276,36 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
     if (node.tags && node.tags.length > 0) {
       fields.push(`tags: [${node.tags.join(', ')}]`);
     }
+  }
 
-    // Metadata fields
-    if (node.metadata) {
-      const skipKeys = ['sections', 'wordCount', 'headingCount']; // Internal metadata
-      for (const [key, value] of Object.entries(node.metadata)) {
-        if (skipKeys.includes(key)) continue;
-        if (value === null || value === undefined) continue;
+  private truncateDescription(desc: string, maxLength: number): string {
+    return desc.length > maxLength ? desc.substring(0, maxLength - 3) + '...' : desc;
+  }
 
-        if (Array.isArray(value)) {
-          fields.push(`${key}: [${value.join(', ')}]`);
-        } else if (value !== null && typeof value === 'object') {
-          // Skip complex objects in frontmatter
-          continue;
-        } else {
-          // Primitive values (string, number, boolean)
-          fields.push(`${key}: ${String(value)}`);
-        }
+  private addMetadataFields(fields: string[], metadata?: Record<string, unknown>): void {
+    if (!metadata) return;
+
+    const skipKeys = ['sections', 'wordCount', 'headingCount'];
+    for (const [key, value] of Object.entries(metadata)) {
+      if (skipKeys.includes(key) || value === null || value === undefined) continue;
+      const formattedValue = this.formatMetadataValue(value);
+      if (formattedValue !== null) {
+        fields.push(`${key}: ${formattedValue}`);
       }
     }
+  }
 
-    return fields.length > 0 ? fields.join('\n') : null;
+  private formatMetadataValue(value: unknown): string | null {
+    if (Array.isArray(value)) {
+      return `[${value.join(', ')}]`;
+    }
+    if (typeof value === 'object') {
+      return null; // Skip complex objects
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return null;
   }
 
   private validateFrontmatter(content: string): { errors: ValidationError[]; warnings: ValidationWarning[] } {

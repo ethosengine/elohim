@@ -449,57 +449,57 @@ export class DataLoaderService {
     const nodesByCategory = new Map<string, Set<string>>();
     const adjacency = new Map<string, Set<string>>();
     const reverseAdjacency = new Map<string, Set<string>>();
-    const relationshipsMap = new Map<string, any>();
 
-    // Build nodes map from index
-    for (const node of contentIndex.nodes || []) {
+    this.indexNodes(contentIndex.nodes || [], nodes, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency);
+    const relationshipsMap = this.buildRelationships(relationshipData.relationships || [], nodes, adjacency, reverseAdjacency);
+
+    return { nodes, relationships: relationshipsMap, nodesByType, nodesByTag, nodesByCategory, adjacency, reverseAdjacency, metadata };
+  }
+
+  private indexNodes(
+    nodeList: ContentNode[],
+    nodes: Map<string, ContentNode>,
+    nodesByType: Map<string, Set<string>>,
+    nodesByTag: Map<string, Set<string>>,
+    nodesByCategory: Map<string, Set<string>>,
+    adjacency: Map<string, Set<string>>,
+    reverseAdjacency: Map<string, Set<string>>
+  ): void {
+    for (const node of nodeList) {
       nodes.set(node.id, node);
-
-      // Track by type
-      if (!nodesByType.has(node.contentType)) {
-        nodesByType.set(node.contentType, new Set());
-      }
-      nodesByType.get(node.contentType)!.add(node.id);
-
-      // Track by tags
+      this.addToSetMap(nodesByType, node.contentType, node.id);
       for (const tag of node.tags || []) {
-        if (!nodesByTag.has(tag)) {
-          nodesByTag.set(tag, new Set());
-        }
-        nodesByTag.get(tag)!.add(node.id);
+        this.addToSetMap(nodesByTag, tag, node.id);
       }
-
-      // Track by category
       const category = (node.metadata as any)?.category ?? 'uncategorized';
-      if (!nodesByCategory.has(category)) {
-        nodesByCategory.set(category, new Set());
-      }
-      nodesByCategory.get(category)!.add(node.id);
-
-      // Initialize adjacency sets
+      this.addToSetMap(nodesByCategory, category, node.id);
       adjacency.set(node.id, new Set());
       reverseAdjacency.set(node.id, new Set());
     }
+  }
 
-    // Build relationships and adjacency
-    for (const rel of relationshipData.relationships || []) {
+  private addToSetMap(map: Map<string, Set<string>>, key: string, value: string): void {
+    if (!map.has(key)) {
+      map.set(key, new Set());
+    }
+    map.get(key)!.add(value);
+  }
+
+  private buildRelationships(
+    relationships: Array<{ id: string; source: string; target: string; type: string }>,
+    nodes: Map<string, ContentNode>,
+    adjacency: Map<string, Set<string>>,
+    reverseAdjacency: Map<string, Set<string>>
+  ): Map<string, any> {
+    const relationshipsMap = new Map<string, any>();
+
+    for (const rel of relationships) {
       const relId = rel.id || `${rel.source}-${rel.target}`;
-      relationshipsMap.set(relId, {
-        id: relId,
-        sourceId: rel.source,
-        targetId: rel.target,
-        type: rel.type
-      });
+      relationshipsMap.set(relId, { id: relId, sourceId: rel.source, targetId: rel.target, type: rel.type });
 
-      // Update adjacency lists
-      if (adjacency.has(rel.source)) {
-        adjacency.get(rel.source)!.add(rel.target);
-      }
-      if (reverseAdjacency.has(rel.target)) {
-        reverseAdjacency.get(rel.target)!.add(rel.source);
-      }
+      adjacency.get(rel.source)?.add(rel.target);
+      reverseAdjacency.get(rel.target)?.add(rel.source);
 
-      // Also update node.relatedNodeIds for compatibility
       const sourceNode = nodes.get(rel.source);
       const targetNode = nodes.get(rel.target);
       if (sourceNode && !sourceNode.relatedNodeIds.includes(rel.target)) {
@@ -510,16 +510,7 @@ export class DataLoaderService {
       }
     }
 
-    return {
-      nodes,
-      relationships: relationshipsMap,
-      nodesByType,
-      nodesByTag,
-      nodesByCategory,
-      adjacency,
-      reverseAdjacency,
-      metadata
-    };
+    return relationshipsMap;
   }
 
   /**

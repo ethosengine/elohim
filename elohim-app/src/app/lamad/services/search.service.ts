@@ -251,64 +251,54 @@ export class SearchService {
    * Check if node passes all query filters.
    */
   private passesFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
-    // Content type filter
-    if (query.contentTypes && query.contentTypes.length > 0) {
-      if (!query.contentTypes.includes(node.contentType)) {
-        return false;
-      }
-    }
+    return this.passesContentTypeFilter(node, query) &&
+           this.passesReachLevelFilter(node, query) &&
+           this.passesTrustLevelFilter(node, query) &&
+           this.passesTagFilters(node, query) &&
+           this.passesTrustScoreFilter(node, query) &&
+           this.passesFlaggedFilter(node, query);
+  }
 
-    // Reach level filter
-    if (query.reachLevels && query.reachLevels.length > 0) {
-      const nodeReach = (node as any).reach ?? 'commons';
-      if (!query.reachLevels.includes(nodeReach)) {
-        return false;
-      }
-    }
+  private passesContentTypeFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
+    if (!query.contentTypes || query.contentTypes.length === 0) return true;
+    return query.contentTypes.includes(node.contentType);
+  }
 
-    // Trust level filter
-    if (query.trustLevels && query.trustLevels.length > 0) {
-      const trustLevel = this.computeTrustLevel(node);
-      if (!query.trustLevels.includes(trustLevel)) {
-        return false;
-      }
-    }
+  private passesReachLevelFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
+    if (!query.reachLevels || query.reachLevels.length === 0) return true;
+    const nodeReach = (node as any).reach ?? 'commons';
+    return query.reachLevels.includes(nodeReach);
+  }
 
-    // Tag filter (OR logic)
+  private passesTrustLevelFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
+    if (!query.trustLevels || query.trustLevels.length === 0) return true;
+    return query.trustLevels.includes(this.computeTrustLevel(node));
+  }
+
+  private passesTagFilters(node: ContentIndexEntry, query: SearchQuery): boolean {
+    const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
+
     if (query.tags && query.tags.length > 0) {
-      const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
-      const hasAnyTag = query.tags.some(t => nodeTags.includes(t.toLowerCase()));
-      if (!hasAnyTag) {
-        return false;
-      }
+      if (!query.tags.some(t => nodeTags.includes(t.toLowerCase()))) return false;
     }
 
-    // Required tags filter (AND logic)
     if (query.requiredTags && query.requiredTags.length > 0) {
-      const nodeTags = (node.tags ?? []).map(t => t.toLowerCase());
-      const hasAllTags = query.requiredTags.every(t => nodeTags.includes(t.toLowerCase()));
-      if (!hasAllTags) {
-        return false;
-      }
-    }
-
-    // Minimum trust score
-    if (query.minTrustScore !== undefined) {
-      const trustScore = (node as any).trustScore ?? 1.0;
-      if (trustScore < query.minTrustScore) {
-        return false;
-      }
-    }
-
-    // Exclude flagged
-    if (query.excludeFlagged) {
-      const flags = (node as any).flags ?? [];
-      if (flags.length > 0) {
-        return false;
-      }
+      if (!query.requiredTags.every(t => nodeTags.includes(t.toLowerCase()))) return false;
     }
 
     return true;
+  }
+
+  private passesTrustScoreFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
+    if (query.minTrustScore === undefined) return true;
+    const trustScore = (node as any).trustScore ?? 1.0;
+    return trustScore >= query.minTrustScore;
+  }
+
+  private passesFlaggedFilter(node: ContentIndexEntry, query: SearchQuery): boolean {
+    if (!query.excludeFlagged) return true;
+    const flags = (node as any).flags ?? [];
+    return flags.length === 0;
   }
 
   /**
@@ -319,82 +309,79 @@ export class SearchService {
     searchWords: string[]
   ): { score: number; matchedFields: MatchedField[]; highlights: SearchHighlight[] } {
     if (searchWords.length === 0) {
-      // No search text - return neutral score
       return { score: 50, matchedFields: [], highlights: [] };
     }
 
-    let totalScore = 0;
     const matchedFields: MatchedField[] = [];
-    const highlights: SearchHighlight[] = [];
+    const nodeText = {
+      title: node.title.toLowerCase(),
+      description: (node.description ?? '').toLowerCase(),
+      tags: (node.tags ?? []).map(t => t.toLowerCase())
+    };
 
-    const titleLower = node.title.toLowerCase();
-    const descLower = (node.description ?? '').toLowerCase();
-    const tagsLower = (node.tags ?? []).map(t => t.toLowerCase());
+    const totalScore = this.calculateFieldScores(searchWords, nodeText, matchedFields);
+    const normalizedScore = this.normalizeScore(totalScore, searchWords.length);
+    const highlights = this.generateHighlights(node, searchWords, matchedFields);
+
+    return { score: normalizedScore, matchedFields, highlights };
+  }
+
+  private calculateFieldScores(
+    searchWords: string[],
+    nodeText: { title: string; description: string; tags: string[] },
+    matchedFields: MatchedField[]
+  ): number {
+    let totalScore = 0;
 
     for (const word of searchWords) {
-      // Title matching
-      const titleMatchType = this.getMatchType(titleLower, word);
-      if (titleMatchType) {
-        const wordScore = SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES[titleMatchType];
-        totalScore += wordScore;
-        matchedFields.push({
-          field: 'title',
-          weight: wordScore,
-          matchedText: word
-        });
-      }
-
-      // Tag matching
-      for (const tag of tagsLower) {
-        const tagMatchType = this.getMatchType(tag, word);
-        if (tagMatchType) {
-          const wordScore = SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES[tagMatchType];
-          totalScore += wordScore;
-          matchedFields.push({
-            field: 'tags',
-            weight: wordScore,
-            matchedText: word
-          });
-          break; // Only count once per word
-        }
-      }
-
-      // Description matching
-      const descMatchType = this.getMatchType(descLower, word);
-      if (descMatchType) {
-        const wordScore = SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES[descMatchType];
-        totalScore += wordScore;
-        matchedFields.push({
-          field: 'description',
-          weight: wordScore,
-          matchedText: word
-        });
-      }
+      totalScore += this.scoreFieldMatch('title', nodeText.title, word, matchedFields);
+      totalScore += this.scoreTagMatch(nodeText.tags, word, matchedFields);
+      totalScore += this.scoreFieldMatch('description', nodeText.description, word, matchedFields);
     }
 
-    // Normalize score to 0-100
-    const maxPossibleScore = searchWords.length * (
+    return totalScore;
+  }
+
+  private scoreFieldMatch(field: 'title' | 'description', text: string, word: string, matchedFields: MatchedField[]): number {
+    const matchType = this.getMatchType(text, word);
+    if (!matchType) return 0;
+
+    const score = SEARCH_FIELD_WEIGHTS[field] * SEARCH_MATCH_BONUSES[matchType];
+    matchedFields.push({ field, weight: score, matchedText: word });
+    return score;
+  }
+
+  private scoreTagMatch(tags: string[], word: string, matchedFields: MatchedField[]): number {
+    for (const tag of tags) {
+      const matchType = this.getMatchType(tag, word);
+      if (matchType) {
+        const score = SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES[matchType];
+        matchedFields.push({ field: 'tags', weight: score, matchedText: word });
+        return score;
+      }
+    }
+    return 0;
+  }
+
+  private normalizeScore(totalScore: number, wordCount: number): number {
+    const maxPossibleScore = wordCount * (
       SEARCH_FIELD_WEIGHTS.title * SEARCH_MATCH_BONUSES.exactMatch +
       SEARCH_FIELD_WEIGHTS.tags * SEARCH_MATCH_BONUSES.exactMatch +
       SEARCH_FIELD_WEIGHTS.description * SEARCH_MATCH_BONUSES.exactMatch
     );
-    const normalizedScore = Math.round((totalScore / maxPossibleScore) * 100);
+    return Math.round((totalScore / maxPossibleScore) * 100);
+  }
 
-    // Generate highlights
+  private generateHighlights(node: ContentIndexEntry, searchWords: string[], matchedFields: MatchedField[]): SearchHighlight[] {
+    const highlights: SearchHighlight[] = [];
     const queryText = searchWords.join(' ');
 
     if (matchedFields.some(f => f.field === 'title')) {
-      highlights.push({
-        field: 'title',
-        ...extractSnippet(node.title, queryText)
-      });
+      highlights.push({ field: 'title', ...extractSnippet(node.title, queryText) });
     }
 
     if (matchedFields.some(f => f.field === 'description') && node.description) {
-      highlights.push({
-        field: 'description',
-        ...extractSnippet(node.description, queryText)
-      });
+      highlights.push({ field: 'description', ...extractSnippet(node.description, queryText) });
     }
 
     if (matchedFields.some(f => f.field === 'tags')) {
@@ -402,15 +389,11 @@ export class SearchService {
         searchWords.some(w => tag.toLowerCase().includes(w))
       );
       if (matchingTags.length > 0) {
-        highlights.push({
-          field: 'tags',
-          snippet: matchingTags.join(', '),
-          matchRanges: [] // Tags don't need ranges
-        });
+        highlights.push({ field: 'tags', snippet: matchingTags.join(', '), matchRanges: [] });
       }
     }
 
-    return { score: normalizedScore, matchedFields, highlights };
+    return highlights;
   }
 
   /**

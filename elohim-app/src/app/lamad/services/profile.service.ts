@@ -64,10 +64,10 @@ export class ProfileService {
       this.getJourneyStats(),
       this.getCurrentFocus(),
       this.getDevelopedCapabilities(),
+      this.agentService.getCurrentAgent(),
     ]).pipe(
-      map(([journeyStats, currentFocus, developedCapabilities]) => {
+      map(([journeyStats, currentFocus, developedCapabilities, agent]) => {
         const session = this.sessionHumanService?.getSession();
-        const agent = this.agentService.getAgent();
 
         return {
           id: session?.sessionId ?? agent?.id ?? 'unknown',

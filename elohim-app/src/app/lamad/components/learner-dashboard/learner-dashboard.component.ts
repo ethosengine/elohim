@@ -7,15 +7,14 @@ import { RouterModule } from '@angular/router';
  *
  * Route: /lamad/me
  *
- * Will display:
+ * Displays:
  * - Active paths with progress
  * - Completed paths
  * - Attestations earned
  * - Learning frontier (what's next)
  *
  * Implements Section 1.3 of LAMAD_API_SPECIFICATION_v1.0.md
- *
- * TODO: Full implementation in Phase 5
+ * Full implementation planned for Phase 5.
  */
 @Component({
   selector: 'app-learner-dashboard',

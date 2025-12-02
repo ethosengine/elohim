@@ -209,10 +209,6 @@ export function compareMasteryLevels(
   return MASTERY_LEVEL_VALUES[a] - MASTERY_LEVEL_VALUES[b];
 }
 
-/**
- * @deprecated Use MasteryLevel instead. This is the old type alias kept for backwards compatibility.
- */
-export type BloomMasteryLevel = MasteryLevel;
 
 /**
  * NewAttestation - Refined attestation model for v2

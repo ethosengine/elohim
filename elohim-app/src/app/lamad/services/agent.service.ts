@@ -496,164 +496,166 @@ export class AgentService {
    * This aggregates data from localStorage progress records.
    */
   getLearningAnalytics(): Observable<{
-    // Overall progress
     totalPathsStarted: number;
     totalPathsCompleted: number;
     totalContentNodesCompleted: number;
     totalStepsCompleted: number;
-
-    // Engagement metrics
-    totalLearningTime: number; // Days between first and last activity
+    totalLearningTime: number;
     lastActivityDate: string;
     firstActivityDate: string;
-    currentStreak: number; // Days with consecutive activity
+    currentStreak: number;
     longestStreak: number;
-
-    // Path breakdown
     mostActivePathId: string | null;
     mostActivePathTitle?: string;
     mostRecentPathId: string | null;
     mostRecentPathTitle?: string;
-
-    // Affinity insights
-    averageAffinity: number; // Average across all steps with affinity
-    highAffinityPaths: string[]; // Paths with avg affinity > 0.7
-
-    // Attestations
+    averageAffinity: number;
+    highAffinityPaths: string[];
     totalAttestationsEarned: number;
     attestationIds: string[];
   }> {
-    const progress = this.getAgentProgress();
-
-    return progress.pipe(
-      map(progressRecords => {
-        // Filter out __global__ progress
-        const pathProgress = progressRecords.filter(p => p.pathId !== '__global__');
-        const globalProgress = progressRecords.find(p => p.pathId === '__global__');
-
-        // Basic counts
-        const totalPathsStarted = pathProgress.length;
-        const totalPathsCompleted = pathProgress.filter(p => p.completedAt).length;
-        const totalContentNodesCompleted = globalProgress?.completedContentIds?.length ?? 0;
-        const totalStepsCompleted = pathProgress.reduce(
-          (sum, p) => sum + p.completedStepIndices.length,
-          0
-        );
-
-        // Time analysis
-        let firstActivityDate = '';
-        let lastActivityDate = '';
-        if (pathProgress.length > 0) {
-          const dates = pathProgress
-            .map(p => new Date(p.startedAt).getTime())
-            .filter(d => !isNaN(d));
-
-          if (dates.length > 0) {
-            firstActivityDate = new Date(Math.min(...dates)).toISOString();
-          }
-
-          const lastDates = pathProgress
-            .map(p => new Date(p.lastActivityAt).getTime())
-            .filter(d => !isNaN(d));
-
-          if (lastDates.length > 0) {
-            lastActivityDate = new Date(Math.max(...lastDates)).toISOString();
-          }
-        }
-
-        const totalLearningTime = firstActivityDate && lastActivityDate
-          ? Math.floor(
-              (new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) /
-              (1000 * 60 * 60 * 24)
-            )
-          : 0;
-
-        // Streak calculation (simplified - counts distinct activity days)
-        const activityDates = new Set(
-          pathProgress
-            .map(p => new Date(p.lastActivityAt).toISOString().split('T')[0])
-        );
-        const currentStreak = this.calculateCurrentStreak(Array.from(activityDates));
-        const longestStreak = this.calculateLongestStreak(Array.from(activityDates));
-
-        // Most active path (by total steps completed)
-        let mostActivePathId: string | null = null;
-        let maxSteps = 0;
-        for (const p of pathProgress) {
-          if (p.completedStepIndices.length > maxSteps) {
-            maxSteps = p.completedStepIndices.length;
-            mostActivePathId = p.pathId;
-          }
-        }
-
-        // Most recent path
-        const mostRecentPathId = pathProgress.length > 0
-          ? pathProgress.reduce((latest, p) =>
-              new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest,
-              pathProgress[0]
-            ).pathId
-          : null;
-
-        // Affinity analysis
-        let totalAffinity = 0;
-        let affinityCount = 0;
-        const pathAffinities = new Map<string, { sum: number; count: number }>();
-
-        for (const p of pathProgress) {
-          const affinityValues = Object.values(p.stepAffinity);
-          for (const affinity of affinityValues) {
-            totalAffinity += affinity;
-            affinityCount++;
-          }
-
-          // Track per-path affinity
-          if (affinityValues.length > 0) {
-            const pathSum = affinityValues.reduce((sum, a) => sum + a, 0);
-            pathAffinities.set(p.pathId, {
-              sum: pathSum,
-              count: affinityValues.length
-            });
-          }
-        }
-
-        const averageAffinity = affinityCount > 0 ? totalAffinity / affinityCount : 0;
-
-        // High affinity paths (avg > 0.7)
-        const highAffinityPaths: string[] = [];
-        for (const [pathId, { sum, count }] of pathAffinities) {
-          const avg = sum / count;
-          if (avg > 0.7) {
-            highAffinityPaths.push(pathId);
-          }
-        }
-
-        // Attestations
-        const allAttestations = new Set<string>();
-        for (const p of pathProgress) {
-          for (const att of p.attestationsEarned) {
-            allAttestations.add(att);
-          }
-        }
-
-        return {
-          totalPathsStarted,
-          totalPathsCompleted,
-          totalContentNodesCompleted,
-          totalStepsCompleted,
-          totalLearningTime,
-          lastActivityDate,
-          firstActivityDate,
-          currentStreak,
-          longestStreak,
-          mostActivePathId,
-          mostRecentPathId,
-          averageAffinity,
-          highAffinityPaths,
-          totalAttestationsEarned: allAttestations.size,
-          attestationIds: Array.from(allAttestations)
-        };
-      })
+    return this.getAgentProgress().pipe(
+      map(progressRecords => this.buildLearningAnalytics(progressRecords))
     );
+  }
+
+  private buildLearningAnalytics(progressRecords: AgentProgress[]): any {
+    const pathProgress = progressRecords.filter(p => p.pathId !== '__global__');
+    const globalProgress = progressRecords.find(p => p.pathId === '__global__');
+
+    const basicCounts = this.calculateBasicCounts(pathProgress, globalProgress);
+    const dateMetrics = this.calculateDateMetrics(pathProgress);
+    const pathMetrics = this.calculatePathMetrics(pathProgress);
+    const affinityMetrics = this.calculateAffinityMetrics(pathProgress);
+    const attestationMetrics = this.calculateAttestationMetrics(pathProgress);
+
+    return {
+      ...basicCounts,
+      ...dateMetrics,
+      ...pathMetrics,
+      ...affinityMetrics,
+      ...attestationMetrics
+    };
+  }
+
+  private calculateBasicCounts(pathProgress: AgentProgress[], globalProgress: AgentProgress | undefined): {
+    totalPathsStarted: number;
+    totalPathsCompleted: number;
+    totalContentNodesCompleted: number;
+    totalStepsCompleted: number;
+  } {
+    return {
+      totalPathsStarted: pathProgress.length,
+      totalPathsCompleted: pathProgress.filter(p => p.completedAt).length,
+      totalContentNodesCompleted: globalProgress?.completedContentIds?.length ?? 0,
+      totalStepsCompleted: pathProgress.reduce((sum, p) => sum + p.completedStepIndices.length, 0)
+    };
+  }
+
+  private calculateDateMetrics(pathProgress: AgentProgress[]): {
+    firstActivityDate: string;
+    lastActivityDate: string;
+    totalLearningTime: number;
+    currentStreak: number;
+    longestStreak: number;
+  } {
+    let firstActivityDate = '';
+    let lastActivityDate = '';
+
+    if (pathProgress.length > 0) {
+      const startDates = pathProgress.map(p => new Date(p.startedAt).getTime()).filter(d => !isNaN(d));
+      const endDates = pathProgress.map(p => new Date(p.lastActivityAt).getTime()).filter(d => !isNaN(d));
+
+      if (startDates.length > 0) firstActivityDate = new Date(Math.min(...startDates)).toISOString();
+      if (endDates.length > 0) lastActivityDate = new Date(Math.max(...endDates)).toISOString();
+    }
+
+    const totalLearningTime = firstActivityDate && lastActivityDate
+      ? Math.floor((new Date(lastActivityDate).getTime() - new Date(firstActivityDate).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    const activityDates = Array.from(new Set(
+      pathProgress.map(p => new Date(p.lastActivityAt).toISOString().split('T')[0])
+    ));
+
+    return {
+      firstActivityDate,
+      lastActivityDate,
+      totalLearningTime,
+      currentStreak: this.calculateCurrentStreak(activityDates),
+      longestStreak: this.calculateLongestStreak(activityDates)
+    };
+  }
+
+  private calculatePathMetrics(pathProgress: AgentProgress[]): {
+    mostActivePathId: string | null;
+    mostRecentPathId: string | null;
+  } {
+    let mostActivePathId: string | null = null;
+    let maxSteps = 0;
+    for (const p of pathProgress) {
+      if (p.completedStepIndices.length > maxSteps) {
+        maxSteps = p.completedStepIndices.length;
+        mostActivePathId = p.pathId;
+      }
+    }
+
+    const mostRecentPathId = pathProgress.length > 0
+      ? pathProgress.reduce((latest, p) =>
+          new Date(p.lastActivityAt) > new Date(latest.lastActivityAt) ? p : latest, pathProgress[0]
+        ).pathId
+      : null;
+
+    return { mostActivePathId, mostRecentPathId };
+  }
+
+  private calculateAffinityMetrics(pathProgress: AgentProgress[]): {
+    averageAffinity: number;
+    highAffinityPaths: string[];
+  } {
+    let totalAffinity = 0;
+    let affinityCount = 0;
+    const pathAffinities = new Map<string, { sum: number; count: number }>();
+
+    for (const p of pathProgress) {
+      const affinityValues = Object.values(p.stepAffinity);
+      for (const affinity of affinityValues) {
+        totalAffinity += affinity;
+        affinityCount++;
+      }
+      if (affinityValues.length > 0) {
+        pathAffinities.set(p.pathId, {
+          sum: affinityValues.reduce((sum, a) => sum + a, 0),
+          count: affinityValues.length
+        });
+      }
+    }
+
+    const highAffinityPaths: string[] = [];
+    for (const [pathId, { sum, count }] of pathAffinities) {
+      if (sum / count > 0.7) highAffinityPaths.push(pathId);
+    }
+
+    return {
+      averageAffinity: affinityCount > 0 ? totalAffinity / affinityCount : 0,
+      highAffinityPaths
+    };
+  }
+
+  private calculateAttestationMetrics(pathProgress: AgentProgress[]): {
+    totalAttestationsEarned: number;
+    attestationIds: string[];
+  } {
+    const allAttestations = new Set<string>();
+    for (const p of pathProgress) {
+      for (const att of p.attestationsEarned) {
+        allAttestations.add(att);
+      }
+    }
+    return {
+      totalAttestationsEarned: allAttestations.size,
+      attestationIds: Array.from(allAttestations)
+    };
   }
 
   /**

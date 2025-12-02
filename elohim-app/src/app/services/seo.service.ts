@@ -173,7 +173,12 @@ export class SeoService {
    * Update Open Graph tags
    */
   updateOpenGraphTags(og: Partial<OpenGraphMetadata>): void {
-    // Core OG tags
+    this.updateCoreOgTags(og);
+    this.updateOgImageTags(og);
+    this.updateOgTypeTags(og);
+  }
+
+  private updateCoreOgTags(og: Partial<OpenGraphMetadata>): void {
     if (og.ogTitle) {
       this.meta.updateTag({ property: 'og:title', content: og.ogTitle });
     }
@@ -183,56 +188,55 @@ export class SeoService {
     if (og.ogUrl) {
       this.meta.updateTag({ property: 'og:url', content: og.ogUrl });
     }
+    if (og.ogLocale) {
+      this.meta.updateTag({ property: 'og:locale', content: og.ogLocale });
+    }
+    this.meta.updateTag({ property: 'og:type', content: og.ogType ?? 'website' });
+    this.meta.updateTag({ property: 'og:site_name', content: og.ogSiteName ?? DEFAULTS.siteName });
+  }
 
-    // Image (use default if not provided)
+  private updateOgImageTags(og: Partial<OpenGraphMetadata>): void {
     const imageUrl = og.ogImage ?? DEFAULTS.defaultImage;
     const imageAlt = og.ogImageAlt ?? DEFAULTS.defaultImageAlt;
     this.meta.updateTag({ property: 'og:image', content: imageUrl });
     this.meta.updateTag({ property: 'og:image:alt', content: imageAlt });
+  }
 
-    // Type (default to website)
-    this.meta.updateTag({ property: 'og:type', content: og.ogType ?? 'website' });
-
-    // Site name
-    this.meta.updateTag({ property: 'og:site_name', content: og.ogSiteName ?? DEFAULTS.siteName });
-
-    // Locale
-    if (og.ogLocale) {
-      this.meta.updateTag({ property: 'og:locale', content: og.ogLocale });
-    }
-
-    // Article-specific tags
+  private updateOgTypeTags(og: Partial<OpenGraphMetadata>): void {
     if (og.ogType === 'article') {
-      if (og.articlePublishedTime) {
-        this.meta.updateTag({ property: 'article:published_time', content: og.articlePublishedTime });
-      }
-      if (og.articleModifiedTime) {
-        this.meta.updateTag({ property: 'article:modified_time', content: og.articleModifiedTime });
-      }
-      if (og.articleSection) {
-        this.meta.updateTag({ property: 'article:section', content: og.articleSection });
-      }
-      if (og.articleTags?.length) {
-        // Remove existing article:tag entries
-        this.removeMetaByProperty('article:tag');
-        // Add new ones
-        og.articleTags.forEach(tag => {
-          this.meta.addTag({ property: 'article:tag', content: tag });
-        });
-      }
+      this.updateArticleTags(og);
+    } else if (og.ogType === 'profile') {
+      this.updateProfileTags(og);
     }
+  }
 
-    // Profile-specific tags
-    if (og.ogType === 'profile') {
-      if (og.profileUsername) {
-        this.meta.updateTag({ property: 'profile:username', content: og.profileUsername });
-      }
-      if (og.profileFirstName) {
-        this.meta.updateTag({ property: 'profile:first_name', content: og.profileFirstName });
-      }
-      if (og.profileLastName) {
-        this.meta.updateTag({ property: 'profile:last_name', content: og.profileLastName });
-      }
+  private updateArticleTags(og: Partial<OpenGraphMetadata>): void {
+    if (og.articlePublishedTime) {
+      this.meta.updateTag({ property: 'article:published_time', content: og.articlePublishedTime });
+    }
+    if (og.articleModifiedTime) {
+      this.meta.updateTag({ property: 'article:modified_time', content: og.articleModifiedTime });
+    }
+    if (og.articleSection) {
+      this.meta.updateTag({ property: 'article:section', content: og.articleSection });
+    }
+    if (og.articleTags?.length) {
+      this.removeMetaByProperty('article:tag');
+      og.articleTags.forEach(tag => {
+        this.meta.addTag({ property: 'article:tag', content: tag });
+      });
+    }
+  }
+
+  private updateProfileTags(og: Partial<OpenGraphMetadata>): void {
+    if (og.profileUsername) {
+      this.meta.updateTag({ property: 'profile:username', content: og.profileUsername });
+    }
+    if (og.profileFirstName) {
+      this.meta.updateTag({ property: 'profile:first_name', content: og.profileFirstName });
+    }
+    if (og.profileLastName) {
+      this.meta.updateTag({ property: 'profile:last_name', content: og.profileLastName });
     }
   }
 

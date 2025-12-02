@@ -103,6 +103,9 @@ export class ExplorationService {
           return this.createError('DEPTH_UNAUTHORIZED', attestationCheck);
         }
 
+        // Update rate limit state with correct tier from attestations
+        this.updateAgentTier(this.currentAgentId, attestationCheck.tier);
+
         // Check rate limit
         const rateLimitCheck = this.checkRateLimit(this.currentAgentId, 'exploration');
         if (!rateLimitCheck.allowed) {
@@ -179,6 +182,9 @@ export class ExplorationService {
             requiredAttestation: 'path-creator'
           });
         }
+
+        // Update rate limit state with correct tier from attestations
+        this.updateAgentTier(this.currentAgentId, attestationCheck.tier);
 
         // Check pathfinding rate limit
         const rateLimitCheck = this.checkRateLimit(this.currentAgentId, 'pathfinding');
@@ -673,7 +679,8 @@ export class ExplorationService {
     // Run Dijkstra with semantic weights
     this.runDijkstra(ctx, (rel) => {
       const baseWeight = rel ? (relationshipWeights[rel.relationshipType] || 2) : 2;
-      const preferred = query.preferredRelationships?.includes(rel?.relationshipType ?? '');
+      const relType = rel?.relationshipType;
+      const preferred = relType ? query.preferredRelationships?.includes(relType) : false;
       return preferred ? baseWeight * 0.5 : baseWeight;
     });
 
@@ -788,6 +795,18 @@ export class ExplorationService {
       return { allowed: state.explorationCount < config.queriesPerHour };
     } else {
       return { allowed: state.pathfindingCount < config.pathfindingPerHour };
+    }
+  }
+
+  /**
+   * Update the tier for an agent's rate limit state.
+   * Called after attestations are verified to ensure correct rate limits are applied.
+   */
+  private updateAgentTier(agentId: string, tier: RateLimitTier): void {
+    const state = this.getOrCreateRateLimitState(agentId);
+    if (state.tier !== tier) {
+      state.tier = tier;
+      this.rateLimitStatusSubject.next(this.getRateLimitStatusSync(agentId));
     }
   }
 

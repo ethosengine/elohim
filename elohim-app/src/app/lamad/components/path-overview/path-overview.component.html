@@ -56,8 +56,7 @@
         <img [src]="path.thumbnailUrl || 'assets/lamad-data/images/path-placeholder.svg'"
              [alt]="path.thumbnailAlt || path.title"
              class="path-thumbnail-image"
-             onerror="this.style.display='none'"> <!-- Hide if fails -->
-        <!-- Fallback visual if image hidden/missing? CSS can handle background color -->
+             (error)="onImageError($event)">
       </div>
     </div>
 

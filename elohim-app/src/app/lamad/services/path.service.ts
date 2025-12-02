@@ -428,66 +428,65 @@ export class PathService {
       progress: this.agentService.getProgressForPath(pathId)
     }).pipe(
       switchMap(({ path, progress }) => {
-        // Map to store concept ID -> IDs of steps that teach this concept
-        const conceptMap = new Map<string, number[]>();
-        
-        // 1. Collect all concepts and which steps they appear in
-        path.steps.forEach((step: any, stepIndex) => {
-          if (step.sharedConcepts && Array.isArray(step.sharedConcepts)) {
-            step.sharedConcepts.forEach((conceptId: string) => {
-              if (!conceptMap.has(conceptId)) {
-                conceptMap.set(conceptId, []);
-              }
-              conceptMap.get(conceptId)?.push(stepIndex);
-            });
-          }
-        });
-
+        const conceptMap = this.buildConceptStepMap(path.steps);
         const uniqueConceptIds = Array.from(conceptMap.keys());
-        
+
         if (uniqueConceptIds.length === 0) {
           return of([]);
         }
 
-        // 2. Load content nodes for concepts to get titles
-        const contentObservables = uniqueConceptIds.map(id =>
-          this.dataLoader.getContent(id).pipe(
-            // Handle error gracefully if a concept node is missing
-            map(node => ({ id, title: node?.title ?? id }))
-          )
-        );
-
-        return forkJoin(contentObservables).pipe(
-          map(conceptNodes => {
-            // 3. Aggregate progress
-            return conceptNodes.map(node => {
-              const stepIndices = conceptMap.get(node.id) ?? [];
-              const totalSteps = stepIndices.length;
-              
-              // Calculate completed steps for this concept
-              let completedSteps = 0;
-              if (progress) {
-                completedSteps = stepIndices.filter(idx => 
-                  progress.completedStepIndices.includes(idx)
-                ).length;
-              }
-
-              const completionPercentage = totalSteps > 0 
-                ? Math.round((completedSteps / totalSteps) * 100) 
-                : 0;
-
-              return {
-                conceptId: node.id,
-                title: node.title,
-                totalSteps,
-                completedSteps,
-                completionPercentage
-              };
-            }).sort((a, b) => b.totalSteps - a.totalSteps); // Sort by prevalence (most common concepts first)
-          })
+        return this.loadConceptTitles(uniqueConceptIds).pipe(
+          map(conceptNodes => this.calculateConceptProgress(conceptNodes, conceptMap, progress))
         );
       })
     );
+  }
+
+  private buildConceptStepMap(steps: any[]): Map<string, number[]> {
+    const conceptMap = new Map<string, number[]>();
+    steps.forEach((step: any, stepIndex) => {
+      if (step.sharedConcepts && Array.isArray(step.sharedConcepts)) {
+        step.sharedConcepts.forEach((conceptId: string) => {
+          if (!conceptMap.has(conceptId)) {
+            conceptMap.set(conceptId, []);
+          }
+          conceptMap.get(conceptId)?.push(stepIndex);
+        });
+      }
+    });
+    return conceptMap;
+  }
+
+  private loadConceptTitles(conceptIds: string[]): Observable<Array<{ id: string; title: string }>> {
+    const contentObservables = conceptIds.map(id =>
+      this.dataLoader.getContent(id).pipe(
+        map(node => ({ id, title: node?.title ?? id }))
+      )
+    );
+    return forkJoin(contentObservables);
+  }
+
+  private calculateConceptProgress(
+    conceptNodes: Array<{ id: string; title: string }>,
+    conceptMap: Map<string, number[]>,
+    progress: AgentProgress | null
+  ): Array<{ conceptId: string; title: string; totalSteps: number; completedSteps: number; completionPercentage: number }> {
+    return conceptNodes.map(node => {
+      const stepIndices = conceptMap.get(node.id) ?? [];
+      const totalSteps = stepIndices.length;
+      const completedSteps = progress
+        ? stepIndices.filter(idx => progress.completedStepIndices.includes(idx)).length
+        : 0;
+      const completionPercentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+      return {
+        conceptId: node.id,
+        title: node.title,
+        totalSteps,
+        completedSteps,
+        completionPercentage
+      };
+    }).sort((a, b) => b.totalSteps - a.totalSteps);
   }
 
   // =========================================================================
@@ -740,15 +739,13 @@ export class PathService {
     agentId?: string
   ): Observable<Array<{
     chapter: PathChapter;
-    // Step-based metrics (traditional)
     completedSteps: number;
     totalSteps: number;
     stepCompletionPercentage: number;
-    // Content-based metrics (Khan Academy-style)
     totalUniqueContent: number;
     completedUniqueContent: number;
     contentCompletionPercentage: number;
-    sharedContentCompleted: number;  // Completed via other paths
+    sharedContentCompleted: number;
     isComplete: boolean;
   }>> {
     return forkJoin({
@@ -757,87 +754,108 @@ export class PathService {
       completedContentIds: this.agentService.getCompletedContentIds(agentId)
     }).pipe(
       map(({ path, progress, completedContentIds }) => {
-        // Path must use chapters
         if (!path.chapters || path.chapters.length === 0) {
           return [];
         }
-
-        let absoluteStepIndex = 0;
-        return path.chapters.map(chapter => {
-          const totalSteps = chapter.steps.length;
-
-          // Extract unique content IDs from this chapter
-          const chapterContentIds = new Set(
-            chapter.steps.map(step => step.resourceId)
-          );
-          const totalUniqueContent = chapterContentIds.size;
-
-          // Calculate step-based completion
-          let completedSteps = 0;
-          if (progress) {
-            for (let i = 0; i < totalSteps; i++) {
-              const stepIndex = absoluteStepIndex + i;
-              if (progress.completedStepIndices.includes(stepIndex)) {
-                completedSteps++;
-              }
-            }
-          }
-
-          // Calculate content-based completion
-          let completedUniqueContent = 0;
-          let sharedContentCompleted = 0;
-
-          for (const contentId of chapterContentIds) {
-            if (completedContentIds.has(contentId)) {
-              completedUniqueContent++;
-
-              // Check if completed in THIS chapter vs other paths/chapters
-              let completedInThisChapter = false;
-              if (progress) {
-                for (let i = 0; i < totalSteps; i++) {
-                  const stepIndex = absoluteStepIndex + i;
-                  if (
-                    progress.completedStepIndices.includes(stepIndex) &&
-                    chapter.steps[i]?.resourceId === contentId
-                  ) {
-                    completedInThisChapter = true;
-                    break;
-                  }
-                }
-              }
-
-              if (!completedInThisChapter) {
-                sharedContentCompleted++;
-              }
-            }
-          }
-
-          absoluteStepIndex += totalSteps;
-
-          const stepCompletionPercentage = totalSteps > 0
-            ? Math.round((completedSteps / totalSteps) * 100)
-            : 0;
-
-          const contentCompletionPercentage = totalUniqueContent > 0
-            ? Math.round((completedUniqueContent / totalUniqueContent) * 100)
-            : 0;
-
-          // Chapter is complete when all unique content is mastered
-          const isComplete = completedUniqueContent === totalUniqueContent;
-
-          return {
-            chapter,
-            completedSteps,
-            totalSteps,
-            stepCompletionPercentage,
-            totalUniqueContent,
-            completedUniqueContent,
-            contentCompletionPercentage,
-            sharedContentCompleted,
-            isComplete
-          };
-        });
+        return this.calculateChapterMetrics(path.chapters, progress, completedContentIds);
       })
     );
+  }
+
+  private calculateChapterMetrics(
+    chapters: PathChapter[],
+    progress: AgentProgress | null,
+    completedContentIds: Set<string>
+  ): Array<any> {
+    let absoluteStepIndex = 0;
+    return chapters.map(chapter => {
+      const metrics = this.calculateSingleChapterMetrics(
+        chapter, absoluteStepIndex, progress, completedContentIds
+      );
+      absoluteStepIndex += chapter.steps.length;
+      return { chapter, ...metrics };
+    });
+  }
+
+  private calculateSingleChapterMetrics(
+    chapter: PathChapter,
+    startIndex: number,
+    progress: AgentProgress | null,
+    completedContentIds: Set<string>
+  ): {
+    completedSteps: number;
+    totalSteps: number;
+    stepCompletionPercentage: number;
+    totalUniqueContent: number;
+    completedUniqueContent: number;
+    contentCompletionPercentage: number;
+    sharedContentCompleted: number;
+    isComplete: boolean;
+  } {
+    const totalSteps = chapter.steps.length;
+    const chapterContentIds = new Set(chapter.steps.map(step => step.resourceId));
+    const totalUniqueContent = chapterContentIds.size;
+
+    const completedSteps = this.countCompletedSteps(totalSteps, startIndex, progress);
+    const { completedUniqueContent, sharedContentCompleted } = this.countCompletedContent(
+      chapterContentIds, chapter.steps, startIndex, progress, completedContentIds
+    );
+
+    const stepCompletionPercentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    const contentCompletionPercentage = totalUniqueContent > 0 ? Math.round((completedUniqueContent / totalUniqueContent) * 100) : 0;
+    const isComplete = completedUniqueContent === totalUniqueContent;
+
+    return {
+      completedSteps, totalSteps, stepCompletionPercentage,
+      totalUniqueContent, completedUniqueContent, contentCompletionPercentage,
+      sharedContentCompleted, isComplete
+    };
+  }
+
+  private countCompletedSteps(totalSteps: number, startIndex: number, progress: AgentProgress | null): number {
+    if (!progress) return 0;
+    let count = 0;
+    for (let i = 0; i < totalSteps; i++) {
+      if (progress.completedStepIndices.includes(startIndex + i)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private countCompletedContent(
+    chapterContentIds: Set<string>,
+    steps: PathStep[],
+    startIndex: number,
+    progress: AgentProgress | null,
+    completedContentIds: Set<string>
+  ): { completedUniqueContent: number; sharedContentCompleted: number } {
+    let completedUniqueContent = 0;
+    let sharedContentCompleted = 0;
+
+    for (const contentId of chapterContentIds) {
+      if (completedContentIds.has(contentId)) {
+        completedUniqueContent++;
+        if (!this.isCompletedInChapter(contentId, steps, startIndex, progress)) {
+          sharedContentCompleted++;
+        }
+      }
+    }
+    return { completedUniqueContent, sharedContentCompleted };
+  }
+
+  private isCompletedInChapter(
+    contentId: string,
+    steps: PathStep[],
+    startIndex: number,
+    progress: AgentProgress | null
+  ): boolean {
+    if (!progress) return false;
+    for (let i = 0; i < steps.length; i++) {
+      if (progress.completedStepIndices.includes(startIndex + i) && steps[i]?.resourceId === contentId) {
+        return true;
+      }
+    }
+    return false;
   }
 }

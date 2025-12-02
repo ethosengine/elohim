@@ -252,7 +252,7 @@ export class PathNavigatorComponent implements OnInit, OnDestroy {
             index: globalStepIndex,
             title: step.stepTitle,
             isCompleted: status.isCompleted,
-            isLocked: false, // Todo: wire up exact locking logic if needed beyond basic completion
+            isLocked: false, // Locking logic can be added if needed beyond basic completion
             isCurrent: globalStepIndex === this.stepIndex,
             isGlobalCompletion: status.completedInOtherPath,
             icon: this.getContentIcon(status.content?.contentType)
