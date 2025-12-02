@@ -34,10 +34,6 @@ export class ContentIORegistryService {
   register(plugin: ContentIOPlugin): void {
     const formatId = plugin.formatId;
 
-    if (this.plugins.has(formatId)) {
-      console.warn(`ContentIORegistry: Plugin '${formatId}' already registered, replacing.`);
-    }
-
     this.plugins.set(formatId, plugin);
 
     // Index by file extensions
@@ -57,8 +53,6 @@ export class ContentIORegistryService {
         this.mimeTypeMap.set(normalizedMime, [...existing, formatId]);
       }
     }
-
-    console.log(`ContentIORegistry: Registered plugin '${formatId}'`);
   }
 
   /**
@@ -85,7 +79,6 @@ export class ContentIORegistryService {
     }
 
     this.plugins.delete(formatId);
-    console.log(`ContentIORegistry: Unregistered plugin '${formatId}'`);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -173,8 +173,7 @@ export class DataLoaderService {
         `${this.basePath}/paths/${pathId}.json`
       ).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.error(`[DataLoaderService] Failed to load path: ${pathId}`, err);
+        catchError(() => {
           throw new Error(`Path not found: ${pathId}`);
         })
       );
@@ -193,8 +192,7 @@ export class DataLoaderService {
         `${this.basePath}/content/${resourceId}.json`
       ).pipe(
         shareReplay(1),
-        catchError(err => {
-          console.error(`[DataLoaderService] Failed to load content: ${resourceId}`, err);
+        catchError(() => {
           throw new Error(`Content not found: ${resourceId}`);
         })
       );
@@ -209,10 +207,7 @@ export class DataLoaderService {
    */
   getContentIndex(): Observable<any> {
     return this.http.get(`${this.basePath}/content/index.json`).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load content index', err);
-        return of({ nodes: [], lastUpdated: new Date().toISOString() });
-      })
+      catchError(() => of({ nodes: [], lastUpdated: new Date().toISOString() }))
     );
   }
 
@@ -221,10 +216,7 @@ export class DataLoaderService {
    */
   getPathIndex(): Observable<PathIndex> {
     return this.http.get<PathIndex>(`${this.basePath}/paths/index.json`).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load path index', err);
-        return of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-      })
+      catchError(() => of({ paths: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
     );
   }
 
@@ -258,8 +250,9 @@ export class DataLoaderService {
     const key = `lamad-progress-${progress.agentId}-${progress.pathId}`;
     try {
       localStorage.setItem(key, JSON.stringify(progress));
-    } catch (err) {
-      console.error('[DataLoaderService] Failed to save progress to localStorage', err);
+    } catch {
+      // Silently ignore localStorage quota errors - progress will be lost on refresh
+      // but the app continues to function
     }
     return of(undefined);
   }
@@ -305,10 +298,7 @@ export class DataLoaderService {
     ).pipe(
       map(response => response.attestations ?? []),
       shareReplay(1),
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load attestations', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     );
     return this.attestationCache$;
   }
@@ -348,10 +338,7 @@ export class DataLoaderService {
     return this.http.get<{ agents: Agent[] }>(
       `${this.basePath}/agents/index.json`
     ).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load agent index', err);
-        return of({ agents: [] });
-      })
+      catchError(() => of({ agents: [] }))
     );
   }
 
@@ -366,10 +353,7 @@ export class DataLoaderService {
     return this.http.get<KnowledgeMapIndex>(
       `${this.basePath}/knowledge-maps/index.json`
     ).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load knowledge map index', err);
-        return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-      })
+      catchError(() => of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
     );
   }
 
@@ -380,10 +364,7 @@ export class DataLoaderService {
     return this.http.get<KnowledgeMap>(
       `${this.basePath}/knowledge-maps/${mapId}.json`
     ).pipe(
-      catchError(err => {
-        console.error(`[DataLoaderService] Failed to load knowledge map: ${mapId}`, err);
-        return of(null);
-      })
+      catchError(() => of(null))
     );
   }
 
@@ -398,10 +379,7 @@ export class DataLoaderService {
     return this.http.get<PathExtensionIndex>(
       `${this.basePath}/extensions/index.json`
     ).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load extension index', err);
-        return of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-      })
+      catchError(() => of({ extensions: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
     );
   }
 
@@ -412,10 +390,7 @@ export class DataLoaderService {
     return this.http.get<PathExtension>(
       `${this.basePath}/extensions/${extensionId}.json`
     ).pipe(
-      catchError(err => {
-        console.error(`[DataLoaderService] Failed to load extension: ${extensionId}`, err);
-        return of(null);
-      })
+      catchError(() => of(null))
     );
   }
 
@@ -455,10 +430,7 @@ export class DataLoaderService {
     }).pipe(
       map(({ overview, index, relationships }) => this.buildContentGraph(overview, index, relationships)),
       shareReplay(1),
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load graph', err);
-        return of(this.createEmptyGraph());
-      })
+      catchError(() => of(this.createEmptyGraph()))
     );
     return this.graphCache$;
   }
@@ -582,10 +554,7 @@ export class DataLoaderService {
     return this.http.get<AssessmentIndex>(
       `${this.basePath}/assessments/index.json`
     ).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load assessment index', err);
-        return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
-      })
+      catchError(() => of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() }))
     );
   }
 
@@ -595,10 +564,7 @@ export class DataLoaderService {
    */
   getAssessment(assessmentId: string): Observable<ContentNode | null> {
     return this.getContent(assessmentId).pipe(
-      catchError(err => {
-        console.error(`[DataLoaderService] Failed to load assessment: ${assessmentId}`, err);
-        return of(null);
-      })
+      catchError(() => of(null))
     );
   }
 
@@ -622,16 +588,13 @@ export class DataLoaderService {
     return this.http.get<GovernanceIndex>(
       `${this.basePath}/governance/index.json`
     ).pipe(
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load governance index', err);
-        return of({
-          lastUpdated: new Date().toISOString(),
-          challengeCount: 0,
-          proposalCount: 0,
-          precedentCount: 0,
-          discussionCount: 0
-        });
-      })
+      catchError(() => of({
+        lastUpdated: new Date().toISOString(),
+        challengeCount: 0,
+        proposalCount: 0,
+        precedentCount: 0,
+        discussionCount: 0
+      }))
     );
   }
 
@@ -643,10 +606,7 @@ export class DataLoaderService {
       `${this.basePath}/governance/challenges.json`
     ).pipe(
       map(response => response.challenges || []),
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load challenges', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     );
   }
 
@@ -669,10 +629,7 @@ export class DataLoaderService {
       `${this.basePath}/governance/proposals.json`
     ).pipe(
       map(response => response.proposals || []),
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load proposals', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     );
   }
 
@@ -693,10 +650,7 @@ export class DataLoaderService {
       `${this.basePath}/governance/precedents.json`
     ).pipe(
       map(response => response.precedents || []),
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load precedents', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     );
   }
 
@@ -717,10 +671,7 @@ export class DataLoaderService {
       `${this.basePath}/governance/discussions.json`
     ).pipe(
       map(response => response.discussions || []),
-      catchError(err => {
-        console.error('[DataLoaderService] Failed to load discussions', err);
-        return of([]);
-      })
+      catchError(() => of([]))
     );
   }
 

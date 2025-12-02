@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { SearchComponent } from './search.component';
 import { ActivatedRoute } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { of, throwError, Subject } from 'rxjs';
+import { of, throwError, Subject, delay } from 'rxjs';
 import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search.model';
 
@@ -130,11 +130,14 @@ describe('SearchComponent', () => {
     }));
 
     it('should set isLoading during search', fakeAsync(() => {
+      // Use delayed observable to test isLoading state
+      searchServiceSpy.search.and.returnValue(of({ results: mockSearchResults } as any).pipe(delay(100)));
+
       component.query = 'test';
       component.performSearch();
 
       expect(component.isLoading).toBeTrue();
-      tick();
+      tick(100);
       expect(component.isLoading).toBeFalse();
     }));
   });

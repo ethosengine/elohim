@@ -9,12 +9,14 @@ import { ContentNode } from '../../models/content-node.model';
   imports: [CommonModule],
   template: `
     <div class="iframe-container">
-      <iframe
-        [src]="safeUrl"
-        [attr.sandbox]="sandboxAttr"
-        class="iframe-content"
-        allowfullscreen
-      ></iframe>
+      @if (safeUrl) {
+        <iframe
+          [src]="safeUrl"
+          sandbox="allow-scripts allow-same-origin"
+          class="iframe-content"
+          allowfullscreen
+        ></iframe>
+      }
     </div>
   `,
   styleUrls: ['./iframe-renderer.component.css']
@@ -23,7 +25,6 @@ export class IframeRendererComponent implements OnChanges {
   @Input() node!: ContentNode;
 
   safeUrl: SafeResourceUrl | null = null;
-  sandboxAttr: string = 'allow-scripts allow-same-origin';
 
   constructor(private readonly sanitizer: DomSanitizer) {}
 
@@ -39,10 +40,5 @@ export class IframeRendererComponent implements OnChanges {
       : '';
 
     this.safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
-
-    // Apply security policy from metadata
-    if (this.node.metadata?.securityPolicy?.sandbox) {
-      this.sandboxAttr = this.node.metadata.securityPolicy.sandbox.join(' ');
-    }
   }
 }

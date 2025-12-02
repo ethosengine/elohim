@@ -64,41 +64,15 @@ describe('IframeRendererComponent', () => {
   });
 
   describe('sandbox attribute', () => {
-    it('should use default sandbox attributes', () => {
+    it('should have static sandbox attribute on iframe', () => {
       component.node = createContentNode('https://example.com');
       component.ngOnChanges({
         node: new SimpleChange(null, component.node, true)
       });
+      fixture.detectChanges();
 
-      expect(component.sandboxAttr).toBe('allow-scripts allow-same-origin');
-    });
-
-    it('should use custom sandbox policy from metadata', () => {
-      const node = createContentNode('https://example.com', {
-        securityPolicy: {
-          sandbox: ['allow-scripts', 'allow-forms', 'allow-popups']
-        }
-      });
-      component.node = node;
-      component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
-      });
-
-      expect(component.sandboxAttr).toBe('allow-scripts allow-forms allow-popups');
-    });
-
-    it('should handle empty sandbox array in metadata', () => {
-      const node = createContentNode('https://example.com', {
-        securityPolicy: {
-          sandbox: []
-        }
-      });
-      component.node = node;
-      component.ngOnChanges({
-        node: new SimpleChange(null, component.node, true)
-      });
-
-      expect(component.sandboxAttr).toBe('');
+      const iframe = fixture.nativeElement.querySelector('iframe');
+      expect(iframe.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin');
     });
   });
 
@@ -116,6 +90,9 @@ describe('IframeRendererComponent', () => {
 
     it('should have iframe-container class', () => {
       component.node = createContentNode('https://example.com');
+      component.ngOnChanges({
+        node: new SimpleChange(null, component.node, true)
+      });
       fixture.detectChanges();
 
       const container = fixture.nativeElement.querySelector('.iframe-container');
