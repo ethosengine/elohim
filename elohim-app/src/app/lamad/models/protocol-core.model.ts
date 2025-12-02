@@ -695,9 +695,9 @@ export interface TokenSpecification {
 }
 
 /**
- * Standard token specifications from Shefa whitepaper.
+ * Standard token specifications for multi-dimensional value tracking.
  */
-export const SHEFA_TOKEN_SPECS: Record<TokenType, TokenSpecification> = {
+export const TOKEN_SPECS: Record<TokenType, TokenSpecification> = {
   care: {
     type: 'care',
     name: 'Care Token',

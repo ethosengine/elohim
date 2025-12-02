@@ -32,9 +32,8 @@
  *
  * Protocol Core Integration:
  * - Uses TokenType from protocol-core for token categories
+ * - Uses TokenDecayRate from protocol-core for demurrage
  * - Uses GovernanceLayer from protocol-core for flow governance
- * - Uses Attestation patterns from protocol-core
- * - Uses ProtocolAgent as base for REAAgent
  *
  * References:
  * - ValueFlows: https://www.valueflo.ws
