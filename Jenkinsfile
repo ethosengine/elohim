@@ -56,9 +56,9 @@ spec:
    tty: true
    resources:
      requests:
-       ephemeral-storage: "1Gi"
+       ephemeral-storage: "2Gi"
      limits:
-       ephemeral-storage: "2.5Gi"
+       ephemeral-storage: "5Gi"
    volumeMounts:
    - name: containerd-sock
      mountPath: /run/containerd/containerd.sock
