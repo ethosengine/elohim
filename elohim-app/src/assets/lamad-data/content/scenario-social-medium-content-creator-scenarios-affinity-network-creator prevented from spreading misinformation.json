@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-content-creator-scenarios-affinity-network-creator prevented from spreading misinformation",
+  "did": "did:web:elohim.host:content:social-medium:content-creator:scenarios:affinity-network-creator prevented from spreading misinformation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Creator prevented from spreading misinformation",
+  "description": "Creator prevented from spreading misinformation",
+  "content": "Scenario: Creator prevented from spreading misinformation\n    Given Jordan creates content making unsupported health claims\n    And the claims contradict scientific consensus\n    When Jordan attempts to contribute the content\n    Then the verification agent surfaces counter-evidence\n    And Jordan sees the evidence gaps before distribution\n    And Jordan can revise with better sources or accept limited reach\n    And if posted without revision, reach is limited to personal connections\n    And communities are protected from health misinformation\n    And Jordan learns that evidence standards enable trust and reach\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:content_creator",
+    "governance_layer:affinity_network",
+    "related_users:child,elder,activist,community_moderator",
+    "related_layers:community,global,educational",
+    "elohim_agents:verification_agent,value_recognition_agent,distribution_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/content_creator/scenarios/affinity_network.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-content-creator-scenarios-affinity-network",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-content-creator-scenarios-affinity-network",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Creator prevented from spreading misinformation",
+    "ogDescription": "Creator prevented from spreading misinformation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-affinity-network-creator prevented from spreading misinformation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Creator prevented from spreading misinformation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-content-creator-scenarios-affinity-network-creator prevented from spreading misinformation",
+    "identifier": "did:web:elohim.host:content:social-medium:content-creator:scenarios:affinity-network-creator prevented from spreading misinformation",
+    "name": "Creator prevented from spreading misinformation",
+    "description": "Creator prevented from spreading misinformation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

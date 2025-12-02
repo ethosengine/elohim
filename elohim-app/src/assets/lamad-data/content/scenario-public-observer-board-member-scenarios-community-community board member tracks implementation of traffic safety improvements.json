@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-community-community board member tracks implementation of traffic safety improvements",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-community board member tracks implementation of traffic safety improvements",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community board member tracks implementation of traffic safety improvements",
+  "description": "Community board member tracks implementation of traffic safety improvements",
+  "content": "Scenario: Community board member tracks implementation of traffic safety improvements\n    Given city committed to traffic calming measures after neighborhood advocacy\n    And board member wants to ensure promises are implemented\n    And community members ask whether improvements are actually happening\n    When the board member uses Observer implementation tracking\n    Then they see timeline of committed improvements versus actual installation\n    And discover only partial implementation despite full funding\n    And access traffic incident data showing ongoing safety concerns\n    And find other neighborhoods received promised improvements faster\n    And impact tracking holds city accountable to community commitments\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:community",
+    "related_users:citizen,parent,activist,community_organizer,politician",
+    "related_layers:district,municipality,neighborhood",
+    "elohim_agents:public_observer,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community board member tracks implementation of traffic safety improvements",
+    "ogDescription": "Community board member tracks implementation of traffic safety improvements",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-community board member tracks implementation of traffic safety improvements",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community board member tracks implementation of traffic safety improvements - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-community-community board member tracks implementation of traffic safety improvements",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:community-community board member tracks implementation of traffic safety improvements",
+    "name": "Community board member tracks implementation of traffic safety improvements",
+    "description": "Community board member tracks implementation of traffic safety improvements",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

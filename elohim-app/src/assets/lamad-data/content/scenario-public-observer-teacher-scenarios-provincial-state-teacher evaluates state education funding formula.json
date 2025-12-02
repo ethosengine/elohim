@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-provincial-state-teacher evaluates state education funding formula",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher evaluates state education funding formula",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher evaluates state education funding formula",
+  "description": "Teacher evaluates state education funding formula",
+  "content": "Scenario: Teacher evaluates state education funding formula\n    Given state funding formula determines district resources\n    And formula appears complex and technical\n    When the Observer analyzes state funding impacts\n    Then teachers see their district gets $8,500 per student\n    And neighboring district gets $12,000 per student from same formula\n    And understand which formula factors create disparities\n    And learn which legislators champion funding equity\n    And coordinate with underfunded districts for reform coalition\n    And education funding becomes teacher advocacy priority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:provincial_state",
+    "related_users:parent,politician,community_organizer,union_representative",
+    "related_layers:district,educational,workplace_organizational",
+    "elohim_agents:public_observer,education_elohim,union_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher evaluates state education funding formula",
+    "ogDescription": "Teacher evaluates state education funding formula",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher evaluates state education funding formula",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher evaluates state education funding formula - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-provincial-state-teacher evaluates state education funding formula",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:provincial-state-teacher evaluates state education funding formula",
+    "name": "Teacher evaluates state education funding formula",
+    "description": "Teacher evaluates state education funding formula",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

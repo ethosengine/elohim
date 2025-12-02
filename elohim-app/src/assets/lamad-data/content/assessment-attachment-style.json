@@ -1,0 +1,143 @@
+{
+  "id": "assessment-attachment-style",
+  "contentType": "assessment",
+  "title": "Attachment Style Exploration",
+  "description": "Understand your patterns in close relationships",
+  "content": {
+    "instrumentType": "attachment",
+    "domain": "attachment",
+    "passingScore": 0,
+    "allowRetake": true,
+    "showCorrectAnswers": false,
+    "contentWarning": "This assessment explores relationship patterns. Some questions may bring up feelings about past relationships.",
+    "preAssessmentContent": "Attachment styles describe patterns in how we relate to others in close relationships. Understanding your style can improve relationship awareness.",
+    "sections": [
+      {
+        "id": "sec-anxiety",
+        "title": "Relationship Feelings",
+        "instructions": "Think about your close relationships. How much do you agree with each statement?",
+        "questions": [
+          {
+            "id": "att-q1",
+            "type": "likert-7",
+            "text": "I worry about being abandoned by people close to me.",
+            "subscales": [
+              "anxiety"
+            ],
+            "scaleAnchors": {
+              "low": "Strongly Disagree",
+              "high": "Strongly Agree"
+            },
+            "reverseScored": false
+          },
+          {
+            "id": "att-q2",
+            "type": "likert-7",
+            "text": "I find it easy to depend on others.",
+            "subscales": [
+              "avoidance"
+            ],
+            "scaleAnchors": {
+              "low": "Strongly Disagree",
+              "high": "Strongly Agree"
+            },
+            "reverseScored": true
+          },
+          {
+            "id": "att-q3",
+            "type": "likert-7",
+            "text": "I often worry that my partner doesn't really love me.",
+            "subscales": [
+              "anxiety"
+            ],
+            "scaleAnchors": {
+              "low": "Strongly Disagree",
+              "high": "Strongly Agree"
+            },
+            "reverseScored": false
+          },
+          {
+            "id": "att-q4",
+            "type": "likert-7",
+            "text": "I feel comfortable opening up to others.",
+            "subscales": [
+              "avoidance"
+            ],
+            "scaleAnchors": {
+              "low": "Strongly Disagree",
+              "high": "Strongly Agree"
+            },
+            "reverseScored": true
+          },
+          {
+            "id": "att-q5",
+            "type": "likert-7",
+            "text": "I need a lot of reassurance that I am loved.",
+            "subscales": [
+              "anxiety"
+            ],
+            "scaleAnchors": {
+              "low": "Strongly Disagree",
+              "high": "Strongly Agree"
+            },
+            "reverseScored": false
+          }
+        ]
+      }
+    ],
+    "interpretation": {
+      "method": "quadrant",
+      "dimensions": [
+        "anxiety",
+        "avoidance"
+      ],
+      "outcomes": [
+        {
+          "name": "Secure",
+          "anxiety": "low",
+          "avoidance": "low"
+        },
+        {
+          "name": "Anxious-Preoccupied",
+          "anxiety": "high",
+          "avoidance": "low"
+        },
+        {
+          "name": "Dismissive-Avoidant",
+          "anxiety": "low",
+          "avoidance": "high"
+        },
+        {
+          "name": "Fearful-Avoidant",
+          "anxiety": "high",
+          "avoidance": "high"
+        }
+      ]
+    }
+  },
+  "contentFormat": "assessment-json",
+  "tags": [
+    "assessment",
+    "attachment",
+    "relationships",
+    "self-knowledge"
+  ],
+  "sourcePath": "generated/assessment-attachment-style.json",
+  "relatedNodeIds": [
+    "know-thyself-path"
+  ],
+  "metadata": {
+    "instrumentType": "attachment",
+    "domain": "attachment",
+    "estimatedTime": "25-35 minutes",
+    "attestationId": "attachment-aware",
+    "contentAccess": "gated",
+    "prerequisiteAttestation": "values-examined",
+    "validation": {
+      "inspired_by": "Experiences in Close Relationships (ECR-R)",
+      "reliability": "Adapted for educational purposes"
+    }
+  },
+  "createdAt": "2025-11-28T00:09:03.479938",
+  "updatedAt": "2025-11-28T00:09:03.479940"
+}

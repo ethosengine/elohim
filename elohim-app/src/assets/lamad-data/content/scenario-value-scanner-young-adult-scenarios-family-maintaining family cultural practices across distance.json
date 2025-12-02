@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-maintaining family cultural practices across distance",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-maintaining family cultural practices across distance",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Maintaining family cultural practices across distance",
+  "description": "Maintaining family cultural practices across distance",
+  "content": "Scenario: Maintaining family cultural practices across distance\n    Given Aisha's family has specific cultural traditions\n    And she wants to maintain cultural connection\n    When Aisha participates in family cultural practices\n    Then the family_elohim should support cultural continuity\n    And it should help coordinate cultural events across distance\n    And it should recognize cultural care work she performs\n    And family cultural values should shape her care economy participation\n    And distance shouldn't prevent cultural transmission\n    And her cultural identity should be maintained through family care bonds\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Maintaining family cultural practices across distance",
+    "ogDescription": "Maintaining family cultural practices across distance",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-maintaining family cultural practices across distance",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Maintaining family cultural practices across distance - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-maintaining family cultural practices across distance",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-maintaining family cultural practices across distance",
+    "name": "Maintaining family cultural practices across distance",
+    "description": "Maintaining family cultural practices across distance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

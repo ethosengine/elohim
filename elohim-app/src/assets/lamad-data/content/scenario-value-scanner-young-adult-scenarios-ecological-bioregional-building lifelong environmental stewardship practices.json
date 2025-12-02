@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-building lifelong environmental stewardship practices",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-building lifelong environmental stewardship practices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building lifelong environmental stewardship practices",
+  "description": "Building lifelong environmental stewardship practices",
+  "content": "Scenario: Building lifelong environmental stewardship practices\n    Given Aisha's consumption patterns will span decades\n    And early adult habits shape lifelong practices\n    When Aisha develops consumption patterns\n    Then the bioregional_elohim should support sustainable habits\n    And it should help her establish environmentally responsible practices\n    And patterns developed now should serve her throughout life\n    And environmental stewardship should become second nature\n    And her generation should normalize ecological responsibility\n    And sustainable consumption should be her baseline expectation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building lifelong environmental stewardship practices",
+    "ogDescription": "Building lifelong environmental stewardship practices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-building lifelong environmental stewardship practices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building lifelong environmental stewardship practices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-building lifelong environmental stewardship practices",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-building lifelong environmental stewardship practices",
+    "name": "Building lifelong environmental stewardship practices",
+    "description": "Building lifelong environmental stewardship practices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

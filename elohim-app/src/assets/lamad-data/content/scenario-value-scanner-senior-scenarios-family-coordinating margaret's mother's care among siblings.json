@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-coordinating margaret's mother's care among siblings",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-coordinating margaret's mother's care among siblings",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating Margaret's mother's care among siblings",
+  "description": "Coordinating Margaret's mother's care among siblings",
+  "content": "Scenario: Coordinating Margaret's mother's care among siblings\n    Given Margaret has siblings who also have responsibilities to their mother\n    And Margaret currently does most hands-on care\n    When the family_elohim coordinates elder care among siblings\n    Then all siblings' contributions should be visible\n    And disparities in care burden should be evident\n    And fair distribution conversations should be supported by data\n    And Margaret should not bear disproportionate burden invisibly\n    And sibling care economy should operate on transparency\n    And family equity should be maintained across distance and circumstance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating Margaret's mother's care among siblings",
+    "ogDescription": "Coordinating Margaret's mother's care among siblings",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-coordinating margaret's mother's care among siblings",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating Margaret's mother's care among siblings - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-coordinating margaret's mother's care among siblings",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-coordinating margaret's mother's care among siblings",
+    "name": "Coordinating Margaret's mother's care among siblings",
+    "description": "Coordinating Margaret's mother's care among siblings",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

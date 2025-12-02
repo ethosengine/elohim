@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-building toward employment while not currently ready to work",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-building toward employment while not currently ready to work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building toward employment while not currently ready to work",
+  "description": "Building toward employment while not currently ready to work",
+  "content": "Scenario: Building toward employment while not currently ready to work\n    Given I am still in acute crisis or early trauma recovery\n    And employment right now would overwhelm my capacity\n    When I plan for future employment while not currently seeking work\n    Then the workplace_elohim helps me identify skill-building opportunities\n    And surfaces training, education, or credential programs I could pursue\n    And validates that not being employment-ready yet is appropriate\n    And helps me build toward future employment at my pace\n    And tracks my skill development and preparation\n    And my personal_agent identifies low-pressure ways to build employment readiness\n    And recognizes that recovery before employment is often necessary\n    And supports my timeline for employment readiness\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building toward employment while not currently ready to work",
+    "ogDescription": "Building toward employment while not currently ready to work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-building toward employment while not currently ready to work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building toward employment while not currently ready to work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-building toward employment while not currently ready to work",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-building toward employment while not currently ready to work",
+    "name": "Building toward employment while not currently ready to work",
+    "description": "Building toward employment while not currently ready to work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

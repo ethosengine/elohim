@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-individual-personal agent serves margaret's autonomy without infantilizing",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-personal agent serves margaret's autonomy without infantilizing",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Personal agent serves Margaret's autonomy without infantilizing",
+  "description": "Personal agent serves Margaret's autonomy without infantilizing",
+  "content": "Scenario: Personal agent serves Margaret's autonomy without infantilizing\n    Given Margaret is a capable adult with decades of life experience\n    And the interface uses AI assistance\n    When the personal_agent interacts with Margaret\n    Then it must preserve her full autonomy and dignity\n    And it must never be patronizing or infantilizing\n    And it must respect her expertise and judgment\n    And it must provide information, not directives\n    And it must acknowledge her nursing background and competence\n    And the relationship should be respectful partnership\n    And Margaret should feel empowered, never managed\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:individual",
+    "related_users:middle_aged,elderly,grandparent,retired,caregiver",
+    "related_layers:household,family,neighborhood,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Personal agent serves Margaret's autonomy without infantilizing",
+    "ogDescription": "Personal agent serves Margaret's autonomy without infantilizing",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-personal agent serves margaret's autonomy without infantilizing",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Personal agent serves Margaret's autonomy without infantilizing - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-individual-personal agent serves margaret's autonomy without infantilizing",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:individual-personal agent serves margaret's autonomy without infantilizing",
+    "name": "Personal agent serves Margaret's autonomy without infantilizing",
+    "description": "Personal agent serves Margaret's autonomy without infantilizing",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

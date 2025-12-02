@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-provincial-state-developer lobbying relationships become transparent",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer lobbying relationships become transparent",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Developer lobbying relationships become transparent",
+  "description": "Developer lobbying relationships become transparent",
+  "content": "Scenario: Developer lobbying relationships become transparent\n    Given a developer lobbies state legislature for favorable policy\n    And makes campaign donations to key committee members\n    When the Observer tracks lobbying and political relationships\n    Then constituents see: $250K in donations to housing committee members\n    And identify correlation between donations and votes on developer-friendly bills\n    And the developer faces accountability for political influence\n    And legislators face scrutiny about who they serve\n    And transparent relationships create pressure for merit-based policy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:provincial_state",
+    "related_users:politician,board_member,citizen,activist",
+    "related_layers:municipality,county_regional,ecological",
+    "elohim_agents:public_observer,state_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-provincial-state",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Developer lobbying relationships become transparent",
+    "ogDescription": "Developer lobbying relationships become transparent",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer lobbying relationships become transparent",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Developer lobbying relationships become transparent - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-provincial-state-developer lobbying relationships become transparent",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:provincial-state-developer lobbying relationships become transparent",
+    "name": "Developer lobbying relationships become transparent",
+    "description": "Developer lobbying relationships become transparent",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

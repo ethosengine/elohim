@@ -18,6 +18,12 @@ describe('App Routes', () => {
   });
 
   it('should have correct number of routes', () => {
-    expect(routes.length).toBe(2);
+    expect(routes.length).toBe(3); // home, lamad, and 404 catch-all
+  });
+
+  it('should have a 404 catch-all route as last route', () => {
+    const lastRoute = routes[routes.length - 1];
+    expect(lastRoute.path).toBe('**');
+    expect(lastRoute.loadComponent).toBeDefined();
   });
 });

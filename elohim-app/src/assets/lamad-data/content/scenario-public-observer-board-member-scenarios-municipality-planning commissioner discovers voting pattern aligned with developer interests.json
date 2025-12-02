@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-board-member-scenarios-municipality-planning commissioner discovers voting pattern aligned with developer interests",
+  "did": "did:web:elohim.host:content:public-observer:board-member:scenarios:municipality-planning commissioner discovers voting pattern aligned with developer interests",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Planning commissioner discovers voting pattern aligned with developer interests",
+  "description": "Planning commissioner discovers voting pattern aligned with developer interests",
+  "content": "Scenario: Planning commissioner discovers voting pattern aligned with developer interests\n    Given commissioner has served for two years making numerous land use decisions\n    And local newspaper questions commissioner's independence\n    And commissioner wants to understand their own voting record\n    When the commissioner uses Observer accountability tracking\n    Then they see their votes on developments categorized by community support levels\n    And discover they voted for 85% of projects opposed by neighborhood associations\n    And find their votes consistently favor developments with higher density than staff recommended\n    And access campaign contribution data showing developer funding sources\n    And accountability transparency helps commissioner reflect on whose interests they serve\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:board_member",
+    "governance_layer:municipality",
+    "related_users:citizen,developer_interests,politician,activist,community_organizer",
+    "related_layers:district,community,ecological",
+    "elohim_agents:public_observer,domain_elohim,community_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/board_member/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-board-member-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-board-member-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Planning commissioner discovers voting pattern aligned with developer interests",
+    "ogDescription": "Planning commissioner discovers voting pattern aligned with developer interests",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-municipality-planning commissioner discovers voting pattern aligned with developer interests",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Planning commissioner discovers voting pattern aligned with developer interests - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-board-member-scenarios-municipality-planning commissioner discovers voting pattern aligned with developer interests",
+    "identifier": "did:web:elohim.host:content:public-observer:board-member:scenarios:municipality-planning commissioner discovers voting pattern aligned with developer interests",
+    "name": "Planning commissioner discovers voting pattern aligned with developer interests",
+    "description": "Planning commissioner discovers voting pattern aligned with developer interests",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-community-access to community resources during extreme scarcity",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:community-access to community resources during extreme scarcity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Access to community resources during extreme scarcity",
+  "description": "Access to community resources during extreme scarcity",
+  "content": "Scenario: Access to community resources during extreme scarcity\n    Given Kenji lives on $180/week and might face emergencies\n    And community food banks, clothing closets, and support services exist\n    When Kenji needs community resources\n    Then the community_elohim should connect him to available support\n    And it should reduce shame and barriers to access\n    And it should frame receiving support as participating in care economy\n    And it should recognize that receiving care is part of reciprocity\n    And the system should normalize community resource sharing\n    And students should access community support with dignity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:community",
+    "related_users:student,young_adult,adult,community_member",
+    "related_layers:neighborhood,educational,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Access to community resources during extreme scarcity",
+    "ogDescription": "Access to community resources during extreme scarcity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-access to community resources during extreme scarcity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Access to community resources during extreme scarcity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-community-access to community resources during extreme scarcity",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:community-access to community resources during extreme scarcity",
+    "name": "Access to community resources during extreme scarcity",
+    "description": "Access to community resources during extreme scarcity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

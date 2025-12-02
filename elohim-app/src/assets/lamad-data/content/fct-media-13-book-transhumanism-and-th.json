@@ -1,0 +1,60 @@
+{
+  "id": "fct-media-13-book-transhumanism-and-th",
+  "contentType": "book",
+  "title": "Transhumanism and the Image of God",
+  "description": "Book by Jacob Shatzer",
+  "content": {
+    "title": "Transhumanism and the Image of God",
+    "author": "Jacob Shatzer",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "book",
+    "fct",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "fct-media",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "mediaType": "book",
+    "author": "Jacob Shatzer"
+  },
+  "_contributor": "Jacob Shatzer",
+  "createdAt": "2025-11-28T21:10:19.225064",
+  "updatedAt": "2025-11-28T21:10:19.225065",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "Transhumanism and the Image of God",
+    "ogDescription": "Book by Jacob Shatzer",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-13-book-transhumanism-and-th",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "Transhumanism and the Image of God - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-13-book-transhumanism-and-th",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Transhumanism and the Image of God",
+    "description": "Book by Jacob Shatzer",
+    "dateCreated": "2025-11-28T21:10:19.225064",
+    "dateModified": "2025-11-28T21:10:19.225065",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Jacob Shatzer"
+    }
+  }
+}

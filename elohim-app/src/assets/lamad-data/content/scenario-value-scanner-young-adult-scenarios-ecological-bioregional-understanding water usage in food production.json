@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding water usage in food production",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-understanding water usage in food production",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Understanding water usage in food production",
+  "description": "Understanding water usage in food production",
+  "content": "Scenario: Understanding water usage in food production\n    Given food production uses significant water resources\n    And water scarcity is increasing\n    When the bioregional_elohim displays environmental data\n    Then it should include water usage in impact assessment\n    And it should explain water costs of different foods\n    And it should help her choose lower water-impact options\n    And bioregional water context should inform recommendations\n    And she should understand food-water connections\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:ecological_bioregional",
+    "related_users:adult,worker,consumer,citizen",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Understanding water usage in food production",
+    "ogDescription": "Understanding water usage in food production",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding water usage in food production",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding water usage in food production - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-ecological-bioregional-understanding water usage in food production",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:ecological-bioregional-understanding water usage in food production",
+    "name": "Understanding water usage in food production",
+    "description": "Understanding water usage in food production",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

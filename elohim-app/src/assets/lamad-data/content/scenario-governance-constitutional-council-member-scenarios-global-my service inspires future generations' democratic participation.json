@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-constitutional-council-member-scenarios-global-my service inspires future generations' democratic participation",
+  "did": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-my service inspires future generations' democratic participation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "My service inspires future generations' democratic participation",
+  "description": "My service inspires future generations' democratic participation",
+  "content": "Scenario: My service inspires future generations' democratic participation\n    Given my children watched my constitutional council journey\n    And they see democracy as participation not just voting\n    When they grow up understanding governance as shared responsibility\n    Then they develop: civic capacities through my example\n    And they believe: they too can shape their world\n    And they practice: deliberation, constitutional thinking, humble judgment\n    And they inherit: democracy as living practice not dead tradition\n    And next generation: is prepared for governance challenges ahead\n    And my service: ripples through time beyond my individual contribution\n    And I know: this is how democracy perpetuates itself\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:constitutional_council_member",
+    "governance_layer:global",
+    "related_users:policy_maker,technical_expert,researcher,appellant",
+    "related_layers:nation_state,continental",
+    "elohim_agents:global_constitutional_agent",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/constitutional_council_member/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-governance-constitutional-council-member-scenarios-global",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-constitutional-council-member-scenarios-global",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "My service inspires future generations' democratic participation",
+    "ogDescription": "My service inspires future generations' democratic participation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-my service inspires future generations' democratic participation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "My service inspires future generations' democratic participation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-constitutional-council-member-scenarios-global-my service inspires future generations' democratic participation",
+    "identifier": "did:web:elohim.host:content:governance:constitutional-council-member:scenarios:global-my service inspires future generations' democratic participation",
+    "name": "My service inspires future generations' democratic participation",
+    "description": "My service inspires future generations' democratic participation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

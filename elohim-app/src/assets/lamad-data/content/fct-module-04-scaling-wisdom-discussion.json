@@ -1,0 +1,56 @@
+{
+  "id": "fct-module-04-scaling-wisdom-discussion",
+  "contentType": "activity",
+  "title": "Discussion: Setting the Stage: Scaling Wisdom",
+  "description": "Group discussion and reflection activity",
+  "content": {
+    "instructions": "Jesus' Wisdom in Kingdom Theology: Examples and Discussion\n\n Key Examples:\n\n1\\. \\*\\*The Sermon on the Mount\\*\\* (Matthew 5-7)  \n   \\- Jesus reinterprets and deepens Old Testament laws, emphasizing the spirit of the law over literal observance.  \n   \\- He presents a new understanding of righteousness based on inner transformation rather than outward compliance.\n\n2\\. \\*\\*Parable of the Good Samaritan\\*\\* (Luke 10:25-37)  \n   \\- Jesus expands the concept of \"neighbor\" beyond cultural and ethnic boundaries.  \n   \\- He demonstrates that wisdom and righteousness are found in compassionate action, not just knowledge of the law.\n\n3\\. \\*\\*Teachings on Servant Leadership\\*\\* (Mark 10:42-45)  \n   \\- Jesus inverts worldly power structures, teaching that true greatness in His Kingdom comes through serving others.  \n   \\- This wisdom challenges conventional understanding of power and responsibility.\n\n4\\. \\*\\*Parable of the Talents\\*\\* (Matthew 25:14-30)  \n   \\- Jesus teaches about the responsibility that comes with gifts and resources.  \n   \\- This parable illustrates how expanding responsibility in God's Kingdom involves faithful stewardship and productive use of what we're given.\n\n5\\. \\*\\*Jesus' Response to Pharisees about Taxes\\*\\* (Matthew 22:15-22)  \n   \\- Jesus wisely navigates a political trap, providing insight into the relationship between earthly and divine authority.  \n   \\- His response, \"Give to Caesar what is Caesar's, and to God what is God's,\" demonstrates wisdom in balancing worldly and spiritual responsibilities.\n\n\\#\\# Discussion Question:\n\nConsider Jesus' teachings on wisdom and responsibility in His Kingdom theology, alongside what we've learned about righteous leadership in the Old Testament and our modern challenges with technology and information systems. How might Jesus' approach to expanding responsibility and scaling wisdom inform our work as Christian technologists? \n\nSpecifically:  \n\\- How can we design digital systems that embody the spirit of Jesus' teachings, emphasizing inner transformation and compassionate action over mere compliance or engagement metrics?  \n\\- In what ways can we apply Jesus' model of servant leadership to our roles in developing and managing technology platforms?  \n\\- How might Jesus' parable of the talents guide our approach to stewarding the powerful technological tools at our disposal?  \n\\- Given Jesus' ability to wisely navigate complex social and political situations, how can we create technologies that help users do the same in our increasingly complex digital landscape?\n\nReflect on how these principles could reshape our approach to scaling wisdom through technology while remaining true to our calling as followers of Christ.\n\nActivity: Mind the Gap \\- What does the World Need? Who are you, at your core? Imagine a life that matches those Priorities. How big is the Gap?  Reflect for a moment on the cause of the gap.",
+    "activityType": "discussion",
+    "groupSize": "small-group",
+    "estimatedTime": "15-20 minutes"
+  },
+  "contentFormat": "activity-json",
+  "sourcePath": "fct/Module 4 - Setting the Stage -__The Need for Scaling Wisdom, __Acting as a Christian.md",
+  "tags": [
+    "activity",
+    "discussion",
+    "fct",
+    "setting-stage"
+  ],
+  "relatedNodeIds": [
+    "fct-module-04-scaling-wisdom"
+  ],
+  "metadata": {
+    "category": "fct-activity",
+    "sourceModule": "fct-module-04-scaling-wisdom",
+    "activityType": "discussion"
+  },
+  "createdAt": "2025-11-28T21:10:19.196730",
+  "updatedAt": "2025-11-28T21:10:19.196731",
+  "did": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Discussion: Setting the Stage: Scaling Wisdom",
+    "ogDescription": "Group discussion and reflection activity",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-discussion",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/activity.jpg",
+    "ogImageAlt": "Discussion: Setting the Stage: Scaling Wisdom - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-04-scaling-wisdom-discussion",
+    "identifier": "did:web:elohim.host:content:fct:module 4 - setting the stage -the need for scaling wisdom, -acting as a christian",
+    "name": "Discussion: Setting the Stage: Scaling Wisdom",
+    "description": "Group discussion and reflection activity",
+    "dateCreated": "2025-11-28T21:10:19.196730",
+    "dateModified": "2025-11-28T21:10:19.196731",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

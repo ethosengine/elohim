@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-expressing preferences for support style",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-expressing preferences for support style",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Expressing preferences for support style",
+  "description": "Expressing preferences for support style",
+  "content": "Scenario: Expressing preferences for support style\n    Given Jordan works with multiple support workers\n    And different workers have different support styles\n    When Jordan uses the support preference feature\n    Then the interface asks simple questions about what helps Jordan\n    And Jordan can indicate preferences using pictures and simple choices\n    And the system communicates Jordan's preferences to support team\n    And support workers honor Jordan's expressed preferences\n    And Jordan's voice shapes how they receive support\n    And Jordan's dignity is preserved through preference respect\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Expressing preferences for support style",
+    "ogDescription": "Expressing preferences for support style",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-expressing preferences for support style",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Expressing preferences for support style - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-expressing preferences for support style",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-expressing preferences for support style",
+    "name": "Expressing preferences for support style",
+    "description": "Expressing preferences for support style",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

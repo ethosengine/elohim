@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-politician-scenarios-district-board member evaluates superintendent budget proposal with impact analysis",
+  "did": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member evaluates superintendent budget proposal with impact analysis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Board member evaluates superintendent budget proposal with impact analysis",
+  "description": "Board member evaluates superintendent budget proposal with impact analysis",
+  "content": "Scenario: Board member evaluates superintendent budget proposal with impact analysis\n    Given administration proposes budget with cuts and reallocations\n    And presents optimistic framing of difficult trade-offs\n    When the Observer provides impact analysis\n    Then they see which students and schools bear burden of cuts\n    And understand transportation changes affect working parent schedules\n    And identify which programs lose funding versus protected priorities\n    And compare budget choices to similar districts\n    And ask informed questions challenging rosy assumptions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:politician",
+    "governance_layer:district",
+    "related_users:parent,teacher,student,administrator,community_organizer,citizen",
+    "related_layers:municipality,provincial_state,educational,school",
+    "elohim_agents:public_observer,district_elohim,education_elohim,constituent_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/politician/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-politician-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-politician-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Board member evaluates superintendent budget proposal with impact analysis",
+    "ogDescription": "Board member evaluates superintendent budget proposal with impact analysis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member evaluates superintendent budget proposal with impact analysis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Board member evaluates superintendent budget proposal with impact analysis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-politician-scenarios-district-board member evaluates superintendent budget proposal with impact analysis",
+    "identifier": "did:web:elohim.host:content:public-observer:politician:scenarios:district-board member evaluates superintendent budget proposal with impact analysis",
+    "name": "Board member evaluates superintendent budget proposal with impact analysis",
+    "description": "Board member evaluates superintendent budget proposal with impact analysis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

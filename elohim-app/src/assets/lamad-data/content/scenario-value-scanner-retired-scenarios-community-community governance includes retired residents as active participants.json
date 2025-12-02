@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-community governance includes retired residents as active participants",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-community governance includes retired residents as active participants",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community governance includes retired residents as active participants",
+  "description": "Community governance includes retired residents as active participants",
+  "content": "Scenario: Community governance includes retired residents as active participants\n    Given Frank and other retired residents have time for civic engagement\n    And they have accumulated community knowledge and experience\n    When the community_elohim facilitates governance\n    Then it should actively include retired residents in decision-making\n    And their time availability should enable substantial governance participation\n    And their experience should inform community policy and planning\n    And community decisions should benefit from elder wisdom\n    And retired residents should be understood as governance resources, not dependents\n    And Frank should participate in shaping community direction\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community governance includes retired residents as active participants",
+    "ogDescription": "Community governance includes retired residents as active participants",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-community governance includes retired residents as active participants",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community governance includes retired residents as active participants - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-community governance includes retired residents as active participants",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-community governance includes retired residents as active participants",
+    "name": "Community governance includes retired residents as active participants",
+    "description": "Community governance includes retired residents as active participants",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

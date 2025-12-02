@@ -1,0 +1,63 @@
+{
+  "id": "feature-public-observer-journalist-scenarios-community",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Hyperlocal Journalism for Journalist",
+  "description": "As a journalist in the public_observer system Operating at the community governance layer I want comprehensive neighborhood surveillance infrastructure So that hyperlocal journalism can exist despite resource constraints",
+  "content": "@epic:public_observer\n@user_type:journalist\n@governance_layer:community\n@related_users:citizen,activist,community_organizer,parent\n@related_layers:municipality,neighborhood,district\n@elohim_agents:public_observer,community_elohim\n\nFeature: Hyperlocal Journalism for Journalist\n  As a journalist in the public_observer system\n  Operating at the community governance layer\n  I want comprehensive neighborhood surveillance infrastructure\n  So that hyperlocal journalism can exist despite resource constraints\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the journalist user is registered in the system\n    And the community governance context is active\n\n  Scenario: Journalist monitors all neighborhood meetings despite being one person\n    Given the journalist covers 8 neighborhood associations\n    And can only attend one meeting per week physically\n    When the Observer monitors all neighborhood meetings simultaneously\n    Then the journalist reviews transcripts of all 8 weekly meetings\n    And receives alerts for newsworthy developments\n    And identifies stories across all neighborhoods efficiently\n    And comprehensive hyperlocal coverage becomes sustainable\n    And no important neighborhood decision goes unreported\n\n  Scenario: Journalist detects gentrification pattern across neighborhoods\n    Given individual rent increases in scattered buildings\n    And the journalist suspects coordinated displacement\n    When the Observer tracks evictions and rent increases across community\n    Then the journalist sees systematic pattern of displacement\n    And identifies corporate landlord acquiring properties neighborhood-wide\n    And documents residents being priced out block by block\n    And connects individual stories to structural pattern\n    And publishes investigation exposing organized gentrification\n\n  Scenario: Journalist fact-checks developer claims about community support\n    Given a developer claims broad community backing for project\n    And the journalist investigates at community meeting\n    When the Observer analyzes community testimony and meeting history\n    Then the journalist sees only 3 community supporters (all with developer ties)\n    And finds 47 community members opposed in past meetings\n    And verifies developer hired people to testify falsely\n    And publishes real-time fact-check of developer claims\n    And astroturfing gets exposed through systematic documentation\n\n  Scenario: Journalist investigates playground neglect in underserved neighborhood\n    Given residents complain about dangerous playground conditions\n    And the journalist needs context on maintenance patterns\n    When the Observer provides hyperlocal infrastructure data\n    Then the journalist sees playground hasn't been maintained in 5 years\n    And compares to monthly maintenance in affluent neighborhoods\n    And documents injury reports and resident complaints ignored\n    And tracks city budget showing maintenance disparities\n    And publishes accountability story on infrastructure racism\n\n  Scenario: Journalist develops sources through community surveillance\n    Given the journalist needs community perspectives on proposed development\n    And doesn't know who has relevant knowledge\n    When the Observer identifies community members affected by issue\n    Then the journalist sees residents who testified at past meetings\n    And identifies homeowners on blocks facing displacement\n    And finds small business owners who will lose customers\n    And contacts informed sources with lived experience\n    And community journalism reflects actual community voices\n\n  Scenario: Journalist tracks neighborhood promises over time\n    Given city officials promised park improvements at community meeting\n    And the journalist covers 12 neighborhoods with similar promises\n    When the Observer monitors promise implementation across neighborhoods\n    Then the journalist receives alert that 18 months have passed\n    And sees park still unimproved despite promise\n    And identifies pattern of broken promises in communities of color\n    And publishes accountability story on systematic neglect\n    And institutional memory prevents promises from being forgotten\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:community",
+    "related_users:citizen,activist,community_organizer,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "feature"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-public-observer-journalist-scenarios-community-journalist monitors all neighborhood meetings despite being one person",
+    "scenario-public-observer-journalist-scenarios-community-journalist detects gentrification pattern across neighborhoods",
+    "scenario-public-observer-journalist-scenarios-community-journalist fact-checks developer claims about community support",
+    "scenario-public-observer-journalist-scenarios-community-journalist investigates playground neglect in underserved neighborhood",
+    "scenario-public-observer-journalist-scenarios-community-journalist develops sources through community surveillance",
+    "scenario-public-observer-journalist-scenarios-community-journalist tracks neighborhood promises over time",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "epic": "public_observer",
+    "scenarioCount": 6
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Hyperlocal Journalism for Journalist",
+    "ogDescription": "As a journalist in the public_observer system Operating at the community governance layer I want comprehensive neighborhood surveillance infrastructure So that hyperlocal journalism can exist despite ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Hyperlocal Journalism for Journalist - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-public-observer-journalist-scenarios-community",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:community",
+    "name": "Hyperlocal Journalism for Journalist",
+    "description": "As a journalist in the public_observer system Operating at the community governance layer I want comprehensive neighborhood surveillance infrastructure So that hyperlocal journalism can exist despite resource constraints",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

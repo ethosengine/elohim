@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-activist-scenarios-community-activist documents neighborhood displacement patterns",
+  "did": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist documents neighborhood displacement patterns",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist documents neighborhood displacement patterns",
+  "description": "Activist documents neighborhood displacement patterns",
+  "content": "Scenario: Activist documents neighborhood displacement patterns\n    Given the activist is organizing against gentrification\n    And needs evidence of displacement in specific neighborhoods\n    When the Observer provides hyperlocal data\n    Then the activist sees rent increase patterns by block\n    And views eviction filing trends over time\n    And identifies buildings with code violations\n    And maps demographic changes showing displacement\n    And organizes residents with documented evidence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:activist",
+    "governance_layer:community",
+    "related_users:community_organizer,citizen,parent",
+    "related_layers:municipality,neighborhood,district",
+    "elohim_agents:public_observer,community_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/activist/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-activist-scenarios-community",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-activist-scenarios-community",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist documents neighborhood displacement patterns",
+    "ogDescription": "Activist documents neighborhood displacement patterns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist documents neighborhood displacement patterns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist documents neighborhood displacement patterns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-activist-scenarios-community-activist documents neighborhood displacement patterns",
+    "identifier": "did:web:elohim.host:content:public-observer:activist:scenarios:community-activist documents neighborhood displacement patterns",
+    "name": "Activist documents neighborhood displacement patterns",
+    "description": "Activist documents neighborhood displacement patterns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

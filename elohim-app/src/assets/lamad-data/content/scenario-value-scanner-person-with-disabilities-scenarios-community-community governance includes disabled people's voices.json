@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-community-community governance includes disabled people's voices",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-community governance includes disabled people's voices",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community governance includes disabled people's voices",
+  "description": "Community governance includes disabled people's voices",
+  "content": "Scenario: Community governance includes disabled people's voices\n    Given community decisions often exclude disabled people\n    And \"Nothing about us without us\" is disability rights principle\n    When community governance decisions are made\n    Then the community_elohim should ensure disabled people's participation\n    And Alex should be included in relevant decision-making processes\n    And accessibility should be standard for all governance activities\n    And disabled people's expertise should shape community policy\n    And the protocol should structurally include disabled voices\n    And community should practice disability justice in governance\n    And Alex's participation should be valued, not tokenized\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:community",
+    "related_users:adult,elderly,idd_community,vulnerable_temporary,caregiver,activist",
+    "related_layers:neighborhood,municipality,workplace_organizational,healthcare_medical",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community governance includes disabled people's voices",
+    "ogDescription": "Community governance includes disabled people's voices",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-community governance includes disabled people's voices",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community governance includes disabled people's voices - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-community-community governance includes disabled people's voices",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:community-community governance includes disabled people's voices",
+    "name": "Community governance includes disabled people's voices",
+    "description": "Community governance includes disabled people's voices",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

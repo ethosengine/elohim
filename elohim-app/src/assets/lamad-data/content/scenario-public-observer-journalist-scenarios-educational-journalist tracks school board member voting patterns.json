@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-educational-journalist tracks school board member voting patterns",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational-journalist tracks school board member voting patterns",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist tracks school board member voting patterns",
+  "description": "Journalist tracks school board member voting patterns",
+  "content": "Scenario: Journalist tracks school board member voting patterns\n    Given a board member campaigns on equity platform\n    And the journalist investigates whether actions match rhetoric\n    When the Observer analyzes 3 years of board voting records\n    Then the journalist sees board member voted against equity funding 7 times\n    And approved budget cutting programs serving disadvantaged students\n    And voted for charter expansion draining district resources\n    And identifies pattern of rhetoric contradicting voting record\n    And publishes accountability profile exposing hypocrisy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:educational",
+    "related_users:teacher,parent,student,board_member,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,education_elohim,district_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist tracks school board member voting patterns",
+    "ogDescription": "Journalist tracks school board member voting patterns",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-educational-journalist tracks school board member voting patterns",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist tracks school board member voting patterns - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-educational-journalist tracks school board member voting patterns",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:educational-journalist tracks school board member voting patterns",
+    "name": "Journalist tracks school board member voting patterns",
+    "description": "Journalist tracks school board member voting patterns",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

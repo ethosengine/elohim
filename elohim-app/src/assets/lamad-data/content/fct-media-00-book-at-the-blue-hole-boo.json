@@ -1,0 +1,60 @@
+{
+  "id": "fct-media-00-book-at-the-blue-hole-boo",
+  "contentType": "book",
+  "title": "\\* At the Blue Hole (book",
+  "description": "Book by Jack Reese",
+  "content": {
+    "title": "\\* At the Blue Hole (book",
+    "author": "Jack Reese",
+    "format": "book"
+  },
+  "contentFormat": "book",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "book",
+    "fct",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "church-crisis",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "mediaType": "book",
+    "author": "Jack Reese"
+  },
+  "_contributor": "Jack Reese",
+  "createdAt": "2025-11-28T21:10:19.182680",
+  "updatedAt": "2025-11-28T21:10:19.182683",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Document",
+  "openGraphMetadata": {
+    "ogTitle": "\\* At the Blue Hole (book",
+    "ogDescription": "Book by Jack Reese",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-media-00-book-at-the-blue-hole-boo",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book.jpg",
+    "ogImageAlt": "\\* At the Blue Hole (book - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Book",
+    "@id": "https://elohim-protocol.org/content/fct-media-00-book-at-the-blue-hole-boo",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "\\* At the Blue Hole (book",
+    "description": "Book by Jack Reese",
+    "dateCreated": "2025-11-28T21:10:19.182680",
+    "dateModified": "2025-11-28T21:10:19.182683",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "author": {
+      "@type": "Person",
+      "name": "Jack Reese"
+    }
+  }
+}

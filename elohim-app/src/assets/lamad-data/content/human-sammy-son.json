@@ -1,0 +1,77 @@
+{
+  "id": "human-sammy-son",
+  "did": "did:web:elohim.host:human:sammy-son",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Sammy",
+  "description": "Learning about the world. Interested in games, building things, and asking questions.",
+  "content": {
+    "displayName": "Sammy",
+    "bio": "Learning about the world. Interested in games, building things, and asking questions.",
+    "profileReach": "network",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "communities": [
+      "community-homeschool-coop"
+    ],
+    "publicAffinities": [
+      "games",
+      "building",
+      "science",
+      "animals"
+    ],
+    "ageCategory": "minor",
+    "guardianIds": [
+      "human-matthew-manager",
+      "human-susan-spouse"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/sammy-son/profile.json",
+  "tags": [
+    "core-family",
+    "animals",
+    "games",
+    "minor",
+    "reach-network",
+    "science",
+    "building",
+    "human-graph",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "core-family",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "family",
+      "community"
+    ],
+    "communityCount": 1,
+    "hasGuardian": true
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sammy",
+    "ogDescription": "Learning about the world. Interested in games, building things, and asking questions.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-sammy-son",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-sammy-son.jpg",
+    "ogImageAlt": "Sammy's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-sammy-son",
+    "identifier": "did:web:elohim.host:human:sammy-son",
+    "name": "Sammy",
+    "description": "Learning about the world. Interested in games, building things, and asking questions.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-12-01T20:08:11.328358",
+  "updatedAt": "2025-12-01T20:08:11.328359"
+}

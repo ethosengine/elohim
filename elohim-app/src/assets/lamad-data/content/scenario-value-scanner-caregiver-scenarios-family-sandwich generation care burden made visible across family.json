@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-family-sandwich generation care burden made visible across family",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-sandwich generation care burden made visible across family",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Sandwich generation care burden made visible across family",
+  "description": "Sandwich generation care burden made visible across family",
+  "content": "Scenario: Sandwich generation care burden made visible across family\n    Given James cares simultaneously for spouse and aging parent\n    And he provides intensive care in both directions\n    When the family_elohim tracks James's care contributions\n    Then his care work for David should be quantified fully\n    And his care coordination for his mother should be visible\n    And extended family should see his dual care burden\n    And sandwich generation reality should be recognized explicitly\n    And family should understand the overwhelming scope of James's labor\n    And visibility should enable family support rather than more demands\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:family",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sandwich generation care burden made visible across family",
+    "ogDescription": "Sandwich generation care burden made visible across family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-sandwich generation care burden made visible across family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sandwich generation care burden made visible across family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-family-sandwich generation care burden made visible across family",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:family-sandwich generation care burden made visible across family",
+    "name": "Sandwich generation care burden made visible across family",
+    "description": "Sandwich generation care burden made visible across family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

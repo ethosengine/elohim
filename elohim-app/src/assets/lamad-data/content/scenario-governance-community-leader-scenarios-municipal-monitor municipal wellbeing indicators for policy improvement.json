@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-municipal-monitor municipal wellbeing indicators for policy improvement",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-monitor municipal wellbeing indicators for policy improvement",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Monitor municipal wellbeing indicators for policy improvement",
+  "description": "Monitor municipal wellbeing indicators for policy improvement",
+  "content": "Scenario: Monitor municipal wellbeing indicators for policy improvement\n    Given Riverside has baseline data on wellbeing before protocol\n    When Jamal reviews municipal dashboard annually\n    Then dashboard shows life satisfaction trends across neighborhoods\n    And dashboard reveals loneliness patterns and interventions\n    And dashboard tracks economic resilience indicators\n    And dashboard identifies neighborhoods struggling despite protocol\n    And Jamal uses data to target policy interventions\n    And evidence-based governance improves outcomes\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipal",
+    "related_users:constitutional_council_member,policy_maker",
+    "related_layers:community,provincial_state",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipal.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-municipal",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-municipal",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Monitor municipal wellbeing indicators for policy improvement",
+    "ogDescription": "Monitor municipal wellbeing indicators for policy improvement",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-monitor municipal wellbeing indicators for policy improvement",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Monitor municipal wellbeing indicators for policy improvement - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-municipal-monitor municipal wellbeing indicators for policy improvement",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal-monitor municipal wellbeing indicators for policy improvement",
+    "name": "Monitor municipal wellbeing indicators for policy improvement",
+    "description": "Monitor municipal wellbeing indicators for policy improvement",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

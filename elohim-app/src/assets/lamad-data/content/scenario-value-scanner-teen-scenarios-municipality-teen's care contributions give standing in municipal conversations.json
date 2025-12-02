@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-municipality-teen's care contributions give standing in municipal conversations",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality-teen's care contributions give standing in municipal conversations",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teen's care contributions give standing in municipal conversations",
+  "description": "Teen's care contributions give standing in municipal conversations",
+  "content": "Scenario: Teen's care contributions give standing in municipal conversations\n    Given Jasmine has accumulated significant care economy participation\n    And she contributes household labor, paid work, volunteering, and civic engagement\n    When municipal discussions about youth policy occur\n    Then her care contributions should give her legitimate standing\n    And municipal_elohim should recognize her as a constitutional participant\n    And she should not be dismissed due to age\n    And her voice should carry weight based on demonstrated contribution\n    And the municipality should recognize teens as current participants, not future constituents\n    And youth civic engagement should be valued as care work for democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:municipality",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:community,neighborhood,ecological_bioregional",
+    "elohim_agents:personal_agent,municipal_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teen's care contributions give standing in municipal conversations",
+    "ogDescription": "Teen's care contributions give standing in municipal conversations",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-municipality-teen's care contributions give standing in municipal conversations",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen's care contributions give standing in municipal conversations - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-municipality-teen's care contributions give standing in municipal conversations",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:municipality-teen's care contributions give standing in municipal conversations",
+    "name": "Teen's care contributions give standing in municipal conversations",
+    "description": "Teen's care contributions give standing in municipal conversations",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

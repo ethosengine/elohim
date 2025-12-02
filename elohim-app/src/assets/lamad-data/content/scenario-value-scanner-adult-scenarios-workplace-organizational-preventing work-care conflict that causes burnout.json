@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-workplace-organizational-preventing work-care conflict that causes burnout",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-preventing work-care conflict that causes burnout",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Preventing work-care conflict that causes burnout",
+  "description": "Preventing work-care conflict that causes burnout",
+  "content": "Scenario: Preventing work-care conflict that causes burnout\n    Given Sarah faces constant conflict between work and care demands\n    And this conflict drives burnout in working parents\n    When the workplace_elohim monitors Sarah's situation\n    Then it should detect when work-care conflicts are unsustainable\n    And it should alert Sarah before burnout occurs\n    And it should suggest interventions (boundaries, policy advocacy, job changes)\n    And it should help Sarah maintain long-term career sustainability\n    And burnout prevention should be proactive, not reactive\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,parent,caregiver,employer,colleague",
+    "related_layers:individual,household,family",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Preventing work-care conflict that causes burnout",
+    "ogDescription": "Preventing work-care conflict that causes burnout",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-preventing work-care conflict that causes burnout",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Preventing work-care conflict that causes burnout - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-workplace-organizational-preventing work-care conflict that causes burnout",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:workplace-organizational-preventing work-care conflict that causes burnout",
+    "name": "Preventing work-care conflict that causes burnout",
+    "description": "Preventing work-care conflict that causes burnout",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

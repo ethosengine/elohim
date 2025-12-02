@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-child-scenarios-individual-individual autonomy expanding based on demonstrated capability",
+  "did": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-individual autonomy expanding based on demonstrated capability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Individual autonomy expanding based on demonstrated capability",
+  "description": "Individual autonomy expanding based on demonstrated capability",
+  "content": "Scenario: Individual autonomy expanding based on demonstrated capability\n    Given Emma has shown good stewardship decisions over time\n    And parents can adjust autonomy levels in the system\n    When Emma's decision-making patterns are reviewed\n    Then her boundaries should expand to reflect capability\n    And she should earn more freedom through demonstrated judgment\n    And the system should track maturity indicators\n    And Emma should understand that autonomy grows with responsibility\n    And her increasing capability should be recognized\n    And freedom should be matched to demonstrated stewardship\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:child",
+    "governance_layer:individual",
+    "related_users:young_child,preteen,parent,student",
+    "related_layers:family,neighborhood,educational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/child/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-child-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-child-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Individual autonomy expanding based on demonstrated capability",
+    "ogDescription": "Individual autonomy expanding based on demonstrated capability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-individual autonomy expanding based on demonstrated capability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Individual autonomy expanding based on demonstrated capability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-child-scenarios-individual-individual autonomy expanding based on demonstrated capability",
+    "identifier": "did:web:elohim.host:content:value-scanner:child:scenarios:individual-individual autonomy expanding based on demonstrated capability",
+    "name": "Individual autonomy expanding based on demonstrated capability",
+    "description": "Individual autonomy expanding based on demonstrated capability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

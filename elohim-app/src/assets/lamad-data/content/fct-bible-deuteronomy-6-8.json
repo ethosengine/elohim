@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-deuteronomy-6-8",
+  "contentType": "bible-verse",
+  "title": "Deuteronomy 6:8",
+  "description": "Scripture reference used in FCT Module 1",
+  "content": {
+    "reference": "Deuteronomy 6:8",
+    "book": "Deuteronomy",
+    "chapter": 6,
+    "verseStart": 8,
+    "verseEnd": null,
+    "contextInModule": "\\- Attention in the Bible:  phylactery, Hebrew tefillin, also spelled tephillin or tfillin, in Jewish religious practice, one of two small black leather cube-shaped cases containing Torah texts written on parchment, which, in accordance with Deuteronomy 6:8 (and similar statements in Deuteronomy 11:18 and Exodus 13:9, 16), are to be worn by male Jews 13 years of age and older as reminders of God and of the obligation to keep the Law during daily life. The name phylactery is derived from the Greek phylakterion, meaning amulet.",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "deuteronomy",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "thematicContext": "The Church Dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.181601",
+  "updatedAt": "2025-11-28T21:10:19.181602",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Deuteronomy 6:8",
+    "ogDescription": "Scripture reference used in FCT Module 1",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-deuteronomy-6-8",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Deuteronomy 6:8 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-deuteronomy-6-8",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Deuteronomy 6:8",
+    "description": "Scripture reference used in FCT Module 1",
+    "dateCreated": "2025-11-28T21:10:19.181601",
+    "dateModified": "2025-11-28T21:10:19.181602",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

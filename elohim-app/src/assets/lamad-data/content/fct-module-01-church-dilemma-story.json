@@ -1,0 +1,54 @@
+{
+  "id": "fct-module-01-church-dilemma-story",
+  "contentType": "narrative",
+  "title": "Story: The Church Dilemma",
+  "description": "Biblical story or example illustrating module concepts",
+  "content": {
+    "narrative": "The Slavery in Egypt (Exodus 1-14): This narrative describes the Israelites' suffering under Egyptian bondage, marking a significant social crisis of slavery and oppression. Moses' leadership and God's intervention through the ten plagues and the parting of the Red Sea are central to their deliverance, showcasing themes of freedom and divine justice.\n\nThe Babylonian Exile (2 Kings 24-25; Jeremiah 52): This period marks a crucial social and religious crisis for the Kingdom of Judah, as the Babylonians destroyed Jerusalem and the Temple, and exiled its people. This event symbolizes the loss of homeland, identity, and faith crisis, yet also a time of reflection, repentance, and spiritual renewal for the Jewish people.\n\nThe Plight of the Poor and Marginalized (Various Psalms and Prophets): Many psalms and prophetic books (e.g., Amos, Isaiah, and Micah) address social injustices, including the neglect of the poor, the exploitation by the rich, and the corruption of leaders. These texts call for justice, mercy, and righteousness, emphasizing God's concern for the marginalized.\n\nThe Good Samaritan (Luke 10:25-37): In this parable, Jesus addresses a social crisis of ethnic prejudice and neglect of the needy. The story of a Samaritan helping a Jewish man beaten by robbers, while religious figures pass by, challenges societal norms about neighborliness and compassion across ethnic and religious boundaries.\n\nThe Early Church's Communal Living (Acts 2:42-47; Acts 4:32-37): The nascent Christian community faced the challenge of establishing a new social order based on shared beliefs and mutual support. Their practice of selling possessions to support each other addresses economic disparities and models an alternative community based on love and generosity.",
+    "narrativeType": "biblical-example"
+  },
+  "contentFormat": "markdown",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "story",
+    "narrative",
+    "fct",
+    "biblical-example",
+    "foundations"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma"
+  ],
+  "metadata": {
+    "category": "fct-narrative",
+    "sourceModule": "fct-module-01-church-dilemma"
+  },
+  "createdAt": "2025-11-28T21:10:19.190695",
+  "updatedAt": "2025-11-28T21:10:19.190696",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Story: The Church Dilemma",
+    "ogDescription": "Biblical story or example illustrating module concepts",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-module-01-church-dilemma-story",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/narrative.jpg",
+    "ogImageAlt": "Story: The Church Dilemma - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-module-01-church-dilemma-story",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Story: The Church Dilemma",
+    "description": "Biblical story or example illustrating module concepts",
+    "dateCreated": "2025-11-28T21:10:19.190695",
+    "dateModified": "2025-11-28T21:10:19.190696",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

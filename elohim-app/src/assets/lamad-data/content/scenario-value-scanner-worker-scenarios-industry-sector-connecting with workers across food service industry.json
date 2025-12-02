@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-industry-sector-connecting with workers across food service industry",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-connecting with workers across food service industry",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Connecting with workers across food service industry",
+  "description": "Connecting with workers across food service industry",
+  "content": "Scenario: Connecting with workers across food service industry\n    Given food service workers face similar exploitation patterns\n    And collective action requires cross-workplace organization\n    When I want to connect with other food service workers\n    Then the protocol should facilitate industry-wide worker networks\n    And help me find worker organizing groups and unions\n    And support building solidarity across restaurants and food businesses\n    And enable coordination for industry-level advocacy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-industry-sector"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-industry-sector",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Connecting with workers across food service industry",
+    "ogDescription": "Connecting with workers across food service industry",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-connecting with workers across food service industry",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Connecting with workers across food service industry - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-industry-sector-connecting with workers across food service industry",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:industry-sector-connecting with workers across food service industry",
+    "name": "Connecting with workers across food service industry",
+    "description": "Connecting with workers across food service industry",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

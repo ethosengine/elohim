@@ -2,11 +2,11 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { Subject, combineLatest } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import { DocumentGraphService } from '../../services/document-graph.service';
+import { takeUntil, map } from 'rxjs/operators';
+import { DataLoaderService } from '../../services/data-loader.service';
 import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { ContentNode, ContentGraph } from '../../models/content-node.model';
-import { CategoryAffinityStats } from '../../models/user-affinity.model';
+import { ContentNode } from '../../models/content-node.model';
+import { CategoryAffinityStats } from '../../models/human-affinity.model';
 
 interface CategorySection {
   name: string;
@@ -41,20 +41,22 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private readonly graphService: DocumentGraphService,
+    private readonly dataLoader: DataLoaderService,
     private readonly affinityService: AffinityTrackingService,
     private readonly router: Router
   ) {}
 
   ngOnInit(): void {
     combineLatest([
-      this.graphService.graph$,
+      this.dataLoader.getContentIndex().pipe(
+        map(index => index.nodes ?? [])
+      ),
       this.affinityService.affinity$,
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([graph, affinity]) => {
-        if (graph) {
-          this.buildMeaningMap(graph);
+      .subscribe(([nodes, affinity]) => {
+        if (nodes.length > 0) {
+          this.buildMeaningMap(nodes);
           this.isLoading = false;
         }
       });
@@ -66,17 +68,11 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Build the hierarchical Meaning Map from the content graph
+   * Build the hierarchical Meaning Map from content nodes
    */
-  private buildMeaningMap(graph: ContentGraph): void {
-    const allNodes = Array.from(graph.nodes.values());
-    // Note: ContentNodeAdapter.fromDocumentNodes is not needed if we are already using ContentNode
-    // But if we need normalization, we can use it. Assuming graph has ContentNodes now.
-
-    const contentNodes = allNodes; 
-
+  private buildMeaningMap(contentNodes: ContentNode[]): void {
     // Get affinity stats
-    const stats = this.affinityService.getStats(allNodes);
+    const stats = this.affinityService.getStats(contentNodes);
     this.overallStats = {
       totalNodes: stats.totalNodes,
       averageAffinity: stats.averageAffinity,
@@ -156,7 +152,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       deployment: 'Deployment & CI/CD',
       uncategorized: 'Other',
     };
-    return displayNames[category] || category;
+    return displayNames[category] ?? category;
   }
 
   /**
@@ -169,7 +165,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       deployment: '🚀',
       uncategorized: '📄',
     };
-    return icons[category] || '📦';
+    return icons[category] ?? '📦';
   }
 
   /**
@@ -215,7 +211,7 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       feature: 'Feature',
       scenario: 'Scenario',
     };
-    return displays[contentType] || contentType;
+    return displays[contentType] ?? contentType;
   }
 
   /**
@@ -227,6 +223,6 @@ export class MeaningMapComponent implements OnInit, OnDestroy {
       feature: '⚙️',
       scenario: '✓',
     };
-    return icons[contentType] || '•';
+    return icons[contentType] ?? '•';
   }
 }

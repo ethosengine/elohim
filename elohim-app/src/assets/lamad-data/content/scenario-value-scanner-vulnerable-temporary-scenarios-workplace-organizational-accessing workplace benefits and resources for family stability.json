@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-accessing workplace benefits and resources for family stability",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-accessing workplace benefits and resources for family stability",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Accessing workplace benefits and resources for family stability",
+  "description": "Accessing workplace benefits and resources for family stability",
+  "content": "Scenario: Accessing workplace benefits and resources for family stability\n    Given employment may provide benefits (health insurance, paid leave, retirement) critical for stability\n    And I need to maximize workplace benefits for family wellbeing\n    When I evaluate or access workplace benefits\n    Then the workplace_elohim helps me understand and maximize available benefits\n    And guides enrollment in health insurance, retirement, other benefits\n    And identifies workplace resources (EAP, childcare support, emergency assistance)\n    And validates that benefits are part of compensation, not \"extras\"\n    And helps me advocate for benefits if employer is unclear about offerings\n    And my personal_agent tracks benefit enrollment deadlines and requirements\n    And recognizes that benefits navigation is complex invisible labor\n    And ensures I access all benefits supporting family stability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Accessing workplace benefits and resources for family stability",
+    "ogDescription": "Accessing workplace benefits and resources for family stability",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-accessing workplace benefits and resources for family stability",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Accessing workplace benefits and resources for family stability - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-accessing workplace benefits and resources for family stability",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-accessing workplace benefits and resources for family stability",
+    "name": "Accessing workplace benefits and resources for family stability",
+    "description": "Accessing workplace benefits and resources for family stability",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

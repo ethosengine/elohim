@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm owner transitions from sole proprietor to worker cooperative facilitator",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farm owner transitions from sole proprietor to worker cooperative facilitator",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
+  "description": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
+  "content": "Scenario: Farm owner transitions from sole proprietor to worker cooperative facilitator\n    Given Tom has owned and operated Johnson Farm individually for 20 years\n    And farmworkers have been employees without ownership or governance voice\n    When Tom considers converting farm to worker-owned cooperative\n    Then he sees how democratic restaurant conversions empowered workers\n    And EAE network offers acquisition support for farm democratic conversion\n    And Tom can transition from sole owner to cooperative member or honored exit\n    And farmworkers gain ownership pathway transforming agricultural labor\n    And workplace_elohim facilitates farm conversion following restaurant model\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:workplace_organizational",
+    "related_users:[worker,manager,small_business_owner]",
+    "related_layers:[industry_sector,community,ecological_bioregional]",
+    "elohim_agents:[workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-workplace-organizational",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "ogDescription": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Farm owner transitions from sole proprietor to worker cooperative facilitator - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-workplace-organizational-farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:workplace-organizational-farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "name": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "description": "Farm owner transitions from sole proprietor to worker cooperative facilitator",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

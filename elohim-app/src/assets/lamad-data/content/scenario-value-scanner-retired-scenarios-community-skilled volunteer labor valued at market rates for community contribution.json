@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-skilled volunteer labor valued at market rates for community contribution",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-skilled volunteer labor valued at market rates for community contribution",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Skilled volunteer labor valued at market rates for community contribution",
+  "description": "Skilled volunteer labor valued at market rates for community contribution",
+  "content": "Scenario: Skilled volunteer labor valued at market rates for community contribution\n    Given Frank volunteers 20 hours/week with Habitat for Humanity\n    And he provides skilled construction labor\n    And this work has clear market value (~$40/hour for skilled trades)\n    When the community_elohim tracks volunteer contributions\n    Then Frank's volunteer labor should be quantified specifically\n    And market value should be calculated (~$20k/year contribution)\n    And his skilled labor should be recognized as substantial community asset\n    And community care tokens should accumulate from volunteer work\n    And Frank should see quantified value of his contribution\n    And the narrative of retired as \"not contributing\" should be countered\n    And community should recognize his volunteer work as real economic value\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Skilled volunteer labor valued at market rates for community contribution",
+    "ogDescription": "Skilled volunteer labor valued at market rates for community contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-skilled volunteer labor valued at market rates for community contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Skilled volunteer labor valued at market rates for community contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-skilled volunteer labor valued at market rates for community contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-skilled volunteer labor valued at market rates for community contribution",
+    "name": "Skilled volunteer labor valued at market rates for community contribution",
+    "description": "Skilled volunteer labor valued at market rates for community contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

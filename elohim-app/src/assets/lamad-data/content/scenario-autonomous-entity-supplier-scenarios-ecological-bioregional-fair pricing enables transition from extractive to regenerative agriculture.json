@@ -1,0 +1,58 @@
+{
+  "id": "scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-fair pricing enables transition from extractive to regenerative agriculture",
+  "did": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:ecological-bioregional-fair pricing enables transition from extractive to regenerative agriculture",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Fair pricing enables transition from extractive to regenerative agriculture",
+  "description": "Fair pricing enables transition from extractive to regenerative agriculture",
+  "content": "Scenario: Fair pricing enables transition from extractive to regenerative agriculture\n    Given corporate food system made regenerative practices financially impossible\n    And Tom wanted to build soil health but thin margins prevented investment\n    When democratic network pays sustainability premium for regenerative practices\n    Then crop rotation becomes economically viable through diversified revenue\n    And cover cropping is compensated as soil-building investment\n    And reduced tillage practices are supported despite initial yield reduction\n    And regenerative agriculture is profitable, not costly burden\n    And bioregional_elohim documents regenerative practice adoption and soil health improvements\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:supplier",
+    "governance_layer:ecological_bioregional",
+    "related_users:[worker,supplier,community_investor]",
+    "related_layers:[workplace_organizational,industry_sector,community]",
+    "elohim_agents:[bioregional_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "scenario"
+  ],
+  "sourcePath": "autonomous_entity/supplier/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "featureId": "feature-autonomous-entity-supplier-scenarios-ecological-bioregional",
+    "epic": "autonomous_entity"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Fair pricing enables transition from extractive to regenerative agriculture",
+    "ogDescription": "Fair pricing enables transition from extractive to regenerative agriculture",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-fair pricing enables transition from extractive to regenerative agriculture",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Fair pricing enables transition from extractive to regenerative agriculture - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-autonomous-entity-supplier-scenarios-ecological-bioregional-fair pricing enables transition from extractive to regenerative agriculture",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:supplier:scenarios:ecological-bioregional-fair pricing enables transition from extractive to regenerative agriculture",
+    "name": "Fair pricing enables transition from extractive to regenerative agriculture",
+    "description": "Fair pricing enables transition from extractive to regenerative agriculture",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

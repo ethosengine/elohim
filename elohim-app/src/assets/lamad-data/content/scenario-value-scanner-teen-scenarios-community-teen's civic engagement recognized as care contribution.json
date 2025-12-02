@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-community-teen's civic engagement recognized as care contribution",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-teen's civic engagement recognized as care contribution",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teen's civic engagement recognized as care contribution",
+  "description": "Teen's civic engagement recognized as care contribution",
+  "content": "Scenario: Teen's civic engagement recognized as care contribution\n    Given Jasmine participates in community service projects\n    And she attends city council meetings about youth issues\n    When her civic engagement is tracked\n    Then it should be recognized as care work for the community\n    And political participation should be valued in care economy\n    And she should learn that civic engagement is care labor\n    And her generation should understand that democracy requires active care work\n    And community_elohim should make visible that youth civic participation matters\n    And her care tokens should reflect her contribution to democratic governance\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:community",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:neighborhood,municipality,educational,workplace_organizational",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teen's civic engagement recognized as care contribution",
+    "ogDescription": "Teen's civic engagement recognized as care contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-teen's civic engagement recognized as care contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teen's civic engagement recognized as care contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-community-teen's civic engagement recognized as care contribution",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:community-teen's civic engagement recognized as care contribution",
+    "name": "Teen's civic engagement recognized as care contribution",
+    "description": "Teen's civic engagement recognized as care contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-family-care tokens flow between independent adult and family",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-care tokens flow between independent adult and family",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Care tokens flow between independent adult and family",
+  "description": "Care tokens flow between independent adult and family",
+  "content": "Scenario: Care tokens flow between independent adult and family\n    Given Aisha both contributes to and receives from family\n    And care flows in multiple directions\n    When family care tokens are calculated\n    Then Aisha's contributions should generate tokens\n    And she should be able to use tokens for family support when needed\n    And parents' ongoing care should be recognized\n    And reciprocal care should be tracked transparently\n    And the family care economy should adapt to her independence\n    And adult family relationships should involve mutual care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:family",
+    "related_users:parent,teen,adult,single_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Care tokens flow between independent adult and family",
+    "ogDescription": "Care tokens flow between independent adult and family",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-care tokens flow between independent adult and family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Care tokens flow between independent adult and family - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-family-care tokens flow between independent adult and family",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:family-care tokens flow between independent adult and family",
+    "name": "Care tokens flow between independent adult and family",
+    "description": "Care tokens flow between independent adult and family",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

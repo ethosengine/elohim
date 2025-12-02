@@ -1,0 +1,71 @@
+<div class="not-found-container">
+  <div class="not-found-content">
+    <!-- Visual Element - Book/Learning themed -->
+    <div class="error-visual">
+      <div class="book-stack">
+        <div class="book book-1"></div>
+        <div class="book book-2"></div>
+        <div class="book book-3"></div>
+        <div class="question-mark">?</div>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <h1>Content Not Found</h1>
+    <p class="message">{{ getMessage() }}</p>
+    <p class="attempted-url" *ngIf="attemptedUrl">
+      <code>{{ attemptedUrl }}</code>
+    </p>
+
+    <!-- Navigation Options -->
+    <div class="actions">
+      <button class="btn btn-primary" (click)="goToLamadHome()">
+        <i class="fa-solid fa-book-open"></i>
+        Browse Paths
+      </button>
+      <button class="btn btn-secondary" (click)="goToSearch()">
+        <i class="fa-solid fa-search"></i>
+        Search Content
+      </button>
+      <button class="btn btn-secondary" (click)="goToExplore()">
+        <i class="fa-solid fa-compass"></i>
+        Explore Map
+      </button>
+      <button class="btn btn-ghost" (click)="goBack()">
+        <i class="fa-solid fa-arrow-left"></i>
+        Go Back
+      </button>
+    </div>
+
+    <!-- Suggestions based on context -->
+    <div class="suggestions">
+      <p class="suggestions-title">Try these instead:</p>
+
+      <div class="suggestion-cards">
+        <a routerLink="/lamad" class="suggestion-card">
+          <i class="fa-solid fa-graduation-cap"></i>
+          <div>
+            <strong>Learning Paths</strong>
+            <span>Curated journeys for learning</span>
+          </div>
+        </a>
+
+        <a routerLink="/lamad/explore" class="suggestion-card">
+          <i class="fa-solid fa-sitemap"></i>
+          <div>
+            <strong>Knowledge Graph</strong>
+            <span>Visual exploration of concepts</span>
+          </div>
+        </a>
+
+        <a routerLink="/lamad/me" class="suggestion-card">
+          <i class="fa-solid fa-user-graduate"></i>
+          <div>
+            <strong>My Dashboard</strong>
+            <span>Your learning progress</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

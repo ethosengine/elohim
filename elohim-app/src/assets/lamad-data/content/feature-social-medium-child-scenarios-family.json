@@ -1,0 +1,61 @@
+{
+  "id": "feature-social-medium-child-scenarios-family",
+  "did": "did:web:elohim.host:content:social-medium:child:scenarios:family",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Family Communication and Safety for Child",
+  "description": "As a child in the social_medium system Operating at the family governance layer I want to communicate safely with my family and learn digital wisdom So that I can build healthy relationships while protected from harm",
+  "content": "@epic:social_medium\n@user_type:child\n@governance_layer:family\n@related_users:elder,content_creator\n@related_layers:individual,neighborhood\n@elohim_agents:guardian_agent,parental_guidance_agent\n\nFeature: Family Communication and Safety for Child\n  As a child in the social_medium system\n  Operating at the family governance layer\n  I want to communicate safely with my family and learn digital wisdom\n  So that I can build healthy relationships while protected from harm\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the child user is registered in the system\n    And the family governance context is active\n    And the child is Emma, age 8, with parental guidance enabled\n\n  Scenario: Child creates first contribution within family circle\n    Given Emma wants to share her art project with her family\n    When she creates a contribution with a photo of her drawing\n    And she writes \"I made this at school today!\"\n    Then the contribution is immediately visible to all family members\n    And it stays within the family circle by default\n    And family members can respond with encouragement\n    And the guardian agent tracks this as positive creative expression\n    And Emma learns that sharing creates connection\n\n  Scenario: Child's gradual reach expansion through good judgment\n    Given Emma has been using the system for 6 months\n    And she consistently makes kind, thoughtful contributions\n    And she helps her younger sibling with homework via the system\n    And she shares creative work that delights her family\n    When the guardian agent evaluates her demonstrated wisdom\n    Then her reach is expanded to include vetted neighborhood children\n    And her parents receive notification of the expanded access\n    And Emma is congratulated for earning greater trust\n    And she gains access to age-appropriate neighborhood activities\n    And safety protections remain fully active\n\n  Scenario: Child blocked from exposure to harmful content\n    Given Emma's uncle shares a news article about violence\n    And the content is appropriate for adults but not children\n    When the article is contributed to the family space\n    Then the guardian agent evaluates age-appropriateness\n    And Emma's view is automatically filtered or summarized\n    And her parents can choose to discuss the topic with her directly\n    And Emma never sees graphic or traumatizing content\n    And family communication continues without disruption\n\n  Scenario: Child receives help during distress\n    Given Emma is upset about something that happened at school\n    When she creates a contribution expressing her distress\n    And the guardian agent detects emotional crisis indicators\n    Then her parents are immediately notified with sensitivity\n    And age-appropriate support resources are surfaced\n    And family members can provide comfort and guidance\n    And if needed, connection to counseling resources is offered\n    And Emma experiences the system as safe space to express feelings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:child",
+    "governance_layer:family",
+    "related_users:elder,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,parental_guidance_agent",
+    "social-medium",
+    "feature"
+  ],
+  "sourcePath": "social_medium/child/scenarios/family.feature",
+  "relatedNodeIds": [
+    "scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+    "scenario-social-medium-child-scenarios-family-child's gradual reach expansion through good judgment",
+    "scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+    "scenario-social-medium-child-scenarios-family-child receives help during distress",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "epic": "social_medium",
+    "scenarioCount": 4
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family Communication and Safety for Child",
+    "ogDescription": "As a child in the social_medium system Operating at the family governance layer I want to communicate safely with my family and learn digital wisdom So that I can build healthy relationships while pro",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-social-medium-child-scenarios-family",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Family Communication and Safety for Child - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-social-medium-child-scenarios-family",
+    "identifier": "did:web:elohim.host:content:social-medium:child:scenarios:family",
+    "name": "Family Communication and Safety for Child",
+    "description": "As a child in the social_medium system Operating at the family governance layer I want to communicate safely with my family and learn digital wisdom So that I can build healthy relationships while protected from harm",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

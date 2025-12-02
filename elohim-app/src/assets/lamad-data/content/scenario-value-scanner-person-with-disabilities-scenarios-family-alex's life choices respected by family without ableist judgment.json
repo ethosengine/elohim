@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-person-with-disabilities-scenarios-family-alex's life choices respected by family without ableist judgment",
+  "did": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-alex's life choices respected by family without ableist judgment",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Alex's life choices respected by family without ableist judgment",
+  "description": "Alex's life choices respected by family without ableist judgment",
+  "content": "Scenario: Alex's life choices respected by family without ableist judgment\n    Given Alex makes life choices that family might not understand\n    And ableism might lead family to question Alex's decisions\n    When Alex makes choices about work, living situation, relationships, etc.\n    Then family should respect Alex's choices as they would any adult's\n    And the family_elohim should affirm Alex's right to self-determination\n    And disability should not be treated as reason to override Alex's autonomy\n    And Alex should not have to justify choices more than non-disabled siblings\n    And the protocol should protect Alex from family paternalism\n    And Alex's sovereignty should be structurally defended\n    And family should be prompted to examine their ableist assumptions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:person_with_disabilities",
+    "governance_layer:family",
+    "related_users:adult,parent,sibling,grandparent,elderly",
+    "related_layers:individual,household,neighborhood,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/person_with_disabilities/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-person-with-disabilities-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Alex's life choices respected by family without ableist judgment",
+    "ogDescription": "Alex's life choices respected by family without ableist judgment",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-alex's life choices respected by family without ableist judgment",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Alex's life choices respected by family without ableist judgment - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-person-with-disabilities-scenarios-family-alex's life choices respected by family without ableist judgment",
+    "identifier": "did:web:elohim.host:content:value-scanner:person-with-disabilities:scenarios:family-alex's life choices respected by family without ableist judgment",
+    "name": "Alex's life choices respected by family without ableist judgment",
+    "description": "Alex's life choices respected by family without ableist judgment",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

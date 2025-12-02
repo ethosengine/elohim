@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-family-family cultural values shape elderly care approach",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family cultural values shape elderly care approach",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Family cultural values shape elderly care approach",
+  "description": "Family cultural values shape elderly care approach",
+  "content": "Scenario: Family cultural values shape elderly care approach\n    Given Helen's family has specific cultural values about elder care\n    And different cultures have different expectations\n    When family care is coordinated\n    Then the family_elohim should respect cultural context\n    And care approaches should align with family cultural values\n    And Helen should receive care consistent with her cultural expectations\n    And family obligations should be understood culturally\n    And the protocol should serve diverse family structures and values\n    And no single model of \"good elder care\" should be imposed\n    And cultural wisdom about aging should be honored\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:family",
+    "related_users:adult_child,grandchild,great_grandchild,caregiver",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Family cultural values shape elderly care approach",
+    "ogDescription": "Family cultural values shape elderly care approach",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family cultural values shape elderly care approach",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Family cultural values shape elderly care approach - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-family-family cultural values shape elderly care approach",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:family-family cultural values shape elderly care approach",
+    "name": "Family cultural values shape elderly care approach",
+    "description": "Family cultural values shape elderly care approach",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

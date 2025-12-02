@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-elder-scenarios-family-elder shares family wisdom with grandchildren",
+  "did": "did:web:elohim.host:content:social-medium:elder:scenarios:family-elder shares family wisdom with grandchildren",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Elder shares family wisdom with grandchildren",
+  "description": "Elder shares family wisdom with grandchildren",
+  "content": "Scenario: Elder shares family wisdom with grandchildren\n    Given Rose's granddaughter Emma asks about Rose's childhood during WWII\n    When Rose creates a contribution sharing her memories\n    And she includes photos from her family album\n    And she describes what life was like during wartime\n    Then the contribution reaches all family members immediately\n    And Emma learns family history and develops deeper connection\n    And other grandchildren engage with questions and appreciation\n    And Rose experiences meaningful intergenerational exchange\n    And the family history is preserved in the network\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:elder",
+    "governance_layer:family",
+    "related_users:child,content_creator",
+    "related_layers:individual,neighborhood",
+    "elohim_agents:guardian_agent,connection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/elder/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-elder-scenarios-family",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-elder-scenarios-family",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Elder shares family wisdom with grandchildren",
+    "ogDescription": "Elder shares family wisdom with grandchildren",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-family-elder shares family wisdom with grandchildren",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elder shares family wisdom with grandchildren - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-elder-scenarios-family-elder shares family wisdom with grandchildren",
+    "identifier": "did:web:elohim.host:content:social-medium:elder:scenarios:family-elder shares family wisdom with grandchildren",
+    "name": "Elder shares family wisdom with grandchildren",
+    "description": "Elder shares family wisdom with grandchildren",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

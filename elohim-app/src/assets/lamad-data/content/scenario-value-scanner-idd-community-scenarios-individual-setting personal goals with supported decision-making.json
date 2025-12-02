@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-setting personal goals with supported decision-making",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-setting personal goals with supported decision-making",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Setting personal goals with supported decision-making",
+  "description": "Setting personal goals with supported decision-making",
+  "content": "Scenario: Setting personal goals with supported decision-making\n    Given Jordan wants to learn a new skill\n    And Jordan's support worker is available to help\n    When Jordan explores the goal-setting feature\n    Then the interface shows potential goals as visual options\n    And the support worker helps Jordan understand each option\n    But Jordan makes the final choice of which goal to pursue\n    And the system breaks the goal into simple, achievable steps\n    And Jordan's personal_agent provides encouragement and progress tracking\n    And Jordan experiences ownership of their own growth\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Setting personal goals with supported decision-making",
+    "ogDescription": "Setting personal goals with supported decision-making",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-setting personal goals with supported decision-making",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Setting personal goals with supported decision-making - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-setting personal goals with supported decision-making",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-setting personal goals with supported decision-making",
+    "name": "Setting personal goals with supported decision-making",
+    "description": "Setting personal goals with supported decision-making",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

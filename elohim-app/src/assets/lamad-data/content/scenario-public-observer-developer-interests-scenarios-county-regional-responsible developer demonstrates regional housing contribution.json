@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer demonstrates regional housing contribution",
+  "did": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-responsible developer demonstrates regional housing contribution",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Responsible developer demonstrates regional housing contribution",
+  "description": "Responsible developer demonstrates regional housing contribution",
+  "content": "Scenario: Responsible developer demonstrates regional housing contribution\n    Given a developer builds affordable housing across the region\n    And wants regional approval bodies to recognize consistent track record\n    When the Observer surfaces regional development patterns\n    Then the developer shows: 600 affordable units built across five municipalities\n    And demonstrates 85% occupancy by local workforce\n    And proves commitment to regional affordability not just luxury development\n    And regional reputation supports new project approvals\n    And consistent value creation becomes visible at scale\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:developer_interests",
+    "governance_layer:county_regional",
+    "related_users:politician,board_member,citizen,community_organizer",
+    "related_layers:municipality,provincial_state,ecological",
+    "elohim_agents:public_observer,regional_elohim,accountability_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/developer_interests/scenarios/county_regional.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-developer-interests-scenarios-county-regional",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-developer-interests-scenarios-county-regional",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Responsible developer demonstrates regional housing contribution",
+    "ogDescription": "Responsible developer demonstrates regional housing contribution",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer demonstrates regional housing contribution",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Responsible developer demonstrates regional housing contribution - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-developer-interests-scenarios-county-regional-responsible developer demonstrates regional housing contribution",
+    "identifier": "did:web:elohim.host:content:public-observer:developer-interests:scenarios:county-regional-responsible developer demonstrates regional housing contribution",
+    "name": "Responsible developer demonstrates regional housing contribution",
+    "description": "Responsible developer demonstrates regional housing contribution",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

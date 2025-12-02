@@ -1,0 +1,38 @@
+{
+  "id": "org-valley-school-district",
+  "did": "did:web:elohim.host:org:valley-school-district",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Valley School District",
+  "description": "Organization with 2 members",
+  "content": {
+    "name": "Valley School District",
+    "memberCount": 2,
+    "members": [
+      {
+        "humanId": "human-janice-janitor",
+        "role": "custodian"
+      },
+      {
+        "humanId": "human-tommy-teacher",
+        "role": "teacher"
+      }
+    ]
+  },
+  "contentFormat": "html",
+  "tags": [
+    "organization",
+    "human-graph"
+  ],
+  "relatedNodeIds": [
+    "human-janice-janitor",
+    "human-tommy-teacher"
+  ],
+  "metadata": {
+    "category": "organization",
+    "memberCount": 2
+  },
+  "reach": "community",
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z"
+}

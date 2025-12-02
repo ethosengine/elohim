@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-family-multi-family appeal about shared resources",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:family-multi-family appeal about shared resources",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Multi-family appeal about shared resources",
+  "description": "Multi-family appeal about shared resources",
+  "content": "Scenario: Multi-family appeal about shared resources\n    Given multiple families share community resources\n    And Family Elohim decisions affect resource distribution across families\n    When we collectively appeal an allocation we believe is unjust\n    Then the appeal bridges family layer to community layer governance\n    And The Constitutional Council evaluates inter-family equity\n    And They consider if resource distribution follows constitutional minimums\n    And They examine if families had meaningful participation in allocation process\n    And The appeal can trigger community deliberation on sharing principles\n    And Multi-family coordination patterns emerge through appeal precedents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:family",
+    "related_users:constitutional_council_member,technical_expert",
+    "related_layers:individual,community",
+    "elohim_agents:family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-family",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-family",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Multi-family appeal about shared resources",
+    "ogDescription": "Multi-family appeal about shared resources",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-multi-family appeal about shared resources",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Multi-family appeal about shared resources - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-family-multi-family appeal about shared resources",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:family-multi-family appeal about shared resources",
+    "name": "Multi-family appeal about shared resources",
+    "description": "Multi-family appeal about shared resources",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace disclosure about domestic violence or crisis circumstances",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-managing workplace disclosure about domestic violence or crisis circumstances",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Managing workplace disclosure about domestic violence or crisis circumstances",
+  "description": "Managing workplace disclosure about domestic violence or crisis circumstances",
+  "content": "Scenario: Managing workplace disclosure about domestic violence or crisis circumstances\n    Given employers may ask about gaps, circumstances, or background\n    And disclosure could lead to discrimination or could generate support\n    When I decide what to disclose to employers\n    Then the workplace_elohim helps me evaluate disclosure risks and benefits\n    And provides guidance on legal protections against discrimination\n    And suggests strategic disclosure approaches when disclosure is beneficial\n    And validates my right to privacy about personal circumstances\n    And helps me navigate background checks or verification issues\n    And my personal_agent reminds me of what I've decided to disclose vs. protect\n    And recognizes disclosure decisions as complex risk assessment\n    And supports my autonomy in disclosure choices\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Managing workplace disclosure about domestic violence or crisis circumstances",
+    "ogDescription": "Managing workplace disclosure about domestic violence or crisis circumstances",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace disclosure about domestic violence or crisis circumstances",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing workplace disclosure about domestic violence or crisis circumstances - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-managing workplace disclosure about domestic violence or crisis circumstances",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-managing workplace disclosure about domestic violence or crisis circumstances",
+    "name": "Managing workplace disclosure about domestic violence or crisis circumstances",
+    "description": "Managing workplace disclosure about domestic violence or crisis circumstances",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

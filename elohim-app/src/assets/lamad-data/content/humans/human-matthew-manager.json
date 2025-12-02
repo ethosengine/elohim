@@ -1,0 +1,67 @@
+{
+  "id": "human-matthew-manager",
+  "displayName": "Matthew",
+  "isPseudonymous": false,
+  "createdAt": "2025-12-01T20:29:49.320609Z",
+  "updatedAt": "2025-12-01T20:29:49.320609Z",
+  "profileReach": "community",
+  "acceptingConnections": true,
+  "bio": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
+  "avatarUrl": "assets/avatars/human-matthew-manager.jpg",
+  "primaryLocation": {
+    "layer": "neighborhood",
+    "displayName": "Tech Valley",
+    "reach": "community",
+    "type": "neighborhood"
+  },
+  "organizationIds": [
+    "org-ethosengine"
+  ],
+  "communityIds": [
+    "community-local-church"
+  ],
+  "affinityGroupIds": [
+    "affinity-governance",
+    "affinity-ai-ethics",
+    "affinity-holochain",
+    "affinity-family-systems",
+    "affinity-christian-theology"
+  ],
+  "publicAffinityNodeIds": [
+    "concept-governance",
+    "concept-ai-ethics",
+    "concept-holochain",
+    "concept-family-systems",
+    "concept-christian-theology"
+  ],
+  "relationshipIds": [
+    "rel-0000",
+    "rel-0001",
+    "rel-0003",
+    "rel-0005",
+    "rel-0006",
+    "rel-0007",
+    "rel-0019"
+  ],
+  "trustedConnectionCount": 4,
+  "_metadata": {
+    "category": "core-family",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "neighborhood"
+    ],
+    "ageCategory": null,
+    "guardianIds": null,
+    "hasGuardian": false,
+    "accessibilityNeeds": null,
+    "languagePreferences": null,
+    "flags": null,
+    "hasFlags": false,
+    "claimedAttestations": null,
+    "foreignCredentials": null,
+    "designNotes": null
+  },
+  "_nodeType": "HumanNode",
+  "_schemaVersion": "1.0.0"
+}

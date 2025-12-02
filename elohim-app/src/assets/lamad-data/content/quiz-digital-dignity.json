@@ -1,0 +1,63 @@
+{
+  "id": "quiz-digital-dignity",
+  "contentType": "assessment",
+  "title": "Digital Dignity Check",
+  "description": "Assess understanding of dignity-preserving platform design",
+  "content": {
+    "passingScore": 70,
+    "allowRetake": true,
+    "showCorrectAnswers": true,
+    "questions": [
+      {
+        "id": "dd-q1",
+        "type": "multiple-choice",
+        "question": "What does 'virality as privilege' mean?",
+        "options": [
+          "Only privileged people can go viral",
+          "Wide reach must be earned through trust, not just engagement",
+          "Viruses are privileged",
+          "Viral content gets special treatment"
+        ],
+        "correctAnswer": 1,
+        "explanation": "Virality as privilege means reach is earned through demonstrated trustworthiness."
+      },
+      {
+        "id": "dd-q2",
+        "type": "true-false",
+        "question": "The Social Medium epic supports 'like' buttons as primary engagement.",
+        "correctAnswer": false,
+        "explanation": "The protocol explicitly avoids low-friction 'likes' in favor of more meaningful engagement."
+      },
+      {
+        "id": "dd-q3",
+        "type": "multiple-choice",
+        "question": "What is 'mediated reaction'?",
+        "options": [
+          "Reactions by mediators",
+          "Elohim intercepting potentially harmful reactions with teaching",
+          "Delayed reactions",
+          "Reactions on media"
+        ],
+        "correctAnswer": 1,
+        "explanation": "Mediated reactions teach rather than block, preserving agency while protecting dignity."
+      }
+    ]
+  },
+  "contentFormat": "quiz-json",
+  "tags": [
+    "quiz",
+    "social-medium",
+    "dignity",
+    "design"
+  ],
+  "sourcePath": "generated/quiz-digital-dignity.json",
+  "relatedNodeIds": [
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "attestationId": "dignity-advocate"
+  },
+  "createdAt": "2025-11-28T00:09:03.479370",
+  "updatedAt": "2025-11-28T00:09:03.479371"
+}

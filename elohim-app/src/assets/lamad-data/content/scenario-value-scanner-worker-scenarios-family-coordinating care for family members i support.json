@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-coordinating care for family members i support",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-coordinating care for family members i support",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Coordinating care for family members I support",
+  "description": "Coordinating care for family members I support",
+  "content": "Scenario: Coordinating care for family members I support\n    Given I may have dependents or family I support financially\n    When my care responsibilities extend beyond myself\n    Then the protocol should help me coordinate care for dependents\n    And optimize limited resources across family needs\n    And connect me to support systems for working families\n    And recognize that work-family balance requires systemic support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Coordinating care for family members I support",
+    "ogDescription": "Coordinating care for family members I support",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-coordinating care for family members i support",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Coordinating care for family members I support - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-coordinating care for family members i support",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-coordinating care for family members i support",
+    "name": "Coordinating care for family members I support",
+    "description": "Coordinating care for family members I support",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

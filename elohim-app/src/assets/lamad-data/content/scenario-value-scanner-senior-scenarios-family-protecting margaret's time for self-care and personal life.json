@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-family-protecting margaret's time for self-care and personal life",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-protecting margaret's time for self-care and personal life",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Protecting Margaret's time for self-care and personal life",
+  "description": "Protecting Margaret's time for self-care and personal life",
+  "content": "Scenario: Protecting Margaret's time for self-care and personal life\n    Given Margaret's family depends on her care contributions\n    And she needs time for her own health and well-being\n    When the family_elohim monitors Margaret's time allocation\n    Then it should protect her time for personal needs\n    And it should flag when family demands encroach on self-care\n    And Margaret should be supported in setting boundaries\n    And family should understand that her care capacity requires self-care\n    And she should be encouraged to maintain her own friendships and interests\n    And the system should prevent family from consuming all her time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:family",
+    "related_users:middle_aged,elderly,grandparent,adult_child,grandchild,elderly_parent",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Protecting Margaret's time for self-care and personal life",
+    "ogDescription": "Protecting Margaret's time for self-care and personal life",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-protecting margaret's time for self-care and personal life",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protecting Margaret's time for self-care and personal life - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-family-protecting margaret's time for self-care and personal life",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:family-protecting margaret's time for self-care and personal life",
+    "name": "Protecting Margaret's time for self-care and personal life",
+    "description": "Protecting Margaret's time for self-care and personal life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

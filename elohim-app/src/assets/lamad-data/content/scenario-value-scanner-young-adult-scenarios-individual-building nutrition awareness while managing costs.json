@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-young-adult-scenarios-individual-building nutrition awareness while managing costs",
+  "did": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-building nutrition awareness while managing costs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Building nutrition awareness while managing costs",
+  "description": "Building nutrition awareness while managing costs",
+  "content": "Scenario: Building nutrition awareness while managing costs\n    Given Aisha has been working through lunch frequently\n    And her energy levels are declining\n    When the personal_agent reviews her eating patterns\n    Then it should flag the concerning pattern\n    And it should say \"You've worked through lunch four days this week\"\n    And it should suggest quick, nutritious options within budget\n    And the agent should help her see self-care as essential, not optional\n    And recommendations should balance nutrition, cost, and time constraints\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:young_adult",
+    "governance_layer:individual",
+    "related_users:teen,adult,student,worker",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/young_adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-young-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-young-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Building nutrition awareness while managing costs",
+    "ogDescription": "Building nutrition awareness while managing costs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-building nutrition awareness while managing costs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Building nutrition awareness while managing costs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-young-adult-scenarios-individual-building nutrition awareness while managing costs",
+    "identifier": "did:web:elohim.host:content:value-scanner:young-adult:scenarios:individual-building nutrition awareness while managing costs",
+    "name": "Building nutrition awareness while managing costs",
+    "description": "Building nutrition awareness while managing costs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

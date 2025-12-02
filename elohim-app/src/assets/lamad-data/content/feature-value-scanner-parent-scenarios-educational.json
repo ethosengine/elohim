@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-parent-scenarios-educational",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Educational Layer Value Recognition for Parent",
+  "description": "As a parent who is both professional teacher and primary educator of own children Operating at the educational governance layer I want recognition that parents are children's primary educators So that home and school learning are coordinated and parent education work is valued",
+  "content": "@epic:value_scanner\n@user_type:parent\n@governance_layer:educational\n@related_users:child,teacher,educator,administrator\n@related_layers:family,community,individual\n@elohim_agents:personal_agent,educational_elohim\n\nFeature: Educational Layer Value Recognition for Parent\n  As a parent who is both professional teacher and primary educator of own children\n  Operating at the educational governance layer\n  I want recognition that parents are children's primary educators\n  So that home and school learning are coordinated and parent education work is valued\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the parent user \"Sarah\" is registered in the system\n    And Sarah is a professional teacher working full-time\n    And Sarah is also the primary educator for Tommy (5) and Emma (8)\n    And the educational governance context is active\n    And the educational_elohim could coordinate home and school learning\n    And Sarah understands education from both professional and parent perspectives\n\n  Scenario: Parent recognized as child's primary educator\n    Given Sarah teaches Tommy and Emma continuously at home\n    And she is their first and most influential teacher\n    When the educational_elohim tracks educational contributions\n    Then it should recognize Sarah's parenting as educational work\n    And it should value home education alongside school education\n    And Sarah's teaching labor should accumulate care tokens\n    And parents should be understood as primary educators\n    And schools should be partners in education, not replacements for parents\n    And the system should make parent educational labor visible\n\n  Scenario: Coordinating home learning with school curriculum\n    Given Emma is learning math at school\n    And Sarah reinforces and extends learning at home\n    When the educational_elohim coordinates home and school\n    Then it should share relevant learning information between contexts\n    And it should help Sarah support Emma's school learning\n    And it should recognize Sarah's home teaching as essential to school success\n    And home and school should be integrated educational environment\n    And the system should facilitate coordination between parents and teachers\n    And Sarah's educational labor should be visible to Emma's school\n\n  Scenario: Parent expertise in child development informs school practices\n    Given Sarah has professional teaching expertise\n    And she knows her children's developmental needs intimately\n    When Sarah engages with children's schools\n    Then her expertise should be recognized and valued\n    And teachers should consult Sarah's knowledge of Tommy and Emma\n    And parent-teacher relationships should be expert collaboration\n    And Sarah's observations should inform educational planning\n    And the system should position parents as expert partners\n    And parent knowledge should shape school practices\n\n  Scenario: Teaching value literacy as core educational content\n    Given Sarah is raising Tommy and Emma in care economy framework\n    And she teaches them to recognize and value care work\n    When the educational_elohim tracks value literacy education\n    Then it should recognize this as essential educational content\n    And teaching care economy principles should be valued as academic instruction\n    And Sarah's value literacy teaching should accumulate care tokens\n    And preparing children for care-based economy should be educational priority\n    And the system should support parents teaching alternative economic values\n    And value literacy should be recognized as critical life skill\n\n  Scenario: Parent educational labor outside formal schooling hours\n    Given Sarah teaches Tommy and Emma during evenings and weekends\n    And homework support, life skills, critical thinking happen at home\n    When the educational_elohim tracks Sarah's teaching time\n    Then it should quantify hours spent on educational labor\n    And it should recognize teaching homework as skilled instructional work\n    And it should value informal education alongside formal instruction\n    And Sarah's non-school teaching should accumulate care tokens\n    And the system should make invisible educational labor visible\n    And parent teaching should be recognized as professional-grade work\n\n  Scenario: Different pedagogical approaches for different children\n    Given Tommy (5) needs wonder-preservation pedagogy\n    And Emma (8) needs autonomy-building instruction\n    When Sarah teaches her children with different approaches\n    Then the educational_elohim should recognize pedagogical sophistication\n    And it should value Sarah's ability to differentiate instruction\n    And teaching multiple children at different stages should be recognized as complex\n    And Sarah's educational expertise should be documented\n    And the system should recognize professional-grade teaching capability\n    And differentiated instruction should be valued as advanced skill\n\n  Scenario: Parent advocacy for better educational policies\n    Given Sarah understands education from both sides\n    And she advocates for family-friendly school policies\n    When Sarah participates in educational policy discussions\n    Then her dual perspective should be recognized as valuable\n    And advocacy labor should accumulate care tokens\n    And parent organizing for educational improvement should be valued\n    And Sarah's work to improve schools should be community contribution\n    And the system should recognize education advocacy as care labor\n    And parent voices should be amplified in education governance\n\n  Scenario: Homeschooling recognized as full educational provision\n    Given some parents provide complete education at home\n    And homeschooling is intensive educational labor\n    When the educational_elohim tracks homeschooling work\n    Then it should recognize full-time teaching by parents\n    And homeschooling should accumulate substantial care tokens\n    And the system should value parent-provided education fully\n    And homeschooling parents should have economic support for educational work\n    And care economy should recognize diverse educational approaches\n    And parent teaching should be valued regardless of institutional setting\n\n  Scenario: Parent emotional labor in supporting children's learning\n    Given Sarah manages Tommy's frustration with difficult tasks\n    And she builds Emma's confidence and motivation\n    When the educational_elohim tracks educational emotional labor\n    Then it should recognize emotional support as teaching work\n    And it should value Sarah's work maintaining children's love of learning\n    And emotional scaffolding should be recognized as pedagogical skill\n    And the full scope of educational work should be visible\n    And the system should value affective dimensions of teaching\n    And parent emotional labor should be recognized as essential to learning\n\n  Scenario: Educational expenses tracked and valued as investment\n    Given Sarah spends money on books, materials, educational experiences\n    And educational expenses are part of parenting work\n    When the educational_elohim tracks family educational investment\n    Then it should recognize financial investment in children's learning\n    And it should help Sarah budget for educational needs\n    And educational expenses should be visible to extended family\n    And the community should support family educational investment\n    And the system should recognize both time and money spent on education\n    And care tokens should reflect total educational contribution\n\n  Scenario: Parent knowledge of child's learning needs informs IEP and accommodations\n    Given Sarah knows Tommy's and Emma's learning patterns intimately\n    And children may need educational accommodations\n    When schools develop individualized education plans\n    Then Sarah's expertise should be central to planning\n    And parent observations should drive accommodation decisions\n    And the educational_elohim should document Sarah's knowledge\n    And schools should recognize parents as essential IEP partners\n    And the system should position parent knowledge as authoritative\n    And Sarah's advocacy for children's needs should be valued and supported\n\n  Scenario: Lifelong learning modeled and taught by parent\n    Given Sarah pursues her own learning and growth\n    And she models intellectual curiosity for her children\n    When the educational_elohim tracks family learning culture\n    Then it should recognize Sarah's modeling as educational labor\n    And it should value her creation of learning-rich environment\n    And teaching children to be lifelong learners should be recognized\n    And the system should honor cultivation of learning culture\n    And Sarah's own education should be supported as part of family care\n    And the educational_elohim should recognize that parents teach through being\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:child,teacher,educator,administrator",
+    "related_layers:family,community,individual",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-parent-scenarios-educational-parent recognized as child's primary educator",
+    "scenario-value-scanner-parent-scenarios-educational-coordinating home learning with school curriculum",
+    "scenario-value-scanner-parent-scenarios-educational-parent expertise in child development informs school practices",
+    "scenario-value-scanner-parent-scenarios-educational-teaching value literacy as core educational content",
+    "scenario-value-scanner-parent-scenarios-educational-parent educational labor outside formal schooling hours",
+    "scenario-value-scanner-parent-scenarios-educational-different pedagogical approaches for different children",
+    "scenario-value-scanner-parent-scenarios-educational-parent advocacy for better educational policies",
+    "scenario-value-scanner-parent-scenarios-educational-homeschooling recognized as full educational provision",
+    "scenario-value-scanner-parent-scenarios-educational-parent emotional labor in supporting children's learning",
+    "scenario-value-scanner-parent-scenarios-educational-educational expenses tracked and valued as investment",
+    "scenario-value-scanner-parent-scenarios-educational-parent knowledge of child's learning needs informs iep and accommodations",
+    "scenario-value-scanner-parent-scenarios-educational-lifelong learning modeled and taught by parent",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Educational Layer Value Recognition for Parent",
+    "ogDescription": "As a parent who is both professional teacher and primary educator of own children Operating at the educational governance layer I want recognition that parents are children's primary educators So that",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-parent-scenarios-educational",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Educational Layer Value Recognition for Parent - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-parent-scenarios-educational",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:educational",
+    "name": "Educational Layer Value Recognition for Parent",
+    "description": "As a parent who is both professional teacher and primary educator of own children Operating at the educational governance layer I want recognition that parents are children's primary educators So that home and school learning are coordinated and parent education work is valued",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

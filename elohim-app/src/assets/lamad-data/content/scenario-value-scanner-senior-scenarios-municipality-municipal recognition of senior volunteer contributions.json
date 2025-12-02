@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-senior-scenarios-municipality-municipal recognition of senior volunteer contributions",
+  "did": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-municipal recognition of senior volunteer contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Municipal recognition of senior volunteer contributions",
+  "description": "Municipal recognition of senior volunteer contributions",
+  "content": "Scenario: Municipal recognition of senior volunteer contributions\n    Given Margaret volunteers extensively in municipal programs\n    And her labor subsidizes municipal service provision\n    When the municipality_elohim tracks volunteer contributions\n    Then municipal government should see aggregate senior volunteer value\n    And policy should reflect dependence on senior volunteer labor\n    And seniors should be recognized as essential to municipal function\n    And Margaret's contributions should give her standing in municipal affairs\n    And volunteer labor should inform resource allocation\n    And senior productivity should be visible to government\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:senior",
+    "governance_layer:municipality",
+    "related_users:middle_aged,elderly,retired,civic_participant,senior_advocate",
+    "related_layers:individual,household,family,neighborhood,community",
+    "elohim_agents:personal_agent,community_elohim,municipality_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/senior/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-senior-scenarios-municipality",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-senior-scenarios-municipality",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal recognition of senior volunteer contributions",
+    "ogDescription": "Municipal recognition of senior volunteer contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-municipal recognition of senior volunteer contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Municipal recognition of senior volunteer contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-senior-scenarios-municipality-municipal recognition of senior volunteer contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:senior:scenarios:municipality-municipal recognition of senior volunteer contributions",
+    "name": "Municipal recognition of senior volunteer contributions",
+    "description": "Municipal recognition of senior volunteer contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

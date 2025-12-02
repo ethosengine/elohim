@@ -1695,6 +1695,10 @@
     {
       "path": "social_medium/elder/scenarios/family.feature",
       "type": "feature"
+    },
+    {
+      "path": "economic_coordination/epic.md",
+      "type": "epic"
     }
   ]
 }

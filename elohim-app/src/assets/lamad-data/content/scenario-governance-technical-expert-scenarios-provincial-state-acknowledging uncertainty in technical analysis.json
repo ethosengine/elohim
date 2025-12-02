@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-technical-expert-scenarios-provincial-state-acknowledging uncertainty in technical analysis",
+  "did": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-acknowledging uncertainty in technical analysis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Acknowledging uncertainty in technical analysis",
+  "description": "Acknowledging uncertainty in technical analysis",
+  "content": "Scenario: Acknowledging uncertainty in technical analysis\n    Given appellant questions agent's 85% confidence in suicide risk pattern\n    And council asks if the confidence level is reliable\n    When I provide honest uncertainty assessment\n    Then I explain: we don't have validated ground truth for this prediction type\n    And I acknowledge: the 85% might be overconfident or underconfident\n    And I clarify: what we know and what we don't know\n    And I avoid: hiding behind expert authority to eliminate uncertainty\n    And I enable: council to make decision under acknowledged uncertainty\n    And I demonstrate: that honesty about limits builds trust\n    And citizens know: when they're governing despite deep uncertainty\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:technical_expert",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,appellant,policy_maker,researcher",
+    "related_layers:nation_state,community",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/technical_expert/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-technical-expert-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-technical-expert-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Acknowledging uncertainty in technical analysis",
+    "ogDescription": "Acknowledging uncertainty in technical analysis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-acknowledging uncertainty in technical analysis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Acknowledging uncertainty in technical analysis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-technical-expert-scenarios-provincial-state-acknowledging uncertainty in technical analysis",
+    "identifier": "did:web:elohim.host:content:governance:technical-expert:scenarios:provincial-state-acknowledging uncertainty in technical analysis",
+    "name": "Acknowledging uncertainty in technical analysis",
+    "description": "Acknowledging uncertainty in technical analysis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

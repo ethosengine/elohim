@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent discovers teacher coalition on class size",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent discovers teacher coalition on class size",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent discovers teacher coalition on class size",
+  "description": "Parent discovers teacher coalition on class size",
+  "content": "Scenario: Parent discovers teacher coalition on class size\n    Given the board proposes increasing class sizes to save money\n    And the parent opposes this for their child's learning\n    When the Observer shows teacher union position on class sizes\n    Then the parent sees teachers oppose increase for same reasons\n    And understands research on class size impacts on learning\n    And natural parent-teacher alliance against harmful policy becomes visible\n    And coordinated parent-teacher testimony defeats the proposal\n    And board cannot divide parents and teachers\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent discovers teacher coalition on class size",
+    "ogDescription": "Parent discovers teacher coalition on class size",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent discovers teacher coalition on class size",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent discovers teacher coalition on class size - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent discovers teacher coalition on class size",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent discovers teacher coalition on class size",
+    "name": "Parent discovers teacher coalition on class size",
+    "description": "Parent discovers teacher coalition on class size",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

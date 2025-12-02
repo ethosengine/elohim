@@ -1,0 +1,42 @@
+{
+  "lastUpdated": "2025-11-29T12:00:00.000000",
+  "totalCount": 2,
+  "paths": [
+    {
+      "id": "elohim-protocol",
+      "title": "Elohim Protocol: Living Documentation",
+      "description": "Discover the vision and find your place in the Protocol",
+      "difficulty": "beginner",
+      "estimatedDuration": "1-2 hours",
+      "stepCount": 8,
+      "tags": [
+        "foundation",
+        "protocol",
+        "onboarding"
+      ],
+      "thumbnailUrl": "/images/elohim_protocol_logo_light.png",
+      "thumbnailAlt": "Elohim Protocol logo"
+    },
+    {
+      "id": "foundations-christian-technology",
+      "title": "Foundations for Christian Technology",
+      "description": "A course equipping Christians to navigate and shape the digital age with wisdom, integrating Center for Humane Technology principles with biblical foundations.",
+      "difficulty": "intermediate",
+      "estimatedDuration": "10-15 hours",
+      "stepCount": 15,
+      "chapterCount": 6,
+      "pathType": "expedition",
+      "tags": [
+        "fct",
+        "christian-technology",
+        "humane-tech",
+        "ethics",
+        "discipleship",
+        "church"
+      ],
+      "category": "fct",
+      "thumbnailUrl": "/images/fct_cover.webp",
+      "thumbnailAlt": "Foundations for Christian Technology course cover"
+    }
+  ]
+}

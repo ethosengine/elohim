@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-professional development for educators in care economy teaching",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-professional development for educators in care economy teaching",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Professional development for educators in care economy teaching",
+  "description": "Professional development for educators in care economy teaching",
+  "content": "Scenario: Professional development for educators in care economy teaching\n    Given Sarah wants to bring care economy into classroom\n    And she needs professional development support\n    When Sarah seeks educator training\n    Then the educational_elohim should provide professional development\n    And training should help teachers integrate care economy into curriculum\n    And it should respect existing teaching expertise\n    And it should provide practical classroom strategies\n    And Sarah should be equipped to teach care economy effectively\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Professional development for educators in care economy teaching",
+    "ogDescription": "Professional development for educators in care economy teaching",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-professional development for educators in care economy teaching",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Professional development for educators in care economy teaching - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-professional development for educators in care economy teaching",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-professional development for educators in care economy teaching",
+    "name": "Professional development for educators in care economy teaching",
+    "description": "Professional development for educators in care economy teaching",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

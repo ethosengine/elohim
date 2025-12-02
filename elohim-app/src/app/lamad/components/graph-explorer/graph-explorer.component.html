@@ -1,0 +1,136 @@
+<div class="graph-explorer">
+  <!-- Header with breadcrumbs and controls -->
+  <header class="explorer-header">
+    <nav class="breadcrumbs">
+      @for (crumb of breadcrumbs; track crumb.id; let last = $last) {
+        @if (!last) {
+          <button class="crumb" (click)="navigateToBreadcrumb(crumb)">
+            {{ crumb.title }}
+          </button>
+          <span class="crumb-separator">/</span>
+        } @else {
+          <span class="crumb current">{{ crumb.title }}</span>
+        }
+      }
+    </nav>
+
+    <div class="controls">
+      <button class="control-btn" (click)="resetZoom()" title="Reset zoom">
+        <span class="icon">&#8634;</span>
+        Reset
+      </button>
+      <button class="control-btn" routerLink="/lamad" title="Back to paths">
+        <span class="icon">&#8592;</span>
+        Paths
+      </button>
+    </div>
+  </header>
+
+  <!-- Loading state -->
+  @if (isLoading) {
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading knowledge graph...</p>
+    </div>
+  }
+
+  <!-- Error state -->
+  @if (error) {
+    <div class="error-state">
+      <h2>Unable to load graph</h2>
+      <p>{{ error }}</p>
+      <button class="btn btn-primary" (click)="loadOverview()">Retry</button>
+    </div>
+  }
+
+  <!-- Graph container -->
+  <div
+    #graphContainer
+    class="graph-container"
+    [class.hidden]="isLoading || error"
+  ></div>
+
+  <!-- Node tooltip / info panel -->
+  @if (hoveredNode || selectedNode) {
+    <div class="node-tooltip" [class.selected]="selectedNode">
+      <div class="tooltip-header">
+        <span class="tooltip-type">{{ (hoveredNode || selectedNode)?.contentType }}</span>
+        <span
+          class="tooltip-state"
+          [class]="'state-' + (hoveredNode || selectedNode)?.state"
+        >
+          {{ getStateLabel((hoveredNode || selectedNode)?.state || '') }}
+        </span>
+      </div>
+
+      <h3 class="tooltip-title">{{ (hoveredNode || selectedNode)?.title }}</h3>
+
+      @if ((hoveredNode || selectedNode)?.description) {
+        <p class="tooltip-description">{{ (hoveredNode || selectedNode)?.description }}</p>
+      }
+
+      @if ((hoveredNode || selectedNode)?.hasChildren) {
+        <p class="tooltip-children">
+          {{ (hoveredNode || selectedNode)?.childCount }} items to explore
+        </p>
+      }
+
+      @if ((hoveredNode || selectedNode)?.state === 'locked') {
+        <div class="tooltip-locked">
+          <span class="lock-icon">&#128274;</span>
+          Complete the Manifesto first to unlock
+        </div>
+      }
+
+      @if (selectedNode && selectedNode.state !== 'locked') {
+        <div class="tooltip-actions">
+          @if (selectedNode.hasChildren && selectedNode.contentType === 'epic') {
+            <button class="btn btn-primary btn-small" (click)="loadEpicDetail(selectedNode.id, selectedNode.title)">
+              Explore
+            </button>
+          }
+          <button class="btn btn-secondary btn-small" (click)="navigateToContent(selectedNode.id)">
+            View Content
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Legend -->
+  <div class="graph-legend">
+    <h4>Legend</h4>
+    <div class="legend-items">
+      <div class="legend-item">
+        <span class="legend-dot unseen"></span>
+        <span>Not Started</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot in-progress"></span>
+        <span>In Progress</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot proficient"></span>
+        <span>Completed</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot recommended"></span>
+        <span>Recommended</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot locked"></span>
+        <span>Locked</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <p>
+      <strong>Click</strong> a node to select &bull;
+      <strong>Double-click</strong> to navigate &bull;
+      <strong>Drag</strong> to reposition &bull;
+      <strong>Scroll</strong> to zoom
+    </p>
+  </div>
+</div>

@@ -1,0 +1,116 @@
+{
+  "id": "human-lenny-lineworker",
+  "did": "did:web:elohim.host:human:lenny-lineworker",
+  "contentType": "human",
+  "activityPubType": "Person",
+  "title": "Lenny",
+  "description": "Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.",
+  "content": {
+    "displayName": "Lenny",
+    "bio": "Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.",
+    "profileReach": "community",
+    "isPseudonymous": false,
+    "acceptingConnections": true,
+    "primaryLocation": {
+      "layer": "county_regional",
+      "displayName": "Valley County",
+      "reach": "community"
+    },
+    "organizations": [
+      {
+        "id": "org-valley-power-electric",
+        "name": "Valley Power & Electric",
+        "role": "journeyman-lineman"
+      },
+      {
+        "id": "org-ibew-local-123",
+        "name": "IBEW Local 123",
+        "role": "member"
+      }
+    ],
+    "communities": [
+      "community-utility-workers",
+      "community-local-church"
+    ],
+    "publicAffinities": [
+      "infrastructure",
+      "electrical-work",
+      "union-labor",
+      "public-safety",
+      "grid-resilience"
+    ],
+    "publicAttestations": [
+      "attestation-journeyman-lineman",
+      "attestation-high-voltage-certified"
+    ]
+  },
+  "contentFormat": "human-json",
+  "sourcePath": "humans/lenny-lineworker/profile.json",
+  "tags": [
+    "union-labor",
+    "layer-county_regional",
+    "infrastructure",
+    "role-member",
+    "grid-resilience",
+    "role-journeyman-lineman",
+    "local-economy",
+    "electrical-work",
+    "public-safety",
+    "human-graph",
+    "reach-community",
+    "human"
+  ],
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "local-economy",
+    "nodeLayer": "human-graph",
+    "governanceLayers": [
+      "workplace",
+      "community",
+      "county_regional"
+    ],
+    "organizationCount": 2,
+    "communityCount": 2
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Lenny",
+    "ogDescription": "Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.",
+    "ogType": "profile",
+    "ogUrl": "https://elohim-protocol.org/humans/human-lenny-lineworker",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/avatars/human-lenny-lineworker.jpg",
+    "ogImageAlt": "Lenny's profile"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Person",
+    "@id": "https://elohim-protocol.org/humans/human-lenny-lineworker",
+    "identifier": "did:web:elohim.host:human:lenny-lineworker",
+    "name": "Lenny",
+    "description": "Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    },
+    "homeLocation": {
+      "@type": "Place",
+      "name": "Valley County",
+      "description": "county_regional"
+    },
+    "affiliation": [
+      {
+        "@type": "Organization",
+        "name": "Valley Power & Electric",
+        "@id": "org-valley-power-electric"
+      },
+      {
+        "@type": "Organization",
+        "name": "IBEW Local 123",
+        "@id": "org-ibew-local-123"
+      }
+    ]
+  },
+  "createdAt": "2025-12-01T20:08:11.328549",
+  "updatedAt": "2025-12-01T20:08:11.328550"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-family-parent care coordinated equitably with siblings",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-parent care coordinated equitably with siblings",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent care coordinated equitably with siblings",
+  "description": "Parent care coordinated equitably with siblings",
+  "content": "Scenario: Parent care coordinated equitably with siblings\n    Given Robert's parents require increasing care support\n    And Robert has two siblings: Sarah and Michael\n    And care coordination across siblings is often fraught\n    When family_elohim coordinates sibling care contributions\n    Then it should track each sibling's care contributions\n    And make contributions visible to all siblings\n    And surface when distribution becomes inequitable\n    And facilitate discussion: \"Robert has handled 65% of medical coordination this quarter\"\n    And help siblings negotiate fair distribution based on capacity\n    And prevent resentment from invisible labor imbalances\n    And support siblings in maintaining relationships while coordinating care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:family",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:household,individual,community,neighborhood",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent care coordinated equitably with siblings",
+    "ogDescription": "Parent care coordinated equitably with siblings",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-parent care coordinated equitably with siblings",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent care coordinated equitably with siblings - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-family-parent care coordinated equitably with siblings",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:family-parent care coordinated equitably with siblings",
+    "name": "Parent care coordinated equitably with siblings",
+    "description": "Parent care coordinated equitably with siblings",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,54 @@
+{
+  "id": "fct-org-netflix",
+  "contentType": "organization",
+  "title": "Netflix",
+  "description": "Streaming Service referenced in FCT",
+  "content": {
+    "name": "Netflix",
+    "type": "streaming-service"
+  },
+  "contentFormat": "organization-json",
+  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "tags": [
+    "organization",
+    "fct",
+    "streaming-service"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-media-00-documentary-the-social-dilemma"
+  ],
+  "metadata": {
+    "category": "organization",
+    "sourceModule": "fct-module-01-church-dilemma",
+    "organizationType": "streaming-service"
+  },
+  "createdAt": "2025-11-28T21:10:19.189255",
+  "updatedAt": "2025-11-28T21:10:19.189256",
+  "did": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+  "activityPubType": "Organization",
+  "openGraphMetadata": {
+    "ogTitle": "Netflix",
+    "ogDescription": "Streaming Service referenced in FCT",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-org-netflix",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Netflix - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/fct-org-netflix",
+    "identifier": "did:web:elohim.host:content:fct:module 1 - the church dilemma",
+    "name": "Netflix",
+    "description": "Streaming Service referenced in FCT",
+    "dateCreated": "2025-11-28T21:10:19.189255",
+    "dateModified": "2025-11-28T21:10:19.189256",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

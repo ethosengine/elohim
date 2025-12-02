@@ -1,0 +1,47 @@
+<div class="not-found-container">
+  <div class="not-found-content">
+    <!-- Visual Element -->
+    <div class="error-visual">
+      <span class="error-code">404</span>
+      <div class="orbit">
+        <div class="planet"></div>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <h1>Page Not Found</h1>
+    <p class="message">
+      The page you're looking for seems to have drifted into uncharted space.
+    </p>
+    <p class="attempted-url" *ngIf="attemptedUrl">
+      <code>{{ attemptedUrl }}</code>
+    </p>
+
+    <!-- Navigation Options -->
+    <div class="actions">
+      <button class="btn btn-primary" (click)="goHome()">
+        <i class="fa-solid fa-house"></i>
+        Go Home
+      </button>
+      <button class="btn btn-secondary" (click)="goToLamad()">
+        <i class="fa-solid fa-graduation-cap"></i>
+        Explore Lamad
+      </button>
+      <button class="btn btn-ghost" (click)="goBack()">
+        <i class="fa-solid fa-arrow-left"></i>
+        Go Back
+      </button>
+    </div>
+
+    <!-- Helpful Links -->
+    <div class="helpful-links">
+      <p>You might be looking for:</p>
+      <ul>
+        <li><a routerLink="/">Home - Learn about Elohim Protocol</a></li>
+        <li><a routerLink="/lamad">Lamad - Learning Platform</a></li>
+        <li><a routerLink="/lamad/explore">Knowledge Explorer</a></li>
+        <li><a routerLink="/lamad/search">Search</a></li>
+      </ul>
+    </div>
+  </div>
+</div>

@@ -1,176 +1,82 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
-import { DomSanitizer } from '@angular/platform-browser';
+import { Router } from '@angular/router';
+import { of, throwError } from 'rxjs';
 import { LamadHomeComponent } from './lamad-home.component';
-import { DocumentGraphService } from '../../services/document-graph.service';
-import { AffinityTrackingService } from '../../services/affinity-tracking.service';
-import { LearningPathService } from '../../services/learning-path.service';
-import { NavigationService } from '../../services/navigation.service';
-import { DocumentGraph } from '../../models';
-import { ContentNode } from '../../models/content-node.model';
+import { PathService } from '../../services/path.service';
+import { ProfileService } from '../../services/profile.service';
+import { AgentService } from '../../services/agent.service';
+import { PathIndex, PathIndexEntry } from '../../models/learning-path.model';
 
 describe('LamadHomeComponent', () => {
   let component: LamadHomeComponent;
   let fixture: ComponentFixture<LamadHomeComponent>;
-  let mockDocumentGraphService: any;
-  let mockAffinityService: any;
-  let mockLearningPathService: any;
-  let mockNavigationService: any;
-  let graphSubject: BehaviorSubject<DocumentGraph | null>;
-  let pathSubject: BehaviorSubject<any[]>;
-  let affinitySubject: BehaviorSubject<any>;
-  let changesSubject: BehaviorSubject<any>;
-  let contextSubject: BehaviorSubject<any>;
-  let nodeRegistry: Map<string, ContentNode>;
+  let pathService: jasmine.SpyObj<PathService>;
+  let router: jasmine.SpyObj<Router>;
+  let profileService: jasmine.SpyObj<ProfileService>;
+  let agentService: jasmine.SpyObj<AgentService>;
+  let localStorageMock: { [key: string]: string };
 
-  const mockContentNode: ContentNode = {
-    id: 'manifesto.md',
-    contentType: 'epic',
-    title: 'Elohim Manifesto',
-    description: 'The founding vision',
-    content: '# Test Content',
-    contentFormat: 'markdown',
-    tags: [],
-    sourcePath: 'manifesto.md',
-    relatedNodeIds: [],
-    metadata: {
-      category: 'vision'
-    }
-  };
-
-  const mockPathNodes = [
+  const mockPaths: PathIndexEntry[] = [
     {
-      node: mockContentNode,
-      order: 0,
-      depth: 0,
-      category: 'vision'
+      id: 'elohim-protocol',
+      title: 'Elohim Protocol',
+      description: 'Learn the Elohim Protocol',
+      difficulty: 'beginner',
+      estimatedDuration: '2 hours',
+      stepCount: 5,
+      tags: ['protocol', 'intro']
+    },
+    {
+      id: 'learning-platform',
+      title: 'Learning Platform',
+      description: 'Understanding Lamad',
+      difficulty: 'intermediate',
+      estimatedDuration: '1 hour',
+      stepCount: 3,
+      tags: ['learning', 'platform']
     }
   ];
 
-  const mockGraph: Partial<DocumentGraph> = {
-    nodes: new Map([
-      ['manifesto.md', {
-        id: 'manifesto.md',
-        type: 'epic' as const,
-        title: 'Elohim Manifesto',
-        description: 'The founding vision',
-        tags: [],
-        sourcePath: '',
-        content: '# Test Content',
-        relatedNodeIds: [],
-        metadata: { category: 'vision' },
-        category: 'vision',
-        featureIds: [],
-        relatedEpicIds: [],
-        markdownContent: '# Test Content',
-        sections: []
-      }]
-    ]),
-    relationships: new Map(),
-    nodesByType: {
-      epics: new Map(),
-      features: new Map(),
-      scenarios: new Map()
-    },
-    nodesByTag: new Map(),
-    nodesByCategory: new Map(),
-    adjacency: new Map(),
-    reverseAdjacency: new Map(),
-    metadata: {
-      nodeCount: 1,
-      relationshipCount: 0,
-      lastBuilt: new Date(),
-      sources: {
-        epicPath: '',
-        featurePath: ''
-      },
-      stats: {
-        epicCount: 1,
-        featureCount: 0,
-        scenarioCount: 0,
-        averageConnectionsPerNode: 0
-      }
-    }
-  } as DocumentGraph;
+  const mockPathIndex: PathIndex = {
+    lastUpdated: '2025-01-01T00:00:00.000Z',
+    totalCount: 2,
+    paths: mockPaths
+  };
 
   beforeEach(async () => {
-    // Create a registry of ContentNodes for navigation mock
-    nodeRegistry = new Map<string, ContentNode>();
-    nodeRegistry.set(mockContentNode.id, mockContentNode);
+    const pathServiceSpy = jasmine.createSpyObj('PathService', ['listPaths']);
+    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    const profileServiceSpy = jasmine.createSpyObj('ProfileService', ['getCurrentFocus']);
+    const agentServiceSpy = jasmine.createSpyObj('AgentService', ['getCurrentAgentId', 'getAgentProgress']);
 
-    graphSubject = new BehaviorSubject<DocumentGraph | null>(mockGraph as DocumentGraph);
-    pathSubject = new BehaviorSubject<any[]>(mockPathNodes);
-    affinitySubject = new BehaviorSubject<any>({});
-    changesSubject = new BehaviorSubject<any>(null);
-    contextSubject = new BehaviorSubject<any>({ nodeId: null, nodeType: null });
-
-    mockDocumentGraphService = {
-      getGraph: jasmine.createSpy('getGraph').and.returnValue(mockGraph as DocumentGraph),
-      graph$: graphSubject.asObservable()
-    };
-
-    mockAffinityService = {
-      getAffinity: jasmine.createSpy('getAffinity').and.returnValue(0.5),
-      trackView: jasmine.createSpy('trackView'),
-      incrementAffinity: jasmine.createSpy('incrementAffinity'),
-      setAffinity: jasmine.createSpy('setAffinity'),
-      getStats: jasmine.createSpy('getStats').and.returnValue({
-        totalNodes: 1,
-        engagedNodes: 1,
-        averageAffinity: 0.5,
-        distribution: {
-          unseen: 0,
-          low: 0,
-          medium: 1,
-          high: 0
-        },
-        byCategory: new Map(),
-        byType: new Map()
-      }),
-      affinity$: affinitySubject.asObservable(),
-      changes$: changesSubject.asObservable()
-    };
-
-    mockLearningPathService = {
-      path$: pathSubject.asObservable(),
-      getPath: jasmine.createSpy('getPath').and.returnValue(mockPathNodes),
-      getNextNode: jasmine.createSpy('getNextNode').and.returnValue(null),
-      getPreviousNode: jasmine.createSpy('getPreviousNode').and.returnValue(null),
-      getNodePosition: jasmine.createSpy('getNodePosition').and.returnValue(0),
-      isInPath: jasmine.createSpy('isInPath').and.returnValue(true),
-      getPathProgress: jasmine.createSpy('getPathProgress').and.returnValue(50)
-    };
-
-    mockNavigationService = {
-      context$: contextSubject.asObservable(),
-      navigateToHome: jasmine.createSpy('navigateToHome'),
-      navigateUp: jasmine.createSpy('navigateUp'),
-      getCurrentContext: jasmine.createSpy('getCurrentContext').and.returnValue({ nodeId: null, nodeType: null }),
-      navigateTo: jasmine.createSpy('navigateTo').and.callFake((nodeType: string, nodeId: string, options?: any) => {
-        // Simulate navigation by emitting on context$ with the node
-        const node = nodeRegistry.get(nodeId);
-        if (node) {
-          contextSubject.next({ currentNode: node, nodeType, nodeId, viewMode: 'node' });
-        }
-      })
-    };
-
-    const mockSanitizer = {
-      sanitize: jasmine.createSpy('sanitize').and.callFake((context: any, value: string) => value)
-    };
+    // Mock localStorage
+    localStorageMock = {};
+    spyOn(localStorage, 'getItem').and.callFake((key: string) => {
+      return localStorageMock[key] || null;
+    });
+    spyOn(localStorage, 'setItem').and.callFake((key: string, value: string) => {
+      localStorageMock[key] = value;
+    });
 
     await TestBed.configureTestingModule({
       imports: [LamadHomeComponent],
       providers: [
-        { provide: DocumentGraphService, useValue: mockDocumentGraphService },
-        { provide: AffinityTrackingService, useValue: mockAffinityService },
-        { provide: LearningPathService, useValue: mockLearningPathService },
-        { provide: NavigationService, useValue: mockNavigationService },
-        { provide: DomSanitizer, useValue: mockSanitizer },
-        provideRouter([])
+        { provide: PathService, useValue: pathServiceSpy },
+        { provide: Router, useValue: routerSpy },
+        { provide: ProfileService, useValue: profileServiceSpy },
+        { provide: AgentService, useValue: agentServiceSpy }
       ]
     }).compileComponents();
+
+    pathService = TestBed.inject(PathService) as jasmine.SpyObj<PathService>;
+    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    profileService = TestBed.inject(ProfileService) as jasmine.SpyObj<ProfileService>;
+    agentService = TestBed.inject(AgentService) as jasmine.SpyObj<AgentService>;
+
+    pathService.listPaths.and.returnValue(of(mockPathIndex));
+    profileService.getCurrentFocus.and.returnValue(of([]));
+    agentService.getCurrentAgentId.and.returnValue('test-agent');
+    agentService.getAgentProgress.and.returnValue(of([]));
 
     fixture = TestBed.createComponent(LamadHomeComponent);
     component = fixture.componentInstance;
@@ -180,173 +86,188 @@ describe('LamadHomeComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load learning path on init', () => {
+  it('should load paths on init', () => {
     fixture.detectChanges();
 
-    expect(component.pathNodes.length).toBe(1);
-    expect(component.pathNodes[0].node.title).toBe('Elohim Manifesto');
+    expect(pathService.listPaths).toHaveBeenCalled();
+    expect(component.paths.length).toBe(2);
+    expect(component.isLoading).toBe(false);
   });
 
-  xit('should select first node on init', () => {
-    // Auto-select is currently disabled to show landing page
+  it('should set featured path to elohim-protocol if available', () => {
     fixture.detectChanges();
 
-    expect(component.selectedNode).toBeTruthy();
-    expect(component.selectedNode?.id).toBe('manifesto.md');
+    expect(component.featuredPath?.id).toBe('elohim-protocol');
   });
 
-  it('should load affinity stats', () => {
+  it('should set featured path to first path if elohim-protocol not found', () => {
+    const pathsWithoutElohim: PathIndex = {
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+      totalCount: 1,
+      paths: [mockPaths[1]]
+    };
+    pathService.listPaths.and.returnValue(of(pathsWithoutElohim));
+
     fixture.detectChanges();
 
-    expect(component.affinityStats).toBeTruthy();
-    expect(component.affinityStats?.totalNodes).toBe(1);
-    expect(component.affinityStats?.engagedNodes).toBe(1);
+    expect(component.featuredPath?.id).toBe('learning-platform');
   });
 
-  it('should handle null graph gracefully', () => {
-    graphSubject.next(null);
+  it('should handle empty paths array', () => {
+    pathService.listPaths.and.returnValue(of({
+      lastUpdated: '2025-01-01T00:00:00.000Z',
+      totalCount: 0,
+      paths: []
+    }));
+
     fixture.detectChanges();
 
-    expect(component.isLoading).toBe(true);
+    expect(component.paths.length).toBe(0);
+    expect(component.featuredPath).toBeNull();
   });
 
-  it('should return correct affinity level', () => {
-    expect(component.getAffinityLevel(0)).toBe('unseen');
-    expect(component.getAffinityLevel(0.2)).toBe('low');
-    expect(component.getAffinityLevel(0.5)).toBe('medium');
-    expect(component.getAffinityLevel(0.8)).toBe('high');
-  });
+  it('should handle path loading error', () => {
+    pathService.listPaths.and.returnValue(throwError(() => new Error('Network error')));
 
-  it('should return correct affinity percentage', () => {
-    expect(component.getAffinityPercentage(0.5)).toBe(50);
-    expect(component.getAffinityPercentage(0.75)).toBe(75);
-    expect(component.getAffinityPercentage(1.0)).toBe(100);
-  });
-
-  it('should return correct content type icons', () => {
-    expect(component.getContentTypeIcon('epic')).toBe('📖');
-    expect(component.getContentTypeIcon('feature')).toBe('⚙️');
-    expect(component.getContentTypeIcon('scenario')).toBe('✓');
-    expect(component.getContentTypeIcon('unknown')).toBe('📄');
-  });
-
-  it('should return correct category display names', () => {
-    expect(component.getCategoryDisplay('vision')).toBe('Vision');
-    expect(component.getCategoryDisplay('core')).toBe('Core Concepts');
-    expect(component.getCategoryDisplay('advanced')).toBe('Advanced');
-    expect(component.getCategoryDisplay('systemic')).toBe('Systemic View');
-    expect(component.getCategoryDisplay('implementation')).toBe('Implementation');
-    expect(component.getCategoryDisplay('technical')).toBe('Technical');
-  });
-
-  it('should select node and track view', () => {
     fixture.detectChanges();
-    const node = mockContentNode;
 
-    component.selectNode(node);
-
-    expect(component.selectedNode).toBe(node);
-    expect(mockAffinityService.trackView).toHaveBeenCalledWith(node.id);
+    expect(component.isLoading).toBe(false);
+    expect(component.error).toBe('Unable to load learning paths');
   });
 
-  it('should toggle graph expansion', () => {
+  it('should navigate to path on goToPath', () => {
+    component.goToPath('test-path');
+
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'test-path']);
+  });
+
+  it('should start featured path at step 0', () => {
     fixture.detectChanges();
-    const initialState = component.isGraphExpanded;
+    component.startFeaturedPath();
 
-    component.toggleGraph();
-
-    expect(component.isGraphExpanded).toBe(!initialState);
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad/path', 'elohim-protocol', 'step', 0]);
   });
 
-  it('should adjust affinity', () => {
+  it('should not navigate if no featured path', () => {
+    component.featuredPath = null;
+    component.startFeaturedPath();
+
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('should navigate to explore view', () => {
+    component.goToExplore();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad/explore']);
+  });
+
+  it('should navigate to search', () => {
+    component.goToSearch();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad/search']);
+  });
+
+  it('should navigate to dashboard', () => {
+    component.goToDashboard();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad/me']);
+  });
+
+  it('should get difficulty class', () => {
+    expect(component.getDifficultyClass('advanced')).toBe('advanced');
+    expect(component.getDifficultyClass('')).toBe('beginner');
+  });
+
+  it('should format difficulty for display', () => {
+    expect(component.formatDifficulty('beginner')).toBe('Beginner');
+    expect(component.formatDifficulty('intermediate')).toBe('Intermediate');
+    expect(component.formatDifficulty('advanced')).toBe('Advanced');
+    expect(component.formatDifficulty('unknown')).toBe('unknown');
+  });
+
+  it('should set view mode to paths', () => {
+    component.setViewMode('paths');
+
+    expect(component.viewMode).toBe('paths');
+    expect(localStorage.setItem).toHaveBeenCalledWith('lamad-view-mode', 'paths');
+  });
+
+  it('should set view mode to explore and navigate', () => {
+    component.setViewMode('explore');
+
+    expect(component.viewMode).toBe('explore');
+    expect(localStorage.setItem).toHaveBeenCalledWith('lamad-view-mode', 'explore');
+    expect(router.navigate).toHaveBeenCalledWith(['/lamad/explore']);
+  });
+
+  it('should load saved view mode from localStorage', () => {
+    localStorageMock['lamad-view-mode'] = 'explore';
+
+    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
+    expect(newComponent.viewMode).toBe('explore');
+  });
+
+  it('should default to paths mode if no saved preference', () => {
+    const newComponent = new LamadHomeComponent(pathService, router, profileService, agentService);
+    expect(newComponent.viewMode).toBe('paths');
+  });
+
+  it('should cleanup on destroy', () => {
     fixture.detectChanges();
-    component.selectedNode = mockContentNode;
 
-    component.adjustAffinity(0.1);
+    spyOn(component['destroy$'], 'next');
+    spyOn(component['destroy$'], 'complete');
 
-    expect(mockAffinityService.incrementAffinity).toHaveBeenCalledWith(mockContentNode.id, 0.1);
+    component.ngOnDestroy();
+
+    expect(component['destroy$'].next).toHaveBeenCalled();
+    expect(component['destroy$'].complete).toHaveBeenCalled();
   });
 
-  it('should navigate to next node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-    const nextNode = { ...mockContentNode, id: 'next-node' };
-    nodeRegistry.set(nextNode.id, nextNode);
-    mockLearningPathService.getNextNode.and.returnValue({ node: nextNode, order: 1, depth: 0, category: 'core' });
-
-    component.goToNext();
-
-    expect(mockLearningPathService.getNextNode).toHaveBeenCalledWith(mockContentNode.id);
-    expect(mockNavigationService.navigateTo).toHaveBeenCalledWith(nextNode.contentType, nextNode.id, jasmine.any(Object));
+  it('should return null for getPathProgress when no progress exists', () => {
+    expect(component.getPathProgress('non-existent-path')).toBeNull();
   });
 
-  it('should navigate to previous node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-    const prevNode = { ...mockContentNode, id: 'prev-node' };
-    nodeRegistry.set(prevNode.id, prevNode);
-    mockLearningPathService.getPreviousNode.and.returnValue({ node: prevNode, order: 0, depth: 0, category: 'vision' });
-
-    component.goToPrevious();
-
-    expect(mockLearningPathService.getPreviousNode).toHaveBeenCalledWith(mockContentNode.id);
-    expect(mockNavigationService.navigateTo).toHaveBeenCalledWith(prevNode.contentType, prevNode.id, jasmine.any(Object));
+  it('should return progress percentage from pathProgressMap', () => {
+    component.pathProgressMap.set('test-path', 50);
+    expect(component.getPathProgress('test-path')).toBe(50);
   });
 
-  it('should check if has next node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-
-    const hasNext = component.hasNext();
-
-    expect(mockLearningPathService.getNextNode).toHaveBeenCalled();
-    expect(hasNext).toBe(false);
-  });
-
-  it('should check if has previous node', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-
-    const hasPrev = component.hasPrevious();
-
-    expect(mockLearningPathService.getPreviousNode).toHaveBeenCalled();
-    expect(hasPrev).toBe(false);
-  });
-
-  it('should render markdown content', () => {
-    const markdown = '# Heading\n**Bold** text';
-    const html = component.renderMarkdown(markdown);
-
-    expect(html).toContain('<h1>Heading</h1>');
-    expect(html).toContain('<strong>Bold</strong>');
-  });
-
-  it('should render gherkin content', () => {
-    const gherkin = 'Feature: Test\n@tag\nScenario: Test scenario';
-    const html = component.renderGherkin(gherkin);
-
-    expect(html).toContain('gherkin-keyword');
-    expect(html).toContain('gherkin-tag');
-  });
-
-  it('should get current position in path', () => {
-    fixture.detectChanges();
-    component.selectedNode = mockContentNode;
-    component.pathNodes = [
-      { node: mockContentNode, order: 0, depth: 0, category: 'vision', affinity: 0.5, affinityLevel: 'medium' }
+  it('should populate pathProgressMap from agent progress', () => {
+    const mockAgentProgress = [
+      {
+        agentId: 'test-agent',
+        pathId: 'elohim-protocol',
+        currentStepIndex: 2,
+        completedStepIndices: [0, 1],
+        startedAt: '2025-01-01T00:00:00.000Z',
+        lastActivityAt: '2025-01-02T00:00:00.000Z',
+        stepAffinity: {},
+        stepNotes: {},
+        reflectionResponses: {},
+        attestationsEarned: []
+      },
+      {
+        agentId: 'test-agent',
+        pathId: 'learning-platform',
+        currentStepIndex: 3,
+        completedStepIndices: [0, 1, 2],
+        startedAt: '2025-01-01T00:00:00.000Z',
+        lastActivityAt: '2025-01-03T00:00:00.000Z',
+        completedAt: '2025-01-03T00:00:00.000Z',
+        stepAffinity: {},
+        stepNotes: {},
+        reflectionResponses: {},
+        attestationsEarned: []
+      }
     ];
+    agentService.getAgentProgress.and.returnValue(of(mockAgentProgress));
 
-    const position = component.getCurrentPosition();
-
-    expect(position).toBe(1);
-  });
-
-  it('should return 0 for current position when no node selected', () => {
     fixture.detectChanges();
-    component.selectedNode = null;
 
-    const position = component.getCurrentPosition();
-
-    expect(position).toBe(0);
+    // elohim-protocol has 5 steps, 2 completed = 40%
+    expect(component.pathProgressMap.get('elohim-protocol')).toBe(40);
+    // learning-platform is completed = 100%
+    expect(component.pathProgressMap.get('learning-platform')).toBe(100);
   });
 });

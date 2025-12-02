@@ -1,0 +1,31 @@
+{
+  "id": "concept-indigenous-wisdom",
+  "contentType": "concept",
+  "title": "Indigenous Wisdom",
+  "description": "Many indigenous cultures maintain communal harmony through restorative justice that heals rather than punishes, collective stewardship of shared resources, and sacred relationship with the commons.",
+  "content": "Many indigenous cultures maintain communal harmony through restorative justice that heals rather than punishes, collective stewardship of shared resources, and sacred relationship with the commons.",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/learning-success/concept-indigenous-wisdom.json",
+  "tags": [
+    "models",
+    "indigenous",
+    "wisdom",
+    "stewardship",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "value-scanner-epic",
+    "economic-coordination-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "learning-success",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.002221",
+  "updatedAt": "2025-11-28T17:11:57.002221"
+}

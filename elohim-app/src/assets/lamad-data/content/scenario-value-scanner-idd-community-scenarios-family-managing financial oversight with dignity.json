@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-family-managing financial oversight with dignity",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-managing financial oversight with dignity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Managing financial oversight with dignity",
+  "description": "Managing financial oversight with dignity",
+  "content": "Scenario: Managing financial oversight with dignity\n    Given Jordan's parents have financial guardianship\n    And Jordan is learning money management skills\n    When Jordan makes purchases with their allowance\n    Then the personal_agent helps Jordan track spending\n    And parents can monitor for safety without controlling every choice\n    And Jordan has autonomy within appropriate boundaries\n    And the family_elohim balances oversight with independence\n    And Jordan's financial learning is supported, not prevented\n    And Jordan experiences growing financial autonomy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Managing financial oversight with dignity",
+    "ogDescription": "Managing financial oversight with dignity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-managing financial oversight with dignity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Managing financial oversight with dignity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-family-managing financial oversight with dignity",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:family-managing financial oversight with dignity",
+    "name": "Managing financial oversight with dignity",
+    "description": "Managing financial oversight with dignity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

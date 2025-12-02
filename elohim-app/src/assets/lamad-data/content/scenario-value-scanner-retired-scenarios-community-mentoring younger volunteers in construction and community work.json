@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-community-mentoring younger volunteers in construction and community work",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-mentoring younger volunteers in construction and community work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Mentoring younger volunteers in construction and community work",
+  "description": "Mentoring younger volunteers in construction and community work",
+  "content": "Scenario: Mentoring younger volunteers in construction and community work\n    Given Frank has both construction expertise and volunteering experience\n    And younger volunteers need skill development and guidance\n    When the community_elohim coordinates mentoring\n    Then it should connect Frank to volunteers seeking construction skills\n    And facilitate teaching and skill transmission\n    And recognize mentoring as multiplying Frank's contribution\n    And value teaching labor as care contribution\n    And build community capacity through intergenerational skill sharing\n    And Frank should experience meaningful role as mentor and teacher\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:community",
+    "related_users:volunteer,senior,worker,organizer,neighbor,elder",
+    "related_layers:neighborhood,municipality,individual,household",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Mentoring younger volunteers in construction and community work",
+    "ogDescription": "Mentoring younger volunteers in construction and community work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-mentoring younger volunteers in construction and community work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Mentoring younger volunteers in construction and community work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-community-mentoring younger volunteers in construction and community work",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:community-mentoring younger volunteers in construction and community work",
+    "name": "Mentoring younger volunteers in construction and community work",
+    "description": "Mentoring younger volunteers in construction and community work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,618 +1,528 @@
-# Lamad Learning Platform - Vision & Architecture
+# Lamad: Agentic Implementation Guide
 
-## Overview
+*This document provides layered guidance for AI agents implementing Lamad. Less capable agents should focus on narrowly scoped tasks in subdirectory `claude.md` files. More capable agents can use this root document for architectural context.*
 
-**Lamad** (לָמַד - Hebrew: "to learn/teach") is a graph-based learning platform inspired by Khan Academy's "World of Math" Meaning Map and Gottman's Love Maps. It provides a domain-agnostic, extensible content model with user affinity tracking, attestation-based achievement unlocking, and orientation-based navigation toward a target subject.
+## Document Hierarchy
 
-This isn't just documentation - it's the first implementation of **Elohim Social Medium principles applied to learning**: where attention is sacred, reach is earned, visibility itself can be earned, and human flourishing is protected through design.
+```
+lamad/
+├── claude.md           <-- YOU ARE HERE (Architecture & Coordination)
+├── LAMAD_API_SPECIFICATION_v1.0.md  <-- AUTHORITATIVE SPEC
+├── IMPLEMENTATION_PLAN.md  <-- STATUS TRACKER (v5.0)
+├── Imago Dei Framework.md  <-- Human-centered identity principles
+├── models/claude.md    <-- Data model interfaces
+├── services/claude.md  <-- Service layer implementation
+├── components/claude.md <-- UI components
+└── renderers/claude.md <-- Rendering system
+```
 
-### Conceptual Inspirations
+**Authority Chain:**
+1. `LAMAD_API_SPECIFICATION_v1.0.md` - The definitive source of truth for all interfaces
+2. `IMPLEMENTATION_PLAN.md` - Status tracker and phase summaries
+3. Directory-level `claude.md` files - Scoped guidance for specific modules
 
-**Khan Academy's "World of Math":**
-- Target subject = "World of Math" (mastery goal)
-- Categories = Math domains (algebra, geometry, etc.)
-- Skills = Individual concepts to master
-- Mastery challenge = Determines next skills based on your progress
-- Our implementation: Replace "World of Math" with "The Elohim Protocol", epics with domains, content nodes with skills
+---
 
-**Gottman's Love Maps:**
-- Target subject = Understanding another person
-- Content nodes = Facts, preferences, history, dreams
-- Affinity = How well you know different aspects of them
-- Orientation = What to learn next to deepen the relationship
-- Attestations = "Closest Intimate Partner" - earned through the journey of building trust
-- Our abstraction: Any subject (person, skill, concept) can be mapped this way
+## Quick Reference: Current State
 
-**Zelda: Breath of the Wild's Fog of War:**
-- Target = Mapping Hyrule, defeating Ganon
-- Sheikah Towers = Visible in distance (orientation) but details locked until you journey there
-- Climbing the tower = Earning access through effort
-- Map reveals = Progressive revelation of content you've proven ready for
-- Our abstraction: Content visibility itself can be earned, protecting while enabling discovery
+### MVP Status (as of 2025-11-27)
 
-### Why "Lamad"?
+**The MVP service layer is feature-complete. REA economic interface contracts established. Four-dimensional relational map architecture complete. Governance deliberation and feedback profile systems defined.** All 21 phases implemented, 14 services active.
 
-**Etymology**: לָמַד (lamad) is Hebrew for "to learn" or "to teach"
+**Active Services:**
+| Service | Purpose |
+|---------|---------|
+| DataLoaderService | JSON file loading (Holochain adapter point) |
+| PathService | Path & step navigation |
+| ContentService | Content access with reach checking, back-links |
+| AgentService | Agent profiles and attestations |
+| AffinityTrackingService | Engagement tracking (session-integrated) |
+| ExplorationService | Graph traversal, pathfinding, rate limiting |
+| KnowledgeMapService | Four-dimensional maps (domain, self, person, collective) |
+| PathExtensionService | Learner-owned path mutations |
+| TrustBadgeService | UI-ready trust badge computation |
+| SearchService | Enhanced search with scoring and facets |
+| SessionUserService | Temporary session identity for MVP |
+| ProfileService | Human-centered profile (Imago Dei aligned) |
+| ElohimAgentService | Autonomous constitutional guardians |
+| GovernanceService | Constitutional moderation, deliberation, feedback |
 
-**Thematic Consistency**: Aligns with **Elohim** (Hebrew: God/gods), maintaining the protocol's linguistic identity
+**Active Components:**
+- LamadHome (path-centric with tabs)
+- LamadLayout (session human UI, upgrade prompts)
+- PathOverview, PathNavigator (journey navigation)
+- ContentViewer (with back-links)
+- GraphExplorer (D3.js visualization)
+- LearnerDashboard
 
-**Bidirectional Nature**: Captures both learning AND teaching through contribution - the essence of the Elohim Social Medium where:
-- Learning = Building affinity and earning attestations
-- Teaching = Contributing content that earns reach
+**Active Renderers:**
+- MarkdownRenderer, GherkinRenderer, IframeRenderer, QuizRenderer
 
-**Beyond Documentation**: "Docs" is passive (reading information). "Lamad" is active (a journey of growth, mastery, and contribution).
+---
 
-**Encodes the Vision**: Like the Social Medium epic states - *"Where the medium itself encodes love"* - the name **Lamad** encodes:
-- Learning as sacred journey
-- Teaching as earned contribution
-- Mastery through attestation
-- The hero's journey to difficult truths
-- Guardians of human flourishing
+## The Six-Layer Architecture
 
-### Terminology Distinction: Elohim vs. Lamad
+### Layer 1: Territory (Content Nodes)
+The immutable knowledge graph. Content exists independently of how it's navigated.
 
-To avoid architectural confusion, we maintain a strict distinction between the *actors* and the *medium*:
-
-**Elohim**: The **Active Agents**.
-- The real-time, intelligent entities operating within the system.
-- Examples: `community_elohim`, `family_elohim`, `personal_agent`.
-- They negotiate access, track patterns, and facilitate coordination.
-- They are the "ghost in the machine."
-
-**Lamad**: The **Static Structure**.
-- The graph-based learning platform and content repository.
-- The definition of Node Types (`LamadNodeType`) and metadata.
-- The map, the territory, and the footprints (affinity).
-- It is the "machine" that the ghosts inhabit and curate.
-
-*Note: We explicitly renamed internal types from `ElohimNodeType` to `LamadNodeType` to enforce this separation of concerns.*
-
-## Core Vision
-
-### Reading Experience First
-
-> "If we can't clearly enjoy reading the story of the living docs, and exploring the features of those epics, then the graph won't be much help yet"
-
-The primary focus is on creating an excellent reading and browsing experience. Graph visualization is a future enhancement, not the foundation.
-
-### Domain-Agnostic Content Model
-
-Rather than rigid type hierarchies (Epic → Feature → Scenario), we use a **generic content model** similar to WordPress posts. This allows the system to be extended to any domain beyond software documentation.
-
-### Scalar Affinity Tracking
-
-Instead of discrete classifications like "practiced" or "mastered", we track the **abstract relationship strength** between a user and content using a scalar value (0.0 to 1.0). This remains domain-agnostic and can be interpreted differently across contexts.
-
-## Key Concepts
-
-### ContentNode
-
-The generic content container that replaces rigid type hierarchies:
-
+**Key Interface:** `ContentNode`
 ```typescript
 interface ContentNode {
   id: string;
-  contentType: string;        // Domain-specific: 'epic', 'feature', 'scenario', 'article', etc.
   title: string;
   description: string;
-  content: string;
-  contentFormat: ContentFormat; // 'markdown' | 'gherkin' | 'html' | 'plaintext'
+  contentType: 'epic' | 'concept' | 'simulation' | 'video' | 'assessment' | ...;
+  contentFormat: 'markdown' | 'html5-app' | 'video-embed' | 'quiz-json' | ...;
+  content: string | object;  // Payload depends on format
   tags: string[];
-  sourcePath?: string;
   relatedNodeIds: string[];
-  metadata: ContentMetadata;   // Flexible key-value pairs for domain-specific extensions
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-interface ContentMetadata {
-  category?: string;
-  authors?: string[];
-  version?: string;
-  status?: string;
-  priority?: number;
-  [key: string]: any;  // Domain-specific extensions
+  metadata: ContentMetadata;
 }
 ```
 
-**Why generic?** Allows extension to any content domain without code changes. New content types are just different `contentType` values with custom metadata.
+### Layer 2: Journey (Learning Paths)
+Curated sequences that add narrative meaning to Territory resources.
 
-### Affinity
+**Key Interfaces:** `LearningPath`, `PathStep`
+```typescript
+interface LearningPath {
+  id: string;
+  title: string;
+  description: string;
+  purpose: string;
+  steps: PathStep[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedDuration: string;
+  visibility: 'public' | 'organization' | 'private';
+  attestationsGranted?: string[];
+}
 
-A **scalar value (0.0 - 1.0)** representing the strength of the user's relationship with a piece of content.
-
-- `0.0` = Unseen, no engagement
-- `0.01-0.33` = Low affinity (viewed once or twice)
-- `0.34-0.66` = Medium affinity (multiple views, some engagement)
-- `0.67-1.0` = High affinity (well-known, frequently referenced)
-
-**Why scalar?** Avoids imposing domain-specific meanings like "practiced" or "mastered". Each domain can interpret the scalar differently.
-
-**Auto-tracking:** First view automatically increments affinity from 0.0 to 0.2 for simple UX.
-
-### Meaning Map View - Inspired by Khan Academy's "World of Math" and Gottman's Love Maps
-
-The Meaning Map is a navigation and discovery interface that helps users journey toward a **target subject** - an overarching learning goal or understanding they want to achieve.
-
-#### Core Concepts
-
-**Target Subject**: The destination or mastery goal the user wants to reach. Examples:
-- "Understanding the Elohim Protocol manifesto" (our prototype)
-- A specific skill (like "factoring equations" in Khan Academy)
-- Knowledge about another person (Gottman's love maps)
-- Any concept or learning objective
-
-For the Elohim Documentation prototype, the target subject is **pre-defined as "The Elohim Protocol"** (like "World of Math" in Khan Academy). In the abstract implementation, users would explicitly select their target: "I want to understand X."
-
-**Taxonomy/Path (Scope and Sequence)**: The curated journey between the user's current position and the target subject. This is the "suggested path that tells a cohesive story." For our prototype, this path is **pre-authored** (like a global course curriculum) to guide users through the Elohim Protocol in a meaningful sequence.
-
-**Affinity**: As the user explores nodes along (or off) the suggested path, they develop deeper **affinity** with that content. This tracks their actual engagement and relationship strength with each piece of content (0.0-1.0 scalar). Think of this as your *footprints* - where you've been, what you've explored.
-
-**Attestations (Achievements/Credentials)**: Proof of capacity earned through completing journeys. Like badges in Khan Academy or licenses in ham radio, attestations represent demonstrated mastery, responsibility, or trust. Examples:
-- "4th grade math mastery" (educational achievement)
-- "Ham Radio Technician/General/Extra" (skill certification)
-- "AS, BS, MS, Dr. Degree Equivalent" (academic credentials)
-- "Closest Intimate Partner" (relationship trust - powerful!)
-- "Civic Organizer Level 2" (proven community contribution)
-- "Trauma Support Capacity" (emotional maturity for sensitive spaces)
-
-Your unique path from A to B, validated by attestations and contributions along the way, becomes the proof of your capacity to handle more advanced, sensitive, or complex content.
-
-**Orientation**: A derived metric that represents how well-positioned a particular node is to help the user progress toward the target subject, given their current affinity levels and earned attestations across the graph.
-
-Think of it like Khan Academy's "mastery challenge" - which skills should be presented next is determined by:
-- Your affinity with related content (what you've already explored)
-- Your earned attestations (what you've proven you can handle)
-- The collection of content in the subject you're trying to master
-- Your position relative to the target subject
-
-In our case:
-- **Target Subject**: "The Elohim Protocol" (like "World of Math")
-- **Epics**: Major domains like "algebra" - macro stories within the protocol
-- **Content Nodes**: Specific skills/concepts to learn on the way to appreciating the vision
-
-#### Fog of War: Earned Access to Content
-
-Inspired by *The Legend of Zelda: Breath of the Wild's* Sheikah towers: You can see towers in the distance (orientation - you know advanced content exists), but you don't get the detailed map until you've journeyed across the landscape and climbed the tower (earned access through proven capacity).
-
-**Progressive Revelation Model:**
-- **Visible but minimal**: You see that advanced content exists - a title, category, or teaser
-- **Locked with requirements**: Hovering/clicking shows what attestations you need to access full details
-- **Journey highlighted**: The path to earn required attestations becomes part of your suggested path
-- **Access granted on proof**: Once you've earned the attestations, the content fully reveals
-
-**Why Some Content Requires Earned Access:**
-
-From the Elohim Social Medium epic: "Speech is free but reach is earned." Extended further: *Visibility itself can be earned.*
-
-Some content requires proven capacity to even see it:
-- **Child safety**: Age-inappropriate content invisible until developmental milestones proven
-- **Sensitive topics**: Trauma support spaces require "emotional maturity" attestations
-- **Complex subjects**: Advanced political organizing requires civic engagement proof
-- **Intimate relationships**: Deep personal content requires "trusted relationship" attestations
-- **Professional domains**: Medical/legal content requires expertise credentials
-- **Difficult truths**: Content that humans naturally wrestle with (the Elohim Protocol manifesto's deeper implications) requires the hero's journey to discover responsibly
-
-**Access Control Negotiation:**
-
-Content nodes can specify access requirements through **smart contracts for human flourishing** (negotiated by Elohim agents, expressed in plain text):
-
-```
-This content requires:
-- Attestation: "Civic Engagement - Level 2"
-  (earned through: neighborhood organizing + district contribution)
-- OR Community endorsement from 3 current members
-- AND Affinity > 0.5 with prerequisite content: [node-ids]
-
-Steward: @neighborhood-council
-Revocable: Yes (on community vote or harmful behavior)
+interface PathStep {
+  order: number;
+  resourceId: string;  // Links to ContentNode.id
+  stepTitle: string;
+  stepNarrative: string;  // WHY this content matters HERE
+  learningObjectives: string[];
+  completionCriteria: string[];
+  optional: boolean;
+  attestationRequired?: string;
+  attestationGranted?: string;
+}
 ```
 
-Access requirements can be:
-- **Author-defined**: Content creator specifies requirements
-- **Community-governed**: Spaces collectively decide protection needs
-- **Protocol-enforced**: Constitutional defaults for categories (child safety, etc.)
-- **Agent-negotiated**: Elohim agents analyze content and suggest appropriate requirements
-- **Dynamically adjusted**: Requirements can tighten during crisis or ease as trust builds
+### Layer 3: Traveler (Humans & Progress)
+Sovereign humans whose progress shapes their experience.
 
-**Earning Attestations: Fun and Meaningfully Challenging**
+**Key Interfaces:** `Agent`, `AgentProgress`, `SessionUser`
+```typescript
+interface Agent {
+  id: string;
+  displayName: string;
+  type: 'human' | 'organization' | 'ai-agent';
+  visibility: 'public' | 'connections' | 'private';
+}
 
-Like Khan Academy's practice modules, earning attestations is designed to be engaging rather than burdensome:
+interface AgentProgress {
+  agentId: string;
+  pathId: string;
+  currentStepIndex: number;
+  completedStepIndices: number[];
+  stepAffinity: Record<number, number>;  // 0.0 to 1.0
+  stepNotes: Record<number, string>;
+  attestationsEarned: string[];
+}
 
-**Practice/Exercise Nodes**: Special content types that create attestations upon completion:
-- **Comprehension checks**: Demonstrate understanding of prerequisite concepts through reflection, synthesis, or application
-- **Real-world application**: Use what you've learned in actual scenarios (like Emma's bus advocacy proving civic capacity in the Social Medium epic)
-- **Community contribution**: Earn endorsements from others who've proven capacity - social proof of responsibility
-- **Time and consistency**: Some attestations require sustained engagement over time - wisdom can't be rushed
+interface SessionUser {
+  sessionId: string;       // Generated UUID
+  displayName: string;
+  isAnonymous: true;
+  accessLevel: 'visitor';  // Always visitor for session humans
+  stats: SessionStats;
+}
+```
 
-**Journey as Proof**: Your unique path itself becomes the credential:
-- Starting affinity with node A: 0.0
-- Completed 7 practice exercises: +7 attestations
-- Contributed solution that helped 3 neighbors: +community endorsement
-- Maintained consistent engagement for 30 days: +consistency attestation
-- Final affinity with node A: 0.8
-- **Achievement unlocked**: "Civic Organizer - Level 2"
+### Layer 4: Profile (Human Identity - Imago Dei)
+Human-centered identity view aligned with Imago Dei framework principles.
 
-This achievement/badge now serves as a key to unlock content that requires civic maturity.
+**Key Interfaces:** `HumanProfile`, `JourneyStats`
+```typescript
+interface HumanProfile {
+  id: string;
+  displayName: string;
+  isSessionBased: boolean;
+  journeyStartedAt: string;
+  lastActiveAt: string;
+  journeyStats: JourneyStats;
+  currentFocus: CurrentFocus[];
+  developedCapabilities: DevelopedCapability[];
+}
 
-**Elohim as Guardian of Human Flourishing**:
+interface JourneyStats {
+  territoryExplored: number;    // Content viewed (breadth)
+  journeysStarted: number;       // Paths begun
+  journeysCompleted: number;     // Paths completed (milestones)
+  stepsCompleted: number;        // Total steps across all paths
+  meaningfulEncounters: number;  // High-affinity content
+  timeInvested: number;          // Learning time (ms)
+  sessionsCount: number;         // Return visits
+}
+```
 
-The system helps you prove and attest to your capacity for responsibility. It makes growth:
-- **Visible**: You see your progress toward attestations
-- **Meaningful**: Attestations unlock real capabilities and access
-- **Challenging**: Requirements are substantive, not trivial checkboxes
-- **Fun**: The journey feels like exploration and discovery, not testing
-- **Protective**: It prevents premature exposure to content you're not ready for
+### Layer 5: Economic (REA Coordination)
+ValueFlows-based economic coordination for recognition, stewardship, and value flows.
 
-The "hero's journey to discover difficult truths" becomes encoded in the very structure of the Meaning Map.
+**Key Interfaces:** `ContributorPresence`, `EconomicEvent`
+```typescript
+// Lifecycle: unclaimed → stewarded → claimed
+type PresenceState = 'unclaimed' | 'stewarded' | 'claimed';
 
-**The Constellation Metaphor**: Think of a constellation of stars, where one star leads to the next. Each star (node) has its own connections and constellations of **varied content types** (like planets, moons, other stars).
+interface ContributorPresence extends REAAgent {
+  type: 'contributor-presence';
+  presenceState: PresenceState;
+  accumulatedRecognition: AccumulatedRecognition;
+  stewardship?: PresenceStewardship;
+  claim?: PresenceClaim;
+}
 
-Content within nodes can include multiple formats/categories:
-- Features (BDD scenarios)
-- Exercises
-- Articles/posts
-- Text files
-- Images
-- Videos
-- Quizzes
+interface EconomicEvent {
+  id: string;
+  action: REAAction;  // 'use' | 'cite' | 'produce' | 'transfer' | 'accept'
+  provider: string;   // Who gave
+  receiver: string;   // Who received
+  resourceQuantity?: Measure;
+  hasPointInTime: string;
+}
 
-Importantly, any particular piece of content could **bridge or be reused** across different subjects/contexts - like how a word can have different meanings based on context. This creates a rich, interconnected graph where content serves multiple learning paths.
+type LamadEventType =
+  | 'content-view'      // Human viewed content
+  | 'affinity-mark'     // Human marked affinity (recognition flows)
+  | 'presence-claim'    // Contributor claimed their presence
+  | 'recognition-transfer'; // Recognition transferred on claim
+```
 
-#### In Our Implementation
+### Layer 6: Governance (Constitutional Moderation)
+The protocol's immune system - deliberation, feedback profiles, and constitutional accountability.
 
-For Elohim Protocol documentation, content nodes contain:
-- **Epics** (macro stories) - the overarching narratives
-- **User stories** within those epics - smaller narrative chunks
-- **Scenarios** (.feature files) - executable specifications and examples
+**Key Interfaces:** `GovernanceState`, `FeedbackProfile`, `DeliberationProposal`
+```typescript
+// Governance state for any entity
+interface GovernanceState {
+  entityId: string;
+  entityType: GovernableEntityType;
+  status: GovernanceStatus;
+  labels: GovernanceLabel[];
+  challenges: Challenge[];
+  appealHistory: Appeal[];
+}
 
-#### User Experience
+// Feedback Profile - virality as privilege, NOT entitlement
+interface FeedbackProfile {
+  id: string;
+  permittedMechanisms: FeedbackMechanism[];  // NO "LIKES"
+  emotionalConstraints?: EmotionalReactionConstraints;
+  currentLevel: FeedbackProfileLevel;
+  profileEvolution: ProfileEvolution[];
+}
 
-The Meaning Map presents a **suggested path** toward the target subject, but allows exploration:
+// Key principle: Facebook-style "likes" are fundamentally pernicious
+// Replaced with: approval-vote (up/down), emotional reactions with context
+type FeedbackMechanism =
+  | 'approval-vote'         // Up/down (replaces "like")
+  | 'emotional-reaction'    // "I feel ___ about this"
+  | 'graduated-usefulness'  // Loomio-style scales
+  | 'discussion-only'       // No amplification
+  | 'view-only';            // No engagement permitted
+```
 
-1. User sees the next recommended nodes on their path (sorted by orientation + affinity)
-2. At each node, they can choose: follow the path, or explore something they're curious about
-3. As they explore, affinity deepens with each node they engage
-4. The path dynamically adjusts based on their exploration
-5. Their **original intent** (the target subject) continues to **orient** them, keeping the core goal in focus even as they wander
+---
 
-#### What It Shows
+## Service Layer Summary
 
-- Content grouped by category/taxonomy
-- Affinity levels with color coding (user's engagement history)
-- Path progress bar (journey toward target subject)
-- **List sorted by affinity AND orientation** - showing the most meaningful sequence toward the target subject to encourage productive exploration
-- Compact at-a-glance graph visualization (future enhancement)
+| Service | Purpose | Depends On |
+|---------|---------|------------|
+| `DataLoaderService` | JSON file fetching (Holochain adapter) | HttpClient |
+| `PathService` | Path & step navigation | DataLoader |
+| `ContentService` | Territory access, reach checking, back-links | DataLoader, AgentService |
+| `AgentService` | Auth, progress, attestations | DataLoader, SessionUserService |
+| `AffinityTrackingService` | Engagement tracking | SessionUserService, localStorage |
+| `ExplorationService` | BFS traversal, pathfinding | DataLoader, AgentService |
+| `KnowledgeMapService` | Four-dimensional maps (domain, self, person, collective) | DataLoader |
+| `PathExtensionService` | Learner path mutations | DataLoader |
+| `TrustBadgeService` | UI-ready trust badge computation | DataLoader, AgentService |
+| `SearchService` | Enhanced search with scoring, facets | DataLoader, TrustBadgeService |
+| `SessionUserService` | Temporary session identity, activity tracking | localStorage |
+| `ProfileService` | Human-centered profile (Imago Dei aligned) | SessionUser, Path, Affinity, Agent |
+| `GovernanceService` | Constitutional moderation, deliberation, feedback | DataLoader, AgentService |
+| `RendererRegistryService` | Content format → Component mapping | None |
 
-**Why hierarchical first?** Provides familiar list/browse UX that tells a cohesive story. Builds foundation for richer graph visualization later.
+---
 
-## Architecture Decisions
-
-### Why Generic ContentNode Over Rigid Types?
-
-**Problem:** DocumentNode → EpicNode → FeatureNode → ScenarioNode creates a rigid hierarchy that doesn't extend to other domains.
-
-**Solution:** Single ContentNode type with flexible `contentType` and `metadata` fields.
-
-**Benefits:**
-- Add new content types without code changes
-- Cross-domain applicability
-- Simpler mental model
-- Easier to maintain
-
-### Why Scalar Affinity Over Discrete States?
-
-**Problem:** Classifications like "practiced" and "mastered" impose domain-specific semantics.
-
-**Solution:** Abstract 0.0-1.0 scalar representing relationship strength.
-
-**Benefits:**
-- Domain-agnostic
-- Fine-grained tracking
-- Natural progression
-- Can derive discrete states if needed: `affinity > 0.67 ? 'mastered' : affinity > 0.33 ? 'practiced' : 'learning'`
-
-### Why localStorage + Demo User?
-
-**Problem:** Real user authentication adds complexity we don't need yet.
-
-**Solution:** Hardcoded 'demo-user' with localStorage persistence.
-
-**Benefits:**
-- Rapid prototyping
-- No auth overhead
-- Focus on core UX
-- Easy to upgrade to real user context later
-
-**Trade-offs:**
-- Single user per browser
-- No cross-device sync
-- Not production-ready for multi-user
-
-### Why Meaning Map (Hierarchical View) Before Full Graph Visualization?
-
-**Decision:** Build Meaning Map (list/tree view with suggested path) before full interactive graph visualization.
-
-**Rationale:**
-- Reading experience is foundational
-- List views with curated paths tell cohesive stories
-- Easier to implement and iterate on path/orientation logic
-- Graph visualization requires solid content, affinity data, and orientation metrics first
-- Users need to understand the "constellation" before navigating it visually
-
-**Current Implementation:** Hierarchical list sorted by affinity, with pre-authored path through Elohim Protocol content.
-
-**Future Enhancement:** Full graph visualization showing relationships, orientation vectors toward target subject, and alternative path options.
-
-## Current Implementation
-
-### Routes
-
-Clean, focused routing structure:
+## Route Structure
 
 ```typescript
-/lamad                 → DocsHomeComponent    (landing, stats, overview)
-/lamad/map            → MeaningMapComponent  (hierarchical browse)
-/lamad/content/:id    → ContentViewerComponent (unified reader)
-/lamad/search         → SearchComponent      (search functionality)
+const LAMAD_ROUTES: Routes = [
+  { path: '', component: LamadHomeComponent },
+  { path: 'path/:pathId', component: PathOverviewComponent },
+  { path: 'path/:pathId/step/:stepIndex', component: PathNavigatorComponent },
+  { path: 'resource/:resourceId', component: ContentViewerComponent },
+  { path: 'me', component: LearnerDashboardComponent },
+  { path: 'explore', component: MeaningMapComponent },  // Deprecated, keep for research
+];
 ```
 
-### Key Components
+---
 
-#### MeaningMapComponent (formerly MissionMapComponent)
-- Hierarchical tree view organized by categories
-- Color-coded affinity indicators (unseen/low/medium/high)
-- Category progress bars showing journey toward target subject
-- Expand/collapse sections
-- Content sorted by affinity (lowest first to encourage exploration)
-- **Future:** Sort by affinity AND orientation toward target subject ("The Elohim Protocol")
-- **Future:** Highlight suggested path nodes (pre-authored sequence)
-- **Future:** Show path alternatives and branching points
-- **Future:** Fog-of-war UI elements:
-  - Locked content shows title/teaser but not full details
-  - Lock icon with tooltip showing required attestations
-  - "Journey to unlock" button that highlights prerequisite path
-  - Progress indicators toward earning required attestations
-  - Visual distinction between "accessible", "locked but visible", and "completely hidden" content
+## Session Human Architecture (MVP)
 
-#### ContentViewerComponent
-- Unified viewer for all content types (markdown, Gherkin, HTML, plaintext)
-- Auto-tracks views (increments affinity)
-- Manual affinity controls (increment/decrement buttons)
-- Circular affinity indicator with gradient colors
-- Related content section
-- Renders based on `contentFormat` field
+The MVP uses a **session human** model that provides:
+1. **Zero-friction entry** - Anyone can explore immediately without signup
+2. **Progress tracking** - Session state stored in localStorage
+3. **Holochain upgrade path** - Session data migrates when human installs app
 
-#### DocsHomeComponent
-- Welcome section with system overview
-- Affinity statistics dashboard
-- Distribution visualization (unseen/low/medium/high)
-- Primary CTA to Meaning Map
-- Search link
+### Access Levels
+| Level | Identity | Can Access |
+|-------|----------|------------|
+| `visitor` | Session human (localStorage) | Open content only |
+| `member` | Holochain AgentPubKey | Gated content |
+| `attested` | Member + attestations | Protected content |
 
-### Services
+### Content Access Tiers
+| Tier | Description | Example |
+|------|-------------|---------|
+| `open` | Freely explorable by anyone | General learning content |
+| `gated` | Requires Holochain identity | Community discussions |
+| `protected` | Requires attestations + path completion | CSAM handling training |
 
-#### AffinityTrackingService
-- localStorage persistence
-- Hardcoded 'demo-user' ID
-- Observable pattern (BehaviorSubject)
-- Methods:
-  - `getAffinity(nodeId): number`
-  - `setAffinity(nodeId, value): void`
-  - `incrementAffinity(nodeId, delta): void`
-  - `trackView(nodeId): void` - Auto-increment to 0.2 on first view
-  - `getStats(nodes): AffinityStats` - Aggregate statistics
-
-#### DocumentGraphService
-- Builds content graph from source files
-- Parses markdown epics (.md)
-- Parses Gherkin features (.feature)
-- Manages node relationships
-- Observable graph state
-
-### Models
-
-#### user-affinity.model.ts
-- `UserAffinity` - User-to-content affinity mappings
-- `AffinityStats` - Aggregate statistics
-- Distribution buckets (unseen/low/medium/high)
-- Per-category and per-type statistics
-- **Future:** Add orientation metrics and target subject tracking
-- **Future:** Add suggested path progress tracking
-- **Future:** Add attestation tracking and achievement unlocking
-
-#### attestations.model.ts (Future)
-- `Attestation` - Earned achievements/credentials/badges
-- `AttestationRequirement` - What's needed to earn an attestation
-- `ContentAccessRequirement` - What attestations unlock which content
-- `AttestationJourney` - The unique path taken to earn an attestation (proof of capacity)
-- Achievement types: educational, skill-based, relational, civic, professional, time-based
-
-#### content-node.model.ts
-- `ContentNode` - Generic content container
-- `ContentMetadata` - Flexible metadata structure
-- `ContentFormat` - Supported formats enum
-- `ContentGraph` - Graph structure
-- `RelationshipType` - Node relationship types
-
-#### Adapters
-
-**document-node.adapter.ts** - Bidirectional conversion between legacy DocumentNode and new ContentNode for backward compatibility during migration.
-
-## Content Sources
-
-### Markdown Epics (.md files)
-- Narrative documentation
-- Vision and context
-- Located in project documentation directories
-
-### Gherkin Features (.feature files)
-- Behavior-Driven Development scenarios
-- Executable specifications
-- Located in feature directories
-- Parsed by GherkinParser
-
-### Future Content Types
-The generic model supports any content type:
-- API documentation
-- Tutorial articles
-- Code examples
-- Video transcripts
-- Design documents
-
-## Navigation Flow
-
+### Session-to-Network Flow
 ```
-Home (Stats & Overview)
-  ↓
-Meaning Map (Browse by Category)
-  ↓
-Content Viewer (Read & Track Affinity)
+1. Human explores freely as visitor (session identity)
+2. Meaningful moments trigger upgrade prompts
+3. Human installs Holochain app
+4. prepareMigration() packages session data
+5. Session data imports to agent's source chain
+6. clearAfterMigration() removes localStorage
+7. Human continues with full network identity
 ```
 
-Simple, focused user journey prioritizing reading experience.
+### Upgrade Prompts
+Session humans see contextual prompts encouraging Holochain installation:
+- `first-affinity`: When human marks first content as resonant
+- `path-completed`: After completing a learning path
+- `notes-saved`: When saving personal notes
+- `network-feature`: When trying a gated feature
 
-## Future Considerations
+---
 
-### Attestation System & Earned Access
-- **Attestation data model**: Track earned achievements, credentials, badges with journey provenance
-- **Access requirement negotiation**: Smart contracts (plain text, agent-negotiated) defining what attestations unlock which content
-- **Practice/exercise nodes**: Special content types that create attestations upon completion
-- **Journey tracking**: Record the unique path taken to earn each attestation as proof of capacity
-- **Credential wallet UI**: Display earned attestations, progress toward next achievements
-- **Fog-of-war visualization**: Progressive revelation of locked content in Meaning Map
-- **Steward/revocation system**: Content authors and community spaces can revoke access based on behavior
-- **Cross-domain attestations**: Educational, skill-based, relational ("Closest Intimate Partner"!), civic, professional credentials
-- **Time-based attestations**: Some achievements require sustained engagement over time (wisdom can't be rushed)
-- **Community endorsement**: Social proof as attestation mechanism
+## Relational Maps Architecture
 
-### Orientation & Path Navigation
-- **Orientation calculation**: Derive metric showing how well-positioned each node is to help user progress toward target subject, considering both affinity and attestations
-- **Target subject selection**: Allow users to explicitly choose their learning goal (for prototype, hardcoded as "The Elohim Protocol")
-- **Suggested path highlighting**: Visual indicators showing pre-authored path nodes
-- **Path branching**: Show alternative routes and curiosity-driven detours
-- **Dynamic path adjustment**: Recalculate suggested path based on user's actual exploration patterns AND earned attestations
-- **Path progress tracking**: Show completion percentage toward target subject
-- **Attestation-aware pathfinding**: Suggest journeys that help earn required attestations for locked content user wants to access
+Learning is fundamentally about building relationship. Lamad supports four types of knowledge maps:
 
-### Graph Visualization
-- Visual node-edge representation showing constellation of content
-- Interactive exploration with orientation vectors pointing toward target subject
-- Force-directed layout that respects suggested path structure
-- Relationship highlighting (prerequisites, bridges, alternatives)
-- Multiple content types within nodes (constellation metaphor: planets, moons, stars)
-- Deferred until reading experience and orientation logic are solid
+| Map Type | Question | Inspiration |
+|----------|----------|-------------|
+| **Domain** | What do I know? | Khan Academy's "World of Math" |
+| **Self** | Who am I? | Delphic maxim "γνῶθι σεαυτόν" (know thyself) |
+| **Person** | Who do I know? | Gottman's Love Maps research |
+| **Collective** | What do we know? | Organizational knowledge management |
 
-### Real User Context
-- Replace hardcoded 'demo-user' with actual authentication
-- Per-user affinity tracking
-- Cross-device synchronization
-- Backend persistence
+### Self-Knowledge Maps
 
-### Content Constellation & Reusability
-The constellation metaphor allows rich content composition:
-- **Multiple content types within nodes**: A single node can contain varied formats (text, images, videos, exercises, quizzes)
-- **Cross-context reusability**: Content can bridge multiple subjects/paths - like a word with different meanings based on context
-- **Hierarchical and networked**: Content can be both nested (planets with moons) and interconnected (constellations)
-- **Domain-agnostic categories**: Features, exercises, articles, media all treated as generic content types
+The self-knowledge map is unique: the mapper and subject are the same person (reflexive). It integrates with the Imago Dei framework:
 
-### Additional Content Types
-The generic model is ready for:
-- Blog posts and articles
-- Step-by-step tutorials
-- API references and code examples
-- Video content and transcripts
-- Interactive demos and exercises
-- Quizzes and assessments
-- Images and diagrams
-- Audio content (podcasts, lectures)
+```typescript
+interface SelfKnowledgeMap extends KnowledgeMap {
+  mapType: 'self';
+  imagoDeiDimensions: ImagoDeiDimension[];  // core, experience, gifts, synthesis
+  valuesHierarchy: PersonalValue[];          // What matters most, in priority order
+  lifeChapters: LifeChapter[];               // Narrative structure of one's journey
+  discoveredGifts: DiscoveredGift[];         // Strengths uncovered through self-examination
+  shadowAreas: ShadowArea[];                 // Growth areas and blind spots
+  vocation?: VocationalClarity;              // Calling, purpose, gift-to-need alignment
+  domainReflections: DomainReflection[];     // How domain learning reveals the self
+}
+```
 
-### Test Status Integration
-- Pull test results from CI/CD pipelines
-- Display test status in Meaning Map
-- Filter by passing/failing tests
-- Track test coverage as metadata
+Theological grounding: "Love your neighbor as yourself" (Mark 12:31) implies you must first know yourself. Self-knowledge is prerequisite to loving others well.
 
-### Epic Manifest Loading
-Currently only feature manifest is loaded. Epic manifest parsing is in place but not integrated.
+---
 
-## Design Principles
+## Human Profile (Imago Dei Framework)
 
-1. **Generic over specific** - Extensibility through abstraction
-2. **Scalar over discrete** - Fine-grained, domain-agnostic measurement
-3. **Simple over complex** - localStorage before database, demo user before auth
-4. **Reading before graphing** - Content experience is foundational
-5. **Progressive enhancement** - Build solid foundation, add visualization later
+The ProfileService provides a human-centered view of identity aligned with the Imago Dei framework:
 
-## For Future Agents
+| Imago Dei Module | ProfileService Method | Purpose |
+|------------------|----------------------|---------|
+| `imagodei-core` | `getProfile()` | Stable identity center |
+| `imagodei-experience` | `getTimeline()`, `getCurrentFocus()` | Learning and transformation |
+| `imagodei-gifts` | `getDevelopedCapabilities()` | Skills and attestations earned |
+| `imagodei-synthesis` | `getTopEngagedContent()`, `getAllNotes()` | Growth and meaning-making |
 
-When working on this feature:
+**Key Design Principles:**
+- Use "human" not "user" throughout codebase
+- Growth-oriented metrics (not consumption metrics)
+- Narrative view of journey (not activity logs)
+- Honor dignity and agency
 
-1. **Maintain domain-agnosticism** - Don't hardcode software-specific assumptions
-2. **Use scalar affinity** - Avoid adding discrete state classifications
-3. **Extend through metadata** - Don't modify ContentNode interface for domain-specific needs
-4. **Test reading experience first** - UX quality trumps visualization complexity
-5. **Keep navigation simple** - Three-step flow: Home → Meaning Map → Content
-6. **Remember the target subject** - All orientation and path decisions should serve the user's journey toward their learning goal
-7. **Pre-author paths for prototype** - Use hardcoded suggested paths (like a global curriculum) before building dynamic path generation
-8. **Think in constellations** - Content can be nested, varied in type, and reused across different contexts
-9. **Affinity deepens, attestations prove, orientation guides** - Affinity tracks engagement history, attestations demonstrate capacity, orientation shows the way forward
-10. **Make growth visible and fun** - Earning attestations should feel like exploration and discovery, not testing
-11. **Protect through progressive revelation** - Fog-of-war isn't just game design, it's human flourishing encoded
-12. **Journey is the credential** - The unique path taken + contributions made = proof of capacity
-13. **Smart contracts in plain text** - Access requirements should be negotiable by agents and readable by humans
+---
 
-## Questions?
+## Technical Conventions
 
-If you're unsure about architectural decisions, refer back to these principles:
-- Would this work for non-software documentation? (WordPress test)
-- Does this impose domain-specific semantics? (Generic test)
-- Does this improve the reading experience? (UX test)
-- Can this be added through metadata? (Extension test)
-- Does it help the user progress toward their target subject? (Orientation test)
+### Date Fields
+All timestamp fields use **ISO 8601 string format** (not Date objects):
+```typescript
+createdAt: string;  // "2025-11-27T14:30:00Z" - CORRECT
+createdAt: Date;    // Do not use
+```
 
-### Key Distinctions to Remember
+### Attestation Model Distinction
+Three distinct attestation models exist - do NOT confuse them:
 
-**Affinity vs Attestations vs Orientation**:
-- **Affinity** = Historical engagement (where you've been, what you've explored) - your footprints
-- **Attestations** = Proven capacity (what you've demonstrated mastery of) - your credentials
-- **Orientation** = Directional guidance (where you should go next to reach your target, considering your attestations) - your compass
-- Think: Affinity tracks the journey, attestations prove the growth, orientation guides the way forward
+| Model | Purpose |
+|-------|---------|
+| **Agent Attestations** (`attestations.model.ts`) | Credentials earned BY humans/agents |
+| **Content Attestations** (`content-attestation.model.ts`) | Trust credentials granted TO content |
+| **Content Access** (`content-access.model.ts`) | Access tier requirements (visitor/member/attested) |
 
-**Target Subject vs Content Node**:
-- **Target Subject** = Overarching learning goal ("Understanding the Elohim Protocol")
-- **Content Node** = Individual piece of content along the journey (an epic, feature, scenario)
-- Think: Target subject is the destination, content nodes are waypoints
+- `AttestationAccessRequirement`: What attestations unlock which content
+- `ContentAccessRequirement`: What access level is required for content
 
-**Suggested Path vs Graph**:
-- **Suggested Path** = Pre-authored, cohesive sequence that tells a story
-- **Graph** = All possible connections and relationships between content
-- Think: Path is the highway, graph is the full road network
+---
 
-**Mission Map vs Meaning Map**:
-- **Mission Map** = Simple hierarchical browse/list view
-- **Meaning Map** = Curated journey with target subject, orientation, and paths
-- The Meaning Map is our implementation - it's not just browsing, it's guided discovery toward understanding
+## Critical Implementation Constraints
 
-**Visibility vs Reach vs Access** (from Elohim Social Medium):
-- **Visibility** = What content you can see exists (fog-of-war: some content locked until attestations earned)
-- **Access** = What content you can read/consume (requires appropriate attestations)
-- **Reach** = How far your contributions can travel (requires community trust and evidence)
-- "Speech is free, but reach is earned" extends to "Visibility itself can be earned"
-- Children, the vulnerable, and the developing gradually earn access as they prove capacity
-- Protects against premature exposure while enabling growth
+### 1. Lazy Loading is NON-NEGOTIABLE
+- Never load "all paths" or "all content"
+- Content fetched by ID, one node at a time
+- Path metadata loads without step content
+- Step content loads only when navigating to that step
 
-#### The Living Documentation as Elohim Social Medium
+### 2. Fog of War
+- Humans can only access: completed steps, current step, or one step ahead
+- Attestation gates can lock content until prerequisites met
+- This is pedagogical wisdom, not artificial scarcity
 
-The Meaning Map is the first implementation of the Elohim Social Medium principles applied to documentation:
+### 3. IDs are Opaque Strings
+- Never parse or depend on ID format
+- In prototype: human-readable slugs (`epic-social-medium`)
+- In production: Holochain hashes (`uhCkk...`)
 
-From the epic: *"Speech is free but reach is earned. Where attention is sacred and data is sovereign. Where communities own their spaces. Where the medium itself encodes love."*
+### 4. Territory vs Journey Separation
+- Content nodes are generic, reusable across paths
+- Path steps add context: "Why does THIS matter HERE?"
+- Same video can appear in marriage path and workplace path with different narratives
 
-In our context:
-- Documentation nodes = Contributions in the social medium
-- Earned access = The same trust-based visibility controls that protect children and prevent extremism
-- Attestations = Proof of capacity that earns both access (to read) and reach (to contribute)
-- The hero's journey = The path toward understanding difficult truths, encoded in progressive revelation
-- Guardians of human flourishing = The system helps you prove responsibility while protecting against premature exposure
+### 5. Human-Centered Terminology
+- Use "human" not "user"
+- Use "journey" not "consumption"
+- Use "meaningful encounters" not "views"
 
-This isn't just documentation - it's a proof-of-concept for how **attention becomes sacred, reach is earned, and human flourishing is protected through design**.
+---
+
+## Completed Implementation Phases
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 1: Data Foundation | ✅ | JSON schemas, 3,097 content nodes |
+| 2: Service Layer | ✅ | DataLoader, Path, Content, Agent services |
+| 3: Rendering Engine | ✅ | Registry pattern, 4 renderers |
+| 4: Journey UI | ✅ | PathNavigator, PathOverview, path-centric home |
+| 5: Graph Explorer | ✅ | D3.js visualization |
+| 6: Integration | ✅ | Build passes, routes working |
+| 7: Mastery System | 🔮 Post-MVP | Spaced repetition, concept quizzes |
+| 8: Graph API | ✅ | ExplorationService with BFS, pathfinding |
+| 9: Knowledge Maps | ✅ | KnowledgeMapService, PathExtensionService |
+| 10: Bidirectional Trust | ✅ | ContentAttestation, reach-based access |
+| 11: Trust Badges | ✅ | TrustBadgeService, unified indicators |
+| 12: Enhanced Search | ✅ | SearchService with scoring, facets |
+| 13: Session Human | ✅ | Zero-friction identity, upgrade path |
+| 14: Human Profile | ✅ | Imago Dei-aligned profile service |
+| 15: REA Economic Models | ✅ | ValueFlows types, ContributorPresence, EconomicEvent |
+| 16: Relational Maps | ✅ | Self-knowledge maps, four-map architecture |
+| 17: Psychometric Assessments | ✅ | Validated instruments, pattern detection |
+| 18: Governance & Feedback | ✅ | Constitutional moderation, challenges, appeals |
+| 19: Governance Deliberation | ✅ | Loomio/Polis/Wikipedia-inspired deliberation |
+| 20: Feedback Profile | ✅ | Virality as privilege, emotional reaction constraints |
+| 21: Cohesion Review | ✅ | Model standardization, documentation alignment |
+
+See `IMPLEMENTATION_PLAN.md` for detailed phase summaries.
+
+---
+
+## Remaining Work
+
+### Priority 1: Profile UI
+- [ ] Profile page component (render HumanProfile data)
+- [ ] Journey timeline visualization
+- [ ] Resume point card ("Continue where you left off")
+- [ ] Paths overview with progress bars
+
+### Priority 2: Content Access UI
+- [ ] Gated content lock indicator
+- [ ] Access denial modal with unlock actions
+- [ ] "Join Network" flow (Holochain install placeholder)
+
+### Priority 3: Polish & Bugs
+- [ ] CSS budget cleanup (content-viewer, lamad-layout exceed 6kb)
+- [ ] Error handling refinement
+- [ ] Loading state animations
+
+### Priority 4: Testing
+- [ ] Cypress e2e tests for path navigation
+- [ ] Unit tests for services (ProfileService, SessionUserService)
+- [ ] Accessibility audit
+
+---
+
+## For Agents
+
+**The MVP service layer is feature-complete. REA interface contracts established.** Future work should focus on:
+1. UI implementation using existing services (Profile, Content Access)
+2. Testing and polish (not new features)
+3. Holochain/hREA migration (when ready)
+4. Contributor Presence service implementation (uses REA models)
+5. Economic event tracking service (uses REA models)
+
+### Do NOT:
+- Add new services without explicit instruction
+- Modify working interfaces
+- Load "all content" or "all paths" anywhere
+- Use "user" terminology - use "human" instead
+- Use "creator" terminology - use "contributor" instead
+- Use `||` for defaults when `??` is intended (nullish coalescing)
+- Omit `readonly` on constructor dependencies
+- Leave unused imports in files
+
+### Code Quality
+SonarQube compliance is required. Key rules:
+- **S6606**: Use `??` instead of `||` for null/undefined defaults
+- **S2933**: Mark all constructor dependencies as `readonly`
+- **S1128**: Remove unused imports
+- **S1874**: Replace `.substr()` with `.substring()`
+
+See `common_mistakes.md` Section 10 for full SonarQube patterns and `services/claude.md` for service-specific examples.
+
+---
+
+## Terminology Quick Reference
+
+| Term | Meaning |
+|------|---------|
+| **Territory** | The content graph (ContentNodes) |
+| **Journey** | A curated learning path |
+| **Traveler** | A human/agent in the system |
+| **Human** | A person using the platform (never "user") |
+| **Contributor** | Someone who creates content (never "creator") |
+| **Elohim** | Active intelligence agents (services, AI) |
+| **Lamad** | The static structure (graph, paths) |
+| **Affinity** | How deeply you've engaged with content (0.0-1.0) |
+| **Attestation** | Earned credential/badge |
+| **Fog of War** | Content visibility earned through progression |
+| **Imago Dei** | Human-centered identity framework |
+| **Self Map** | Reflexive knowledge map ("know thyself") |
+| **Person Map** | Knowledge about another person (Gottman love maps) |
+| **Domain Map** | Knowledge about a subject area |
+| **Collective Map** | Shared knowledge within a community |
+| **Session Human** | Temporary visitor identity (localStorage) |
+| **Presence** | Placeholder identity for external contributors |
+| **Recognition** | Value acknowledgment flowing to contributors |
+| **REA** | Resources, Events, Agents - accounting ontology |
+| **ValueFlows** | REA implementation standard (hREA uses this) |

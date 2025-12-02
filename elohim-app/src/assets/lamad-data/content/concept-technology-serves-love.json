@@ -1,0 +1,29 @@
+{
+  "id": "concept-technology-serves-love",
+  "contentType": "concept",
+  "title": "Technology serves love",
+  "description": "rather than engagement metrics or surveillance capitalism",
+  "content": "rather than engagement metrics or surveillance capitalism",
+  "contentFormat": "text",
+  "sourcePath": "generated/landing-page/vision/concept-technology-serves-love.json",
+  "tags": [
+    "vision",
+    "love",
+    "technology",
+    "landing-page"
+  ],
+  "relatedNodeIds": [
+    "manifesto",
+    "governance-epic",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "landing-page-concept",
+    "section": "vision",
+    "isLandingPageConcept": true,
+    "canBeLinked": true,
+    "displayOnHomepage": true
+  },
+  "createdAt": "2025-11-28T17:11:57.001241",
+  "updatedAt": "2025-11-28T17:11:57.001241"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-researcher-scenarios-national-examine cohort effects comparing early vs late adopters",
+  "did": "did:web:elohim.host:content:governance:researcher:scenarios:national-examine cohort effects comparing early vs late adopters",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Examine cohort effects comparing early vs late adopters",
+  "description": "Examine cohort effects comparing early vs late adopters",
+  "content": "Scenario: Examine cohort effects comparing early vs late adopters\n    Given communities adopted protocol at different times across decade\n    When James compares adoption cohorts\n    Then he finds early adopters benefit from learning community support\n    And he discovers later adopters benefit from improved protocol versions\n    And he identifies that community context matters more than timing\n    And cohort analysis illuminates adoption dynamics\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:researcher",
+    "governance_layer:national",
+    "related_users:constitutional_council_member,policy_maker,technical_expert",
+    "related_layers:provincial_state,global",
+    "elohim_agents:national_elohim,regional_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/researcher/scenarios/national.feature",
+  "relatedNodeIds": [
+    "feature-governance-researcher-scenarios-national",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-researcher-scenarios-national",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Examine cohort effects comparing early vs late adopters",
+    "ogDescription": "Examine cohort effects comparing early vs late adopters",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-examine cohort effects comparing early vs late adopters",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Examine cohort effects comparing early vs late adopters - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-researcher-scenarios-national-examine cohort effects comparing early vs late adopters",
+    "identifier": "did:web:elohim.host:content:governance:researcher:scenarios:national-examine cohort effects comparing early vs late adopters",
+    "name": "Examine cohort effects comparing early vs late adopters",
+    "description": "Examine cohort effects comparing early vs late adopters",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

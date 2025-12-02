@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community caregiver support networks connect isolated caregivers",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community caregiver support networks connect isolated caregivers",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community caregiver support networks connect isolated caregivers",
+  "description": "Community caregiver support networks connect isolated caregivers",
+  "content": "Scenario: Community caregiver support networks connect isolated caregivers\n    Given James is profoundly isolated by intensive caregiving\n    And connection to other caregivers is essential for survival\n    When the community_elohim connects caregivers\n    Then James should access support groups for Alzheimer's caregivers\n    And he should connect with other sandwich generation caregivers\n    And he should find LGBTQ+ caregiver community if desired\n    And support networks should provide practical advice and emotional support\n    And community should actively prevent caregiver isolation\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community caregiver support networks connect isolated caregivers",
+    "ogDescription": "Community caregiver support networks connect isolated caregivers",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community caregiver support networks connect isolated caregivers",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community caregiver support networks connect isolated caregivers - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community caregiver support networks connect isolated caregivers",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community caregiver support networks connect isolated caregivers",
+    "name": "Community caregiver support networks connect isolated caregivers",
+    "description": "Community caregiver support networks connect isolated caregivers",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-family-supporting family members during crisis",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-supporting family members during crisis",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Supporting family members during crisis",
+  "description": "Supporting family members during crisis",
+  "content": "Scenario: Supporting family members during crisis\n    Given a family member experiences health crisis or emergency\n    When I want to help but have employment obligations\n    Then the protocol should help me assess my options\n    And coordinate with other family members for coverage\n    And help me communicate with my employer about family needs\n    And support me in balancing work demands with family care\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Supporting family members during crisis",
+    "ogDescription": "Supporting family members during crisis",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-supporting family members during crisis",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Supporting family members during crisis - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-family-supporting family members during crisis",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:family-supporting family members during crisis",
+    "name": "Supporting family members during crisis",
+    "description": "Supporting family members during crisis",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

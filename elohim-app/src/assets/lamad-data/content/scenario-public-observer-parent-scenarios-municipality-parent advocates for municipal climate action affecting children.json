@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-municipality-parent advocates for municipal climate action affecting children",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent advocates for municipal climate action affecting children",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent advocates for municipal climate action affecting children",
+  "description": "Parent advocates for municipal climate action affecting children",
+  "content": "Scenario: Parent advocates for municipal climate action affecting children\n    Given extreme heat days close schools and cancel outdoor activities\n    And the parent worries about children's future climate impacts\n    When the parent reviews municipal climate adaptation plans\n    Then they see schools lack air conditioning for heat waves\n    And learn city has no strategy for protecting children's health\n    And understand children are most vulnerable to climate impacts\n    And connect with other parents concerned about children's futures\n    And municipal climate policy centers children's wellbeing and safety\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:municipality",
+    "related_users:citizen,activist,community_organizer,board_member",
+    "related_layers:district,community,educational,ecological",
+    "elohim_agents:public_observer,community_elohim,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent advocates for municipal climate action affecting children",
+    "ogDescription": "Parent advocates for municipal climate action affecting children",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent advocates for municipal climate action affecting children",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent advocates for municipal climate action affecting children - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-municipality-parent advocates for municipal climate action affecting children",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:municipality-parent advocates for municipal climate action affecting children",
+    "name": "Parent advocates for municipal climate action affecting children",
+    "description": "Parent advocates for municipal climate action affecting children",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

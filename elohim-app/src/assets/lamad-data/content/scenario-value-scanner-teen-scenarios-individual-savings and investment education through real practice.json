@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-teen-scenarios-individual-savings and investment education through real practice",
+  "did": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-savings and investment education through real practice",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Savings and investment education through real practice",
+  "description": "Savings and investment education through real practice",
+  "content": "Scenario: Savings and investment education through real practice\n    Given Jasmine is saving for college and future goals\n    And she has accumulated $2,400 in savings from work\n    When she explores investment options through her personal_agent\n    Then the agent should provide age-appropriate investment education\n    And explain concepts like compound interest, risk, diversification\n    And connect to her specific goals and timeline\n    And help her understand long-term financial planning\n    And provide resources for learning about different investment vehicles\n    And support her building adult financial capability\n    And never pressure her toward specific investment products\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:teen",
+    "governance_layer:individual",
+    "related_users:preteen,young_adult,parent,student,worker",
+    "related_layers:family,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/teen/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-teen-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-teen-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Savings and investment education through real practice",
+    "ogDescription": "Savings and investment education through real practice",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-savings and investment education through real practice",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Savings and investment education through real practice - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-teen-scenarios-individual-savings and investment education through real practice",
+    "identifier": "did:web:elohim.host:content:value-scanner:teen:scenarios:individual-savings and investment education through real practice",
+    "name": "Savings and investment education through real practice",
+    "description": "Savings and investment education through real practice",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

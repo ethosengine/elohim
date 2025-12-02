@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-educational-technology literacy education adapted for elderly learners",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-technology literacy education adapted for elderly learners",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Technology literacy education adapted for elderly learners",
+  "description": "Technology literacy education adapted for elderly learners",
+  "content": "Scenario: Technology literacy education adapted for elderly learners\n    Given Helen needs technology skills for daily functioning\n    And technology education often ignores elderly learners\n    When Helen learns to use new technologies\n    Then instruction should be adapted to her learning pace\n    And age-appropriate pedagogy should be employed\n    And no assumption of prior tech knowledge should be made\n    And patient repetition should be available\n    And learning should serve her actual needs, not abstract skills\n    And the protocol should ensure elderly inclusion in digital literacy\n    And Helen should be empowered, not left behind by technology\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:educational",
+    "related_users:senior,grandchild,young_adult,community_member",
+    "related_layers:individual,community,family",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Technology literacy education adapted for elderly learners",
+    "ogDescription": "Technology literacy education adapted for elderly learners",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-technology literacy education adapted for elderly learners",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Technology literacy education adapted for elderly learners - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-educational-technology literacy education adapted for elderly learners",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:educational-technology literacy education adapted for elderly learners",
+    "name": "Technology literacy education adapted for elderly learners",
+    "description": "Technology literacy education adapted for elderly learners",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

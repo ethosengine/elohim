@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-neighborhood-elderly person's neighborhood contributions made visible",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-elderly person's neighborhood contributions made visible",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Elderly person's neighborhood contributions made visible",
+  "description": "Elderly person's neighborhood contributions made visible",
+  "content": "Scenario: Elderly person's neighborhood contributions made visible\n    Given Helen has contributed to neighborhood for decades\n    And she still participates in community memory-keeping\n    When Helen shares neighborhood history\n    Then her contributions should be recognized by neighborhood_elohim\n    And neighbors should see that Helen still gives to community\n    And her knowledge of neighborhood history should be valued\n    And care tokens should reflect her ongoing contributions\n    And she should experience herself as valued neighbor, not burden\n    And the protocol should make visible that care flows both ways\n    And longtime residents should have standing based on accumulated contributions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:neighborhood",
+    "related_users:neighbor,local_business,community_volunteer",
+    "related_layers:household,community,individual",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Elderly person's neighborhood contributions made visible",
+    "ogDescription": "Elderly person's neighborhood contributions made visible",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-elderly person's neighborhood contributions made visible",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elderly person's neighborhood contributions made visible - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-neighborhood-elderly person's neighborhood contributions made visible",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:neighborhood-elderly person's neighborhood contributions made visible",
+    "name": "Elderly person's neighborhood contributions made visible",
+    "description": "Elderly person's neighborhood contributions made visible",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

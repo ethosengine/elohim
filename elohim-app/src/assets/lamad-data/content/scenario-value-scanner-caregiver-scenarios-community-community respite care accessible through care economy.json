@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-community-community respite care accessible through care economy",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community respite care accessible through care economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community respite care accessible through care economy",
+  "description": "Community respite care accessible through care economy",
+  "content": "Scenario: Community respite care accessible through care economy\n    Given James needs regular respite to prevent burnout\n    And formal respite care costs $20-30/hour he cannot afford\n    When James accesses community respite resources\n    Then his care token accumulation should subsidize respite costs\n    And community should provide respite care at accessible rates\n    And respite should be professional-quality and reliable\n    And care economy should ensure caregivers get necessary breaks\n    And community should invest in caregiver sustainability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:community",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:neighborhood,family,municipality",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community respite care accessible through care economy",
+    "ogDescription": "Community respite care accessible through care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community respite care accessible through care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community respite care accessible through care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-community-community respite care accessible through care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:community-community respite care accessible through care economy",
+    "name": "Community respite care accessible through care economy",
+    "description": "Community respite care accessible through care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

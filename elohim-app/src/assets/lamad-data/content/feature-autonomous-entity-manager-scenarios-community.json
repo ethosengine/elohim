@@ -1,0 +1,67 @@
+{
+  "id": "feature-autonomous-entity-manager-scenarios-community",
+  "did": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Community Service and Accountability for Manager",
+  "description": "As a manager in the autonomous_entity system Operating at the community governance layer I want to serve community needs through workplace coordination So that ChickenMax functions as community institution, not extraction site",
+  "content": "@epic:autonomous_entity\n@user_type:manager\n@governance_layer:community\n@related_users:[customer,community_investor,worker]\n@related_layers:[workplace_organizational,municipality]\n@elohim_agents:[community_elohim,workplace_elohim]\n\nFeature: Community Service and Accountability for Manager\n  As a manager in the autonomous_entity system\n  Operating at the community governance layer\n  I want to serve community needs through workplace coordination\n  So that ChickenMax functions as community institution, not extraction site\n\n  Background:\n    Given the Elohim Protocol is operational\n    And Marcus coordinates ChickenMax operations serving community\n    And the community governance context is active\n    And community invested in EAE acquisition expecting community benefit\n\n  Scenario: Manager coordinates community programs while workers govern priorities\n    Given workers democratically decided to implement senior meal program\n    And operational coordination is needed for program execution\n    When Marcus coordinates senior meal program logistics\n    Then Marcus ensures meals meet quality and dietary requirements\n    And Marcus coordinates with senior center on scheduling and delivery\n    And Marcus tracks program metrics (meals served, costs, feedback)\n    But workers determine program scope, pricing, and continuation\n    And community_elohim ensures program serves community without exploiting workers\n\n  Scenario: Manager facilitates community stakeholder meetings transparently\n    Given community investors and customers want to provide input\n    And workers want community perspective while maintaining autonomy\n    When annual stakeholder meeting occurs\n    Then Marcus facilitates meeting ensuring all voices are heard\n    And Marcus presents operational updates transparently\n    And Marcus helps translate community input into actionable worker proposals\n    But Marcus doesn't filter or control community input\n    And workers make final decisions on community suggestions\n    And community_elohim ensures facilitation doesn't manipulate outcomes\n\n  Scenario: Manager responds to community concerns about operations\n    Given community member complains about noise from early morning deliveries\n    And legitimate community concern requires operational adjustment\n    When Marcus receives the complaint\n    Then Marcus investigates the noise issue objectively\n    And Marcus proposes delivery schedule modification to worker council\n    And workers deliberate balancing operational needs with community impact\n    And workers vote on delivery schedule change\n    And Marcus implements worker decision and communicates to community\n    And community_elohim facilitates community-worker dialogue\n\n  Scenario: Manager demonstrates ChickenMax democratic model to curious community\n    Given community members are curious about worker ownership\n    And Marcus has visible coordinator role in community institution\n    When community members ask about democratic business model\n    Then Marcus explains transformation from corporate extraction to worker ownership\n    And Marcus emphasizes workers govern, he coordinates with their consent\n    And Marcus's transparency about coordinator vs. owner role educates community\n    And community sees democratic governance as viable alternative\n    And other small businesses consider conversion after seeing example\n\n  Scenario: Manager coordinates operations to serve community needs workers prioritize\n    Given workers democratically decided to prioritize local sourcing\n    And operational coordination is needed for supply chain transition\n    When Marcus coordinates shift from Sysco to Johnson Farm\n    Then Marcus manages logistics of local procurement\n    And Marcus tracks quality, costs, and community feedback\n    And Marcus ensures operational transition doesn't disrupt service\n    And workers govern strategic decision, Marcus executes operationally\n    And community benefits from local food system Marcus helps coordinate\n\n  Scenario: Manager's community visibility shifts from corporate enforcer to democratic participant\n    Given Marcus was previously invisible corporate manager\n    And community only saw corporate brand, not individual manager\n    When democratic conversion makes governance visible\n    Then community knows Marcus as democratic coordinator, not owner or boss\n    And community sees him at stakeholder meetings, farmers markets, neighborhood events\n    And community recognizes him as community member serving institution\n    And his role transformation from extraction to service becomes community narrative\n    And community_elohim helps tell story of individual and structural transformation\n\n  Scenario: Manager coordinates with community organizations for mutual benefit\n    Given workers decided to partner with youth employment program\n    And operational coordination is needed for internship program\n    When Marcus coordinates youth internship logistics\n    Then Marcus works with youth program on participant selection and scheduling\n    And Marcus ensures youth interns receive quality training and mentorship\n    And Marcus tracks program outcomes (skill development, employment, community impact)\n    And Marcus reports to workers who govern program strategic decisions\n    And community organization recognizes Marcus as reliable coordinator supporting youth\n\n  Scenario: Manager ensures operational transparency builds community trust\n    Given community wants to understand how democratic business actually functions\n    And operational transparency is key to community confidence\n    When Marcus prepares quarterly community report\n    Then Marcus provides honest data on operations, challenges, and successes\n    And Marcus doesn't hide operational difficulties or failures\n    And Marcus celebrates worker governance achievements transparently\n    And Marcus's operational honesty builds community trust in democratic model\n    And community_elohim ensures reporting is accurate and accessible\n\n  Scenario: Manager balances operational efficiency with community relationship priorities\n    Given workers prioritize customer relationships over transaction speed\n    And corporate model measured Marcus on speed metrics\n    When Marcus coordinates daily operations\n    Then Marcus optimizes for customer satisfaction and care, not just speed\n    And Marcus measures success by community feedback and relationship depth\n    And Marcus rejects corporate-style speedup pressure\n    And operational coordination serves worker-defined values\n    And community experiences genuine care, not performative corporate \"service\"\n\n  Scenario: Manager participates in community economic development as practitioner\n    Given municipality seeks input on economic development strategies\n    And Marcus has practical experience with democratic business model\n    When community economic development planning occurs\n    Then Marcus shares operational insights about democratic coordination\n    And Marcus explains how eliminating extraction enabled higher wages and community programs\n    And Marcus advocates for policies supporting democratic business conversions\n    And Marcus participates as community member with expertise, not as business representative\n    And community_elohim connects his testimony to broader movement for economic democracy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:autonomous_entity",
+    "user_type:manager",
+    "governance_layer:community",
+    "related_users:[customer,community_investor,worker]",
+    "related_layers:[workplace_organizational,municipality]",
+    "elohim_agents:[community_elohim,workplace_elohim]",
+    "autonomous-entity",
+    "feature"
+  ],
+  "sourcePath": "autonomous_entity/manager/scenarios/community.feature",
+  "relatedNodeIds": [
+    "scenario-autonomous-entity-manager-scenarios-community-manager coordinates community programs while workers govern priorities",
+    "scenario-autonomous-entity-manager-scenarios-community-manager facilitates community stakeholder meetings transparently",
+    "scenario-autonomous-entity-manager-scenarios-community-manager responds to community concerns about operations",
+    "scenario-autonomous-entity-manager-scenarios-community-manager demonstrates chickenmax democratic model to curious community",
+    "scenario-autonomous-entity-manager-scenarios-community-manager coordinates operations to serve community needs workers prioritize",
+    "scenario-autonomous-entity-manager-scenarios-community-manager's community visibility shifts from corporate enforcer to democratic participant",
+    "scenario-autonomous-entity-manager-scenarios-community-manager coordinates with community organizations for mutual benefit",
+    "scenario-autonomous-entity-manager-scenarios-community-manager ensures operational transparency builds community trust",
+    "scenario-autonomous-entity-manager-scenarios-community-manager balances operational efficiency with community relationship priorities",
+    "scenario-autonomous-entity-manager-scenarios-community-manager participates in community economic development as practitioner",
+    "autonomous-entity-epic"
+  ],
+  "metadata": {
+    "category": "autonomous-entity",
+    "epic": "autonomous_entity",
+    "scenarioCount": 10
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community Service and Accountability for Manager",
+    "ogDescription": "As a manager in the autonomous_entity system Operating at the community governance layer I want to serve community needs through workplace coordination So that ChickenMax functions as community instit",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-autonomous-entity-manager-scenarios-community",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Community Service and Accountability for Manager - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-autonomous-entity-manager-scenarios-community",
+    "identifier": "did:web:elohim.host:content:autonomous-entity:manager:scenarios:community",
+    "name": "Community Service and Accountability for Manager",
+    "description": "As a manager in the autonomous_entity system Operating at the community governance layer I want to serve community needs through workplace coordination So that ChickenMax functions as community institution, not extraction site",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

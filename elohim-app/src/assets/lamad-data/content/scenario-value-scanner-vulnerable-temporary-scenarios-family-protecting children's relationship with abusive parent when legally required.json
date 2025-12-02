@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-family-protecting children's relationship with abusive parent when legally required",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-protecting children's relationship with abusive parent when legally required",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Protecting children's relationship with abusive parent when legally required",
+  "description": "Protecting children's relationship with abusive parent when legally required",
+  "content": "Scenario: Protecting children's relationship with abusive parent when legally required\n    Given my children have court-ordered visitation with their abusive parent\n    And I need to support children's wellbeing within legal constraints\n    When children navigate relationship with abusive parent\n    Then the family_elohim helps me prepare children appropriately\n    And tracks children's responses to visitation\n    And helps me support children's processing of complex feelings\n    And documents concerning behaviors for legal purposes if needed\n    And connects me to resources on supporting children through this\n    And my personal_agent reminds me of safety protocols around visitation\n    And recognizes my emotional labor supporting children through this trauma\n    And validates that my protective responses are appropriate\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-family"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-family",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Protecting children's relationship with abusive parent when legally required",
+    "ogDescription": "Protecting children's relationship with abusive parent when legally required",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-protecting children's relationship with abusive parent when legally required",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Protecting children's relationship with abusive parent when legally required - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-family-protecting children's relationship with abusive parent when legally required",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:family-protecting children's relationship with abusive parent when legally required",
+    "name": "Protecting children's relationship with abusive parent when legally required",
+    "description": "Protecting children's relationship with abusive parent when legally required",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

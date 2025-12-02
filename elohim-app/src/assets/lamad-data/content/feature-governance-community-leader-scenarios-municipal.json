@@ -1,0 +1,64 @@
+{
+  "id": "feature-governance-community-leader-scenarios-municipal",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Municipal Governance for Community Leader",
+  "description": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate across Riverside neighborhoods for citywide flourishing So that diverse neighborhood needs are balanced within shared infrastructure",
+  "content": "@epic:governance\n@user_type:community_leader\n@governance_layer:municipal\n@related_users:constitutional_council_member,policy_maker\n@related_layers:community,provincial_state\n@elohim_agents:municipal_elohim,community_elohim\n\nFeature: Municipal Governance for Community Leader\n  As a community_leader in the governance system\n  Operating at the municipal governance layer\n  I want to coordinate across Riverside neighborhoods for citywide flourishing\n  So that diverse neighborhood needs are balanced within shared infrastructure\n\n  Background:\n    Given the Elohim Protocol is operational\n    And Jamal Washington leads Riverside municipality\n    And the municipal governance context is active\n    And multiple neighborhoods have different needs and priorities\n\n  Scenario: Coordinate resource allocation across diverse neighborhoods\n    Given downtown needs economic development support\n    And residential areas prioritize environmental protection\n    And outskirts need infrastructure investment\n    When Municipal Elohim analyzes resource allocation\n    Then agent shows resource flows and gaps across neighborhoods\n    And agent identifies conflicts and synergies\n    And Jamal facilitates city council deliberation with agent data\n    And city council makes democratic allocation decisions\n    And protocol enables informed democratic choice\n\n  Scenario: Address climate refugee resettlement at municipal scale\n    Given climate refugees are arriving faster than housing can accommodate\n    And Municipal Elohim coordinates capacity mapping\n    When Jamal works with agent on integration strategy\n    Then agent matches refugee skills to job availability\n    And agent suggests phased integration by neighborhood\n    And agent monitors integration outcomes for adjustment\n    And Jamal ensures community voice in resettlement decisions\n    And integration succeeds better than without coordination\n    And Riverside demonstrates scalable humanitarian response\n\n  Scenario: Municipal policy integration with protocol decisions\n    Given city council passes new housing affordability ordinance\n    And Municipal Elohim flags potential conflict with property protocols\n    When conflict is identified\n    Then Constitutional Council reviews constitutional alignment\n    And council determines whether ordinance or protocol needs adjustment\n    And Jamal facilitates resolution through democratic deliberation\n    And city retains policy sovereignty within constitutional bounds\n    And agents and elected government work as partners\n\n  Scenario: Crisis coordination across municipal infrastructure\n    Given opioid overdose cluster occurs in downtown\n    When Municipal Elohim detects crisis pattern\n    Then agent coordinates emergency services, health services, and social support\n    And agent identifies who needs help across multiple systems\n    And agent enables rapid mutual aid mobilization\n    And Jamal maintains human judgment for crisis decisions\n    And agents inform while humans decide under uncertainty\n    And coordinated response saves lives\n\n  Scenario: Monitor municipal wellbeing indicators for policy improvement\n    Given Riverside has baseline data on wellbeing before protocol\n    When Jamal reviews municipal dashboard annually\n    Then dashboard shows life satisfaction trends across neighborhoods\n    And dashboard reveals loneliness patterns and interventions\n    And dashboard tracks economic resilience indicators\n    And dashboard identifies neighborhoods struggling despite protocol\n    And Jamal uses data to target policy interventions\n    And evidence-based governance improves outcomes\n\n  Scenario: Facilitate inter-neighborhood dialogue on shared challenges\n    Given neighborhoods have conflicting priorities\n    And downtown wants nightlife economy\n    And residential areas want noise reduction\n    When Municipal Elohim identifies the conflict\n    Then Jamal convenes inter-neighborhood deliberative assembly\n    And assembly uses Polis-style clustering to find common ground\n    And assembly develops solution: nightlife district with sound barriers\n    And neighborhoods collaborate rather than compete\n    And municipal scale enables solutions impossible at neighborhood level\n\n  Scenario: Coordinate with county and state on cross-boundary issues\n    Given Riverside is part of larger regional ecosystem\n    And watershed management crosses municipal boundaries\n    When Jamal works on water allocation issues\n    Then he coordinates with upstream and downstream municipalities\n    And Municipal Elohim shares data with regional agents\n    And multi-municipal deliberative assembly convenes\n    And solution serves multiple jurisdictions\n    And municipal leaders demonstrate lateral coordination\n    And subsidiarity enables appropriate-scale problem solving\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:municipal",
+    "related_users:constitutional_council_member,policy_maker",
+    "related_layers:community,provincial_state",
+    "elohim_agents:municipal_elohim,community_elohim",
+    "governance",
+    "feature"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/municipal.feature",
+  "relatedNodeIds": [
+    "scenario-governance-community-leader-scenarios-municipal-coordinate resource allocation across diverse neighborhoods",
+    "scenario-governance-community-leader-scenarios-municipal-address climate refugee resettlement at municipal scale",
+    "scenario-governance-community-leader-scenarios-municipal-municipal policy integration with protocol decisions",
+    "scenario-governance-community-leader-scenarios-municipal-crisis coordination across municipal infrastructure",
+    "scenario-governance-community-leader-scenarios-municipal-monitor municipal wellbeing indicators for policy improvement",
+    "scenario-governance-community-leader-scenarios-municipal-facilitate inter-neighborhood dialogue on shared challenges",
+    "scenario-governance-community-leader-scenarios-municipal-coordinate with county and state on cross-boundary issues",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "epic": "governance",
+    "scenarioCount": 7
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Municipal Governance for Community Leader",
+    "ogDescription": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate across Riverside neighborhoods for citywide flourishing So that diverse neighborhood nee",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-governance-community-leader-scenarios-municipal",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Municipal Governance for Community Leader - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-governance-community-leader-scenarios-municipal",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:municipal",
+    "name": "Municipal Governance for Community Leader",
+    "description": "As a community_leader in the governance system Operating at the municipal governance layer I want to coordinate across Riverside neighborhoods for citywide flourishing So that diverse neighborhood needs are balanced within shared infrastructure",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,68 @@
+{
+  "id": "feature-value-scanner-elderly-scenarios-individual",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Individual Layer Autonomy Preservation for Elderly",
+  "description": "As an elderly person (ages 75+) in the value scanner system Operating at the individual governance layer I want to maintain autonomy and agency over my own life So that I remain a person with dignity despite requiring substantial assistance",
+  "content": "@epic:value_scanner\n@user_type:elderly\n@governance_layer:individual\n@related_users:senior,caregiver,family_member,medical_professional\n@related_layers:household,family,community\n@elohim_agents:personal_agent\n\nFeature: Individual Layer Autonomy Preservation for Elderly\n  As an elderly person (ages 75+) in the value scanner system\n  Operating at the individual governance layer\n  I want to maintain autonomy and agency over my own life\n  So that I remain a person with dignity despite requiring substantial assistance\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the elderly user \"Helen\" is registered in the system\n    And Helen is 82 years old\n    And Helen manages early-stage dementia and mobility limitations\n    And the individual governance context is active\n    And Helen's personal_agent is configured for cognitive support\n    And Helen's income is $24k/year (Social Security only)\n\n  Scenario: Voice-primary interface adapts to cognitive and physical limitations\n    Given Helen has difficulty with small text and complex navigation\n    And her mobility makes precise touch targets challenging\n    When Helen opens the Value Scanner application\n    Then the interface should use voice-primary interaction\n    And visual elements should have large fonts and high contrast\n    And touch targets should be large and forgiving\n    And navigation should be simple with minimal steps\n    And the pace should be slow with no time pressure\n    And error recovery should be patient and supportive\n    And the interface should preserve Helen's dignity throughout\n\n  Scenario: Personal agent provides cognitive support without replacement\n    Given Helen experiences memory challenges from early-stage dementia\n    And she needs reminders for medications and appointments\n    When Helen's personal_agent provides cognitive assistance\n    Then it should support her memory without replacing her agency\n    And medication reminders should be gentle: \"Helen, time for your heart medication\"\n    And appointment notifications should give adequate lead time\n    And the agent should repeat information patiently when needed\n    And support should feel like partnership, not management\n    And Helen should remain the decision-maker about her own life\n    And the agent must never make choices for Helen without explicit delegation\n\n  Scenario: Elderly person maintains choice authority despite assistance needs\n    Given Helen's daughter assists with weekly shopping\n    And Helen requires help but retains decision-making capacity\n    When Helen uses the Value Scanner with assistance\n    Then she should still choose which foods she prefers\n    And her daughter should facilitate, not decide for her\n    And the personal_agent should say \"Helen, which apples do you want?\"\n    And Helen's preferences should be respected and recorded\n    And assistance should enhance her autonomy, not diminish it\n    And her dignity as decision-maker should be preserved\n    And the system should distinguish between needing help and losing authority\n\n  Scenario: Recognition of continued contributions despite care receipt\n    Given Helen receives substantial care from family and community\n    And she also contributes through mentoring and wisdom sharing\n    When Helen shares family stories with great-grandchildren\n    Then her care contribution should be recognized and valued\n    And her personal_agent should note: \"Your stories preserve our family history\"\n    And care tokens should reflect her continued giving\n    And the system should make visible that care flows both directions\n    And Helen should experience herself as valued person, not burden\n    And reciprocity should be visible even when care flows are asymmetric\n\n  Scenario: Advance directives maintained as authoritative voice\n    Given Helen is planning for potential loss of capacity\n    And she has specific values about end-of-life care\n    When Helen configures her advance directives in the system\n    Then her personal_agent should hold and communicate her wishes\n    And her values should remain authoritative even if she loses speech\n    And medical providers should receive clear advance directive information\n    And family should have access to Helen's documented preferences\n    And her agency over her own death should be preserved\n    And the protocol should ensure her voice guides care when she cannot speak\n    And dignity should be maintained throughout end-of-life process\n\n  Scenario: Privacy rights preserved despite family care coordination needs\n    Given Helen's family needs information for care coordination\n    And Helen retains full personhood and privacy rights\n    When Helen's care data is accessed\n    Then Helen must maintain control over her own data\n    And she must explicitly delegate any family access\n    And default should preserve her privacy unless she chooses sharing\n    And she is not someone to be managed without consent\n    And safety needs do not automatically override privacy rights\n    And the system must balance autonomy with necessary coordination\n    And Helen remains a person with full rights, not a patient to be managed\n\n  Scenario: Financial constraint management without stigma\n    Given Helen's fixed income is $24k/year\n    And this is severe resource constraint\n    When Helen uses the Value Scanner for purchasing decisions\n    Then the system should help her navigate financial limits\n    And budget assistance should be provided with dignity\n    And no shame should be attached to limited resources\n    And community care economy connections should be surfaced\n    And food assistance should be presented as legitimate reciprocity\n    And her lifetime of contributions should create valid claims on support\n    And assistance should flow with respect, not charity\n\n  Scenario: Crisis detection preserves autonomy while ensuring safety\n    Given Helen lives alone with family and community support\n    And she is at risk for falls and medication errors\n    When the system detects potential crisis indicators\n    Then safety monitoring should occur without surveillance feeling\n    And alerts should go to Helen first when appropriate\n    And emergency contacts should be notified only when necessary\n    And intervention should preserve her agency: \"Helen, you haven't moved in a while. Are you okay?\"\n    And she should be consulted before family is contacted when possible\n    And safety should enhance autonomy, not replace it\n    And the system should balance protection with dignity\n\n  Scenario: Continued learning and growth acknowledged at advanced age\n    Given Helen participates in senior learning programs\n    And she shares ecological wisdom from decades of experience\n    When Helen engages with educational content\n    Then the system should recognize that learning continues until death\n    And her accumulated knowledge should be valued\n    And opportunities to share wisdom should be surfaced\n    And she should experience ongoing growth and contribution\n    And the protocol should reject notion that personhood ends with productivity decline\n    And Helen should be supported in remaining engaged with life\n\n  Scenario: Right to disconnect maintained despite vulnerability\n    Given Helen is elderly and vulnerable\n    And constitutional constraints apply at all layers\n    When Helen or her designated advocate chooses to disconnect\n    Then the system must honor disconnection immediately\n    And no manipulative retention patterns should be employed\n    And her right to refuse participation must be absolute\n    And vulnerability does not diminish constitutional rights\n    And data deletion must occur per her instructions\n    And autonomy includes the right to reject the protocol entirely\n\n  Scenario: Identity preserved through memory challenges\n    Given Helen's dementia causes increasing memory difficulties\n    And her sense of self needs support and continuity\n    When her personal_agent interacts with her over time\n    Then it should help maintain her identity continuity\n    And it should reference her history: \"You worked as a teacher for 30 years\"\n    And it should support her self-concept despite cognitive changes\n    And it should remind her of relationships and accomplishments\n    And her personhood should remain intact even as memory fades\n    And the protocol should serve the human being she remains\n    And dignity should be preserved regardless of cognitive capacity\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-elderly-scenarios-individual-voice-primary interface adapts to cognitive and physical limitations",
+    "scenario-value-scanner-elderly-scenarios-individual-personal agent provides cognitive support without replacement",
+    "scenario-value-scanner-elderly-scenarios-individual-elderly person maintains choice authority despite assistance needs",
+    "scenario-value-scanner-elderly-scenarios-individual-recognition of continued contributions despite care receipt",
+    "scenario-value-scanner-elderly-scenarios-individual-advance directives maintained as authoritative voice",
+    "scenario-value-scanner-elderly-scenarios-individual-privacy rights preserved despite family care coordination needs",
+    "scenario-value-scanner-elderly-scenarios-individual-financial constraint management without stigma",
+    "scenario-value-scanner-elderly-scenarios-individual-crisis detection preserves autonomy while ensuring safety",
+    "scenario-value-scanner-elderly-scenarios-individual-continued learning and growth acknowledged at advanced age",
+    "scenario-value-scanner-elderly-scenarios-individual-right to disconnect maintained despite vulnerability",
+    "scenario-value-scanner-elderly-scenarios-individual-identity preserved through memory challenges",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 11
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Individual Layer Autonomy Preservation for Elderly",
+    "ogDescription": "As an elderly person (ages 75+) in the value scanner system Operating at the individual governance layer I want to maintain autonomy and agency over my own life So that I remain a person with dignity ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-elderly-scenarios-individual",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Individual Layer Autonomy Preservation for Elderly - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-elderly-scenarios-individual",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual",
+    "name": "Individual Layer Autonomy Preservation for Elderly",
+    "description": "As an elderly person (ages 75+) in the value scanner system Operating at the individual governance layer I want to maintain autonomy and agency over my own life So that I remain a person with dignity despite requiring substantial assistance",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

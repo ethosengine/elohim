@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-teacher-scenarios-district-teacher decodes school board agenda in morning brief",
+  "did": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher decodes school board agenda in morning brief",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teacher decodes school board agenda in morning brief",
+  "description": "Teacher decodes school board agenda in morning brief",
+  "content": "Scenario: Teacher decodes school board agenda in morning brief\n    Given tonight's board meeting will vote on \"instructional efficiency optimization\"\n    And teachers have limited time to track board activities\n    When the teacher receives Observer morning brief\n    Then they learn this means increasing class sizes from 24 to 28\n    And see projected impact on teaching and individual attention\n    And get concrete advocacy pathway (testimony, email, coordination)\n    And can coordinate response with colleagues and parents during workday\n    And board jargon becomes actionable intelligence\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:teacher",
+    "governance_layer:district",
+    "related_users:parent,board_member,community_organizer,administrator",
+    "related_layers:school,municipality,provincial_state,educational",
+    "elohim_agents:public_observer,education_elohim,classroom_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/teacher/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-teacher-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-teacher-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teacher decodes school board agenda in morning brief",
+    "ogDescription": "Teacher decodes school board agenda in morning brief",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher decodes school board agenda in morning brief",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teacher decodes school board agenda in morning brief - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-teacher-scenarios-district-teacher decodes school board agenda in morning brief",
+    "identifier": "did:web:elohim.host:content:public-observer:teacher:scenarios:district-teacher decodes school board agenda in morning brief",
+    "name": "Teacher decodes school board agenda in morning brief",
+    "description": "Teacher decodes school board agenda in morning brief",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

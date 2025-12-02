@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-single-parent-scenarios-neighborhood-local economic cooperation for service cost reduction",
+  "did": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-local economic cooperation for service cost reduction",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Local economic cooperation for service cost reduction",
+  "description": "Local economic cooperation for service cost reduction",
+  "content": "Scenario: Local economic cooperation for service cost reduction\n    Given Maria struggles to afford household services on limited income\n    And neighbors might coordinate for collective cost reduction\n    When neighborhood members need similar services\n    Then the neighborhood_elohim should coordinate group contracting\n    And collective service hiring should reduce costs for all participants\n    And Maria should access affordable household services through cooperation\n    And neighborhood economic coordination should address resource constraints\n    And single parents should benefit from collective bargaining power\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:single_parent",
+    "governance_layer:neighborhood",
+    "related_users:parent,neighbor,community_member,single_parent",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/single_parent/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-single-parent-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Local economic cooperation for service cost reduction",
+    "ogDescription": "Local economic cooperation for service cost reduction",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-local economic cooperation for service cost reduction",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Local economic cooperation for service cost reduction - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-single-parent-scenarios-neighborhood-local economic cooperation for service cost reduction",
+    "identifier": "did:web:elohim.host:content:value-scanner:single-parent:scenarios:neighborhood-local economic cooperation for service cost reduction",
+    "name": "Local economic cooperation for service cost reduction",
+    "description": "Local economic cooperation for service cost reduction",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

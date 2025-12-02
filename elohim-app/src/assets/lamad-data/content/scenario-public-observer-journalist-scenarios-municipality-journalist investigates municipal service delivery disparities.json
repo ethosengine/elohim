@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-journalist-scenarios-municipality-journalist investigates municipal service delivery disparities",
+  "did": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality-journalist investigates municipal service delivery disparities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Journalist investigates municipal service delivery disparities",
+  "description": "Journalist investigates municipal service delivery disparities",
+  "content": "Scenario: Journalist investigates municipal service delivery disparities\n    Given residents in certain neighborhoods report neglected infrastructure\n    And the journalist suspects systematic discrimination\n    When the Observer analyzes municipal operations by neighborhood\n    Then the journalist sees pothole repairs average 2 days in white areas\n    And same repairs take 47 days in Black neighborhoods\n    And code enforcement targets rental properties in immigrant communities\n    And documents service quality correlating with neighborhood race and income\n    And publishes investigation exposing structural racism in city operations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:journalist",
+    "governance_layer:municipality",
+    "related_users:politician,activist,board_member,citizen,journalist",
+    "related_layers:community,county_regional,provincial_state",
+    "elohim_agents:public_observer,municipal_elohim,pattern_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/journalist/scenarios/municipality.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-journalist-scenarios-municipality",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-journalist-scenarios-municipality",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Journalist investigates municipal service delivery disparities",
+    "ogDescription": "Journalist investigates municipal service delivery disparities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-municipality-journalist investigates municipal service delivery disparities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Journalist investigates municipal service delivery disparities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-journalist-scenarios-municipality-journalist investigates municipal service delivery disparities",
+    "identifier": "did:web:elohim.host:content:public-observer:journalist:scenarios:municipality-journalist investigates municipal service delivery disparities",
+    "name": "Journalist investigates municipal service delivery disparities",
+    "description": "Journalist investigates municipal service delivery disparities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

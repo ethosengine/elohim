@@ -1,0 +1,60 @@
+{
+  "id": "fct-bible-proverbs-3-27",
+  "contentType": "bible-verse",
+  "title": "Proverbs 3:27",
+  "description": "Scripture reference used in FCT Module 14",
+  "content": {
+    "reference": "Proverbs 3:27",
+    "book": "Proverbs",
+    "chapter": 3,
+    "verseStart": 27,
+    "verseEnd": null,
+    "contextInModule": "Proverbs 3:27 \\- Do not withhold good when it is in your power to act",
+    "translation": "ESV"
+  },
+  "contentFormat": "bible-json",
+  "sourcePath": "fct/Module 14 - Ready To Act_ Embodying Christ in the Digital Age.md",
+  "tags": [
+    "bible",
+    "scripture",
+    "fct",
+    "proverbs",
+    "action"
+  ],
+  "relatedNodeIds": [
+    "fct-module-14-ready-to-act"
+  ],
+  "metadata": {
+    "category": "scripture",
+    "sourceModule": "fct-module-14-ready-to-act",
+    "thematicContext": "Ready To Act: Embodying Christ in the Digital Age"
+  },
+  "createdAt": "2025-11-28T21:10:19.224719",
+  "updatedAt": "2025-11-28T21:10:19.224720",
+  "did": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+  "activityPubType": "Note",
+  "openGraphMetadata": {
+    "ogTitle": "Proverbs 3:27",
+    "ogDescription": "Scripture reference used in FCT Module 14",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-bible-proverbs-3-27",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/bible-verse.jpg",
+    "ogImageAlt": "Proverbs 3:27 - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/fct-bible-proverbs-3-27",
+    "identifier": "did:web:elohim.host:content:fct:module 14 - ready to act- embodying christ in the digital age",
+    "name": "Proverbs 3:27",
+    "description": "Scripture reference used in FCT Module 14",
+    "dateCreated": "2025-11-28T21:10:19.224719",
+    "dateModified": "2025-11-28T21:10:19.224720",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-household-making invisible household care labor visible to roommates",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:household-making invisible household care labor visible to roommates",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Making invisible household care labor visible to roommates",
+  "description": "Making invisible household care labor visible to roommates",
+  "content": "Scenario: Making invisible household care labor visible to roommates\n    Given Kenji cooks meals for all four roommates regularly\n    And he plans menus, shops for ingredients, and manages kitchen\n    When the household_elohim tracks Kenji's household contributions\n    Then it should quantify his cooking labor in care tokens\n    And it should make visible that he provides nutrition care for four people\n    And his roommates should see \"Kenji cooked 18 meals this week for household\"\n    And invisible care work should become undeniably visible\n    And the system should prevent resentment from invisible labor\n    And fair household coordination requires visibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:household",
+    "related_users:young_adult,adult,roommate",
+    "related_layers:individual,family,neighborhood",
+    "elohim_agents:personal_agent,household_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/household.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-household",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-household",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Making invisible household care labor visible to roommates",
+    "ogDescription": "Making invisible household care labor visible to roommates",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-making invisible household care labor visible to roommates",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Making invisible household care labor visible to roommates - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-household-making invisible household care labor visible to roommates",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:household-making invisible household care labor visible to roommates",
+    "name": "Making invisible household care labor visible to roommates",
+    "description": "Making invisible household care labor visible to roommates",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

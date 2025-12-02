@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-preteen-scenarios-community-community-level food justice advocacy informed by preteen experience",
+  "did": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-community-level food justice advocacy informed by preteen experience",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community-level food justice advocacy informed by preteen experience",
+  "description": "Community-level food justice advocacy informed by preteen experience",
+  "content": "Scenario: Community-level food justice advocacy informed by preteen experience\n    Given Marcus's experience reveals food system failures\n    And his data shows food access inequities\n    When community food policy is developed\n    Then Marcus's anonymized experience should inform advocacy\n    And the community_elohim should aggregate data about food insecurity\n    And community should advocate for systemic change\n    And Marcus's struggles should fuel collective political action\n    And care economy should connect individual experience to community organizing\n    And his burden should contribute to changing systems that create it\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:preteen",
+    "governance_layer:community",
+    "related_users:child,teen,parent,student",
+    "related_layers:individual,family,neighborhood,educational,ecological_bioregional",
+    "elohim_agents:personal_agent,family_elohim,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/preteen/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-preteen-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-preteen-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community-level food justice advocacy informed by preteen experience",
+    "ogDescription": "Community-level food justice advocacy informed by preteen experience",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-community-level food justice advocacy informed by preteen experience",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community-level food justice advocacy informed by preteen experience - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-preteen-scenarios-community-community-level food justice advocacy informed by preteen experience",
+    "identifier": "did:web:elohim.host:content:value-scanner:preteen:scenarios:community-community-level food justice advocacy informed by preteen experience",
+    "name": "Community-level food justice advocacy informed by preteen experience",
+    "description": "Community-level food justice advocacy informed by preteen experience",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

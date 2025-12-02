@@ -1,0 +1,62 @@
+{
+  "id": "governance-books-the-collapse-of-complex-societies-readme",
+  "did": "did:web:elohim.host:content:governance:books:the-collapse-of-complex-societies:readme",
+  "contentType": "book-chapter",
+  "activityPubType": "Document",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Political disintegration is a persistent feature of world history. The Collapse of Complex Societies, though written by an archaeologist, will therefore strike a chord throughout the social sciences. Any explanation of societal collapse carries lessons not just for the study of ancient societies, bu\u2026",
+  "content": "---\nnode_type: book\norg_id: the_collapse_of_complex_societies\nname: \"The Collapse of Complex Societies\"\nurl: \"https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0\"\ngem_id: \"ss9WkKEJ55XMAKBTmw6F\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How The Collapse of Complex Societies inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# The Collapse of Complex Societies\n\n## Description\n\nPolitical disintegration is a persistent feature of world history. The Collapse of Complex Societies, though written by an archaeologist, will therefore strike a chord throughout the social sciences. Any explanation of societal collapse carries lessons not just for the study of ancient societies, bu\u2026\n\n**Publisher:** Google Books\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how The Collapse of Complex Societies relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "governance",
+    "book-chapter"
+  ],
+  "sourcePath": "governance/books/the_collapse_of_complex_societies/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance",
+    "url": "https://www.google.com/books/edition/The_Collapse_of_Complex_Societies/YdW5wSPJXIoC?hl=en&gbpv=0",
+    "name": "The Collapse of Complex Societies",
+    "org_id": "the_collapse_of_complex_societies",
+    "gem_id": "ss9WkKEJ55XMAKBTmw6F",
+    "node_type": "book",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "Google Books",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How The Collapse of Complex Societies inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Political disintegration is a persistent feature of world history. The Collapse of Complex Societies, though written by an archaeologist, will therefore strike a chord throughout the social sciences. ",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-books-the-collapse-of-complex-societies-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/book-chapter.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Chapter",
+    "@id": "https://elohim-protocol.org/content/governance-books-the-collapse-of-complex-societies-readme",
+    "identifier": "did:web:elohim.host:content:governance:books:the-collapse-of-complex-societies:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Political disintegration is a persistent feature of world history. The Collapse of Complex Societies, though written by an archaeologist, will therefore strike a chord throughout the social sciences. Any explanation of societal collapse carries lessons not just for the study of ancient societies, bu\u2026",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

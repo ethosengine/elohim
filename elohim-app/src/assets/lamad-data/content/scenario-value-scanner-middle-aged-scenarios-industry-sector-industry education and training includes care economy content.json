@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-industry-sector-industry education and training includes care economy content",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry education and training includes care economy content",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Industry education and training includes care economy content",
+  "description": "Industry education and training includes care economy content",
+  "content": "Scenario: Industry education and training includes care economy content\n    Given professional development shapes industry practices\n    And care economy should be included in professional education\n    And Robert's experience qualifies him to contribute to education\n    When industry_elohim connects education and care economy\n    Then it should help Robert contribute to industry education development\n    And support inclusion of care economy in professional training\n    And help him develop case studies from lived experience\n    And build industry curriculum that includes care economy principles\n    And educate next generation of professionals in care economy thinking\n    And advance care economy through professional education\n    And demonstrate that industry knowledge should include care economy\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:industry_sector",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:workplace_organizational,municipality,community,ecological_bioregional",
+    "elohim_agents:personal_agent,industry_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/industry_sector.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-industry-sector",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Industry education and training includes care economy content",
+    "ogDescription": "Industry education and training includes care economy content",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry education and training includes care economy content",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Industry education and training includes care economy content - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-industry-sector-industry education and training includes care economy content",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:industry-sector-industry education and training includes care economy content",
+    "name": "Industry education and training includes care economy content",
+    "description": "Industry education and training includes care economy content",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

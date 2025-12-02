@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-understanding workplace rights and protections as vulnerable worker",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-understanding workplace rights and protections as vulnerable worker",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Understanding workplace rights and protections as vulnerable worker",
+  "description": "Understanding workplace rights and protections as vulnerable worker",
+  "content": "Scenario: Understanding workplace rights and protections as vulnerable worker\n    Given I may face workplace discrimination, harassment, or rights violations\n    And vulnerable workers are often targeted for workplace abuse\n    When I encounter workplace problems or need to understand my rights\n    Then the workplace_elohim provides information on my workplace rights\n    And helps me identify illegal workplace practices\n    And connects me to legal resources or worker advocacy organizations\n    And validates that I deserve workplace protection and dignity\n    And helps me document workplace problems\n    And my personal_agent alerts me to rights violations\n    And recognizes that vulnerable workers need extra rights awareness\n    And supports me in demanding legal workplace treatment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-workplace-organizational",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Understanding workplace rights and protections as vulnerable worker",
+    "ogDescription": "Understanding workplace rights and protections as vulnerable worker",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-understanding workplace rights and protections as vulnerable worker",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Understanding workplace rights and protections as vulnerable worker - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-workplace-organizational-understanding workplace rights and protections as vulnerable worker",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:workplace-organizational-understanding workplace rights and protections as vulnerable worker",
+    "name": "Understanding workplace rights and protections as vulnerable worker",
+    "description": "Understanding workplace rights and protections as vulnerable worker",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

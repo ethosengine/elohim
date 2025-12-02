@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-district-parent decodes district resource allocation decisions",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:district-parent decodes district resource allocation decisions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent decodes district resource allocation decisions",
+  "description": "Parent decodes district resource allocation decisions",
+  "content": "Scenario: Parent decodes district resource allocation decisions\n    Given the school board discusses \"optimizing resource distribution\"\n    And the parent cannot attend the 3-hour Tuesday evening meeting\n    When the parent reviews Observer's translated summary\n    Then they learn this means cutting 12 teaching positions\n    And see this increases their child's class size from 24 to 32 students\n    And understand real impact on their child's learning\n    And can submit informed opposition via app in 10 minutes\n    And bureaucratic language doesn't hide impacts from working parents\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:district",
+    "related_users:teacher,board_member,citizen,activist,student",
+    "related_layers:community,municipality,educational",
+    "elohim_agents:public_observer,district_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/district.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-district",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-district",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent decodes district resource allocation decisions",
+    "ogDescription": "Parent decodes district resource allocation decisions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-district-parent decodes district resource allocation decisions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent decodes district resource allocation decisions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-district-parent decodes district resource allocation decisions",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:district-parent decodes district resource allocation decisions",
+    "name": "Parent decodes district resource allocation decisions",
+    "description": "Parent decodes district resource allocation decisions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

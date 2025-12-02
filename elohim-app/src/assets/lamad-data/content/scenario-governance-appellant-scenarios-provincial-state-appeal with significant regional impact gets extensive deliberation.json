@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-appellant-scenarios-provincial-state-appeal with significant regional impact gets extensive deliberation",
+  "did": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal with significant regional impact gets extensive deliberation",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Appeal with significant regional impact gets extensive deliberation",
+  "description": "Appeal with significant regional impact gets extensive deliberation",
+  "content": "Scenario: Appeal with significant regional impact gets extensive deliberation\n    Given my case could affect thousands of families across the region\n    And the constitutional question has major implications\n    When Regional Constitutional Council reviews my high-stakes appeal\n    Then they allocate substantial time (multiple sessions over weeks)\n    And They invite testimony from diverse community leaders\n    And They consult with technical experts on implementation implications\n    And They examine long-term consequences of different interpretations\n    And They consider dissenting views and minority perspectives\n    And They produce comprehensive written opinion with reasoning\n    And The thorough deliberation legitimates the significant precedent they create\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:appellant",
+    "governance_layer:provincial_state",
+    "related_users:constitutional_council_member,technical_expert,policy_maker,researcher",
+    "related_layers:community,nation_state",
+    "elohim_agents:regional_elohim,community_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/appellant/scenarios/provincial_state.feature",
+  "relatedNodeIds": [
+    "feature-governance-appellant-scenarios-provincial-state",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-appellant-scenarios-provincial-state",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Appeal with significant regional impact gets extensive deliberation",
+    "ogDescription": "Appeal with significant regional impact gets extensive deliberation",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal with significant regional impact gets extensive deliberation",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Appeal with significant regional impact gets extensive deliberation - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-appellant-scenarios-provincial-state-appeal with significant regional impact gets extensive deliberation",
+    "identifier": "did:web:elohim.host:content:governance:appellant:scenarios:provincial-state-appeal with significant regional impact gets extensive deliberation",
+    "name": "Appeal with significant regional impact gets extensive deliberation",
+    "description": "Appeal with significant regional impact gets extensive deliberation",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

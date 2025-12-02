@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood meal support during caregiver crisis periods",
+  "did": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood meal support during caregiver crisis periods",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Neighborhood meal support during caregiver crisis periods",
+  "description": "Neighborhood meal support during caregiver crisis periods",
+  "content": "Scenario: Neighborhood meal support during caregiver crisis periods\n    Given caregiving intensity varies with David's condition\n    And James may have periods of extreme overwhelm\n    When the neighborhood_elohim detects crisis conditions\n    Then it should coordinate meal support from neighbors\n    And meal delivery should be appropriate for David's dietary needs\n    And food support should be dignified, not stigmatizing\n    And neighborhood should provide practical crisis support\n    And James should access help during overwhelming periods\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:caregiver",
+    "governance_layer:neighborhood",
+    "related_users:adult,middle_aged,elderly,person_with_disabilities",
+    "related_layers:individual,household,community",
+    "elohim_agents:personal_agent,neighborhood_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/caregiver/scenarios/neighborhood.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-caregiver-scenarios-neighborhood",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Neighborhood meal support during caregiver crisis periods",
+    "ogDescription": "Neighborhood meal support during caregiver crisis periods",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood meal support during caregiver crisis periods",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Neighborhood meal support during caregiver crisis periods - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-caregiver-scenarios-neighborhood-neighborhood meal support during caregiver crisis periods",
+    "identifier": "did:web:elohim.host:content:value-scanner:caregiver:scenarios:neighborhood-neighborhood meal support during caregiver crisis periods",
+    "name": "Neighborhood meal support during caregiver crisis periods",
+    "description": "Neighborhood meal support during caregiver crisis periods",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

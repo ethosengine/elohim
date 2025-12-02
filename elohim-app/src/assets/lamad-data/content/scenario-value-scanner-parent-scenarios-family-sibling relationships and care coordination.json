@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-parent-scenarios-family-sibling relationships and care coordination",
+  "did": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-sibling relationships and care coordination",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Sibling relationships and care coordination",
+  "description": "Sibling relationships and care coordination",
+  "content": "Scenario: Sibling relationships and care coordination\n    Given Sarah's siblings also have care responsibilities\n    And they coordinate care for aging parents\n    When the family_elohim tracks sibling care contributions\n    Then it should show who is doing what for parents\n    And it should prevent care labor from falling unequally on one sibling\n    And it should enable equitable distribution of elder care\n    And sibling relationships should be based on fair care sharing\n    And the system should prevent family dynamics where one child does everything\n    And care economy should create accountability among siblings\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:parent",
+    "governance_layer:family",
+    "related_users:child,grandparent,partner,extended_family",
+    "related_layers:household,individual,community",
+    "elohim_agents:personal_agent,family_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/parent/scenarios/family.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-parent-scenarios-family",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-parent-scenarios-family",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Sibling relationships and care coordination",
+    "ogDescription": "Sibling relationships and care coordination",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-sibling relationships and care coordination",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Sibling relationships and care coordination - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-parent-scenarios-family-sibling relationships and care coordination",
+    "identifier": "did:web:elohim.host:content:value-scanner:parent:scenarios:family-sibling relationships and care coordination",
+    "name": "Sibling relationships and care coordination",
+    "description": "Sibling relationships and care coordination",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

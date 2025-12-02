@@ -1,0 +1,58 @@
+{
+  "id": "scenario-public-observer-parent-scenarios-educational-parent advocates for school safety investments",
+  "did": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent advocates for school safety investments",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Parent advocates for school safety investments",
+  "description": "Parent advocates for school safety investments",
+  "content": "Scenario: Parent advocates for school safety investments\n    Given the parent worries about school safety and emergency preparedness\n    And board discusses \"safety measures\" in vague terms\n    When the parent reviews Observer's safety policy analysis\n    Then they see which safety measures are evidence-based vs security theater\n    And understand budget allocations for counselors vs surveillance\n    And learn about trauma-informed approaches to school safety\n    And can advocate for measures that actually protect children\n    And school safety policy centers student wellbeing not punishment\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:public_observer",
+    "user_type:parent",
+    "governance_layer:educational",
+    "related_users:teacher,board_member,student,citizen,activist",
+    "related_layers:district,municipality,provincial_state",
+    "elohim_agents:public_observer,district_elohim,education_elohim,family_elohim",
+    "public-observer",
+    "scenario"
+  ],
+  "sourcePath": "public_observer/parent/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-public-observer-parent-scenarios-educational",
+    "public-observer-epic"
+  ],
+  "metadata": {
+    "category": "public-observer",
+    "featureId": "feature-public-observer-parent-scenarios-educational",
+    "epic": "public_observer"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Parent advocates for school safety investments",
+    "ogDescription": "Parent advocates for school safety investments",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent advocates for school safety investments",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Parent advocates for school safety investments - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-public-observer-parent-scenarios-educational-parent advocates for school safety investments",
+    "identifier": "did:web:elohim.host:content:public-observer:parent:scenarios:educational-parent advocates for school safety investments",
+    "name": "Parent advocates for school safety investments",
+    "description": "Parent advocates for school safety investments",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

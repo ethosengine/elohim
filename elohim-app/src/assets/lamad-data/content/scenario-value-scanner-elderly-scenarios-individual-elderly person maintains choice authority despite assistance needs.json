@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-individual-elderly person maintains choice authority despite assistance needs",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-elderly person maintains choice authority despite assistance needs",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Elderly person maintains choice authority despite assistance needs",
+  "description": "Elderly person maintains choice authority despite assistance needs",
+  "content": "Scenario: Elderly person maintains choice authority despite assistance needs\n    Given Helen's daughter assists with weekly shopping\n    And Helen requires help but retains decision-making capacity\n    When Helen uses the Value Scanner with assistance\n    Then she should still choose which foods she prefers\n    And her daughter should facilitate, not decide for her\n    And the personal_agent should say \"Helen, which apples do you want?\"\n    And Helen's preferences should be respected and recorded\n    And assistance should enhance her autonomy, not diminish it\n    And her dignity as decision-maker should be preserved\n    And the system should distinguish between needing help and losing authority\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:individual",
+    "related_users:senior,caregiver,family_member,medical_professional",
+    "related_layers:household,family,community",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Elderly person maintains choice authority despite assistance needs",
+    "ogDescription": "Elderly person maintains choice authority despite assistance needs",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-elderly person maintains choice authority despite assistance needs",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Elderly person maintains choice authority despite assistance needs - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-individual-elderly person maintains choice authority despite assistance needs",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:individual-elderly person maintains choice authority despite assistance needs",
+    "name": "Elderly person maintains choice authority despite assistance needs",
+    "description": "Elderly person maintains choice authority despite assistance needs",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

@@ -1,0 +1,153 @@
+{
+  "id": "elohim-protocol",
+  "version": "1.0.0",
+  "title": "Elohim Protocol: Living Documentation",
+  "description": "Discover the vision and find your place in the Protocol",
+  "purpose": "Understand the Elohim Protocol and identify which domain resonates with you",
+  "createdBy": "system",
+  "contributors": [],
+  "createdAt": "2025-11-28T21:09:48.296129",
+  "updatedAt": "2025-11-29T12:00:00.000000",
+  "thumbnailUrl": "/images/elohim_protocol_logo_light.png",
+  "thumbnailAlt": "Elohim Protocol logo",
+  "steps": [
+    {
+      "order": 0,
+      "resourceId": "manifesto",
+      "stepTitle": "The Vision",
+      "stepNarrative": "Begin with the foundational vision of the Elohim Protocol - digital infrastructure for human flourishing",
+      "learningObjectives": [
+        "Understand the core vision of decentralized governance",
+        "Learn the five epic domains",
+        "Identify the principles of sovereign identity and love-centered technology"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Read the manifesto"
+      ],
+      "estimatedTime": "30-45 minutes"
+    },
+    {
+      "order": 1,
+      "resourceId": "quiz-who-are-you",
+      "stepTitle": "Find Your Path",
+      "stepNarrative": "Discover which epic domain aligns with your interests, values, and the impact you want to make",
+      "learningObjectives": [
+        "Identify your primary domain of interest"
+      ],
+      "optional": false,
+      "completionCriteria": [
+        "Complete the quiz"
+      ],
+      "attestationGranted": "protocol-explorer",
+      "estimatedTime": "5-10 minutes"
+    },
+    {
+      "order": 2,
+      "resourceId": "governance-epic",
+      "stepTitle": "AI Governance",
+      "stepNarrative": "Constitutional oversight, appeals, and democratic AI governance",
+      "learningObjectives": [
+        "Understand the AI Governance domain",
+        "Learn about user types in this domain",
+        "Explore scenarios and use cases"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Read the AI Governance epic overview"
+      ],
+      "estimatedTime": "15-20 minutes"
+    },
+    {
+      "order": 3,
+      "resourceId": "value-scanner-epic",
+      "stepTitle": "Value Scanner",
+      "stepNarrative": "Supporting caregivers and recognizing invisible work",
+      "learningObjectives": [
+        "Understand the Value Scanner domain",
+        "Learn about user types in this domain",
+        "Explore scenarios and use cases"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Read the Value Scanner epic overview"
+      ],
+      "estimatedTime": "15-20 minutes"
+    },
+    {
+      "order": 4,
+      "resourceId": "public-observer-epic",
+      "stepTitle": "Public Observer",
+      "stepNarrative": "Civic participation and public oversight",
+      "learningObjectives": [
+        "Understand the Public Observer domain",
+        "Learn about user types in this domain",
+        "Explore scenarios and use cases"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Read the Public Observer epic overview"
+      ],
+      "estimatedTime": "15-20 minutes"
+    },
+    {
+      "order": 5,
+      "resourceId": "autonomous-entity-epic",
+      "stepTitle": "Autonomous Entity",
+      "stepNarrative": "Transforming workplace ownership and governance",
+      "learningObjectives": [
+        "Understand the Autonomous Entity domain",
+        "Learn about user types in this domain",
+        "Explore scenarios and use cases"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Read the Autonomous Entity epic overview"
+      ],
+      "estimatedTime": "15-20 minutes"
+    },
+    {
+      "order": 6,
+      "resourceId": "social-medium-epic",
+      "stepTitle": "Social Medium",
+      "stepNarrative": "Building healthier digital communication spaces",
+      "learningObjectives": [
+        "Understand the Social Medium domain",
+        "Learn about user types in this domain",
+        "Explore scenarios and use cases"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Read the Social Medium epic overview"
+      ],
+      "estimatedTime": "15-20 minutes"
+    },
+    {
+      "order": 7,
+      "resourceId": "economic-coordination-epic",
+      "stepTitle": "Economic Coordination",
+      "stepNarrative": "REA-based value flows, creator recognition, and network economics",
+      "learningObjectives": [
+        "Understand the Economic Coordination domain",
+        "Learn about user types in this domain",
+        "Explore scenarios and use cases"
+      ],
+      "optional": true,
+      "completionCriteria": [
+        "Read the Economic Coordination epic overview"
+      ],
+      "estimatedTime": "15-20 minutes"
+    }
+  ],
+  "tags": [
+    "foundation",
+    "protocol",
+    "onboarding"
+  ],
+  "difficulty": "beginner",
+  "estimatedDuration": "1-2 hours",
+  "visibility": "public",
+  "attestationsGranted": [
+    "protocol-explorer"
+  ]
+}

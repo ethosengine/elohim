@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-elderly-scenarios-community-healthcare costs managed through community care economy",
+  "did": "did:web:elohim.host:content:value-scanner:elderly:scenarios:community-healthcare costs managed through community care economy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Healthcare costs managed through community care economy",
+  "description": "Healthcare costs managed through community care economy",
+  "content": "Scenario: Healthcare costs managed through community care economy\n    Given Helen faces overwhelming healthcare expenses\n    And medical debt threatens her housing stability\n    When healthcare costs are tracked\n    Then the community_elohim should help navigate cost assistance\n    And community care economy should supplement inadequate insurance\n    And medical care should not require choosing between health and housing\n    And Helen's contributions should create claims on community health resources\n    And the protocol should address the healthcare affordability crisis for elderly\n    And community networks should provide economic buffer against medical costs\n    And care economy should demonstrate healthcare as community responsibility\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:elderly",
+    "governance_layer:community",
+    "related_users:senior,caregiver,healthcare_provider,social_services",
+    "related_layers:neighborhood,family,individual",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/elderly/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-elderly-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-elderly-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Healthcare costs managed through community care economy",
+    "ogDescription": "Healthcare costs managed through community care economy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-community-healthcare costs managed through community care economy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Healthcare costs managed through community care economy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-elderly-scenarios-community-healthcare costs managed through community care economy",
+    "identifier": "did:web:elohim.host:content:value-scanner:elderly:scenarios:community-healthcare costs managed through community care economy",
+    "name": "Healthcare costs managed through community care economy",
+    "description": "Healthcare costs managed through community care economy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

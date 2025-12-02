@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-vulnerable-temporary-scenarios-community-contributing my lived experience to community knowledge and advocacy",
+  "did": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-contributing my lived experience to community knowledge and advocacy",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Contributing my lived experience to community knowledge and advocacy",
+  "description": "Contributing my lived experience to community knowledge and advocacy",
+  "content": "Scenario: Contributing my lived experience to community knowledge and advocacy\n    Given my experience navigating domestic violence, housing crisis, or social services provides valuable insight\n    And community advocacy could benefit from my perspective\n    When opportunities arise to contribute to advocacy or community knowledge\n    Then the Value Scanner facilitates my participation in advocacy\n    And values my experiential knowledge as expertise\n    And helps me contribute to policy advocacy or community education\n    And protects my privacy while amplifying my voice\n    And recognizes advocacy participation as valuable community contribution\n    And my personal_agent identifies advocacy opportunities matching my capacity\n    And tracks my advocacy contributions with care economy credit\n    And celebrates that vulnerable people's knowledge shapes community\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/vulnerable_temporary/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-vulnerable-temporary-scenarios-community"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-vulnerable-temporary-scenarios-community",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Contributing my lived experience to community knowledge and advocacy",
+    "ogDescription": "Contributing my lived experience to community knowledge and advocacy",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-contributing my lived experience to community knowledge and advocacy",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Contributing my lived experience to community knowledge and advocacy - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-vulnerable-temporary-scenarios-community-contributing my lived experience to community knowledge and advocacy",
+    "identifier": "did:web:elohim.host:content:value-scanner:vulnerable-temporary:scenarios:community-contributing my lived experience to community knowledge and advocacy",
+    "name": "Contributing my lived experience to community knowledge and advocacy",
+    "description": "Contributing my lived experience to community knowledge and advocacy",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

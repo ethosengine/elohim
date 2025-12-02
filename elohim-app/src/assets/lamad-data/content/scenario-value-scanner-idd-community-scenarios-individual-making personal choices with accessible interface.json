@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-idd-community-scenarios-individual-making personal choices with accessible interface",
+  "did": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-making personal choices with accessible interface",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Making personal choices with accessible interface",
+  "description": "Making personal choices with accessible interface",
+  "content": "Scenario: Making personal choices with accessible interface\n    Given Jordan wants to choose their outfit for a community event\n    When Jordan opens the Value Scanner wardrobe feature\n    Then the interface displays clothing options with large pictures\n    And each option uses simple labels (\"Blue shirt\", \"Red sweater\")\n    And the interface uses step-by-step guidance (\"First pick a shirt\")\n    And Jordan can make their own choice without support worker intervention\n    And the system celebrates Jordan's choice with positive feedback\n    And Jordan's preference is recorded for future suggestions\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/idd_community/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-idd-community-scenarios-individual"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-idd-community-scenarios-individual",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Making personal choices with accessible interface",
+    "ogDescription": "Making personal choices with accessible interface",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-making personal choices with accessible interface",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Making personal choices with accessible interface - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-idd-community-scenarios-individual-making personal choices with accessible interface",
+    "identifier": "did:web:elohim.host:content:value-scanner:idd-community:scenarios:individual-making personal choices with accessible interface",
+    "name": "Making personal choices with accessible interface",
+    "description": "Making personal choices with accessible interface",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

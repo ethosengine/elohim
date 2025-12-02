@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-retired-scenarios-ecological-bioregional-local material sourcing reduces transportation impact",
+  "did": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-local material sourcing reduces transportation impact",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Local material sourcing reduces transportation impact",
+  "description": "Local material sourcing reduces transportation impact",
+  "content": "Scenario: Local material sourcing reduces transportation impact\n    Given Frank's construction work requires materials\n    And material transportation has significant carbon footprint\n    When the bioregional_elohim coordinates material sourcing\n    Then it should facilitate use of locally-sourced materials\n    And connect Frank to local salvage and reclaimed material sources\n    And reduce transportation impact through bioregional supply chains\n    And recognize local sourcing as ecological care contribution\n    And strengthen bioregional material economies\n    And Frank's work should demonstrate local material viability\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:retired",
+    "governance_layer:ecological_bioregional",
+    "related_users:senior,steward,gardener,volunteer,elder,conservationist",
+    "related_layers:individual,household,neighborhood,community,municipality",
+    "elohim_agents:personal_agent,household_elohim,community_elohim,bioregional_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/retired/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-retired-scenarios-ecological-bioregional",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Local material sourcing reduces transportation impact",
+    "ogDescription": "Local material sourcing reduces transportation impact",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-local material sourcing reduces transportation impact",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Local material sourcing reduces transportation impact - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-retired-scenarios-ecological-bioregional-local material sourcing reduces transportation impact",
+    "identifier": "did:web:elohim.host:content:value-scanner:retired:scenarios:ecological-bioregional-local material sourcing reduces transportation impact",
+    "name": "Local material sourcing reduces transportation impact",
+    "description": "Local material sourcing reduces transportation impact",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

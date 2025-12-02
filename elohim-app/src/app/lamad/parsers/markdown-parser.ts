@@ -1,5 +1,28 @@
-import { ContentNode, ContentMetadata } from '../models/content-node.model';
-import { EpicSection, EmbeddedReference } from '../models/epic-node.model';
+import { ContentNode, ContentMetadata, ContentType } from '../models/content-node.model';
+
+/**
+ * Section extracted from markdown content.
+ */
+export interface MarkdownSection {
+  title: string;
+  level: number;
+  anchor: string;
+  content: string;
+  embeddedReferences: EmbeddedReference[];
+}
+
+/**
+ * Reference embedded in markdown content (e.g., [Feature: xxx]).
+ */
+export interface EmbeddedReference {
+  type: 'feature' | 'scenario' | 'epic';
+  nodeId: string;
+  position: number;
+  displayText: string;
+}
+
+// Legacy alias for backward compatibility
+export type EpicSection = MarkdownSection;
 
 /**
  * Parser for Markdown documents
@@ -47,8 +70,7 @@ export class MarkdownParser {
 
     return {
       id,
-      contentType,
-      type: contentType, // Legacy compatibility
+      contentType: contentType as ContentType,
       title,
       description: this.generateDescription(sections),
       tags,
@@ -57,8 +79,8 @@ export class MarkdownParser {
       contentFormat: 'markdown',
       relatedNodeIds: [...featureIds, ...relatedEpicIds],
       metadata,
-      createdAt: new Date(), // Placeholder
-      updatedAt: new Date()  // Placeholder
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
   }
 
@@ -129,9 +151,9 @@ export class MarkdownParser {
   /**
    * Extract sections with headings
    */
-  private static extractSections(lines: string[], startIndex: number): EpicSection[] {
-    const sections: EpicSection[] = [];
-    let currentSection: EpicSection | null = null;
+  private static extractSections(lines: string[], startIndex: number): MarkdownSection[] {
+    const sections: MarkdownSection[] = [];
+    let currentSection: MarkdownSection | null = null;
 
     for (let i = startIndex; i < lines.length; i++) {
       const headingMatch = /^(#{1,6})\s+(.+)$/.exec(lines[i]);
@@ -252,7 +274,7 @@ export class MarkdownParser {
   /**
    * Generate description from first section or first paragraph
    */
-  private static generateDescription(sections: EpicSection[]): string {
+  private static generateDescription(sections: MarkdownSection[]): string {
     if (sections.length === 0) return '';
 
     const firstSection = sections[0];

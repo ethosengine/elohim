@@ -1,0 +1,51 @@
+{
+  "id": "scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for sustainable food practices at work",
+  "did": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-advocating for sustainable food practices at work",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Advocating for sustainable food practices at work",
+  "description": "Advocating for sustainable food practices at work",
+  "content": "Scenario: Advocating for sustainable food practices at work\n    Given my workplace makes decisions about sourcing and operations\n    When I want to advocate for more sustainable and care-aligned practices\n    Then the protocol should help me propose sustainable improvements\n    Such as local sourcing, waste reduction, composting, sustainable packaging\n    And provide evidence for ecological and economic benefits\n    And support me in advocating for care-economy-aligned food operations\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/worker/scenarios/ecological_bioregional.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-worker-scenarios-ecological-bioregional"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-worker-scenarios-ecological-bioregional",
+    "epic": null
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Advocating for sustainable food practices at work",
+    "ogDescription": "Advocating for sustainable food practices at work",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for sustainable food practices at work",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Advocating for sustainable food practices at work - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-worker-scenarios-ecological-bioregional-advocating for sustainable food practices at work",
+    "identifier": "did:web:elohim.host:content:value-scanner:worker:scenarios:ecological-bioregional-advocating for sustainable food practices at work",
+    "name": "Advocating for sustainable food practices at work",
+    "description": "Advocating for sustainable food practices at work",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

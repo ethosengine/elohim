@@ -1,0 +1,69 @@
+{
+  "id": "feature-value-scanner-student-scenarios-individual",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:individual",
+  "contentType": "feature",
+  "activityPubType": "Article",
+  "title": "Individual Layer Value Recognition for Student",
+  "description": "As a student learning to manage adult independence on limited resources Operating at the individual governance layer I want to develop care economy skills and build sustainable adult patterns So that I can thrive now and carry these capabilities throughout adult life",
+  "content": "@epic:value_scanner\n@user_type:student\n@governance_layer:individual\n@related_users:young_adult,teen,worker,adult\n@related_layers:household,educational,workplace_organizational\n@elohim_agents:personal_agent\n\nFeature: Individual Layer Value Recognition for Student\n  As a student learning to manage adult independence on limited resources\n  Operating at the individual governance layer\n  I want to develop care economy skills and build sustainable adult patterns\n  So that I can thrive now and carry these capabilities throughout adult life\n\n  Background:\n    Given the Elohim Protocol is operational\n    And the student user \"Kenji\" is registered in the system\n    And Kenji is 20 years old\n    And Kenji is a college sophomore studying environmental science\n    And Kenji works part-time 15 hours per week\n    And Kenji has a total budget of $180/week for all expenses\n    And Kenji allocates $50/week for personal groceries\n    And Kenji lives in shared apartment with three roommates\n    And the individual governance context is active\n    And Kenji's personal_agent is configured as patient teacher and advisor\n\n  Scenario: Personal agent teaches value literacy as foundational life skill\n    Given Kenji is shopping for groceries on his $50/week budget\n    And he struggles to identify best nutritional value per dollar\n    When Kenji's personal_agent analyzes his shopping choices\n    Then the agent should teach him to compare nutrition per cost\n    And it should explain \"Brown rice gives you 8 servings for $3, while instant rice gives 4 for $4\"\n    And it should help him identify efficient protein sources\n    And the agent should build Kenji's capability to make informed choices\n    And value literacy should be taught through practice, not lectures\n    And Kenji should develop skills that serve him throughout adult life\n\n  Scenario: Building sustainable resource management patterns under constraint\n    Given Kenji manages extreme resource constraint with $180/week total budget\n    And his scarcity requires sophisticated planning and discipline\n    When the personal_agent helps Kenji develop resource management practices\n    Then it should teach budgeting, meal planning, and strategic shopping\n    And it should help him distinguish needs from wants under pressure\n    And it should validate that managing scarcity is skilled work\n    And the agent should recognize his constraint management as capability development\n    And patterns learned now should become sustainable adult habits\n    And Kenji should learn that resource stewardship is care economy skill\n\n  Scenario: Identity development beyond student role\n    Given Kenji's identity is currently shaped by being a student\n    And he will graduate and transition to other adult roles\n    When the personal_agent supports Kenji's identity development\n    Then it should recognize him as complete person beyond student status\n    And it should support his interests in environmental science as life calling\n    And it should help him build identity that will persist after graduation\n    And it should validate his current contributions (cooking, care work) as real\n    And the agent should support integrated identity across contexts\n    And Kenji should develop sense of self beyond temporary student role\n\n  Scenario: Personal burnout prevention during academic pressure\n    Given Kenji faces intense academic demands during midterms and finals\n    And he also must maintain work hours to pay for expenses\n    When the personal_agent detects unsustainable stress patterns\n    Then it should flag burnout risk explicitly\n    And it should say \"You've slept 4 hours three nights in a row. This is dangerous.\"\n    And it should help him identify what must give to protect health\n    And it should connect him to campus mental health resources if needed\n    And crisis intervention should prioritize his survival\n    And the system should validate that breaking under these demands is not failure\n\n  Scenario: Developing cooking skills as care economy capability\n    Given Kenji is learning to cook efficiently on tight budget\n    And cooking is new skill he's developing as independent adult\n    When the personal_agent teaches Kenji cooking techniques\n    Then it should provide patient, practical instruction\n    And it should teach him to plan meals that use ingredients efficiently\n    And it should help him learn techniques that reduce prep time\n    And the agent should recognize cooking as care economy skill\n    And it should validate his progress: \"You can now make 5 meals confidently\"\n    And Kenji should experience cooking as capability, not chore\n\n  Scenario: Care token accumulation for self-care and household contributions\n    Given Kenji prepares nutritious meals for himself\n    And he manages his space, does laundry, and maintains basic self-care\n    When the Value Scanner tracks Kenji's individual care contributions\n    Then it should accumulate care tokens for self-care labor\n    And it should recognize that caring for himself is care economy work\n    And it should track his development of adult life skills\n    And self-maintenance should be valued, not invisible\n    And the system should make visible the work of sustaining himself\n    And Kenji should see that taking care of himself is productive\n\n  Scenario: Financial literacy development through care economy lens\n    Given Kenji must manage all his finances independently\n    And he receives financial aid, earns wages, and makes all spending decisions\n    When the personal_agent teaches financial management\n    Then it should frame finances through care economy principles\n    And it should teach him to value care contributions alongside paid work\n    And it should help him understand exploitation vs. fair exchange\n    And the agent should build financial literacy integrated with care values\n    And Kenji should learn to see economy as care exchange, not just money\n    And financial capability should be built on care economy foundation\n\n  Scenario: Privacy and autonomy as emerging independent adult\n    Given Kenji is establishing adult independence\n    And he has full rights to privacy in his personal life\n    When care economy data is collected about Kenji\n    Then he must have complete control over all personal information\n    And no data should be shared with family or school without his consent\n    And his adult autonomy should be respected completely\n    And privacy should be default, not something he must request\n    And the system should support his development of adult boundaries\n    And Kenji's data sovereignty should be absolute\n\n  Scenario: Learning to recognize own needs and ask for help\n    Given Kenji is navigating adult independence for first time\n    And college culture often treats struggling as weakness\n    When Kenji faces challenges beyond his current capacity\n    Then the personal_agent should teach him to recognize when he needs help\n    And it should normalize asking for support as strength, not failure\n    And it should connect him to available resources (food bank, counseling, emergency aid)\n    And the agent should validate that everyone needs help sometimes\n    And the system should counteract toxic independence culture\n    And Kenji should learn that care economy includes receiving care\n\n  Scenario: Time management for competing demands\n    Given Kenji must balance 15 hours work, full academic load, and household responsibilities\n    And time is his most constrained resource\n    When the personal_agent helps Kenji manage his schedule\n    Then it should teach realistic time budgeting\n    And it should help him prioritize among competing demands\n    And it should recognize time spent on care work as real constraint\n    And the agent should validate that he cannot do everything\n    And it should help him make conscious trade-offs\n    And Kenji should learn sustainable pacing for long-term success\n\n  Scenario: Building resilience through care economy participation\n    Given Kenji faces significant stress and uncertainty\n    And he is geographically separated from family support networks\n    When the personal_agent supports Kenji's resilience development\n    Then it should recognize his participation in care economy as building connection\n    And it should show how his care contributions create community\n    And it should validate that resilience comes from reciprocal relationships\n    And the agent should help him build care networks in temporary community\n    And the system should teach that care economy creates security\n    And Kenji should learn that giving and receiving care builds resilience\n\n  Scenario: Recognizing that student patterns shape adult life\n    Given Kenji is forming habits and patterns that will persist\n    And his college years are when adult identity and practices solidify\n    When the personal_agent reflects on Kenji's pattern development\n    Then it should help him see that current choices shape future self\n    And it should validate that learning care economy now matters lifelong\n    And it should recognize this developmental phase as formative\n    And the agent should support intentional pattern-building\n    And the system should help Kenji become the adult he wants to be\n    And student years should be recognized as foundation-laying time\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:individual",
+    "related_users:young_adult,teen,worker,adult",
+    "related_layers:household,educational,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "feature"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "scenario-value-scanner-student-scenarios-individual-personal agent teaches value literacy as foundational life skill",
+    "scenario-value-scanner-student-scenarios-individual-building sustainable resource management patterns under constraint",
+    "scenario-value-scanner-student-scenarios-individual-identity development beyond student role",
+    "scenario-value-scanner-student-scenarios-individual-personal burnout prevention during academic pressure",
+    "scenario-value-scanner-student-scenarios-individual-developing cooking skills as care economy capability",
+    "scenario-value-scanner-student-scenarios-individual-care token accumulation for self-care and household contributions",
+    "scenario-value-scanner-student-scenarios-individual-financial literacy development through care economy lens",
+    "scenario-value-scanner-student-scenarios-individual-privacy and autonomy as emerging independent adult",
+    "scenario-value-scanner-student-scenarios-individual-learning to recognize own needs and ask for help",
+    "scenario-value-scanner-student-scenarios-individual-time management for competing demands",
+    "scenario-value-scanner-student-scenarios-individual-building resilience through care economy participation",
+    "scenario-value-scanner-student-scenarios-individual-recognizing that student patterns shape adult life",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "epic": "value_scanner",
+    "scenarioCount": 12
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Individual Layer Value Recognition for Student",
+    "ogDescription": "As a student learning to manage adult independence on limited resources Operating at the individual governance layer I want to develop care economy skills and build sustainable adult patterns So that ",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/feature-value-scanner-student-scenarios-individual",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/feature.jpg",
+    "ogImageAlt": "Individual Layer Value Recognition for Student - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Article",
+    "@id": "https://elohim-protocol.org/content/feature-value-scanner-student-scenarios-individual",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:individual",
+    "name": "Individual Layer Value Recognition for Student",
+    "description": "As a student learning to manage adult independence on limited resources Operating at the individual governance layer I want to develop care economy skills and build sustainable adult patterns So that I can thrive now and carry these capabilities throughout adult life",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

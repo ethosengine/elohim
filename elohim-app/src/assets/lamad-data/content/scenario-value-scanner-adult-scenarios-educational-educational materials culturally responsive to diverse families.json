@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-educational-educational materials culturally responsive to diverse families",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-educational materials culturally responsive to diverse families",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Educational materials culturally responsive to diverse families",
+  "description": "Educational materials culturally responsive to diverse families",
+  "content": "Scenario: Educational materials culturally responsive to diverse families\n    Given Sarah teaches students from diverse cultural backgrounds\n    And her own children are learning family cultural values\n    When educational materials are designed\n    Then the educational_elohim should provide culturally diverse resources\n    And materials should respect different care economy traditions\n    And Sarah should be able to adapt to cultural contexts\n    And value literacy should be taught in culturally responsive ways\n    And diverse approaches to care should be honored in education\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:educational",
+    "related_users:young_child,child,parent,educator,student",
+    "related_layers:family,workplace_organizational,community",
+    "elohim_agents:personal_agent,educational_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/educational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-educational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-educational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Educational materials culturally responsive to diverse families",
+    "ogDescription": "Educational materials culturally responsive to diverse families",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-educational materials culturally responsive to diverse families",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Educational materials culturally responsive to diverse families - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-educational-educational materials culturally responsive to diverse families",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:educational-educational materials culturally responsive to diverse families",
+    "name": "Educational materials culturally responsive to diverse families",
+    "description": "Educational materials culturally responsive to diverse families",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

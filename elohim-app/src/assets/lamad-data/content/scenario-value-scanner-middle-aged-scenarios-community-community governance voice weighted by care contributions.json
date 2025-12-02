@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-middle-aged-scenarios-community-community governance voice weighted by care contributions",
+  "did": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community governance voice weighted by care contributions",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Community governance voice weighted by care contributions",
+  "description": "Community governance voice weighted by care contributions",
+  "content": "Scenario: Community governance voice weighted by care contributions\n    Given Robert has made substantial care contributions over decades\n    And his care work demonstrates community investment\n    When community_elohim supports governance participation\n    Then his accumulated care contributions should give him standing\n    And his voice in community decisions should reflect his investment\n    And governance processes should actively solicit his input\n    And his experience managing complexity should be valued in community planning\n    And care tokens should connect to community governance participation\n    And demonstrate that care economy participation creates civic voice\n    And prevent governance dominated by those without care experience\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:middle_aged",
+    "governance_layer:community",
+    "related_users:adult,senior,parent,grandparent,worker,caregiver",
+    "related_layers:neighborhood,municipality,workplace_organizational,family",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/middle_aged/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-middle-aged-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-middle-aged-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Community governance voice weighted by care contributions",
+    "ogDescription": "Community governance voice weighted by care contributions",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community governance voice weighted by care contributions",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Community governance voice weighted by care contributions - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-middle-aged-scenarios-community-community governance voice weighted by care contributions",
+    "identifier": "did:web:elohim.host:content:value-scanner:middle-aged:scenarios:community-community governance voice weighted by care contributions",
+    "name": "Community governance voice weighted by care contributions",
+    "description": "Community governance voice weighted by care contributions",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

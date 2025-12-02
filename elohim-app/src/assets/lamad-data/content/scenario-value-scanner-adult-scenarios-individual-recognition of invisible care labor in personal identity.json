@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-adult-scenarios-individual-recognition of invisible care labor in personal identity",
+  "did": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-recognition of invisible care labor in personal identity",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Recognition of invisible care labor in personal identity",
+  "description": "Recognition of invisible care labor in personal identity",
+  "content": "Scenario: Recognition of invisible care labor in personal identity\n    Given Sarah performs enormous amounts of invisible care work\n    And traditional economics don't recognize meal planning, schedule management, emotional labor\n    When Sarah reviews her care contributions\n    Then the Value Scanner should make all care labor visible\n    And her personal_agent should quantify meal planning, shopping, cooking, coordination, kin-keeping\n    And care tokens should accumulate reflecting her actual contributions\n    And Sarah's self-understanding should shift from \"not working\" to \"performing essential care labor\"\n    And visibility should transform how Sarah sees herself\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:adult",
+    "governance_layer:individual",
+    "related_users:young_adult,middle_aged,parent,worker,caregiver",
+    "related_layers:household,family,workplace_organizational",
+    "elohim_agents:personal_agent",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/adult/scenarios/individual.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-adult-scenarios-individual",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-adult-scenarios-individual",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Recognition of invisible care labor in personal identity",
+    "ogDescription": "Recognition of invisible care labor in personal identity",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-recognition of invisible care labor in personal identity",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Recognition of invisible care labor in personal identity - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-adult-scenarios-individual-recognition of invisible care labor in personal identity",
+    "identifier": "did:web:elohim.host:content:value-scanner:adult:scenarios:individual-recognition of invisible care labor in personal identity",
+    "name": "Recognition of invisible care labor in personal identity",
+    "description": "Recognition of invisible care labor in personal identity",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

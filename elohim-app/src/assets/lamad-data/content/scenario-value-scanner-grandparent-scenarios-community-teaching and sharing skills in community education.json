@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-grandparent-scenarios-community-teaching and sharing skills in community education",
+  "did": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-teaching and sharing skills in community education",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Teaching and sharing skills in community education",
+  "description": "Teaching and sharing skills in community education",
+  "content": "Scenario: Teaching and sharing skills in community education\n    Given Margaret has skills in health, crafts, traditional knowledge\n    And community members want to learn these skills\n    When Margaret teaches classes or workshops\n    Then the community_elohim should recognize teaching as care work\n    And it should facilitate skill-sharing opportunities\n    And it should connect Margaret with learners\n    And community education should be valued and supported\n    And Margaret's teaching should accumulate care tokens\n    And community should benefit from skill transmission\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:grandparent",
+    "governance_layer:community",
+    "related_users:senior,retired,volunteer,elderly,middle_aged",
+    "related_layers:neighborhood,family,municipality,ecological_bioregional",
+    "elohim_agents:personal_agent,community_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/grandparent/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-grandparent-scenarios-community",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-grandparent-scenarios-community",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Teaching and sharing skills in community education",
+    "ogDescription": "Teaching and sharing skills in community education",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-teaching and sharing skills in community education",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Teaching and sharing skills in community education - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-grandparent-scenarios-community-teaching and sharing skills in community education",
+    "identifier": "did:web:elohim.host:content:value-scanner:grandparent:scenarios:community-teaching and sharing skills in community education",
+    "name": "Teaching and sharing skills in community education",
+    "description": "Teaching and sharing skills in community education",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

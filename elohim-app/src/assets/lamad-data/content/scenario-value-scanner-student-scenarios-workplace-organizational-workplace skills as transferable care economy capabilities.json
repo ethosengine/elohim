@@ -1,0 +1,58 @@
+{
+  "id": "scenario-value-scanner-student-scenarios-workplace-organizational-workplace skills as transferable care economy capabilities",
+  "did": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-workplace skills as transferable care economy capabilities",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Workplace skills as transferable care economy capabilities",
+  "description": "Workplace skills as transferable care economy capabilities",
+  "content": "Scenario: Workplace skills as transferable care economy capabilities\n    Given Kenji develops skills through work (customer service, teamwork, reliability)\n    And these capabilities serve him throughout life\n    When the workplace_elohim documents Kenji's skill development\n    Then it should recognize customer service as care economy skill\n    And it should value teamwork, communication, and problem-solving\n    And it should translate work skills to care economy capabilities\n    And it should help Kenji articulate skills for future opportunities\n    And the system should recognize all work as capability development\n    And Kenji should understand his part-time work as building life skills\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:value_scanner",
+    "user_type:student",
+    "governance_layer:workplace_organizational",
+    "related_users:worker,employee,young_adult,manager",
+    "related_layers:individual,educational,community",
+    "elohim_agents:personal_agent,workplace_elohim",
+    "value-scanner",
+    "scenario"
+  ],
+  "sourcePath": "value_scanner/student/scenarios/workplace_organizational.feature",
+  "relatedNodeIds": [
+    "feature-value-scanner-student-scenarios-workplace-organizational",
+    "value-scanner-epic"
+  ],
+  "metadata": {
+    "category": "value-scanner",
+    "featureId": "feature-value-scanner-student-scenarios-workplace-organizational",
+    "epic": "value_scanner"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Workplace skills as transferable care economy capabilities",
+    "ogDescription": "Workplace skills as transferable care economy capabilities",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-workplace skills as transferable care economy capabilities",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Workplace skills as transferable care economy capabilities - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-value-scanner-student-scenarios-workplace-organizational-workplace skills as transferable care economy capabilities",
+    "identifier": "did:web:elohim.host:content:value-scanner:student:scenarios:workplace-organizational-workplace skills as transferable care economy capabilities",
+    "name": "Workplace skills as transferable care economy capabilities",
+    "description": "Workplace skills as transferable care economy capabilities",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

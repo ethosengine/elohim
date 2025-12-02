@@ -1,0 +1,58 @@
+{
+  "id": "scenario-social-medium-activist-scenarios-global-activist coordinates planetary climate strike",
+  "did": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist coordinates planetary climate strike",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Activist coordinates planetary climate strike",
+  "description": "Activist coordinates planetary climate strike",
+  "content": "Scenario: Activist coordinates planetary climate strike\n    Given youth activists worldwide demand emergency climate action\n    And they want coordinated strikes across all continents\n    When the network establishes a coordinated action date\n    And local groups plan context-appropriate actions\n    And the coordination respects different hemispheres, cultures, and capacities\n    Then each community organizes autonomously within global framework\n    And the translation agents enable real-time cross-language coordination\n    And traditional media amplification is earned through demonstrated scale\n    And the collective action maintains coherence without centralized control\n    And impact is measured through network-wide participation tracking\n    And the strike demonstrates viable model for global coordination\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:social_medium",
+    "user_type:activist",
+    "governance_layer:global",
+    "related_users:refugee,displaced_person,activist,content_creator",
+    "related_layers:nation_state,continental,affinity_network,cultural_linguistic",
+    "elohim_agents:translation_agent,verification_agent,pattern_recognition_agent,protection_agent",
+    "social-medium",
+    "scenario"
+  ],
+  "sourcePath": "social_medium/activist/scenarios/global.feature",
+  "relatedNodeIds": [
+    "feature-social-medium-activist-scenarios-global",
+    "social-medium-epic"
+  ],
+  "metadata": {
+    "category": "social-medium",
+    "featureId": "feature-social-medium-activist-scenarios-global",
+    "epic": "social_medium"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Activist coordinates planetary climate strike",
+    "ogDescription": "Activist coordinates planetary climate strike",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist coordinates planetary climate strike",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Activist coordinates planetary climate strike - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-social-medium-activist-scenarios-global-activist coordinates planetary climate strike",
+    "identifier": "did:web:elohim.host:content:social-medium:activist:scenarios:global-activist coordinates planetary climate strike",
+    "name": "Activist coordinates planetary climate strike",
+    "description": "Activist coordinates planetary climate strike",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

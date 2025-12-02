@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-adopting elohim protocol through community referendum",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community-adopting elohim protocol through community referendum",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Adopting Elohim Protocol through community referendum",
+  "description": "Adopting Elohim Protocol through community referendum",
+  "content": "Scenario: Adopting Elohim Protocol through community referendum\n    Given Riverside is considering protocol adoption\n    And I am responsible for democratic decision-making process\n    When we conduct community deliberation and vote\n    Then we provide: 6 months of education and pilot testing\n    And we ensure: residents understand what they're choosing\n    And we hold: town halls, demonstrations, Q&A sessions\n    And we offer: transparent information about benefits and risks\n    And we conduct: referendum with 65% approval threshold\n    And we respect: community sovereignty to accept or reject\n    And adoption becomes: democratic mandate not top-down imposition\n    And I am accountable: for implementation serving community values\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Adopting Elohim Protocol through community referendum",
+    "ogDescription": "Adopting Elohim Protocol through community referendum",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-adopting elohim protocol through community referendum",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Adopting Elohim Protocol through community referendum - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-adopting elohim protocol through community referendum",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:community-adopting elohim protocol through community referendum",
+    "name": "Adopting Elohim Protocol through community referendum",
+    "description": "Adopting Elohim Protocol through community referendum",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

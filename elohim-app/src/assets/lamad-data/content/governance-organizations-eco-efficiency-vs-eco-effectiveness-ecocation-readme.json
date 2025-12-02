@@ -1,0 +1,62 @@
+{
+  "id": "governance-organizations-eco-efficiency-vs-eco-effectiveness-ecocation-readme",
+  "did": "did:web:elohim.host:content:governance:organizations:eco-efficiency-vs-eco-effectiveness-ecocation:readme",
+  "contentType": "organization",
+  "activityPubType": "Organization",
+  "title": "Epic relationships (NO DUPLICATION NEEDED)",
+  "description": "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.",
+  "content": "---\nnode_type: organization\norg_id: eco_efficiency_vs_eco_effectiveness_ecocation\nname: \"Eco Efficiency vs Eco Effectiveness - EcoCation\"\nurl: \"https://ecocation.org/eco-efficiency-vs-eco-effectiveness/\"\ngem_id: \"GldRGANcGYQwGPxYMxQa\"\n\n# Epic relationships (NO DUPLICATION NEEDED)\nprimary_epic: governance\nrelated_epics: []\n\nepic_relationships:\n  governance:\n    inspiration: \"[How Eco Efficiency vs Eco Effectiveness - EcoCation inspires the governance epic]\"\n    parallel_work: []\n\n# What they demonstrate\ndemonstrates_principles: []\n\n# Who they inspire (across ALL epics)\ninspires_users: []\n\n# Where they operate\noperates_at_layers: []\n\n# Graph relationships (automatically generated from above)\nedge_types:\n  - inspires_epic\n  - demonstrates_principle\n  - aligns_with_user\n  - operates_at_layer\n---\n\n# Eco Efficiency vs Eco Effectiveness - EcoCation\n\n## Description\n\nEco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.\n\n**Publisher:** EcoCation\n\n## Vision Alignment\n\nHow this organization's work aligns with the Elohim Protocol vision:\n\n- [Alignment point 1 - to be filled in]\n- [Alignment point 2 - to be filled in]\n\n## Multi-Epic Inspiration\n\n### Primary Epic: governance\n\n[Detailed explanation of how Eco Efficiency vs Eco Effectiveness - EcoCation relates to and inspires the governance epic]\n\n**Parallel Work:**\n- [What they're doing that parallels this epic]\n\n## Demonstrations of Principles\n\n### [Principle 1]\nHow this organization demonstrates this principle in practice\n\n### [Principle 2]  \nHow this organization demonstrates this principle in practice\n\n## Key Resources\n\n- **Website:** https://ecocation.org/eco-efficiency-vs-eco-effectiveness/\n- **Key reading:** [Links to important content]\n- **People:** [Key figures]\n\n## Graph Connections\n\n### Inspires Epics\n- `governance` - Primary focus and location\n\n### Inspires Users\n- `[epic:user_type]` - [how/why]\n\n### Demonstrates Principles\n- `[principle_name]` - [how they demonstrate it]\n\n### Operates At Layers\n- `[layer_name]` - [what they do at this layer]\n",
+  "contentFormat": "markdown",
+  "tags": [
+    "organization",
+    "governance"
+  ],
+  "sourcePath": "governance/organizations/eco_efficiency_vs_eco_effectiveness_ecocation/README.md",
+  "relatedNodeIds": [],
+  "metadata": {
+    "category": "governance",
+    "related_epics": [],
+    "primary_epic": "governance",
+    "url": "https://ecocation.org/eco-efficiency-vs-eco-effectiveness/",
+    "name": "Eco Efficiency vs Eco Effectiveness - EcoCation",
+    "org_id": "eco_efficiency_vs_eco_effectiveness_ecocation",
+    "gem_id": "GldRGANcGYQwGPxYMxQa",
+    "node_type": "organization",
+    "demonstrates_principles": [],
+    "inspires_users": [],
+    "operates_at_layers": [],
+    "publisher": "EcoCation",
+    "epic_relationships": {
+      "governance": {
+        "inspiration": "[How Eco Efficiency vs Eco Effectiveness - EcoCation inspires the governance epic]",
+        "parallel_work": []
+      }
+    }
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Epic relationships (NO DUPLICATION NEEDED)",
+    "ogDescription": "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/governance-organizations-eco-efficiency-vs-eco-effectiveness-ecocation-readme",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/organization.jpg",
+    "ogImageAlt": "Epic relationships (NO DUPLICATION NEEDED) - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Organization",
+    "@id": "https://elohim-protocol.org/content/governance-organizations-eco-efficiency-vs-eco-effectiveness-ecocation-readme",
+    "identifier": "did:web:elohim.host:content:governance:organizations:eco-efficiency-vs-eco-effectiveness-ecocation:readme",
+    "name": "Epic relationships (NO DUPLICATION NEEDED)",
+    "description": "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}

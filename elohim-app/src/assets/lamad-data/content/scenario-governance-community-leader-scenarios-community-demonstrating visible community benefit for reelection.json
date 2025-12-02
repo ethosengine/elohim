@@ -1,0 +1,58 @@
+{
+  "id": "scenario-governance-community-leader-scenarios-community-demonstrating visible community benefit for reelection",
+  "did": "did:web:elohim.host:content:governance:community-leader:scenarios:community-demonstrating visible community benefit for reelection",
+  "contentType": "scenario",
+  "activityPubType": "Note",
+  "title": "Demonstrating visible community benefit for reelection",
+  "description": "Demonstrating visible community benefit for reelection",
+  "content": "Scenario: Demonstrating visible community benefit for reelection\n    Given I face reelection and need to show protocol serves Riverside\n    And residents judge me on outcomes not philosophy\n    When I present annual protocol review to community\n    Then I show: data on wellbeing improvements (loneliness down, satisfaction up)\n    And I report: crisis response effectiveness and economic resilience\n    And I acknowledge: failures and challenges honestly\n    And I demonstrate: transparent accountability\n    And I propose: continuing with recommended calibrations\n    And residents vote: 68% to continue (not consensus but democratic)\n    And I remain accountable: through normal democratic processes\n    And evidence matters: for sustaining political support\n",
+  "contentFormat": "gherkin",
+  "tags": [
+    "epic:governance",
+    "user_type:community_leader",
+    "governance_layer:community",
+    "related_users:constitutional_council_member,appellant,policy_maker,technical_expert,researcher",
+    "related_layers:municipality,district",
+    "elohim_agents:community_elohim,family_elohim",
+    "governance",
+    "scenario"
+  ],
+  "sourcePath": "governance/community_leader/scenarios/community.feature",
+  "relatedNodeIds": [
+    "feature-governance-community-leader-scenarios-community",
+    "governance-epic"
+  ],
+  "metadata": {
+    "category": "governance",
+    "featureId": "feature-governance-community-leader-scenarios-community",
+    "epic": "governance"
+  },
+  "openGraphMetadata": {
+    "ogTitle": "Demonstrating visible community benefit for reelection",
+    "ogDescription": "Demonstrating visible community benefit for reelection",
+    "ogType": "article",
+    "ogUrl": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-demonstrating visible community benefit for reelection",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articlePublishedTime": "2025-11-22T01:43:14Z",
+    "articleModifiedTime": "2025-11-22T01:43:14Z",
+    "ogImage": "https://elohim-protocol.org/assets/images/og-defaults/scenario.jpg",
+    "ogImageAlt": "Demonstrating visible community benefit for reelection - Elohim Protocol"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "CreativeWork",
+    "@id": "https://elohim-protocol.org/content/scenario-governance-community-leader-scenarios-community-demonstrating visible community benefit for reelection",
+    "identifier": "did:web:elohim.host:content:governance:community-leader:scenarios:community-demonstrating visible community benefit for reelection",
+    "name": "Demonstrating visible community benefit for reelection",
+    "description": "Demonstrating visible community benefit for reelection",
+    "dateCreated": "2025-11-22T01:43:14Z",
+    "dateModified": "2025-11-22T01:43:14Z",
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://elohim-protocol.org",
+      "name": "Elohim Protocol"
+    }
+  },
+  "createdAt": "2025-11-22T01:43:14Z",
+  "updatedAt": "2025-11-22T01:43:14Z"
+}
