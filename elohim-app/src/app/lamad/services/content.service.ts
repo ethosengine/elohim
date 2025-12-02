@@ -180,7 +180,7 @@ export class ContentService {
         (index.nodes ?? []).forEach((node: ContentIndexEntry) => {
           node.tags?.forEach((tag: string) => tagSet.add(tag));
         });
-        return Array.from(tagSet).sort();
+        return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
       })
     );
   }
@@ -550,7 +550,7 @@ export class ContentService {
     ];
 
     for (const pattern of patterns) {
-      const match = url.match(pattern);
+      const match = pattern.exec(url);
       if (match) {
         return match[1];
       }
@@ -703,9 +703,9 @@ export class ContentService {
   getStandardsMetadata(resourceId: string): Observable<{
     did: string | null;
     activityPubType: string | null;
-    activityPubObject: any | null;
-    openGraph: any | null;
-    jsonLd: any | null;
+    activityPubObject: unknown;
+    openGraph: unknown;
+    jsonLd: unknown;
   }> {
     return this.dataLoader.getContent(resourceId).pipe(
       map(content => ({

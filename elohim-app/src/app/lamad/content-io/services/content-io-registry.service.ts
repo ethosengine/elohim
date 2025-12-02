@@ -234,7 +234,7 @@ export class ContentIORegistryService {
   // ─────────────────────────────────────────────────────────────────────────────
 
   private getFileExtension(filename: string): string | null {
-    const match = filename.match(/\.[^.]+$/);
+    const match = /\.[^.]+$/.exec(filename);
     return match ? match[0].toLowerCase() : null;
   }
 

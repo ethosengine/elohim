@@ -376,7 +376,7 @@ export class ContentMasteryService {
     const now = new Date().toISOString();
 
     for (const [privilegeType, requiredLevel] of Object.entries(PRIVILEGE_REQUIREMENTS)) {
-      const granted = compareMasteryLevels(level, requiredLevel as BloomMasteryLevel) >= 0;
+      const granted = compareMasteryLevels(level, requiredLevel) >= 0;
       privileges.push({
         privilege: privilegeType as PrivilegeType,
         grantedAt: granted ? now : '',

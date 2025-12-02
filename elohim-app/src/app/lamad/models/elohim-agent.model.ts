@@ -241,7 +241,7 @@ export interface ElohimRequest {
   requestId: string;
 
   /** Which Elohim to invoke (or 'auto' for layer-appropriate selection) */
-  targetElohimId: string | 'auto';
+  targetElohimId: string;
 
   /** The capability being requested */
   capability: ElohimCapability;

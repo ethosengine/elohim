@@ -50,6 +50,16 @@ export type GovernableEntityType =
   | 'governance-decision'; // Decisions themselves can be challenged
 
 /**
+ * ActorType - Types of actors that can perform governance actions.
+ */
+export type ActorType = 'human' | 'elohim' | 'collective';
+
+/**
+ * DeciderType - Types of decision makers (includes algorithm).
+ */
+export type DeciderType = 'algorithm' | ActorType;
+
+/**
  * GovernanceState - The current governance status of any entity.
  *
  * Every entity in the system has a GovernanceState that tracks:
@@ -116,7 +126,7 @@ export interface StatusBasis {
 
   /** Who/what made this determination? */
   deciderId: string;
-  deciderType: 'algorithm' | 'human' | 'elohim' | 'collective';
+  deciderType: DeciderType;
 
   /** When was this determination made? */
   decidedAt: string;
@@ -229,7 +239,7 @@ export interface ReviewRecord {
 
   /** Who conducted this review? */
   reviewerId: string;
-  reviewerType: 'human' | 'elohim' | 'collective';
+  reviewerType: ActorType;
 
   /** Type of review */
   reviewType: ReviewType;
@@ -299,7 +309,7 @@ export interface Challenge {
 
   /** Who is challenging? */
   challengerId: string;
-  challengerType: 'human' | 'elohim' | 'collective';
+  challengerType: ActorType;
 
   /** Standing - why does challenger have right to challenge? */
   standing: ChallengeStanding;
@@ -705,7 +715,7 @@ export interface ContentGovernanceHistory {
 export interface CreationRecord {
   createdAt: string;
   createdBy: string;
-  creatorType: 'human' | 'elohim' | 'collective';
+  creatorType: ActorType;
 
   /** Original context (how was this created?) */
   creationContext: CreationContext;
@@ -746,7 +756,7 @@ export interface VersionRecord {
 
   /** Who made this change? */
   authorId: string;
-  authorType: 'human' | 'elohim' | 'collective';
+  authorType: ActorType;
 
   /** What changed? */
   changeType: VersionChangeType;

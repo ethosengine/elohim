@@ -78,7 +78,7 @@
 
   <!-- Upgrade Modal -->
   <dialog *ngIf="showUpgradeModal" class="modal-overlay" (click)="closeUpgradeModal()" (keydown.escape)="closeUpgradeModal()" (keydown.enter)="closeUpgradeModal()" open aria-labelledby="upgrade-modal-title">
-    <div class="upgrade-modal" (click)="$event.stopPropagation()">
+    <div class="upgrade-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
       <button class="modal-close" (click)="closeUpgradeModal()">✕</button>
 
       <div class="modal-header">

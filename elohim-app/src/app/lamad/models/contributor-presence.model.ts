@@ -473,7 +473,7 @@ export interface AssignStewardshipRequest {
   presenceId: string;
 
   /** The Elohim to assign (or 'auto' for system selection) */
-  stewardId: string | 'auto';
+  stewardId: string;
 
   /** Why this stewardship is being assigned */
   reason: string;

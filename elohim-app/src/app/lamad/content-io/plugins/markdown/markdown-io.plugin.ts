@@ -283,11 +283,12 @@ export class MarkdownIOPlugin implements ContentIOPlugin {
 
         if (Array.isArray(value)) {
           fields.push(`${key}: [${value.join(', ')}]`);
-        } else if (typeof value === 'object') {
+        } else if (value !== null && typeof value === 'object') {
           // Skip complex objects in frontmatter
           continue;
         } else {
-          fields.push(`${key}: ${value}`);
+          // Primitive values (string, number, boolean)
+          fields.push(`${key}: ${String(value)}`);
         }
       }
     }

@@ -651,7 +651,7 @@ export interface NetworkEconomicMetrics {
  *
  * This will be implemented when integrating with Holochain.
  */
-export interface hREAEventAdapter {
+export interface HREAEventAdapter {
   /** Convert Lamad event to hREA GraphQL format */
   toHREA(event: EconomicEvent): unknown;
 

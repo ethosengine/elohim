@@ -215,8 +215,7 @@ export class GherkinRendererComponent implements OnChanges {
       let inDescription = false;
       let descriptionLines: string[] = [];
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+      for (const line of lines) {
         const trimmed = line.trim();
 
         // Skip empty lines (unless in doc string)
