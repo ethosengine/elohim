@@ -20,7 +20,6 @@ import {
 } from '../models/path-negotiation.model';
 import { hasMinimumIntimacy } from '../models/human-consent.model';
 import { PathNegotiationContent } from '../models/source-chain.model';
- from '../models/learning-path.model';
 
 /**
  * PathNegotiationService - Placeholder for Elohim-to-Elohim path negotiation.
