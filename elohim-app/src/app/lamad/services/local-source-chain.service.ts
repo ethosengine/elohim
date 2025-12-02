@@ -355,7 +355,7 @@ export class LocalSourceChainService {
     propertyValue: unknown
   ): SourceChainEntry<T>[] {
     return this.getEntriesByType<T>(entryType).filter(
-      entry => (entry.content as T)[propertyName] === propertyValue
+      entry => entry.content[propertyName] === propertyValue
     );
   }
 

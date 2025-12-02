@@ -14,14 +14,13 @@ import {
   NegotiationResponse,
   PathAcceptance,
   AffinityAnalysis,
-  AffinityNode,
   ProposedPathStructure,
   isNegotiationActive,
   isNegotiationResolved,
 } from '../models/path-negotiation.model';
 import { hasMinimumIntimacy } from '../models/human-consent.model';
-import { PathNegotiationContent, NegotiationMessageContent } from '../models/source-chain.model';
-import type { LearningPath, PathStep } from '../models/learning-path.model';
+import { PathNegotiationContent } from '../models/source-chain.model';
+ from '../models/learning-path.model';
 
 /**
  * PathNegotiationService - Placeholder for Elohim-to-Elohim path negotiation.
@@ -40,13 +39,13 @@ import type { LearningPath, PathStep } from '../models/learning-path.model';
  */
 @Injectable({ providedIn: 'root' })
 export class PathNegotiationService {
-  private negotiationsSubject = new BehaviorSubject<PathNegotiation[]>([]);
+  private readonly negotiationsSubject = new BehaviorSubject<PathNegotiation[]>([]);
   public negotiations$ = this.negotiationsSubject.asObservable();
 
   constructor(
-    private sourceChain: LocalSourceChainService,
-    private consentService: HumanConsentService,
-    private affinityService: AffinityTrackingService
+    private readonly sourceChain: LocalSourceChainService,
+    private readonly consentService: HumanConsentService,
+    private readonly affinityService: AffinityTrackingService
   ) {}
 
   // =========================================================================

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, throwError, BehaviorSubject } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { tap } from 'rxjs/operators';
 
 import { LocalSourceChainService } from './local-source-chain.service';
 import { SessionHumanService } from './session-human.service';
@@ -8,14 +8,10 @@ import {
   HumanConsent,
   IntimacyLevel,
   ConsentState,
-  ConsentStateChange,
-  ConsentRequest,
-  ConsentResponse,
   ElevationRequest,
   hasMinimumIntimacy,
   isConsentActive,
   canElevate,
-  getNextIntimacyLevel,
 } from '../models/human-consent.model';
 import { HumanConsentContent } from '../models/source-chain.model';
 import type { LearningPath, PathVisibility } from '../models/learning-path.model';
@@ -37,12 +33,12 @@ import type { LearningPath, PathVisibility } from '../models/learning-path.model
  */
 @Injectable({ providedIn: 'root' })
 export class HumanConsentService {
-  private consentsSubject = new BehaviorSubject<HumanConsent[]>([]);
+  private readonly consentsSubject = new BehaviorSubject<HumanConsent[]>([]);
   public consents$ = this.consentsSubject.asObservable();
 
   constructor(
-    private sourceChain: LocalSourceChainService,
-    private sessionHuman: SessionHumanService
+    private readonly sourceChain: LocalSourceChainService,
+    private readonly sessionHuman: SessionHumanService
   ) {}
 
   // =========================================================================

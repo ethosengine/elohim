@@ -44,12 +44,7 @@
 
 import {
   type TokenType,
-  type TokenDecayRate,
   type GovernanceLayer,
-  type Attestation,
-  type AttestationStatus,
-  type ProtocolAgent,
-  type AgentType,
 } from './protocol-core.model';
 
 // ============================================================================

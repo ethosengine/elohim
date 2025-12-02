@@ -45,12 +45,6 @@ import {
   type GovernanceLayer,
   type ReachLevel,
   type GeographicContext,
-  type ProtocolAgent,
-  type Attestation,
-  type Timestamps,
-  type Identifiable,
-  INTIMACY_LEVEL_VALUES,
-  hasMinimumIntimacy,
 } from './protocol-core.model';
 
 // Re-export core types for convenience
