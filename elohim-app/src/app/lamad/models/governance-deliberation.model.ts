@@ -321,36 +321,36 @@ export interface DeliberationProposal {
   // Proposal type determines voting rules
   type: ProposalType;
 
-  // Target entity
+  // the Target entity
   targetType: GovernableEntityType;
   targetId: string;
 
-  // Proposal content
+  // the Proposal content
   title: string;
   description: string;
   proposedAction: string;
 
-  // Proposer info
+  // the Proposer info
   proposerId: string;
   proposedAt: string;
 
-  // Timeline
+  // the Timeline
   discussionEndsAt?: string;
   votingEndsAt: string;
 
-  // Current phase
+  // the Current phase
   phase: ProposalPhase;
 
-  // Discussion thread
+  // the Discussion thread
   discussionThreadId: string;
 
-  // Voting configuration
+  // the Voting configuration
   votingConfig: VotingConfiguration;
 
-  // Current results
+  // the Current results
   results?: ProposalResults;
 
-  // Outcome (when decided)
+  // the Outcome (when decided)
   outcome?: ProposalOutcome;
 }
 
@@ -400,13 +400,13 @@ export interface ProposalResults {
   participationRate: number;
   quorumMet: boolean;
 
-  // Results by option
+  // query results by option
   optionResults: Array<{
     optionId: string;
     votes: number;
     percentage: number;
-    score?: number;      // For score voting
-    rank?: number;       // For ranked choice
+    score?: number;
+    rank?: number;
   }>;
 
   // For consent: any blocks?
@@ -425,7 +425,7 @@ export interface ProposalOutcome {
   decidedBy: string;
   decidedAt: string;
   actionsTriggered: string[];
-  precedentCreated?: string;  // Precedent ID if this creates precedent
+  precedentCreated?: string;
 }
 
 // ============================================================================
@@ -444,12 +444,10 @@ export interface SensemakingVisualization {
   targetId: string;
   topic: string;
 
-  // Participant stats
+  // statistics
   participantCount: number;
   statementCount: number;
   voteCount: number;
-
-  // Opinion clusters
   clusters: OpinionCluster[];
 
   // Cross-cluster consensus (bridging statements)
@@ -464,7 +462,7 @@ export interface SensemakingVisualization {
 
 export interface OpinionCluster {
   id: string;
-  name?: string;  // Auto-generated or human-labeled
+  name?: string;
   participantCount: number;
   participantPercentage: number;
 
@@ -537,7 +535,6 @@ export interface GovernanceHistoryView {
   entityType: GovernableEntityType;
   entityId: string;
   entityTitle: string;
-
   activeTab: HistoryTab;
 
   // Tab-specific data
@@ -548,9 +545,7 @@ export interface GovernanceHistoryView {
     governance: HistoryGovernanceTab;
     engagement: HistoryEngagementTab;
   };
-
   filters: HistoryFilters;
-
   pagination: {
     currentPage: number;
     pageSize: number;
@@ -724,38 +719,38 @@ export const GOVERNANCE_ROUTES = {
  * GovernanceDeliberationService - Service contract for governance deliberation components.
  */
 export interface GovernanceDeliberationService {
-  // Context menu
+  // the Context menu
   getContextMenu(entityType: string, entityId: string): Promise<GovernanceContextMenu>;
 
-  // Feedback
+  // the Feedback
   getFeedbackSelector(entityType: string, entityId: string, context: FeedbackContext): Promise<GraduatedFeedbackSelector>;
   submitFeedback(entityType: string, entityId: string, context: FeedbackContext, response: FeedbackResponse): Promise<void>;
   getFeedbackAggregate(entityType: string, entityId: string, context: FeedbackContext): Promise<FeedbackAggregateView>;
 
-  // Deliberation
+  // the Deliberation
   getProposals(entityType: string, entityId: string, filters?: { phase?: ProposalPhase }): Promise<DeliberationProposal[]>;
   getProposal(proposalId: string): Promise<DeliberationProposal>;
   createProposal(proposal: Omit<DeliberationProposal, 'id' | 'proposedAt' | 'phase' | 'results'>): Promise<DeliberationProposal>;
   voteOnProposal(proposalId: string, vote: unknown): Promise<void>;
 
-  // Sensemaking
+  // the Sensemaking
   getSensemakingVisualization(entityType: string, entityId: string): Promise<SensemakingVisualization>;
   submitStatement(entityType: string, entityId: string, statement: string): Promise<string>;
   voteOnStatement(statementId: string, vote: 'agree' | 'disagree' | 'pass'): Promise<void>;
 
-  // History
+  // the History
   getHistoryView(entityType: string, entityId: string, tab: HistoryTab, filters?: HistoryFilters): Promise<GovernanceHistoryView>;
 
-  // Discussions
+  // the Discussions
   getDiscussionThread(threadId: string): Promise<DiscussionThread>;
   createDiscussionThread(entityType: string, entityId: string, category: DiscussionCategory, topic: string, initialMessage: string): Promise<DiscussionThread>;
   postMessage(threadId: string, message: Omit<DiscussionMessage, 'id' | 'timestamp' | 'reactions' | 'edited' | 'hidden'>): Promise<DiscussionMessage>;
 
-  // Challenges
+  // the Challenges
   fileChallenge(challenge: Omit<Challenge, 'id' | 'filedAt' | 'state'>): Promise<Challenge>;
   respondToChallenge(challengeId: string, response: unknown): Promise<void>;
 
-  // Subscriptions
+  // the Subscriptions
   subscribeToEntity(entityType: string, entityId: string, events: AlertType[]): Promise<void>;
   unsubscribeFromEntity(entityType: string, entityId: string): Promise<void>;
 }
