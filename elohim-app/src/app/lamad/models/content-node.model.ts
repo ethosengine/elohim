@@ -29,13 +29,7 @@
 
 import {
   type ReachLevel,
-  type GovernanceLayer,
   type GeographicContext,
-  type Attestation,
-  type AttestationStatus,
-  type Timestamps,
-  type Identifiable,
-  REACH_LEVEL_VALUES,
 } from './protocol-core.model';
 import type { Place } from './place.model';
 import { JsonLdMetadata } from './json-ld.model';

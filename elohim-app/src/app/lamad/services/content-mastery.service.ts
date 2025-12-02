@@ -16,15 +16,11 @@ import {
 } from '../models/content-mastery.model';
 import {
   BloomMasteryLevel,
-  BLOOM_LEVEL_VALUES,
-  ATTESTATION_GATE_LEVEL,
   isAboveGate,
   compareMasteryLevels,
 } from '../models/agent.model';
 import {
   MasteryRecordContent,
-  LamadEntryType,
-  LamadLinkType,
   SourceChainEntry,
 } from '../models/source-chain.model';
 
@@ -415,7 +411,7 @@ export class ContentMasteryService {
    * Refresh all freshness values in cache.
    */
   refreshAllFreshness(): void {
-    for (const [contentId, mastery] of this.masteryCache) {
+    for (const [, mastery] of this.masteryCache) {
       mastery.freshness = this.computeFreshness(mastery);
       mastery.needsRefresh = mastery.freshness < FRESHNESS_THRESHOLDS.FRESH;
 

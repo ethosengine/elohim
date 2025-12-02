@@ -7,8 +7,8 @@ import { takeUntil } from 'rxjs/operators';
 import { SessionHumanService } from '../../services/session-human.service';
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { SessionHuman, SessionActivity, SessionPathProgress } from '../../models/session-human.model';
-import { MasteryStats, ContentMastery } from '../../models/content-mastery.model';
-import { BloomMasteryLevel, BLOOM_LEVEL_VALUES } from '../../models/agent.model';
+import { MasteryStats } from '../../models/content-mastery.model';
+import { BloomMasteryLevel } from '../../models/agent.model';
 
 /**
  * ProfilePageComponent - Session Human profile management.
