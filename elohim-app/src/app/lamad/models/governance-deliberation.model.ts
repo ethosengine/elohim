@@ -321,36 +321,27 @@ export interface DeliberationProposal {
   // Proposal type determines voting rules
   type: ProposalType;
 
-  // (!)Target entity
   targetType: GovernableEntityType;
   targetId: string;
 
-  /// (!)Proposal content
   title: string;
   description: string;
   proposedAction: string;
 
-  // (!)Proposer info
   proposerId: string;
   proposedAt: string;
 
-  // (!)Timeline
   discussionEndsAt?: string;
   votingEndsAt: string;
 
-  // (!)Current phase
   phase: ProposalPhase;
 
-  // (!)Discussion thread
   discussionThreadId: string;
 
-  // (!)Voting configuration
   votingConfig: VotingConfiguration;
 
-  // (!)Current results
   results?: ProposalResults;
 
-  // (!)Outcome (when decided)
   outcome?: ProposalOutcome;
 }
 
@@ -400,7 +391,6 @@ export interface ProposalResults {
   participationRate: number;
   quorumMet: boolean;
 
-  // ===== query results by option
   optionResults: Array<{
     optionId: string;
     votes: number;
@@ -482,7 +472,6 @@ export interface ConsensusStatement {
   text: string;
   overallAgreement: number;
 
-  // ===== Agreement level per cluster
   clusterAgreement: Array<{
     clusterId: string;
     agreement: number;
@@ -494,7 +483,7 @@ export interface ConsensusStatement {
 export interface DivisiveStatement {
   id: string;
   text: string;
-  variance: number;  // ===== How spread out the opinions are
+  variance: number;  
 
   // How each cluster feels
   clusterPositions: Array<{
@@ -514,7 +503,7 @@ export interface ClusterVisualizationData {
     clusterId: string;
   }>;
 
-  // Cluster boundaries
+
   clusterBoundaries: Array<{
     clusterId: string;
     polygon: Array<{ x: number; y: number }>;
